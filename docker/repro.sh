@@ -9,9 +9,7 @@ log() {
     printf '[repro] %s\n' "$*"
 }
 
-log "initializing submodules"
-git -C "${PROJECT_ROOT}" submodule sync --recursive
-git -C "${PROJECT_ROOT}" submodule update --init --recursive
+log "using vendored source tree"
 
 log "building Docker image: ${IMAGE_NAME}"
 docker build \

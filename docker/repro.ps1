@@ -18,11 +18,7 @@ function Assert-LastExitCode {
     }
 }
 
-Write-ReproLog "initializing submodules"
-git -C "$ProjectRoot" submodule sync --recursive
-Assert-LastExitCode "git submodule sync"
-git -C "$ProjectRoot" submodule update --init --recursive
-Assert-LastExitCode "git submodule update"
+Write-ReproLog "using vendored source tree"
 
 Write-ReproLog "building Docker image: $ImageName"
 docker build `
