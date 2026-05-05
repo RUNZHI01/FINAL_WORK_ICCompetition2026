@@ -3,7 +3,7 @@
 artifact_guard.py — TVM 推理前 artifact 完整性校验模块
 
 在 TVM 推理执行之前，对部署的 .so artifact 做 SHA256 校验，
-防止未知/被篡改的 artifact 被加载执行（对应 CLAUDE.md 风险项 #1）。
+防止未知/被篡改的 artifact 被加载执行（安全风险项 #1）。
 
 用法:
   from artifact_guard import preflight_check, get_trusted_sha

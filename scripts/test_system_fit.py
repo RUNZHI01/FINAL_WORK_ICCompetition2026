@@ -247,7 +247,7 @@ class TestSFIT02MetaAADContractViolation:
 class TestSFIT03ArtifactSHAMismatch:
     """S-FIT-03 — Artifact SHA256 校验失败 → 拒绝加载执行
 
-    对应 CLAUDE.md 风险项 #1：未知 artifact 执行风险。
+    对应安全风险项 #1：未知 artifact 执行风险。
     验证 artifact_guard.verify_artifact() 在错误 SHA 和文件不存在两种
     场景下均返回 deny。
     """

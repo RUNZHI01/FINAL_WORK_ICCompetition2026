@@ -98,7 +98,7 @@ RUN cd /tmp/cockpit_desktop \
     && npm ci \
     && npm cache clean --force
 
-COPY README.md AGENTS.md requirements.txt /workspace/
+COPY README.md requirements.txt /workspace/
 COPY start.sh cleanup.sh /workspace/
 COPY docker /workspace/docker
 COPY mlkem_link /workspace/mlkem_link
