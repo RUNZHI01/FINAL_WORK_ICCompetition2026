@@ -1,0 +1,4 @@
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}

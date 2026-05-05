@@ -1,0 +1,1932 @@
+{
+  "run_id": "judge_evidence_pack_20260330_current_chunk4",
+  "generated_at": "2026-03-30T15:55:50+08:00",
+  "title": "Judge Technical Evidence Pack",
+  "report_markdown": "session_bootstrap/reports/judge_evidence_pack_20260330_current_chunk4.md",
+  "report_json": "session_bootstrap/reports/judge_evidence_pack_20260330_current_chunk4.json",
+  "quality_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/judge_quality_formal_report_20260330.json",
+  "hotspot_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323.json",
+  "resource_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728.json",
+  "snr_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.json",
+  "quality_report": {
+    "run_id": "judge_quality_formal_report_20260330",
+    "generated_at": "2026-03-30T15:23:44+08:00",
+    "title": "Formal Quality Report",
+    "report_json": "session_bootstrap/reports/judge_quality_formal_report_20260330.json",
+    "report_markdown": "session_bootstrap/reports/judge_quality_formal_report_20260330.md",
+    "rows": [
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "run_id": "quality_metrics_20260312_pytorch_vs_tvm_baseline",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_baseline.json",
+        "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_baseline.md",
+        "status": "success",
+        "matched_png_count": 300,
+        "compared_image_count": 300,
+        "missing_in_test_count": 0,
+        "extra_in_test_count": 0,
+        "cropped_pair_count": 300,
+        "shape_mismatch_status": null,
+        "shape_mismatch_message": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+        "psnr": {
+          "count": 300,
+          "mean": 34.47948504003322,
+          "median": 34.65463445557447,
+          "std": 2.182962577981479,
+          "ci95_half_width": 0.24702547027758331,
+          "min": 25.839511521136647,
+          "max": 40.174438929742635,
+          "aggregate_mean": 34.47948504003321,
+          "aggregate_median": 34.65463445557447,
+          "aggregate_std": 2.179321270062001,
+          "aggregate_min": 25.839511521136647,
+          "aggregate_max": 40.174438929742635
+        },
+        "ssim": {
+          "count": 300,
+          "mean": 0.9703583280206586,
+          "median": 0.9705531048275724,
+          "std": 0.005518461705363474,
+          "ci95_half_width": 0.0006244727288164315,
+          "min": 0.9359435351526462,
+          "max": 0.9822756889787283,
+          "aggregate_mean": 0.9703583280206586,
+          "aggregate_median": 0.9705531048275724,
+          "aggregate_std": 0.00550925659185683,
+          "aggregate_min": 0.9359435351526462,
+          "aggregate_max": 0.9822756889787283
+        },
+        "lpips": {
+          "count": 0,
+          "mean": null,
+          "median": null,
+          "std": null,
+          "ci95_half_width": null,
+          "min": null,
+          "max": null,
+          "aggregate_mean": null,
+          "aggregate_median": null,
+          "aggregate_std": null,
+          "aggregate_min": null,
+          "aggregate_max": null
+        },
+        "worst_cases": [
+          {
+            "relative_path": "Places365_val_00000449_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000449_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000449_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 25.839511521136647,
+            "ssim": 0.9486254486172132,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000290_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000290_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000290_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 26.30120554292258,
+            "ssim": 0.9639767728376625,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000386_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000386_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000386_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 27.10028514688464,
+            "ssim": 0.9674529452060111,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000362_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000362_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000362_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 27.863780185724526,
+            "ssim": 0.9359435351526462,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000486_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000486_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000486_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 28.448267931368964,
+            "ssim": 0.9753316790332147,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000347_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000347_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000347_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.04106100210823,
+            "ssim": 0.9664925550857707,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000214_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000214_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000214_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.2799158016733,
+            "ssim": 0.9662218146921017,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000249_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000249_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000249_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.38125923540667,
+            "ssim": 0.9698248354875074,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000434_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000434_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000434_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.78407915352198,
+            "ssim": 0.9637482917386234,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000251_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000251_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000251_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              249,
+              249,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 30.121412155413214,
+            "ssim": 0.9698027223650746,
+            "lpips": null
+          }
+        ]
+      },
+      {
+        "comparison_label": "pytorch_vs_tvm_current",
+        "run_id": "quality_metrics_20260312_pytorch_vs_tvm_current",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_current.json",
+        "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_current.md",
+        "status": "success",
+        "matched_png_count": 300,
+        "compared_image_count": 300,
+        "missing_in_test_count": 0,
+        "extra_in_test_count": 0,
+        "cropped_pair_count": 0,
+        "shape_mismatch_status": null,
+        "shape_mismatch_message": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+        "psnr": {
+          "count": 300,
+          "mean": 35.69418754066526,
+          "median": 35.72977134885079,
+          "std": 1.6105903994382609,
+          "ci95_half_width": 0.1822554609313017,
+          "min": 31.695486217119072,
+          "max": 40.7935559079884,
+          "aggregate_mean": 35.694187540665254,
+          "aggregate_median": 35.72977134885079,
+          "aggregate_std": 1.6079038414387496,
+          "aggregate_min": 31.695486217119072,
+          "aggregate_max": 40.7935559079884
+        },
+        "ssim": {
+          "count": 300,
+          "mean": 0.9728362713251338,
+          "median": 0.9729424228831426,
+          "std": 0.004902470938214184,
+          "ci95_half_width": 0.0005547668115109661,
+          "min": 0.9507430014485796,
+          "max": 0.9832469594388402,
+          "aggregate_mean": 0.9728362713251338,
+          "aggregate_median": 0.9729424228831426,
+          "aggregate_std": 0.004894293332957737,
+          "aggregate_min": 0.9507430014485796,
+          "aggregate_max": 0.9832469594388402
+        },
+        "lpips": {
+          "count": 0,
+          "mean": null,
+          "median": null,
+          "std": null,
+          "ci95_half_width": null,
+          "min": null,
+          "max": null,
+          "aggregate_mean": null,
+          "aggregate_median": null,
+          "aggregate_std": null,
+          "aggregate_min": null,
+          "aggregate_max": null
+        },
+        "worst_cases": [
+          {
+            "relative_path": "Places365_val_00000355_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000355_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000355_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 31.695486217119072,
+            "ssim": 0.9693821199523504,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000433_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000433_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000433_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 31.928196063204524,
+            "ssim": 0.9627470073274873,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000395_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000395_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000395_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.09867566200125,
+            "ssim": 0.9683165832470771,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000235_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000235_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000235_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.20580902372734,
+            "ssim": 0.9660028226544212,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000366_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000366_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000366_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.30213423153684,
+            "ssim": 0.9608187410977355,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000262_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000262_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000262_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.3492897599112,
+            "ssim": 0.965451285909683,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000369_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000369_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000369_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.35399989231995,
+            "ssim": 0.9637436386079151,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000484_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000484_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000484_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.502121623854975,
+            "ssim": 0.9574008203021608,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000452_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000452_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000452_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.74367279365547,
+            "ssim": 0.9507430014485796,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000389_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000389_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000389_recon.png",
+            "ref_shape": [
+              256,
+              256,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              256,
+              256,
+              3
+            ],
+            "cropped": false,
+            "psnr_db": 32.77091362164923,
+            "ssim": 0.9669247912161869,
+            "lpips": null
+          }
+        ]
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "run_id": "quality_metrics_20260312_tvm_baseline_vs_tvm_current",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_tvm_baseline_vs_tvm_current.json",
+        "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_tvm_baseline_vs_tvm_current.md",
+        "status": "success",
+        "matched_png_count": 300,
+        "compared_image_count": 300,
+        "missing_in_test_count": 0,
+        "extra_in_test_count": 0,
+        "cropped_pair_count": 300,
+        "shape_mismatch_status": null,
+        "shape_mismatch_message": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+        "psnr": {
+          "count": 300,
+          "mean": 34.529852149146066,
+          "median": 34.60044266656402,
+          "std": 2.1237469817468564,
+          "ci95_half_width": 0.2403245947540317,
+          "min": 26.198328545192023,
+          "max": 40.23475572827276,
+          "aggregate_mean": 34.529852149146066,
+          "aggregate_median": 34.60044266656402,
+          "aggregate_std": 2.1202044488690124,
+          "aggregate_min": 26.198328545192023,
+          "aggregate_max": 40.23475572827276
+        },
+        "ssim": {
+          "count": 300,
+          "mean": 0.9704320174669013,
+          "median": 0.9704312518412365,
+          "std": 0.005365180953130595,
+          "ci95_half_width": 0.0006071273788380363,
+          "min": 0.9361508814899341,
+          "max": 0.9819535186673767,
+          "aggregate_mean": 0.9704320174669012,
+          "aggregate_median": 0.9704312518412365,
+          "aggregate_std": 0.00535623152078983,
+          "aggregate_min": 0.9361508814899341,
+          "aggregate_max": 0.9819535186673767
+        },
+        "lpips": {
+          "count": 0,
+          "mean": null,
+          "median": null,
+          "std": null,
+          "ci95_half_width": null,
+          "min": null,
+          "max": null,
+          "aggregate_mean": null,
+          "aggregate_median": null,
+          "aggregate_std": null,
+          "aggregate_min": null,
+          "aggregate_max": null
+        },
+        "worst_cases": [
+          {
+            "relative_path": "Places365_val_00000449_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000449_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000449_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 26.198328545192023,
+            "ssim": 0.9503883169409936,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000290_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000290_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000290_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 27.640941159199016,
+            "ssim": 0.9648900560273033,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000386_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000386_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000386_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 27.817911003975595,
+            "ssim": 0.9676952620883177,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000362_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000362_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000362_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 28.142845849129525,
+            "ssim": 0.9361508814899341,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000486_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000486_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000486_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 28.91329030926022,
+            "ssim": 0.9750253007654679,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000214_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000214_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000214_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 28.967767337781133,
+            "ssim": 0.965130499963539,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000347_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000347_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000347_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.02961582249908,
+            "ssim": 0.9678907151035929,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000249_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000249_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000249_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 29.0544133395143,
+            "ssim": 0.9700645531112936,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000482_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000482_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000482_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 30.172673503779812,
+            "ssim": 0.9679853864431545,
+            "lpips": null
+          },
+          {
+            "relative_path": "Places365_val_00000454_recon.png",
+            "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000454_recon.png",
+            "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000454_recon.png",
+            "ref_shape": [
+              249,
+              249,
+              3
+            ],
+            "test_shape": [
+              256,
+              256,
+              3
+            ],
+            "compared_shape": [
+              249,
+              249,
+              3
+            ],
+            "cropped": true,
+            "psnr_db": 30.427400285894848,
+            "ssim": 0.968180792882444,
+            "lpips": null
+          }
+        ]
+      }
+    ],
+    "findings": [
+      "Against the same PyTorch reference, current is 1.2147 dB higher in mean PSNR and 0.002478 higher in mean SSIM than baseline.",
+      "Direct TVM baseline-vs-current divergence is 34.5299 dB PSNR and 0.970432 SSIM.",
+      "LPIPS is missing for at least one comparison; keep PSNR/SSIM as the formal minimum set and treat LPIPS as environment-gated complementary evidence.",
+      "At least one comparison required spatial normalization; judge-facing tables should footnote the crop policy."
+    ],
+    "worst_cases": [
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "relative_path": "Places365_val_00000449_recon.png",
+        "psnr_db": 25.839511521136647,
+        "ssim": 0.9486254486172132,
+        "lpips": null
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "relative_path": "Places365_val_00000449_recon.png",
+        "psnr_db": 26.198328545192023,
+        "ssim": 0.9503883169409936,
+        "lpips": null
+      },
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "relative_path": "Places365_val_00000290_recon.png",
+        "psnr_db": 26.30120554292258,
+        "ssim": 0.9639767728376625,
+        "lpips": null
+      },
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "relative_path": "Places365_val_00000386_recon.png",
+        "psnr_db": 27.10028514688464,
+        "ssim": 0.9674529452060111,
+        "lpips": null
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "relative_path": "Places365_val_00000290_recon.png",
+        "psnr_db": 27.640941159199016,
+        "ssim": 0.9648900560273033,
+        "lpips": null
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "relative_path": "Places365_val_00000386_recon.png",
+        "psnr_db": 27.817911003975595,
+        "ssim": 0.9676952620883177,
+        "lpips": null
+      },
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "relative_path": "Places365_val_00000362_recon.png",
+        "psnr_db": 27.863780185724526,
+        "ssim": 0.9359435351526462,
+        "lpips": null
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "relative_path": "Places365_val_00000362_recon.png",
+        "psnr_db": 28.142845849129525,
+        "ssim": 0.9361508814899341,
+        "lpips": null
+      },
+      {
+        "comparison_label": "pytorch_vs_tvm_baseline",
+        "relative_path": "Places365_val_00000486_recon.png",
+        "psnr_db": 28.448267931368964,
+        "ssim": 0.9753316790332147,
+        "lpips": null
+      },
+      {
+        "comparison_label": "tvm_baseline_vs_tvm_current",
+        "relative_path": "Places365_val_00000486_recon.png",
+        "psnr_db": 28.91329030926022,
+        "ssim": 0.9750253007654679,
+        "lpips": null
+      }
+    ]
+  },
+  "hotspot_report": {
+    "generated_at": "2026-03-12T15:43:35+0800",
+    "run_id": "profiling_trusted_current_20260312_154323",
+    "summary_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323.json",
+    "summary_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323.md",
+    "log_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/logs/profiling_trusted_current_20260312_154323.log",
+    "raw_dir": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323",
+    "hotspot_phase": {
+      "requested_mode": "auto",
+      "status": "extracted",
+      "env_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_current_safe.baseline_seeded_warm_start.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env",
+      "report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_tasks.json",
+      "report_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_tasks.md",
+      "recommended_full_hotspot_tasks": [
+        "reshape2",
+        "fused_variance1_add3_tir_sqrt1",
+        "reshape1",
+        "fused_mean1_subtract1_divide1_multiply1_add4",
+        "fused_conv2d1_add2",
+        "fused_conv2d2_add2",
+        "mirror_pad1",
+        "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+      ],
+      "top_tasks": [
+        {
+          "rank": 1,
+          "task_name": "reshape2",
+          "weight": 42,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 2,
+          "task_name": "fused_variance1_add3_tir_sqrt1",
+          "weight": 21,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 3,
+          "task_name": "reshape1",
+          "weight": 21,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 4,
+          "task_name": "fused_mean1_subtract1_divide1_multiply1_add4",
+          "weight": 11,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 5,
+          "task_name": "fused_conv2d1_add2",
+          "weight": 10,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 6,
+          "task_name": "fused_conv2d2_add2",
+          "weight": 10,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 7,
+          "task_name": "mirror_pad1",
+          "weight": 10,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        },
+        {
+          "rank": 8,
+          "task_name": "fused_mean1_subtract1_divide1_multiply1_add4_relu",
+          "weight": 5,
+          "dispatched_count": 1,
+          "prim_funcs": [
+            "main"
+          ],
+          "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+        }
+      ],
+      "error": null,
+      "python_executable": "/home/tianxing/.venvs/tvm-ms/bin/python",
+      "stdout_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_extract.stdout.log",
+      "stderr_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_extract.stderr.log"
+    },
+    "runtime_phase": {
+      "requested_mode": "auto",
+      "status": "fallback_only",
+      "trusted_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env",
+      "trusted_variant": "current",
+      "command": "bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current --max-inputs 1 --seed 0 --profile-ops --profile-samples 1",
+      "command_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/runtime_command.log",
+      "summary": {
+        "variant": "current",
+        "artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so",
+        "artifact_sha256": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+        "artifact_sha256_expected": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+        "artifact_sha256_match": true,
+        "input_dir": "/home/user/Downloads/jscc-test/简化版latent",
+        "output_dir": "/home/user/Downloads/jscc-test/jscc/infer_outputs/profiling_trusted_current_20260312_154323_current/reconstructions",
+        "output_count": 1,
+        "processed_count": 1,
+        "input_count": 1,
+        "available_input_count": 300,
+        "load_ms": 2.407,
+        "vm_init_ms": 0.474,
+        "run_count": 1,
+        "run_samples_ms": [
+          317.123
+        ],
+        "run_median_ms": 317.123,
+        "run_mean_ms": 317.123,
+        "run_min_ms": 317.123,
+        "run_max_ms": 317.123,
+        "run_variance_ms2": 0.0,
+        "output_shape": [
+          1,
+          3,
+          256,
+          256
+        ],
+        "output_dtype": "float32",
+        "snr": 10.0,
+        "batch_size": 1,
+        "save_format": "png",
+        "seed": 0,
+        "max_inputs": 1,
+        "runtime_profiling": {
+          "requested": true,
+          "profile_samples_requested": 1,
+          "attempted_samples": 1,
+          "successful_samples": 0,
+          "supported": false,
+          "status": "unsupported",
+          "top_ops": [],
+          "sample_results": [
+            {
+              "input_file": "Places365_val_00000208_latent.pt",
+              "requested": true,
+              "supported": false,
+              "status": "error",
+              "api_call": "vm.profile('main', input)",
+              "attempts": [
+                {
+                  "call": "vm.profile('main', input)",
+                  "status": "error",
+                  "error": "AttributeError: Module has no function 'profile'"
+                }
+              ],
+              "error": "AttributeError: Module has no function 'profile'"
+            }
+          ]
+        }
+      },
+      "fallback_reason": "AttributeError: Module has no function 'profile'",
+      "remote_host": "100.121.87.73",
+      "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+      "expected_artifact_sha256": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+      "returncode": 0
+    },
+    "overall_status": "stage_level_hotspot_only",
+    "recommended_full_hotspot_tasks": [
+      "reshape2",
+      "fused_variance1_add3_tir_sqrt1",
+      "reshape1",
+      "fused_mean1_subtract1_divide1_multiply1_add4",
+      "fused_conv2d1_add2",
+      "fused_conv2d2_add2",
+      "mirror_pad1",
+      "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+    ],
+    "runtime_hotspot_candidates": [],
+    "next_step_guidance": "If runtime_operator_profile is available, feed runtime_hotspot_candidates into 4.2/7.1. If only stage_level_hotspot_only is available, keep using recommended_full_hotspot_tasks for 4.2 and rebuild or replace the remote TVM runtime with profiler support before treating 7.1 as settled."
+  },
+  "resource_profile": {
+    "run_id": "resource_profile_trusted_current_chunk4_20260330_151728",
+    "command_mode": "trusted",
+    "trusted_variant": "current",
+    "run_label": "trusted_current",
+    "env_file": "session_bootstrap/tmp/resource_profile_trusted_current_chunk4_20260330_151728.env",
+    "remote_host": "100.121.87.73",
+    "remote_port": 22,
+    "vmstat_interval_seconds": 1,
+    "command_started_at": "2026-03-30T15:17:31+08:00",
+    "command_ended_at": "2026-03-30T15:19:03+08:00",
+    "wall_time_seconds": 92,
+    "target_exit_code": 0,
+    "target_description": "bash ./session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current",
+    "raw_dir": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728",
+    "wrapper_log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/resource_profile_trusted_current_chunk4_20260330_151728.log",
+    "wrapper_log_bytes": 964,
+    "target_log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/target.command.log",
+    "target_log_bytes": 107371,
+    "tool_probe": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/tool_probe.txt",
+      "host": "Phytium-Pi",
+      "captured_at": "2026-03-30T15:17:28+08:00",
+      "bash": "/usr/bin/bash",
+      "vmstat": "/usr/bin/vmstat",
+      "free": "/usr/bin/free",
+      "top": "/usr/bin/top",
+      "date": "/usr/bin/date",
+      "hostname": "/usr/bin/hostname",
+      "pidstat": "missing",
+      "mpstat": "missing",
+      "perf": "missing",
+      "sar": "missing",
+      "/usr/bin/time": "missing",
+      "required_missing": "0"
+    },
+    "vmstat_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/vmstat.log",
+    "free_pre_h_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/free_pre_h.txt",
+    "free_post_h_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/free_post_h.txt",
+    "top_pre_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/top_pre.txt",
+    "top_post_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/top_post.txt",
+    "memory_pre_mib": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/free_pre_m.txt"
+    },
+    "memory_post_mib": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/free_post_m.txt"
+    },
+    "memory_available_delta_mib": null,
+    "top_pre_summary": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/top_pre.txt",
+      "top_line": "top - 15:17:30 up 11 days, 21:17,  1 user,  load average: 0.19, 0.09, 0.03",
+      "load_average_line": "top - 15:17:30 up 11 days, 21:17,  1 user,  load average: 0.19, 0.09, 0.03",
+      "cpu_line": "%Cpu(s):  1.4 us,  1.4 sy,  0.0 ni, 95.8 id,  0.0 wa,  1.4 hi,  0.0 si,  0.0 st"
+    },
+    "top_post_summary": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/top_post.txt",
+      "top_line": "top - 15:19:36 up 11 days, 21:19,  1 user,  load average: 0.80, 0.50, 0.19",
+      "load_average_line": "top - 15:19:36 up 11 days, 21:19,  1 user,  load average: 0.80, 0.50, 0.19",
+      "cpu_line": "%Cpu(s):  1.4 us,  2.8 sy,  0.0 ni, 95.8 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st"
+    },
+    "vmstat_summary": {
+      "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728/vmstat.log",
+      "raw_row_count": 93,
+      "sample_count": 92,
+      "avg_runnable": 1.685,
+      "max_runnable": 5,
+      "avg_blocked": 0.022,
+      "max_blocked": 1,
+      "min_free_kb": 88340,
+      "avg_cpu_user_pct": 32.283,
+      "avg_cpu_system_pct": 9.065,
+      "avg_cpu_idle_pct": 58.348,
+      "avg_cpu_wait_pct": 0.25,
+      "max_cpu_wait_pct": 6,
+      "avg_context_switches_per_sec": 1539.783,
+      "avg_interrupts_per_sec": 1395.707,
+      "dropped_boot_average_row": true
+    },
+    "target_last_json": {
+      "variant": "current",
+      "artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so",
+      "artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "artifact_sha256_match": true,
+      "input_dir": "/home/user/Downloads/jscc-test/简化版latent",
+      "output_dir": "/home/user/Downloads/jscc-test/jscc/infer_outputs/resource_profile_trusted_current_chunk4_20260330_151728_current/reconstructions",
+      "output_count": 300,
+      "processed_count": 300,
+      "input_count": 300,
+      "available_input_count": 300,
+      "load_ms": 2.58,
+      "vm_init_ms": 2.927,
+      "run_count": 300,
+      "run_samples_ms": [
+        606.423,
+        245.57,
+        224.781,
+        220.14,
+        233.469,
+        233.442,
+        224.726,
+        200.807,
+        234.494,
+        230.04,
+        252.523,
+        247.996,
+        240.998,
+        230.241,
+        228.684,
+        236.264,
+        231.388,
+        241.961,
+        216.874,
+        259.489,
+        220.393,
+        240.99,
+        244.665,
+        239.341,
+        230.285,
+        216.683,
+        243.133,
+        205.377,
+        212.995,
+        227.564,
+        247.935,
+        230.08,
+        226.893,
+        222.19,
+        232.58,
+        244.36,
+        251.859,
+        251.338,
+        234.996,
+        240.764,
+        238.813,
+        246.404,
+        240.902,
+        239.138,
+        227.274,
+        231.902,
+        232.702,
+        253.619,
+        233.602,
+        232.045,
+        218.95,
+        239.77,
+        244.578,
+        209.451,
+        195.488,
+        215.009,
+        230.534,
+        206.515,
+        241.796,
+        220.955,
+        233.164,
+        218.728,
+        232.573,
+        227.748,
+        233.549,
+        232.216,
+        221.487,
+        229.354,
+        235.32,
+        252.578,
+        243.838,
+        222.978,
+        237.432,
+        218.965,
+        236.575,
+        255.72,
+        501.237,
+        222.815,
+        239.513,
+        250.822,
+        255.515,
+        235.663,
+        236.123,
+        233.495,
+        207.802,
+        227.197,
+        215.252,
+        234.394,
+        206.043,
+        217.304,
+        226.371,
+        216.841,
+        235.837,
+        234.368,
+        213.082,
+        219.98,
+        229.404,
+        220.019,
+        220.264,
+        226.549,
+        203.542,
+        256.46,
+        256.192,
+        224.265,
+        221.976,
+        234.943,
+        251.756,
+        248.789,
+        237.603,
+        220.023,
+        240.989,
+        244.87,
+        247.425,
+        221.306,
+        212.02,
+        206.915,
+        216.594,
+        243.157,
+        246.842,
+        223.41,
+        237.634,
+        230.021,
+        213.673,
+        235.524,
+        241.522,
+        244.473,
+        224.863,
+        227.454,
+        233.851,
+        201.797,
+        201.48,
+        249.788,
+        215.579,
+        235.903,
+        243.502,
+        213.341,
+        232.507,
+        221.252,
+        226.92,
+        239.623,
+        233.677,
+        232.29,
+        217.855,
+        209.241,
+        258.415,
+        214.797,
+        240.959,
+        190.611,
+        237.371,
+        232.1,
+        206.71,
+        229.74,
+        242.182,
+        237.114,
+        226.193,
+        246.181,
+        219.974,
+        220.25,
+        213.354,
+        223.447,
+        243.117,
+        193.643,
+        241.257,
+        219.883,
+        236.245,
+        226.775,
+        223.035,
+        226.106,
+        224.254,
+        210.094,
+        214.732,
+        220.705,
+        210.172,
+        226.527,
+        244.279,
+        208.885,
+        233.942,
+        222.089,
+        233.066,
+        238.078,
+        243.084,
+        208.031,
+        243.583,
+        249.54,
+        244.916,
+        239.586,
+        215.59,
+        199.519,
+        246.095,
+        219.661,
+        239.123,
+        221.435,
+        249.235,
+        237.882,
+        244.698,
+        239.205,
+        223.435,
+        248.927,
+        235.949,
+        206.758,
+        233.017,
+        212.678,
+        219.059,
+        217.764,
+        229.261,
+        241.119,
+        233.044,
+        236.722,
+        219.232,
+        238.097,
+        213.116,
+        205.052,
+        206.268,
+        241.593,
+        232.057,
+        223.847,
+        234.688,
+        219.549,
+        224.929,
+        204.928,
+        214.891,
+        239.493,
+        224.016,
+        233.646,
+        236.85,
+        193.483,
+        210.506,
+        234.909,
+        218.724,
+        229.501,
+        223.358,
+        269.52,
+        227.479,
+        211.884,
+        232.634,
+        216.114,
+        227.339,
+        253.303,
+        243.991,
+        236.631,
+        247.895,
+        213.722,
+        232.238,
+        228.368,
+        216.007,
+        217.291,
+        230.215,
+        240.195,
+        215.97,
+        234.536,
+        236.467,
+        193.217,
+        251.955,
+        262.387,
+        227.776,
+        241.748,
+        247.463,
+        235.984,
+        230.399,
+        237.74,
+        230.946,
+        228.957,
+        238.433,
+        224.264,
+        205.977,
+        214.322,
+        217.398,
+        261.959,
+        224.49,
+        214.436,
+        217.408,
+        218.794,
+        206.978,
+        234.097,
+        223.588,
+        236.941,
+        194.497,
+        220.942,
+        236.913,
+        236.662,
+        236.432,
+        212.18,
+        240.412,
+        222.589,
+        232.831,
+        213.386,
+        193.15,
+        239.731,
+        213.194,
+        212.812,
+        209.153,
+        235.191,
+        246.854,
+        239.718,
+        213.754,
+        224.218,
+        247.754,
+        228.579,
+        327.345,
+        203.504
+      ],
+      "run_median_ms": 230.466,
+      "run_mean_ms": 231.548,
+      "run_min_ms": 190.611,
+      "run_max_ms": 606.423,
+      "run_variance_ms2": 954.547486,
+      "output_shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "output_dtype": "float32",
+      "snr": 10.0,
+      "batch_size": 1,
+      "save_format": "png",
+      "seed": null,
+      "max_inputs": 0,
+      "runtime_profiling": {
+        "requested": false,
+        "profile_samples_requested": 0,
+        "attempted_samples": 0,
+        "successful_samples": 0,
+        "supported": null,
+        "status": "not_requested",
+        "top_ops": [],
+        "sample_results": []
+      }
+    },
+    "limitations": [
+      "Resource evidence is based on free, top, vmstat, and shell wall time only.",
+      "vmstat is system-wide sampling, not per-process attribution.",
+      "Board-level power still requires an external meter."
+    ]
+  },
+  "snr_report": {
+    "run_id": "judge_snr_robustness_20260330_current_chunk4",
+    "generated_at": "2026-03-30T15:55:50+08:00",
+    "title": "Multi-SNR Robustness Report",
+    "report_markdown": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.md",
+    "report_json": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.json",
+    "latency_chart_svg": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4_latency.svg",
+    "quality_chart_svg": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4_quality.svg",
+    "coverage_status": "latency_and_quality",
+    "latency_points": [
+      {
+        "snr": 1.0,
+        "status": "success",
+        "baseline_ms": null,
+        "current_ms": 228.223,
+        "improvement_pct": null,
+        "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+      },
+      {
+        "snr": 4.0,
+        "status": "success",
+        "baseline_ms": null,
+        "current_ms": 228.595,
+        "improvement_pct": null,
+        "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+      },
+      {
+        "snr": 7.0,
+        "status": "success",
+        "baseline_ms": null,
+        "current_ms": 233.509,
+        "improvement_pct": null,
+        "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+      },
+      {
+        "snr": 10.0,
+        "status": "success",
+        "baseline_ms": null,
+        "current_ms": 231.893,
+        "improvement_pct": null,
+        "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+      },
+      {
+        "snr": 13.0,
+        "status": "success",
+        "baseline_ms": null,
+        "current_ms": 234.018,
+        "improvement_pct": null,
+        "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+      }
+    ],
+    "quality_points": [
+      {
+        "snr": 1.0,
+        "comparison_label": "trusted_current_snr1_vs_pytorch_reference",
+        "run_id": "snr_current_chunk4_snr1_20260330_152054_quality",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr1_20260330_152054_quality.json",
+        "psnr_mean_db": 29.145174303746582,
+        "ssim_mean": 0.9000386382158856,
+        "lpips_mean": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+      },
+      {
+        "snr": 4.0,
+        "comparison_label": "trusted_current_snr4_vs_pytorch_reference",
+        "run_id": "snr_current_chunk4_snr4_20260330_152054_quality",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr4_20260330_152054_quality.json",
+        "psnr_mean_db": 31.80465321539713,
+        "ssim_mean": 0.9395592505067378,
+        "lpips_mean": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+      },
+      {
+        "snr": 7.0,
+        "comparison_label": "trusted_current_snr7_vs_pytorch_reference",
+        "run_id": "snr_current_chunk4_snr7_20260330_152054_quality",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr7_20260330_152054_quality.json",
+        "psnr_mean_db": 34.018474333177274,
+        "ssim_mean": 0.96124265860332,
+        "lpips_mean": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+      },
+      {
+        "snr": 10.0,
+        "comparison_label": "trusted_current_snr10_vs_pytorch_reference",
+        "run_id": "snr_current_chunk4_snr10_20260330_152054_quality",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr10_20260330_152054_quality.json",
+        "psnr_mean_db": 35.66440449174833,
+        "ssim_mean": 0.9727349759392971,
+        "lpips_mean": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+      },
+      {
+        "snr": 13.0,
+        "comparison_label": "trusted_current_snr13_vs_pytorch_reference",
+        "run_id": "snr_current_chunk4_snr13_20260330_152054_quality",
+        "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr13_20260330_152054_quality.json",
+        "psnr_mean_db": 36.86951018284996,
+        "ssim_mean": 0.9787571706320946,
+        "lpips_mean": null,
+        "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+      }
+    ],
+    "source_reports": [],
+    "findings": [
+      "Historical current latency is best at SNR=1 with 228.223 ms and worst at SNR=13 with 234.018 ms.",
+      "Quality coverage exists for 5 SNR points; best mean PSNR currently recorded is 36.8695 dB at SNR=13."
+    ],
+    "manual_command": "for snr in 1 4 7 10 13; do\n  RUN_TAG=\"judge_snr_${snr}_$(date +%Y%m%d_%H%M%S)\"\n  ENV_COPY=\"session_bootstrap/tmp/${RUN_TAG}.env\"\n  cp session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env \"$ENV_COPY\"\n  sed -i \\\n    -e \"s#^INFERENCE_OUTPUT_PREFIX=.*#INFERENCE_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^INFERENCE_REAL_OUTPUT_PREFIX=.*#INFERENCE_REAL_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^REMOTE_SNR_CURRENT=.*#REMOTE_SNR_CURRENT=${snr}#\" \\\n    \"$ENV_COPY\"\n\n  bash ./session_bootstrap/scripts/run_remote_pytorch_reference_reconstruction.sh \\\n    --env-file \"$ENV_COPY\" \\\n    --output-prefix \"${RUN_TAG}_pytorch_ref\" \\\n    --snr \"$snr\"\n\n  set -a\n  source \"$ENV_COPY\"\n  set +a\n  bash ./session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current\n\n  REF_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_pytorch_ref\"\n  CUR_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_current\"\n  python3 ./session_bootstrap/scripts/compute_image_quality_metrics.py \\\n    --ref-dir \"${REF_DIR}/reconstructions\" \\\n    --test-dir \"${CUR_DIR}/reconstructions\" \\\n    --comparison-label \"pytorch_vs_tvm_current_snr${snr}\" \\\n    --report-prefix \"session_bootstrap/reports/${RUN_TAG}_quality\"\ndone"
+  },
+  "payload_report": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/inference_compare_currentsafe_chunk4_refresh_20260313_1758.md",
+    "fields": {
+      "execution_id": "inference_compare_currentsafe_chunk4_refresh_20260313_1758",
+      "mode": "inference_benchmark",
+      "status": "success",
+      "timestamp": "2026-03-13T18:11:14+08:00",
+      "env_file": "./session_bootstrap/tmp/inference_compare_currentsafe_chunk4_refresh_20260313_1758.env",
+      "model_name": "jscc",
+      "target": "{kind:llvm,mtriple:aarch64-linux-gnu,mcpu:cortex-a72,mattr:[+neon],num-cores:4}",
+      "shape_buckets": "1x3x224x224,1x3x256x256",
+      "threads": "4",
+      "input_shape": "1,32,32,32",
+      "input_dtype": "float32",
+      "inference_repeat": "10",
+      "inference_warmup_runs": "2",
+      "inference_timeout_sec": "5400",
+      "baseline_expected_sha256_configured": "NA",
+      "current_expected_sha256_configured": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "baseline_load_ms": "NA",
+      "baseline_vm_init_ms": "NA",
+      "baseline_run_median_ms": "1846.9",
+      "baseline_run_mean_ms": "1847.723",
+      "baseline_run_min_ms": "1842.6",
+      "baseline_run_max_ms": "1879.9",
+      "baseline_run_variance_ms2": "16.77982",
+      "baseline_run_count": "300",
+      "baseline_exit_code": "0",
+      "baseline_output_shape": "NA",
+      "baseline_output_dtype": "NA",
+      "baseline_artifact_path": "NA",
+      "baseline_artifact_sha256": "NA",
+      "baseline_artifact_sha256_expected": "NA",
+      "baseline_artifact_sha256_match": "NA",
+      "current_load_ms": "3.763",
+      "current_vm_init_ms": "1.089",
+      "current_run_median_ms": "130.219",
+      "current_run_mean_ms": "130.168",
+      "current_run_min_ms": "129.424",
+      "current_run_max_ms": "130.607",
+      "current_run_variance_ms2": "0.150186",
+      "current_run_count": "10",
+      "current_exit_code": "0",
+      "current_output_shape": "[1, 3, 256, 256]",
+      "current_output_dtype": "float32",
+      "current_artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so",
+      "current_artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "current_artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "current_artifact_sha256_match": "True",
+      "delta_ms_current_minus_baseline": "-1716.681",
+      "improvement_pct": "92.95",
+      "baseline_cmd": "bash ./session_bootstrap/scripts/run_remote_legacy_tvm_compat.sh --variant baseline",
+      "current_cmd": "bash ./session_bootstrap/scripts/run_remote_tvm_inference_payload.sh --variant current",
+      "log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/inference_compare_currentsafe_chunk4_refresh_20260313_1758.log",
+      "raw_csv_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/inference_compare_currentsafe_chunk4_refresh_20260313_1758_raw.csv"
+    }
+  },
+  "e2e_report": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.md",
+    "fields": {
+      "execution_id": "inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758",
+      "mode": "inference_benchmark",
+      "status": "success",
+      "timestamp": "2026-03-13T18:22:47+08:00",
+      "env_file": "./session_bootstrap/tmp/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.env",
+      "model_name": "jscc",
+      "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+      "shape_buckets": "1x3x224x224,1x3x256x256",
+      "threads": "4",
+      "input_shape": "1,32,32,32",
+      "input_dtype": "float32",
+      "inference_repeat": "1",
+      "inference_warmup_runs": "0",
+      "inference_timeout_sec": "7200",
+      "baseline_expected_sha256_configured": "NA",
+      "current_expected_sha256_configured": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "baseline_load_ms": "NA",
+      "baseline_vm_init_ms": "NA",
+      "baseline_run_median_ms": "1850.0",
+      "baseline_run_mean_ms": "1850.857",
+      "baseline_run_min_ms": "1846.2",
+      "baseline_run_max_ms": "1892.1",
+      "baseline_run_variance_ms2": "23.074646",
+      "baseline_run_count": "300",
+      "baseline_exit_code": "0",
+      "baseline_output_shape": "NA",
+      "baseline_output_dtype": "NA",
+      "baseline_artifact_path": "NA",
+      "baseline_artifact_sha256": "NA",
+      "baseline_artifact_sha256_expected": "NA",
+      "baseline_artifact_sha256_match": "NA",
+      "current_load_ms": "2.629",
+      "current_vm_init_ms": "0.461",
+      "current_run_median_ms": "230.339",
+      "current_run_mean_ms": "230.719",
+      "current_run_min_ms": "189.687",
+      "current_run_max_ms": "637.698",
+      "current_run_variance_ms2": "752.430274",
+      "current_run_count": "300",
+      "current_exit_code": "0",
+      "current_output_shape": "[1, 3, 256, 256]",
+      "current_output_dtype": "float32",
+      "current_artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so",
+      "current_artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "current_artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "current_artifact_sha256_match": "True",
+      "delta_ms_current_minus_baseline": "-1619.661",
+      "improvement_pct": "87.55",
+      "baseline_cmd": "bash ./session_bootstrap/scripts/run_remote_legacy_tvm_compat.sh --variant baseline",
+      "current_cmd": "bash ./session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current",
+      "log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.log",
+      "raw_csv_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758_raw.csv"
+    }
+  },
+  "big_little_summary": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/big_little_real_run_summary_20260318.md",
+    "fields": {
+      "serial current median": "`231.522 ms/image`",
+      "pipeline current median": "`134.617 ms/image`",
+      "serial_total_wall_ms": "`69323.66`",
+      "pipeline_total_wall_ms": "`44413.422`",
+      "serial_images_per_sec": "`4.328`",
+      "pipeline_images_per_sec": "`6.755`",
+      "throughput_uplift_pct": "`56.077`",
+      "current median": "`230.339 ms/image`",
+      "trusted current SHA256": "`6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1`",
+      "baseline/current count": "`300 / 300`",
+      "degraded-board direct rerun": "`347.375 ms/image`",
+      "same-day intermediate recovery observation": "`295.255 ms/image`",
+      "post-reboot direct rerun": "`239.233 ms/image`",
+      "degraded-board CPU online": "`0-2`（CPU3 offline）",
+      "post-reboot CPU online": "`0-3`",
+      "status": "`ok`",
+      "processed_count": "`300`",
+      "artifact_sha256_match": "`true`",
+      "big_cores": "`[2]`",
+      "little_cores": "`[0,1]`",
+      "total_wall_ms": "`44413.422`",
+      "images_per_sec": "`6.755`",
+      "throughput uplift": "`36.54%`",
+      "`69e7644` — `fix": "accept mixed-output topology suggestion files`",
+      "`0c3b548` — `fix": "unblock real big.LITTLE first run`",
+      "`0633789` — `fix": "avoid early big.LITTLE worker termination`",
+      "`6730224` — `fix": "relax resource profile tool probe`",
+      "`bebc0a0` — `fix": "tolerate noisy resource probe exit codes`"
+    }
+  },
+  "artifact": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/phytium_baseline_seeded_warm_start_current_incremental_chunk4_20260313_131545/optimized_model.so",
+    "size_bytes": 1651136
+  },
+  "executive_summary": [
+    "Trusted payload benchmark holds at 1846.9 -> 130.219 ms (92.95% improvement).",
+    "Trusted real reconstruction holds at 1850.0 -> 230.339 ms/image (87.55% improvement).",
+    "Current stays closer to the PyTorch reference than baseline by 1.2147 dB mean PSNR.",
+    "Operator evidence is currently stage_level_hotspot_only; the top stage-weight hotspot set starts with reshape2,fused_variance1_add3_tir_sqrt1,reshape1,fused_mean1_subtract1_divide1_multiply1_add4.",
+    "Trusted current resource profile shows avg CPU user/system/idle/wait 32.283 / 9.065 / 58.348 / 0.250 %.",
+    "Trusted local artifact size is 1651136 bytes (1.575 MiB).",
+    "Multi-SNR evidence currently covers 5 latency points and 5 quality points."
+  ],
+  "defense_map": [
+    {
+      "slide": "1. Trusted Performance Headline",
+      "claim": "Current trusted artifact materially outperforms baseline on both payload and real reconstruction.",
+      "evidence": [
+        "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/inference_compare_currentsafe_chunk4_refresh_20260313_1758.md",
+        "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.md"
+      ]
+    },
+    {
+      "slide": "2. Reconstruction Quality",
+      "claim": "Current keeps reconstruction quality at least comparable to baseline against the PyTorch reference.",
+      "evidence": [
+        "session_bootstrap/reports/judge_quality_formal_report_20260330.md"
+      ]
+    },
+    {
+      "slide": "3. Operator and System Bottlenecks",
+      "claim": "The dominant optimization targets are already localized even though trusted runtime per-op profiling remains limited.",
+      "evidence": [
+        "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323.md",
+        "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/resource_profile_trusted_current_chunk4_20260330_151728.log"
+      ]
+    },
+    {
+      "slide": "4. Resource Footprint",
+      "claim": "CPU load, free-memory floor, and artifact size are bounded and can be cited directly.",
+      "evidence": [
+        "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_chunk4_20260330_151728.json"
+      ]
+    },
+    {
+      "slide": "5. Robustness vs SNR",
+      "claim": "Current trusted chunk4 now has both latency and quality SNR coverage for 5 points.",
+      "evidence": [
+        "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.md"
+      ]
+    }
+  ]
+}

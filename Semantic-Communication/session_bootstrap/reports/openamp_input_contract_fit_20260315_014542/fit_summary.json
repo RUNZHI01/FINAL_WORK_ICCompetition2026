@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-03-15T01:47:41+0800",
+  "fit_id": "FIT-02",
+  "tc_id": "TC-004",
+  "run_id": "openamp_input_contract_fit_20260315_014542",
+  "scenario": "illegal expected_outputs JOB_REQ on real board path",
+  "risk_item": "input contract / param range violation",
+  "status": "PASS",
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "injected_param": {
+    "field": "expected_outputs",
+    "value": 2
+  },
+  "board_access": {
+    "mode": "ssh",
+    "host": "100.121.87.73",
+    "port": "22",
+    "reachable": true
+  },
+  "expected_result": {
+    "decision": "DENY",
+    "fault_code": 9,
+    "fault_name": "ILLEGAL_PARAM_RANGE",
+    "guard_state": "READY",
+    "runner_should_not_start": true
+  },
+  "observed_result": {
+    "decision": "DENY",
+    "fault_code": 9,
+    "fault_name": "ILLEGAL_PARAM_RANGE",
+    "guard_final": "READY",
+    "last_fault": "ILLEGAL_PARAM_RANGE",
+    "wrapper_result": "denied_by_control_hook",
+    "runner_marker_absent": true
+  },
+  "evidence_bundle": {
+    "run_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/run_manifest.json",
+    "pre_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/pre_status/status_snapshot.json",
+    "wrapper_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/job_manifest.json",
+    "wrapper_trace": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/control_trace.jsonl",
+    "wrapper_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/wrapper_summary.json",
+    "job_req_bridge_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/hook/job_req/bridge_summary.json",
+    "post_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/post_status/status_snapshot.json",
+    "fit_report": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/fit_report_FIT-02.md",
+    "coverage_matrix": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/coverage_matrix.md"
+  }
+}

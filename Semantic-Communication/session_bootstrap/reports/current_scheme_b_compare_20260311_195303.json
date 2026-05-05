@@ -1,0 +1,102 @@
+{
+  "mode": "current-only scheme B compare",
+  "rebuild_only": {
+    "variant": "current",
+    "archive": "/home/user/Downloads/jscc-test/current_scheme_b_compare_20260311_195303_rebuild_only",
+    "entry": "main",
+    "shape": [
+      1,
+      32,
+      32,
+      32
+    ],
+    "dtype": "float32",
+    "warmup_runs": 2,
+    "repeat": 10,
+    "tvm_version": "0.24.dev0",
+    "device": "cpu:0",
+    "artifact_path": "/home/user/Downloads/jscc-test/current_scheme_b_compare_20260311_195303_rebuild_only/tvm_tune_logs/optimized_model.so",
+    "artifact_sha256": "2fcf773fa34d6aa69f80740ffedde33faaf265a045cae97b72022ae2c62a8449",
+    "artifact_size_bytes": 2060848,
+    "artifact_sha256_expected": "2fcf773fa34d6aa69f80740ffedde33faaf265a045cae97b72022ae2c62a8449",
+    "artifact_sha256_match": true,
+    "load_ms": 4.027,
+    "vm_init_ms": 3.03,
+    "run_count": 10,
+    "run_samples_ms": [
+      2478.028,
+      2484.411,
+      2483.416,
+      2479.381,
+      2485.425,
+      2478.739,
+      2478.657,
+      2480.156,
+      2479.085,
+      2479.112
+    ],
+    "run_median_ms": 2479.246,
+    "run_mean_ms": 2480.641,
+    "run_min_ms": 2478.028,
+    "run_max_ms": 2485.425,
+    "run_variance_ms2": 6.576738,
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_dtype": "float32"
+  },
+  "incremental": {
+    "variant": "current",
+    "archive": "/home/user/Downloads/jscc-test/current_scheme_b_compare_20260311_195303_incremental",
+    "entry": "main",
+    "shape": [
+      1,
+      32,
+      32,
+      32
+    ],
+    "dtype": "float32",
+    "warmup_runs": 2,
+    "repeat": 10,
+    "tvm_version": "0.24.dev0",
+    "device": "cpu:0",
+    "artifact_path": "/home/user/Downloads/jscc-test/current_scheme_b_compare_20260311_195303_incremental/tvm_tune_logs/optimized_model.so",
+    "artifact_sha256": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+    "artifact_size_bytes": 1653592,
+    "artifact_sha256_expected": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+    "artifact_sha256_match": true,
+    "load_ms": 3.887,
+    "vm_init_ms": 0.506,
+    "run_count": 10,
+    "run_samples_ms": [
+      152.679,
+      152.192,
+      152.4,
+      152.18,
+      154.162,
+      152.415,
+      152.32,
+      152.422,
+      152.285,
+      152.228
+    ],
+    "run_median_ms": 152.36,
+    "run_mean_ms": 152.528,
+    "run_min_ms": 152.18,
+    "run_max_ms": 154.162,
+    "run_variance_ms2": 0.315991,
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_dtype": "float32"
+  },
+  "delta_ms_incremental_minus_rebuild_only": -2326.886,
+  "improvement_pct_incremental_vs_rebuild_only": 93.85,
+  "speedup_x_incremental_vs_rebuild_only": 16.272
+}

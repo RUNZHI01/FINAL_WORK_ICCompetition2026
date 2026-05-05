@@ -1,0 +1,57 @@
+{
+  "run_id": "judge_snr_robustness_20260330",
+  "generated_at": "2026-03-30T15:21:20+08:00",
+  "title": "Multi-SNR Robustness Report",
+  "report_markdown": "session_bootstrap/reports/judge_snr_robustness_20260330.md",
+  "report_json": "session_bootstrap/reports/judge_snr_robustness_20260330.json",
+  "latency_chart_svg": "session_bootstrap/reports/judge_snr_robustness_20260330_latency.svg",
+  "quality_chart_svg": null,
+  "coverage_status": "latency_only",
+  "latency_points": [
+    {
+      "snr": 8.0,
+      "status": "success",
+      "baseline_ms": 76949.93,
+      "current_ms": 75667.989,
+      "improvement_pct": 1.67,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_2026-03-01.md"
+    },
+    {
+      "snr": 10.0,
+      "status": "success",
+      "baseline_ms": 78160.686,
+      "current_ms": 77640.022,
+      "improvement_pct": 0.67,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_2026-03-01.md"
+    },
+    {
+      "snr": 12.0,
+      "status": "success",
+      "baseline_ms": 77247.983,
+      "current_ms": 111505.756,
+      "improvement_pct": -44.35,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_2026-03-01.md"
+    },
+    {
+      "snr": 14.0,
+      "status": "success",
+      "baseline_ms": 82090.845,
+      "current_ms": 79369.808,
+      "improvement_pct": 3.31,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_2026-03-01.md"
+    }
+  ],
+  "quality_points": [],
+  "source_reports": [
+    "session_bootstrap/reports/full_rpc_armv8_phytium_snr8.md",
+    "session_bootstrap/reports/full_rpc_armv8_phytium_snr10.md",
+    "session_bootstrap/reports/full_rpc_armv8_phytium_snr12.md",
+    "session_bootstrap/reports/full_rpc_armv8_phytium_snr14.md"
+  ],
+  "findings": [
+    "Historical current latency is best at SNR=8 with 75667.989 ms and worst at SNR=12 with 111505.756 ms.",
+    "The strongest historical regression appears at SNR=12 with improvement_pct=-44.35%.",
+    "Quality-by-SNR points are not yet archived locally; only the historical latency sweep is currently plotted."
+  ],
+  "manual_command": "for snr in 1 4 7 10 13; do\n  RUN_TAG=\"judge_snr_${snr}_$(date +%Y%m%d_%H%M%S)\"\n  ENV_COPY=\"session_bootstrap/tmp/${RUN_TAG}.env\"\n  cp session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env \"$ENV_COPY\"\n  sed -i \\\n    -e \"s#^INFERENCE_OUTPUT_PREFIX=.*#INFERENCE_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^INFERENCE_REAL_OUTPUT_PREFIX=.*#INFERENCE_REAL_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^REMOTE_SNR_CURRENT=.*#REMOTE_SNR_CURRENT=${snr}#\" \\\n    \"$ENV_COPY\"\n\n  bash ./session_bootstrap/scripts/run_remote_pytorch_reference_reconstruction.sh \\\n    --env-file \"$ENV_COPY\" \\\n    --output-prefix \"${RUN_TAG}_pytorch_ref\" \\\n    --snr \"$snr\"\n\n  set -a\n  source \"$ENV_COPY\"\n  set +a\n  bash ./session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current\n\n  REF_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_pytorch_ref\"\n  CUR_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_current\"\n  python3 ./session_bootstrap/scripts/compute_image_quality_metrics.py \\\n    --ref-dir \"${REF_DIR}/reconstructions\" \\\n    --test-dir \"${CUR_DIR}/reconstructions\" \\\n    --comparison-label \"pytorch_vs_tvm_current_snr${snr}\" \\\n    --report-prefix \"session_bootstrap/reports/${RUN_TAG}_quality\"\ndone"
+}

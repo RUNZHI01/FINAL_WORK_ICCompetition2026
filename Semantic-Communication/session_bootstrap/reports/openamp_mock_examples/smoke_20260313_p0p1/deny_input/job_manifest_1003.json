@@ -1,0 +1,25 @@
+{
+  "run_id": "openamp_mock_smoke_20260313_p0p1",
+  "scenario": "deny_input",
+  "job_id": 1003,
+  "flags": "payload",
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "artifact_sha_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "artifact_sha_actual": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "deadline_ms": 500,
+  "expected_outputs": 1,
+  "decision": "DENY",
+  "orchestrator_state": "DENIED",
+  "guard_state": "READY",
+  "last_fault_code": "F002",
+  "formal_metrics": {
+    "payload_ms": {
+      "baseline": 1846.9,
+      "current": 130.219
+    },
+    "real_e2e_ms_per_image": {
+      "baseline": 1850.0,
+      "current": 230.339
+    }
+  }
+}

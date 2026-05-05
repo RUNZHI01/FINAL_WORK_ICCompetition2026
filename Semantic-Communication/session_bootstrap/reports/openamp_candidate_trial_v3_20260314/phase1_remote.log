@@ -1,0 +1,42 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+=== BASELINE ===
+pre_state=running
+orig_size=1650448 orig_mtime=2026-03-14 15:35:17.355869412 +0800
+a855b5681e2ac2e64f0c6ea17628ed502e302c6140bab479c3eb6f708e103835  /lib/firmware/openamp_core0.elf
+cand_size=1627224 cand_mtime=2026-03-14 03:41:13.596655709 +0800
+685f39b0bcdd4eee31ad81d196cf8dda4ba6e33e2285b32985727bd1465e5dc8  /home/user/phytium-dev/release_v1.4.0/example/system/amp/openamp_for_linux/phytiumpi_aarch64_firefly_openamp_core0.elf
+backup=/tmp/openamp_core0.elf.backup.v3.20260314_155647
+[sudo] user 的密码： stop_wait_1=offline
+trial_fw_size=1627224 trial_fw_mtime=2026-03-14 15:56:47.915518645 +0800
+685f39b0bcdd4eee31ad81d196cf8dda4ba6e33e2285b32985727bd1465e5dc8  /lib/firmware/openamp_core0.elf
+=== CANDIDATE_BRINGUP ===
+set_env_rc=1
+/home/user/open-amp/set_env.sh: 第 3 行： echo: 写错误: 被中断的系统调用
+/home/user/open-amp/set_env.sh: 行 5: /sys/bus/rpmsg/devices/virtio0.rpmsg-openamp-demo-channel.-1.0/driver_override: 没有那个文件或目录
+insmod: ERROR: could not insert module /lib/modules/5.10.209-phytium-embedded-v2.2/kernel/drivers/rpmsg/rpmsg_char.ko: File exists
+devnodes_rc=2
+ls: 无法访问 '/dev/rpmsg_ctrl0': 没有那个文件或目录
+ls: 无法访问 '/dev/rpmsg0': 没有那个文件或目录
+demo_rc=255
+open rpmsg_ctrl0 failed.
+: No such file or directory
+candidate_state=offline
+=== CANDIDATE_DMESG ===
+349:[    2.604721] remoteproc remoteproc0: homo_rproc is available
+494:[  238.147047] remoteproc remoteproc0: powering up homo_rproc
+495:[  238.223096] remoteproc remoteproc0: Booting fw image openamp_core0.elf, size 1650448
+498:[  238.409137] virtio_rpmsg_bus virtio0: rpmsg host is online
+499:[  238.422110]  remoteproc0#vdev0buffer: registered virtio0 (type 7)
+500:[  238.428354] remoteproc remoteproc0: remote processor homo_rproc is now up
+501:[  238.545565] virtio_rpmsg_bus virtio0: creating channel rpmsg-openamp-demo-channel addr 0x0
+502:[  335.664365] remoteproc remoteproc0: stopped remote processor homo_rproc
+503:[  335.770479] remoteproc remoteproc0: powering up homo_rproc
+504:[  335.777807] remoteproc remoteproc0: Booting fw image openamp_core0.elf, size 1627224
+505:[  335.886446] remoteproc remoteproc0: can't start rproc homo_rproc: -4
+506:[  335.892974] remoteproc remoteproc0: Boot failed: -4
+CANDIDATE_RESULT=candidate_bringup_only
+=== RESTORE_OFFICIAL_FILE ===
+restored_size=1650448 restored_mtime=2026-03-14 15:56:49.271513249 +0800
+a855b5681e2ac2e64f0c6ea17628ed502e302c6140bab479c3eb6f708e103835  /lib/firmware/openamp_core0.elf
+=== REBOOTING ===
+Connection to 100.121.87.73 closed by remote host.

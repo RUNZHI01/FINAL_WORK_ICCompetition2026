@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-03-15T01:24:34+0800",
+  "byte_len": 36,
+  "hex": "4d4f43530100020001000000552400000c000000190b2c73000000000100000001000000",
+  "rx_timeout": false,
+  "parsed_frame": {
+    "raw_len": 36,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 2,
+    "msg_name": "JOB_ACK",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 12,
+    "header_crc32": 1932266265,
+    "expected_header_crc32": 1932266265,
+    "payload_hex": "000000000100000001000000",
+    "job_ack": {
+      "payload_len": 12,
+      "parsed": true,
+      "decision": 0,
+      "decision_name": "DENY",
+      "fault_code": 1,
+      "fault_name": "ARTIFACT_SHA_MISMATCH",
+      "guard_state": 1,
+      "guard_state_name": "READY"
+    }
+  }
+}

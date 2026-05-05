@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=飞腾原生座舱
+GenericName=Feiteng Native Cockpit
+Comment=Qt/PySide6 native cockpit for the TVM/OpenAMP execution demo
+Exec=__EXEC_PATH__
+Terminal=false
+Icon=__ICON_NAME__
+Categories=Utility;Development;
+StartupNotify=true
+StartupWMClass=feiteng-native-cockpit

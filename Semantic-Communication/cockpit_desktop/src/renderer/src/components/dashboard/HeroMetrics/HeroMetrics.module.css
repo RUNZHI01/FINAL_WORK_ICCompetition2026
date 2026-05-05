@@ -1,0 +1,116 @@
+.container {
+  display: flex;
+  align-items: stretch;
+  min-height: 72px;
+  padding: 0;
+  background: var(--color-bg-card);
+  border-bottom: 1px solid var(--color-border-light);
+  gap: 0;
+  overflow-x: auto;
+}
+
+.metricItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 24px;
+  border-right: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.metricItem:last-child {
+  border-right: none;
+}
+
+.metricTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metricDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.metricIcon {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.metricValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.metricValueContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sparkline {
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+
+.metricValueGiant {
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-primary), #0891B2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-family-mono);
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  white-space: nowrap;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.metricHighlight {
+  color: var(--color-primary);
+}
+
+.metricSuccess {
+  color: var(--color-success);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1200px) {
+  .container {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding: var(--space-sm) var(--space-md);
+    gap: 0;
+  }
+  .metricItem {
+    padding: var(--space-sm) var(--space-md);
+    border-right: none;
+    flex: 0 0 calc(50% - 8px);
+  }
+}
+
+@media (max-width: 900px) {
+  .metricItem {
+    flex: 0 0 calc(50% - 8px);
+  }
+}

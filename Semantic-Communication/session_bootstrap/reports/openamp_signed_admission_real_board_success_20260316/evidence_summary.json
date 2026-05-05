@@ -1,0 +1,144 @@
+{
+  "schema": "openamp_signed_admission_real_board_success_evidence/v1",
+  "captured_at": "2026-03-16T20:38:00+08:00",
+  "assembled_offline": true,
+  "assembled_without_new_board_side_effects": true,
+  "final_session_confirmed_facts": {
+    "live_firmware_sha256": "140e2e8ca22d951d518907ab92a3ec910969fba6830481fc3d397193ac1712f1",
+    "cold_start_survives": true,
+    "signed_sideband_success": {
+      "begin_acked": true,
+      "chunk_acked": true,
+      "signature_acked": true,
+      "commit_acked": true,
+      "final_job_req_result": "JOB_ACK(ALLOW)"
+    },
+    "repeat_after_safe_stop_cleanup": true,
+    "repeat_used_fresh_job_id": true
+  },
+  "reference_fixture": {
+    "bundle_path": "session_bootstrap/examples/openamp_signed_manifest.fixture.bundle.json",
+    "transport_path": "session_bootstrap/examples/openamp_signed_manifest.fixture.transport.json",
+    "firmware_contract_path": "session_bootstrap/examples/openamp_signed_manifest.fixture.firmware_contract.json",
+    "public_key_path": "session_bootstrap/examples/openamp_signed_manifest.fixture.public.pem",
+    "transport_schema": "openamp_signed_admission_transport_plan/v1",
+    "bundle_schema": "openamp_signed_manifest_bundle/v1",
+    "reference_job_id": 7301,
+    "manifest_sha256": "dcde2829dcf76b7c974dc193ac93dd8641d2dfb948b15b4d46c9bbbef7f45d54",
+    "artifact_sha256": "09af47ee1b0e2a7d3cad3add031f36811926e1fe34cfd58fa98d70eba9526b91",
+    "manifest_len": 808,
+    "signature_len": 71,
+    "signature_algorithm": "ecdsa-p256-sha256",
+    "chunk_size": 160,
+    "chunk_offsets": [
+      0,
+      160,
+      320,
+      480,
+      640,
+      800
+    ],
+    "job_req": {
+      "deadline_ms": 60000,
+      "expected_outputs": 300,
+      "flags": 2,
+      "job_flags": "reconstruction"
+    }
+  },
+  "recovered_local_artifacts": {
+    "board_source_snapshot": {
+      "path": "/tmp/board_slaver_00_example.c",
+      "sha256": "a8b3a064f39fe38fcc54be3b17b0d8e9108808077ded0ec3f37f0a3ad1c060ad"
+    },
+    "merged_signed_source_snapshot": {
+      "path": "/tmp/board_slaver_00_example.signed.c",
+      "sha256": "b1f2235d8dda6538a86816f00a10428851a31b0a32900dc6760c2e912b12e66d",
+      "lines": 2374
+    },
+    "local_merge_reference_localbase": {
+      "path": "/tmp/slaver_00_example.signed.localbase.c",
+      "sha256": "4e9ebde64f3f1dfe8c33d6a8567c50e1517e2ecf2eec2d549db32cc32fd159a6"
+    },
+    "local_merge_reference_final": {
+      "path": "/tmp/slaver_00_example.signed.final.c",
+      "sha256": "59748575d523d884fa41dacda7b2bb2bc922d4995a1ed842659bd9b4373a3c54"
+    },
+    "recovered_helper_scripts": {
+      "openamp_mincrypto_build": {
+        "path": "/tmp/openamp_mincrypto_build.sh",
+        "sha256": "583cc660d06e8fa668a369c0a72692d08aabc118a8733ff7b2366662306aabbd"
+      },
+      "openamp_shafix_build": {
+        "path": "/tmp/openamp_shafix_build.sh",
+        "sha256": "09e529075b9109ecdfc618a662b2194896f563fefe30529c553bada88fe1d33c"
+      }
+    }
+  },
+  "recovered_board_transcript_lineage": {
+    "pre_signed_live_firmware": {
+      "sha256": "45ab903160016ea1e0253c35df2e6ba2033b888142514576897dad50fdd479a1",
+      "size_bytes": 911192,
+      "state_before_set_env": "remoteproc0=offline"
+    },
+    "board_tree": "/home/user/phytium-dev/release_v1.4.0-jobdone-v14/example/system/amp/openamp_for_linux",
+    "board_toolchain": "/home/user/phytium-dev/cross_tool_official/gcc-arm-10.3-2021.07-aarch64-aarch64-none-elf/bin/aarch64-none-elf-gcc",
+    "earlier_signed_board_build": {
+      "sha256": "901e18027825689dc350b89a2b8da23607cf1234df896edadea92cfda3bd4789",
+      "size_bytes": 1678832,
+      "installed_to_live_firmware": true,
+      "cold_start_outcome_from_recovered_log": "reboot_started_then_follow_up_ssh_timed_out"
+    }
+  },
+  "blockers_overcome": [
+    {
+      "name": "legacy_allowlist_root",
+      "description": "Admission originally depended on a static artifact SHA check; the signed path had to be added without regressing the legacy fallback."
+    },
+    {
+      "name": "signed_sideband_scaffold",
+      "description": "The board source had to gain BEGIN/CHUNK/SIGNATURE/COMMIT/ACK message types, staging state, and RPMsg dispatch support before verification could exist."
+    },
+    {
+      "name": "mbedtls_integration",
+      "description": "The board source had to move from a deny-by-default crypto boundary to a real SDK-backed mbedTLS include and symbol path."
+    },
+    {
+      "name": "minimal_crypto_only_build_path",
+      "description": "Recovered board helper scripts show that a narrow CONFIG_USE_MBEDTLS plus lib_libmbedtls.a path and a sha256 symbol fix were required to get through board compilation."
+    },
+    {
+      "name": "repeat_validation_after_cleanup",
+      "description": "The final success was not accepted as one-shot; it was re-verified after SAFE_STOP cleanup with a fresh job_id."
+    }
+  ],
+  "private_key_search": {
+    "searched_roots": [
+      "/home/tianxing/tvm_metaschedule_execution_project",
+      "/tmp",
+      "/home/tianxing/.codex",
+      "/home/tianxing"
+    ],
+    "matching_private_key_found": false,
+    "matched_private_key_path": null,
+    "found_relevant_public_key_paths": [
+      "session_bootstrap/examples/openamp_signed_manifest.fixture.public.pem"
+    ],
+    "found_unrelated_private_key_paths": [
+      "/home/tianxing/.ssh/id_ed25519"
+    ],
+    "notes": [
+      "No file containing fixture-dev-20260316 or openamp-fixture was found in private-key material.",
+      "No P-256 private key matching the committed fixture public key was found in the repo/workspace search."
+    ]
+  },
+  "baseline_signed_validation": {
+    "attempted": false,
+    "possible_from_this_workspace": false,
+    "reason": "Matching fixture private key not found."
+  },
+  "evidence_gaps": [
+    "The raw final 140e... build/install transcript was not recovered locally.",
+    "The raw final board ACK frames for the 140e... success were not persisted in the repo or local session archive.",
+    "The exact fresh job_id used in the repeat-after-SAFE_STOP success was not recovered."
+  ]
+}

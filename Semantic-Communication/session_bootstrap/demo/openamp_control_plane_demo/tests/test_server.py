@@ -1,0 +1,6657 @@
+from __future__ import annotations
+
+from argparse import Namespace
+import html
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import unittest
+from unittest.mock import Mock, patch
+from urllib.parse import quote
+import urllib.request
+
+
+DEMO_ROOT = Path(__file__).resolve().parents[1]
+if str(DEMO_ROOT) not in sys.path:
+    sys.path.insert(0, str(DEMO_ROOT))
+
+import server  # noqa: E402
+from server import DashboardState, DemoRequestHandler  # noqa: E402
+import usrp_runtime  # noqa: E402
+
+
+REPO_ROOT = DEMO_ROOT.parents[2]
+
+
+def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
+    return {
+        "requested_at": requested_at,
+        "reachable": True,
+        "status": "success",
+        "summary": summary,
+        "error": "",
+        "details": {
+            "hostname": "phytium-demo",
+            "remoteproc": [{"name": "remoteproc0", "state": "running"}],
+            "firmware": {"sha256": "abcd" * 16},
+        },
+    }
+
+
+def failed_probe_payload(requested_at: str, summary: str, error: str) -> dict[str, object]:
+    return {
+        "requested_at": requested_at,
+        "reachable": False,
+        "status": "error",
+        "summary": summary,
+        "error": error,
+        "details": {},
+    }
+
+
+def live_progress_payload(label: str, state: str, percent: int, current_stage: str) -> dict[str, object]:
+    expected_count = server.DEFAULT_MAX_INPUTS
+    completed_count = max(0, round((percent / 100.0) * expected_count)) if state != "running" else percent
+    return {
+        "state": state,
+        "label": label,
+        "tone": "online" if label == "真实在线推进" else "degraded",
+        "percent": percent,
+        "phase_percent": 76 if state == "running" else 100,
+        "completed_count": completed_count,
+        "expected_count": expected_count,
+        "remaining_count": expected_count - completed_count,
+        "completion_ratio": completed_count / expected_count,
+        "count_source": "runner_log.sample_latency_lines" if state == "running" else "runner_summary.processed_count",
+        "count_label": f"{completed_count} / {expected_count}",
+        "current_stage": current_stage,
+        "stages": [
+            {"key": "connected", "label": "已连接", "status": "done", "detail": "STATUS_RESP: READY / fault=NONE"},
+            {"key": "dispatched", "label": "已下发", "status": "done", "detail": "已向 OpenAMP 控制面提交 JOB_REQ。"},
+            {"key": "running", "label": "板端执行中", "status": "current" if state == "running" else "done", "detail": "JOB_ACK(ALLOW) / guard=JOB_ACTIVE"},
+            {
+                "key": "returned",
+                "label": "已返回结果",
+                "status": "pending" if state == "running" else ("done" if label == "真实在线推进" else "error"),
+                "detail": "等待 JOB_DONE。" if state == "running" else "JOB_DONE 已回收，runner_exit=0 / result=0",
+            },
+        ],
+        "event_log": [
+            "[19:24:47] STATUS_REQ -> guard=READY / fault=NONE",
+            "[19:24:48] JOB_REQ -> trusted_sha=1946b08e6cf2",
+            "[19:24:48] JOB_ACK(ALLOW) -> guard=JOB_ACTIVE / fault=NONE",
+        ],
+    }
+
+
+class FakeInferenceJob:
+    def __init__(self, snapshots: list[dict[str, object]], *, job_id: str = "demo-job-001") -> None:
+        self.job_id = job_id
+        self._snapshots = [json.loads(json.dumps(item)) for item in snapshots]
+        self._calls = 0
+
+    def snapshot(self) -> dict[str, object]:
+        index = min(self._calls, len(self._snapshots) - 1)
+        self._calls += 1
+        return json.loads(json.dumps(self._snapshots[index]))
+
+
+class FakeTextStream:
+    def __init__(self, lines: list[str] | None = None, *, read_text: str = "") -> None:
+        self._lines = list(lines or [])
+        self._read_text = read_text
+
+    def __iter__(self):
+        return iter(self._lines)
+
+    def read(self) -> str:
+        return self._read_text
+
+
+class FakePopen:
+    def __init__(self, stdout_lines: list[str] | None = None, *, stderr_text: str = "", returncode: int = 0) -> None:
+        self.stdout = FakeTextStream(stdout_lines or [])
+        self.stderr = FakeTextStream(read_text=stderr_text)
+        self.returncode = returncode
+
+    def wait(self, timeout: float | None = None) -> int:
+        return self.returncode
+
+
+class NonClosingBytesIO(io.BytesIO):
+    def close(self) -> None:
+        return
+
+
+class FakeSocket:
+    def __init__(self, request_bytes: bytes) -> None:
+        self._rfile = io.BytesIO(request_bytes)
+        self._wfile = NonClosingBytesIO()
+
+    def makefile(self, mode: str, *args: object, **kwargs: object) -> io.BytesIO:
+        if "r" in mode:
+            return self._rfile
+        if "w" in mode:
+            return self._wfile
+        raise ValueError(f"Unsupported mode: {mode}")
+
+    def sendall(self, data: bytes) -> None:
+        self._wfile.write(data)
+
+    def close(self) -> None:
+        return
+
+    def response_bytes(self) -> bytes:
+        return self._wfile.getvalue()
+
+
+def request_response(
+    state: DashboardState,
+    method: str,
+    path: str,
+    body: bytes | None = None,
+) -> tuple[int, dict[str, str], bytes]:
+    payload = body or b""
+    request_bytes = (
+        f"{method} {path} HTTP/1.1\r\n"
+        "Host: 127.0.0.1\r\n"
+        "Connection: close\r\n"
+        f"Content-Length: {len(payload)}\r\n"
+        "\r\n"
+    ).encode("utf-8") + payload
+    server = type("FakeServer", (), {"app_state": state})()
+    sock = FakeSocket(request_bytes)
+    DemoRequestHandler(sock, ("127.0.0.1", 12345), server)
+
+    raw_response = sock.response_bytes()
+    header_bytes, response_body = raw_response.split(b"\r\n\r\n", 1)
+    header_lines = header_bytes.decode("iso-8859-1").split("\r\n")
+    status = int(header_lines[0].split()[1])
+    headers: dict[str, str] = {}
+    for line in header_lines[1:]:
+        if not line:
+            continue
+        name, value = line.split(":", 1)
+        headers[name.strip().lower()] = value.strip()
+    return status, headers, response_body
+
+
+def request_json(
+    state: DashboardState,
+    method: str,
+    path: str,
+    body: bytes | None = None,
+) -> tuple[int, dict[str, str], dict[str, object]]:
+    status, headers, response_body = request_response(state, method, path, body)
+    try:
+        return status, headers, json.loads(response_body.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise AssertionError(response_body.decode("utf-8")) from exc
+
+
+def request_text(
+    state: DashboardState,
+    method: str,
+    path: str,
+    body: bytes | None = None,
+) -> tuple[int, dict[str, str], str]:
+    status, headers, response_body = request_response(state, method, path, body)
+    return status, headers, response_body.decode("utf-8")
+
+
+def archive_event(
+    *,
+    session_id: str,
+    sequence: int,
+    timestamp: str,
+    event_type: str,
+    message: str,
+    plane: str = "control",
+    source: str = "archive_test",
+    job_id: str = "",
+    mode_scope: str = server.CONTROL_MODE_SCOPE,
+    data: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return {
+        "event_id": f"{session_id}:{sequence:06d}",
+        "sequence": sequence,
+        "session_id": session_id,
+        "timestamp": timestamp,
+        "type": event_type,
+        "job_id": job_id,
+        "source": source,
+        "plane": plane,
+        "mode_scope": mode_scope,
+        "message": message,
+        "data": data or {},
+    }
+
+
+def write_archive_session(
+    archive_root: str | Path,
+    *,
+    session_id: str,
+    events: list[dict[str, object]] | None = None,
+    snapshot: dict[str, object] | None = None,
+) -> Path:
+    session_dir = Path(archive_root) / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    if events is not None:
+        (session_dir / "events.jsonl").write_text(
+            "".join(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n" for item in events),
+            encoding="utf-8",
+        )
+    if snapshot is not None:
+        (session_dir / "state_snapshot.json").write_text(
+            json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return session_dir
+
+
+class DashboardStateTest(unittest.TestCase):
+    def test_parse_json_stdout_payload_skips_trailing_non_json_lines(self) -> None:
+        raw = "\n".join(
+            [
+                "[mnn-remote] startup",
+                json.dumps({"status": "ok", "processed_count": 2}, ensure_ascii=False),
+                "CPU Group: [ 0  1 ], 187500 - 1500000",
+                "The device supports: i8sdot:0, fp16:0",
+            ]
+        )
+
+        payload = server._parse_json_stdout_payload(raw)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["processed_count"], 2)
+
+    def test_startup_uses_saved_successful_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "openamp_demo_live_probe_latest.json"
+            payload = live_probe_payload("2026-03-15T12:00:00+0800", "saved probe summary")
+            cache_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            state = DashboardState(None, 30.0, cache_path)
+            snapshot = state.current_snapshot()
+
+        self.assertEqual(snapshot["mode"]["effective_label"], "在线读数可用")
+        self.assertEqual(snapshot["board"]["current_status"]["label"], "保存的只读 SSH 探板")
+        self.assertEqual(snapshot["board"]["current_status"]["requested_at"], payload["requested_at"])
+        self.assertTrue(snapshot["board"]["current_status"]["reachable"])
+
+    def test_failed_refresh_keeps_last_successful_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "openamp_demo_live_probe_latest.json"
+            success = live_probe_payload("2026-03-15T12:00:00+0800", "first success")
+            failure = {
+                "requested_at": "2026-03-15T12:05:00+0800",
+                "reachable": False,
+                "status": "error",
+                "summary": "probe failed",
+                "error": "ssh timeout",
+                "details": {},
+            }
+
+            state = DashboardState(None, 30.0, cache_path)
+
+            with patch("server.run_live_probe", return_value=success):
+                self.assertEqual(state.refresh_live_probe(), success)
+
+            cached_after_success = json.loads(cache_path.read_text(encoding="utf-8"))
+            self.assertEqual(cached_after_success["requested_at"], success["requested_at"])
+
+            with patch("server.run_live_probe", return_value=failure):
+                self.assertEqual(state.refresh_live_probe(), failure)
+
+            snapshot = state.current_snapshot()
+            cached_after_failure = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(snapshot["board"]["current_status"]["requested_at"], success["requested_at"])
+        self.assertTrue(snapshot["board"]["current_status"]["reachable"])
+        self.assertEqual(cached_after_failure["requested_at"], success["requested_at"])
+
+    def test_start_batch_inference_tracks_one_live_current_job(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        progress_calls: dict[str, int] = {}
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 2)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-live-300",
+                "live_progress": {
+                    "completed_count": 0,
+                    "expected_count": 2,
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            calls = progress_calls.get(job_id, 0)
+            progress_calls[job_id] = calls + 1
+            if calls == 0:
+                return {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": job_id,
+                    "live_progress": {
+                        "completed_count": 1,
+                        "expected_count": 2,
+                    },
+                }
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "ML-KEM 安全协议就绪 + 真实在线推进 + 归档样例图",
+                "message": "ML-KEM 安全协议已建立；Current 继续走板端本地 latent / 既有 live 数据面。",
+                "artifact_sha": "sha-live",
+                "sample": {"label": "sample-live"},
+                "live_progress": {
+                    "completed_count": 2,
+                    "expected_count": 2,
+                },
+                "live_attempt": {
+                    "security": {
+                        "protocol": "mlkem_control",
+                        "handshake_ms": 11.0,
+                        "summary": "ML-KEM 安全协议已建立；Current 继续走板端本地 latent / 既有 live 数据面。",
+                    },
+                },
+                "timings": {"payload_ms": 20.0, "total_ms": 31.0},
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=2)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["completed"], 2)
+        self.assertEqual(final_state["success"], 2)
+        self.assertEqual(final_state["fallback"], 0)
+        self.assertEqual(final_state["sha_match"], 0)
+        self.assertEqual(final_state["benchmark"]["handshake_ms"]["n"], 1)
+        self.assertEqual(final_state["benchmark"]["handshake_ms"]["mean_ms"], 11.0)
+        self.assertEqual(final_state["benchmark"]["total_ms"]["mean_ms"], 31.0)
+        self.assertEqual(state._recent_inference_results["current"]["status"], "success")
+
+    def test_start_batch_inference_publishes_live_current_result_into_system_status(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        progress_calls: dict[str, int] = {}
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            self.assertEqual(variant, "current")
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-live-publish-001",
+                "live_progress": {
+                    "completed_count": 0,
+                    "expected_count": 3,
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            calls = progress_calls.get(job_id, 0)
+            progress_calls[job_id] = calls + 1
+            if calls == 0:
+                return {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": job_id,
+                    "live_progress": {
+                        "completed_count": 2,
+                        "expected_count": 3,
+                    },
+                }
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "真实在线推进 + 归档样例图",
+                "message": "Current live 结果已经回到页面。",
+                "artifact_sha": "sha-current-live-result",
+                "sample": {"label": "sample-live-publish"},
+                "quality": {"psnr_db": 31.2, "ssim": 0.9412},
+                "live_progress": {
+                    "completed_count": 3,
+                    "expected_count": 3,
+                },
+                "timings": {"payload_ms": 239.2, "total_ms": 251.7},
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+            status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(system_payload["recent_results"]["current"]["execution_mode"], "live")
+        self.assertEqual(system_payload["recent_results"]["current"]["status"], "success")
+        self.assertEqual(system_payload["recent_results"]["current"]["artifact_sha"], "sha-current-live-result")
+        self.assertEqual(system_payload["recent_results"]["current"]["timings"]["payload_ms"], 239.2)
+        self.assertEqual(system_payload["recent_results"]["current"]["timings"]["total_ms"], 251.7)
+
+    def test_runner_only_fallback_allows_host_env_error_preflight(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        self.assertTrue(
+            state._can_launch_runner_only_fallback(
+                board_access=Mock(connection_ready=True),
+                status_payload={"status_category": "host_env_error"},
+            )
+        )
+
+    def test_run_demo_inference_degraded_runner_only_skips_mlkem_helper_arm(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = Mock(configured=True, probe_ready=True, connection_ready=True)
+        board_access.build_env.return_value = {}
+        state._board_access = board_access
+        live_access = Mock()
+        live_access.missing_inference_fields.return_value = []
+        fake_live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": "runner-only-live-001",
+                    "control_transport": "none",
+                    "live_progress": {"completed_count": 0, "expected_count": 3},
+                }
+            ],
+            job_id="runner-only-live-001",
+        )
+
+        with (
+            patch.object(state, "_live_board_access_for_variant", return_value=live_access),
+            patch.object(state, "_nontrusted_current_requires_signed_admission", return_value=False),
+            patch("server.expected_sha_for_variant", return_value="sha-current"),
+            patch("server.describe_demo_variant_support", return_value={"mode": "legacy_sha"}),
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "error",
+                    "status_category": "host_env_error",
+                    "message": "host environment cannot open SSH socket",
+                },
+            ),
+            patch.object(
+                state,
+                "_arm_mlkem_security_context",
+                side_effect=AssertionError("runner-only degraded launch must not arm ML-KEM helper"),
+            ),
+            patch("server.launch_remote_reconstruction_job", return_value=fake_live_job) as launch_job,
+        ):
+            payload = state.run_demo_inference(
+                variant="current",
+                image_index=0,
+                allow_preflight_degraded=True,
+                max_inputs=3,
+            )
+
+        launch_job.assert_called_once()
+        _, kwargs = launch_job.call_args
+        self.assertEqual(kwargs["control_transport"], "none")
+        self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["job_id"], "runner-only-live-001")
+
+    def test_start_batch_inference_usrp_tvm_hydrates_recent_current_quality(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+        progress_calls: dict[str, int] = {}
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 5)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "usrp-tvm-live-001",
+                "live_progress": {"completed_count": 0, "expected_count": 5},
+                "live_attempt": {
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 0, "expected_count": 5, "state": "running"},
+                        "transport": {"completed_count": 0, "expected_count": 5, "state": "pending"},
+                        "inference": {"completed_count": 0, "expected_count": 5, "state": "pending"},
+                    }
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            calls = progress_calls.get(job_id, 0)
+            progress_calls[job_id] = calls + 1
+            if calls == 0:
+                return {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": job_id,
+                    "live_progress": {"completed_count": 0, "expected_count": 5},
+                    "live_attempt": {
+                        "stage_progress": {
+                            "host_preprocess": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                            "transport": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                            "inference": {"completed_count": 2, "expected_count": 5, "state": "running"},
+                        }
+                    },
+                }
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "USRP 混合链路在线推进 + 归档样例图",
+                "message": "USRP TVM completed.",
+                "artifact_sha": "sha-usrp-tvm",
+                "sample": {"label": "airfield"},
+                "quality": {"psnr_db": 37.0, "ssim": 0.97},
+                "live_progress": {"completed_count": 5, "expected_count": 5},
+                "timings": {"payload_ms": 121.0, "total_ms": 130.0},
+                "wrapper_summary": {
+                    "inference_engine": "tvm",
+                    "inference_summary": {
+                        "status": "ok",
+                        "processed_count": 5,
+                        "selected_input_count": 5,
+                        "run_samples_ms": [120.0, 121.0, 122.0, 123.0, 124.0],
+                        "run_median_ms": 122.0,
+                        "run_mean_ms": 122.0,
+                    },
+                },
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "tvm",
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 5,
+                            "selected_input_count": 5,
+                            "run_samples_ms": [120.0, 121.0, 122.0, 123.0, 124.0],
+                            "run_median_ms": 122.0,
+                            "run_mean_ms": 122.0,
+                        },
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                        "transport": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                        "inference": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                    },
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=5)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"usrp tvm batch did not finish: {state.get_batch_state()}")
+
+            status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["engine"], "tvm")
+        self.assertEqual(final_state["quality"]["psnr_db"], server.build_prerecorded_inference_result(0, "current")["quality"]["psnr_db"])
+        self.assertEqual(status, 200)
+        self.assertEqual(system_payload["recent_results"]["current"]["execution_mode"], "live")
+        self.assertEqual(system_payload["recent_results"]["current"]["quality"]["psnr_db"], 37.0)
+        self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "tvm")
+
+    def test_start_batch_inference_marks_done_when_worker_raises(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.object(state, "run_demo_inference", side_effect=IndexError("invalid image_index")):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["message"], "IndexError: invalid image_index")
+
+        self.assertEqual(state.get_batch_state(), {"status": "idle"})
+
+    def test_running_inference_job_record_refreshes_stale_snapshot(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        job = FakeInferenceJob(
+            [
+                {
+                    "status": "success",
+                    "request_state": "completed",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "completed on board",
+                    "progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+                }
+            ],
+            job_id="stale-job-001",
+        )
+        state._inference_jobs[job.job_id] = {
+            "job": job,
+            "job_id": job.job_id,
+            "variant": "current",
+            "image_index": 0,
+            "last_snapshot": {
+                "status": "running",
+                "request_state": "running",
+                "execution_mode": "live",
+                "variant": "current",
+                "message": "stale local snapshot",
+            },
+        }
+
+        self.assertIsNone(state._running_inference_job_record())
+        self.assertEqual(state._inference_jobs[job.job_id]["last_snapshot"]["request_state"], "completed")
+
+    def test_start_batch_inference_returns_blocked_without_running_batch_when_launch_falls_back(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.object(
+            state,
+            "run_demo_inference",
+            return_value={
+                "status": "fallback",
+                "execution_mode": "prerecorded",
+                "request_state": "completed",
+                "status_category": "config_error",
+                "source_label": "配置不完整，回退展示（归档样例）",
+                "message": "远端推理配置不完整或不可用，请检查连接信息和推理环境参数。 当前已回退到预录结果。",
+                "live_progress": {
+                    "completed_count": 0,
+                    "expected_count": 3,
+                },
+            },
+        ) as run_demo_inference:
+            payload = state.start_batch_inference(count=3)
+
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["status_category"], "config_error")
+        self.assertEqual(payload["engine"], "tvm")
+        self.assertEqual(payload["service_mode"], "FULL_FRAME")
+        self.assertIn("远端推理配置不完整或不可用", payload["message"])
+        batch_state = state.get_batch_state()
+        self.assertEqual(batch_state["status"], "done")
+        self.assertEqual(batch_state["completed"], 0)
+        self.assertEqual(batch_state["fallback"], 3)
+        self.assertEqual(batch_state["status_category"], "config_error")
+        self.assertIn("远端推理配置不完整或不可用", batch_state["message"])
+        run_demo_inference.assert_called_once()
+
+    def test_start_batch_inference_returns_blocked_when_crypto_client_diagnostics_include_paths(self) -> None:
+        env_file = "session_bootstrap/config/inference_demo_openamp_mean4_v7.2026-04-20.phytium_pi.env"
+        state = DashboardState(env_file, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+                "env_file": env_file,
+            },
+            fallback=state._board_access,
+        )
+
+        preflight = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch("server.query_live_status", return_value=preflight),
+            patch(
+                "server.resolve_local_crypto_client",
+                return_value=(Path("/tmp/legacy_tcp_client.py"), [Path("/tmp/legacy_tcp_client.py")]),
+            ),
+            patch.object(state, "_emit_inference_rejection_events", return_value=None),
+        ):
+            payload = state.start_batch_inference(count=3)
+
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["status_category"], "client_missing")
+        self.assertEqual(payload["engine"], "tvm")
+        self.assertEqual(payload["service_mode"], "FULL_FRAME")
+        batch_state = state.get_batch_state()
+        self.assertEqual(batch_state["status"], "done")
+        self.assertEqual(batch_state["completed"], 0)
+        self.assertEqual(batch_state["fallback"], 3)
+        self.assertEqual(batch_state["status_category"], "client_missing")
+
+    def test_start_batch_inference_alert_mode_keeps_batch_state_accessible_and_completes(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state.set_link_director_profile({"profile_id": "flaky"})
+
+        payload = state.start_batch_inference(count=3)
+        self.assertEqual(payload["status"], "started")
+        self.assertEqual(payload["service_mode"], "ALERT_ONLY")
+        self.assertEqual(payload["total"], 3)
+
+        # Batch mode should stay stable for the lifetime of this batch even if
+        # the operator changes the staged profile afterwards.
+        state.set_link_director_profile({"profile_id": "normal"})
+
+        time.sleep(0.05)
+        holder: dict[str, object] = {}
+
+        def _read_batch_state() -> None:
+            holder["state"] = state.get_batch_state()
+
+        reader = threading.Thread(target=_read_batch_state, daemon=True)
+        reader.start()
+        reader.join(timeout=0.2)
+        self.assertFalse(reader.is_alive(), "get_batch_state() blocked during ALERT_ONLY batch")
+
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            current = state.get_batch_state()
+            if current.get("status") == "done":
+                break
+            time.sleep(0.02)
+        else:
+            self.fail(f"alert-mode batch did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["service_mode"], "ALERT_ONLY")
+        self.assertEqual(final_state["completed"], 3)
+        self.assertEqual(final_state["total"], 3)
+        self.assertEqual(final_state["success"], 0)
+        self.assertEqual(final_state["fallback"], 0)
+        self.assertIsNone(final_state["benchmark"])
+
+    def test_start_batch_inference_roi_mode_reduces_effective_count_and_completes(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state.set_link_director_profile({"profile_id": "lossy"})
+        progress_calls: dict[str, int] = {}
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertTrue(allow_preflight_degraded)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "roi-live-003",
+                "live_progress": {
+                    "completed_count": 0,
+                    "expected_count": 3,
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            calls = progress_calls.get(job_id, 0)
+            progress_calls[job_id] = calls + 1
+            if calls == 0:
+                return {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": job_id,
+                    "live_progress": {
+                        "completed_count": 1,
+                        "expected_count": 3,
+                    },
+                }
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "ROI_ONLY 降采样在线推进",
+                "message": "ROI_ONLY 模式下按 3:1 降采样完成在线推进。",
+                "artifact_sha": "sha-roi",
+                "sample": {"label": "sample-roi"},
+                "live_progress": {
+                    "completed_count": 3,
+                    "expected_count": 3,
+                },
+                "live_attempt": {
+                    "security": {
+                        "protocol": "mlkem_control",
+                        "handshake_ms": 9.5,
+                        "summary": "ROI_ONLY 降采样批量已完成。",
+                    },
+                },
+                "timings": {"payload_ms": 12.0, "total_ms": 18.0},
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=9)
+            self.assertEqual(payload["status"], "started")
+            self.assertEqual(payload["service_mode"], "ROI_ONLY")
+            self.assertEqual(payload["total"], 3)
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"roi-only batch did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["service_mode"], "ROI_ONLY")
+        self.assertEqual(final_state["completed"], 3)
+        self.assertEqual(final_state["total"], 3)
+        self.assertEqual(final_state["success"], 3)
+        self.assertEqual(final_state["fallback"], 0)
+        self.assertEqual(final_state["benchmark"]["handshake_ms"]["mean_ms"], 9.5)
+
+    def test_start_mnn_batch_inference_tracks_300_image_run(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        mnn_summary = {
+            "status": "ok",
+            "variant": "current",
+            "selected_input_count": 300,
+            "processed_count": 300,
+            "sample_stats": {
+                "run_ms": {
+                    "count": 300,
+                    "min_ms": 120.0,
+                    "max_ms": 220.0,
+                    "mean_ms": 163.2,
+                    "median_ms": 161.9,
+                    "variance_ms2": 25.0,
+                },
+                "resize_ms": {
+                    "count": 300,
+                    "min_ms": 1.8,
+                    "max_ms": 16.4,
+                    "mean_ms": 8.4,
+                    "median_ms": 8.0,
+                    "variance_ms2": 3.0,
+                },
+                "total_ms": {
+                    "count": 300,
+                    "min_ms": 240.0,
+                    "max_ms": 410.0,
+                    "mean_ms": 331.0,
+                    "median_ms": 329.6,
+                    "variance_ms2": 42.0,
+                },
+            },
+        }
+
+        with patch.object(state, "_run_mnn_batch", return_value=mnn_summary):
+            payload = state.start_mnn_batch_inference(count=300)
+            self.assertEqual(payload["status"], "started")
+            self.assertEqual(payload["engine"], "mnn")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"mnn batch did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["engine"], "mnn")
+        self.assertEqual(final_state["completed"], 300)
+        self.assertEqual(final_state["total"], 300)
+        self.assertEqual(final_state["success"], 300)
+        self.assertEqual(final_state["fallback"], 0)
+        self.assertEqual(final_state["benchmark"]["inference_ms"]["mean_ms"], 163.2)
+        self.assertEqual(final_state["benchmark"]["total_ms"]["mean_ms"], 331.0)
+
+    def test_start_mnn_usrp_batch_hydrates_recent_current_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+        progress_calls: dict[str, int] = {}
+
+        def fake_register_live_job(*, live_job, variant: str, image_index: int, security_context=None):
+            del security_context
+            record = {"job": live_job, "job_id": live_job.job_id, "variant": variant, "image_index": image_index}
+            return record, {"job_id": live_job.job_id}
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            calls = progress_calls.get(job_id, 0)
+            progress_calls[job_id] = calls + 1
+            if calls == 0:
+                return {
+                    "status": "running",
+                    "execution_mode": "live",
+                    "request_state": "running",
+                    "job_id": job_id,
+                    "live_progress": {"completed_count": 0, "expected_count": 5},
+                    "live_attempt": {
+                        "stage_progress": {
+                            "host_preprocess": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                            "transport": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                            "inference": {"completed_count": 2, "expected_count": 5, "state": "running"},
+                        }
+                    },
+                }
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "message": "USRP MNN completed.",
+                "live_progress": {"completed_count": 5, "expected_count": 5},
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "mnn",
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 5,
+                            "selected_input_count": 5,
+                            "sample_stats": {
+                                "run_ms": {"count": 5, "mean_ms": 163.2, "median_ms": 161.9},
+                                "total_ms": {"count": 5, "mean_ms": 331.0, "median_ms": 329.6},
+                            },
+                        },
+                    },
+                    "artifacts": {"remote_rx_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-001_rx"},
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                        "transport": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                        "inference": {"completed_count": 5, "expected_count": 5, "state": "completed"},
+                    },
+                },
+            }
+
+        fake_live_job = Mock(job_id="usrp-mnn-live-001")
+        with (
+            patch.object(state, "_arm_mlkem_security_context", return_value=(None, None)),
+            patch("server.launch_local_usrp_reconstruction_job", return_value=fake_live_job),
+            patch.object(state, "_register_live_job", side_effect=fake_register_live_job),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_mnn_batch_inference(count=5)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"usrp mnn batch did not finish: {state.get_batch_state()}")
+
+            status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["engine"], "mnn")
+        self.assertEqual(final_state["benchmark"]["total_ms"]["median_ms"], 329.6)
+        self.assertEqual(final_state["quality"]["psnr_db"], server.build_prerecorded_inference_result(0, "current")["quality"]["psnr_db"])
+        self.assertEqual(status, 200)
+        self.assertEqual(system_payload["recent_results"]["current"]["execution_mode"], "live")
+        self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "mnn")
+        self.assertEqual(system_payload["recent_results"]["current"]["quality"]["ssim"], server.build_prerecorded_inference_result(0, "current")["quality"]["ssim"])
+
+    def test_start_mnn_batch_inference_updates_progress_while_running(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        progress_seen = threading.Event()
+        release_runner = threading.Event()
+
+        mnn_summary = {
+            "status": "ok",
+            "variant": "current",
+            "selected_input_count": 300,
+            "processed_count": 300,
+            "sample_stats": {
+                "run_ms": {"count": 300, "min_ms": 100.0, "max_ms": 200.0, "mean_ms": 150.0, "median_ms": 149.0},
+                "total_ms": {"count": 300, "min_ms": 220.0, "max_ms": 380.0, "mean_ms": 310.0, "median_ms": 308.0},
+            },
+        }
+
+        def fake_run_mnn_batch(*, count: int = 300, progress_callback=None) -> dict[str, object]:
+            self.assertEqual(count, 300)
+            self.assertIsNotNone(progress_callback)
+            progress_callback(120, 300)
+            progress_seen.set()
+            release_runner.wait(timeout=1.0)
+            return mnn_summary
+
+        with patch.object(state, "_run_mnn_batch", side_effect=fake_run_mnn_batch):
+            payload = state.start_mnn_batch_inference(count=300)
+            self.assertEqual(payload["status"], "started")
+            self.assertTrue(progress_seen.wait(timeout=1.0), "mnn progress callback was not observed")
+            mid_state = state.get_batch_state()
+            self.assertEqual(mid_state["status"], "running")
+            self.assertEqual(mid_state["engine"], "mnn")
+            self.assertEqual(mid_state["completed"], 120)
+            self.assertEqual(mid_state["total"], 300)
+            release_runner.set()
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"mnn batch did not finish after progress update: {state.get_batch_state()}")
+
+    def test_run_mnn_batch_does_not_leak_torch_pythonpath_without_explicit_mnn_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / "mnn.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "REMOTE_HOST=100.121.87.73",
+                        "REMOTE_USER=user",
+                        "REMOTE_PASS=user",
+                        "REMOTE_SSH_PORT=22",
+                        "REMOTE_MNN_PYTHON=/home/user/anaconda3/envs/MNN/bin/python",
+                        "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/encoder_outputs",
+                        "REMOTE_OUTPUT_BASE=/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
+                        "REMOTE_SNR_CURRENT=10",
+                        "MNN_FP32_MODEL=/home/user/Downloads/MNNversion/origin/model1.mnn",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            captured_env: dict[str, str] = {}
+            captured_cmd: list[str] = []
+
+            def fake_popen(*args, **kwargs):
+                if args:
+                    captured_cmd.extend(list(args[0]))
+                captured_env.update(kwargs.get("env") or {})
+                return FakePopen(
+                    stdout_lines=[
+                        json.dumps(
+                            {
+                                "status": "ok",
+                                "selected_input_count": 3,
+                                "processed_count": 3,
+                                "sample_stats": {},
+                                "errors": [],
+                            },
+                            ensure_ascii=False,
+                        )
+                    ]
+                )
+
+            with (
+                patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.subprocess.Popen", side_effect=fake_popen),
+            ):
+                payload = state._run_mnn_batch(count=3)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertNotIn("REMOTE_TORCH_PYTHONPATH", captured_env)
+        self.assertNotIn("REMOTE_REAL_EXTRA_PYTHONPATH", captured_env)
+        self.assertIn("--warmup-inputs", captured_cmd)
+        self.assertEqual(captured_cmd[captured_cmd.index("--warmup-inputs") + 1], "0")
+
+    def test_run_mnn_batch_uses_usrp_rx_dir_when_input_source_is_usrp(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides(
+            {
+                "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / "mnn.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "REMOTE_HOST=100.121.87.73",
+                        "REMOTE_USER=user",
+                        "REMOTE_PASS=user",
+                        "REMOTE_SSH_PORT=22",
+                        "REMOTE_MNN_PYTHON=/home/user/anaconda3/envs/MNN/bin/python",
+                        "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/encoder_outputs",
+                        "REMOTE_OUTPUT_BASE=/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
+                        "REMOTE_SNR_CURRENT=10",
+                        "MNN_FP32_MODEL=/home/user/Downloads/MNNversion/origin/model1.mnn",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            captured_env: dict[str, str] = {}
+
+            def fake_popen(*args, **kwargs):
+                del args
+                captured_env.update(kwargs.get("env") or {})
+                return FakePopen(
+                    stdout_lines=[
+                        json.dumps(
+                            {
+                                "status": "ok",
+                                "selected_input_count": 3,
+                                "processed_count": 3,
+                                "sample_stats": {},
+                                "errors": [],
+                            },
+                            ensure_ascii=False,
+                        )
+                    ]
+                )
+
+            with (
+                patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.subprocess.Popen", side_effect=fake_popen),
+            ):
+                payload = state._run_mnn_batch(count=3)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(captured_env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(captured_env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+
+    def test_usrp_stage_access_uses_run_specific_tvm_output_prefix(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides(
+            {
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "REMOTE_OUTPUT_BASE": "/home/user/Downloads/jscc-test/jscc/infer_outputs",
+                "INFERENCE_REAL_OUTPUT_PREFIX": "openamp3_handwritten_mean4_v7_direct",
+            }
+        )
+
+        access = state._usrp_stage_access(
+            base_access,
+            {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx"},
+        )
+        env = access.build_env()
+
+        self.assertEqual(env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(env["REMOTE_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx")
+        self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/tvm")
+        self.assertEqual(env["INFERENCE_REAL_OUTPUT_PREFIX"], "openamp3_usrp_123")
+
+    def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides(
+            {
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "REMOTE_OUTPUT_BASE": "/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
+            }
+        )
+
+        access = state._usrp_stage_access(
+            base_access,
+            {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-456_rx"},
+            engine=server.INFERENCE_ENGINE_MNN,
+        )
+        env = access.build_env()
+
+        self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-456_rx")
+        self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/mnn")
+        self.assertEqual(env["INFERENCE_REAL_OUTPUT_PREFIX"], "openamp3_usrp_456")
+
+    def test_post_run_mnn_batch_uses_dashboard_state_entrypoint(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.object(
+            state,
+            "start_mnn_batch_inference",
+            return_value={"status": "started", "batch_job_id": "mnn-demo-300", "total": 300, "engine": "mnn"},
+        ) as start_mnn:
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-mnn-batch",
+                body=json.dumps({"count": 300}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "started")
+        self.assertEqual(payload["engine"], "mnn")
+        start_mnn.assert_called_once_with(count=300)
+
+    def test_run_demo_inference_with_crypto_uses_standard_live_job_with_security_context(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = Mock(configured=True, probe_ready=False, connection_ready=True)
+
+        fake_live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "control_transport": "hook",
+                    "progress": {
+                        "completed_count": 0,
+                        "expected_count": 300,
+                    },
+                }
+            ],
+            job_id="live-job-001",
+        )
+
+        class FakeVariantAccess:
+            def missing_inference_fields(self, variant: str) -> list[str]:
+                del variant
+                return []
+
+        security_context = {
+            "protocol": "mlkem_control",
+            "handshake_ms": 12.3,
+            "summary": "ML-KEM 安全协议已建立；Current 继续走板端本地 latent / 既有 live 数据面。",
+            "channel_state": "ok",
+        }
+
+        with (
+            patch.object(state, "_live_board_access_for_variant", return_value=FakeVariantAccess()),
+            patch("server.expected_sha_for_variant", return_value="abcd" * 16),
+            patch("server.describe_demo_variant_support", return_value={"mode": "signed_manifest_v1"}),
+            patch.object(state, "_arm_mlkem_security_context", return_value=(security_context, None)),
+            patch.object(state, "run_mlkem_inference", side_effect=AssertionError("legacy ML-KEM data path should not be used")),
+            patch("server.launch_remote_reconstruction_job", return_value=fake_live_job) as launch_job,
+        ):
+            payload = state.run_demo_inference(variant="current", image_index=0)
+
+        launch_job.assert_called_once()
+        self.assertEqual(payload["job_id"], "live-job-001")
+        self.assertEqual(payload["status"], "running")
+        self.assertIn("ML-KEM 安全协议就绪", str(payload["source_label"]))
+        self.assertIn("板端本地 latent", str(payload["message"]))
+        security = payload.get("live_attempt", {}).get("security", {})
+        self.assertEqual(security.get("protocol"), "mlkem_control")
+        self.assertEqual(security.get("handshake_ms"), 12.3)
+
+    def test_run_demo_inference_with_usrp_transport_uses_local_usrp_job_with_mlkem_control(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        fake_live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "USRP 数据面 batch-spool 正在推进；界面继续使用归档样例图，无线链路指标来自当前 2922 运行时。",
+                    "control_transport": "mlkem",
+                    "data_transport": "usrp",
+                    "control_handshake_complete": True,
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("USRP 混合链路在线推进", "running", 76, "USRP 数据面 76/300"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="usrp-live-001",
+        )
+        security_context = {
+            "protocol": "mlkem_control",
+            "handshake_ms": 8.5,
+            "summary": "ML-KEM 安全协议已建立；Current 继续走 USRP 数据面。",
+            "channel_state": "ok",
+        }
+
+        with (
+            patch.object(state, "_arm_mlkem_security_context", return_value=(security_context, None)),
+            patch("server.launch_local_usrp_reconstruction_job", return_value=fake_live_job) as launch_usrp_job,
+            patch("server.launch_remote_reconstruction_job", side_effect=AssertionError("OpenAMP live path should not be used in usrp mode")),
+            patch("server.expected_sha_for_variant", side_effect=AssertionError("USRP mode should not require OpenAMP artifact sha gate")),
+            patch("server.describe_demo_variant_support", side_effect=AssertionError("USRP mode should not inspect OpenAMP variant support")),
+        ):
+            payload = state.run_demo_inference(variant="current", image_index=0)
+
+        launch_usrp_job.assert_called_once()
+        _, kwargs = launch_usrp_job.call_args
+        self.assertEqual(kwargs["variant"], "current")
+        self.assertEqual(kwargs["control_transport"], "mlkem")
+        self.assertEqual(payload["job_id"], "usrp-live-001")
+        self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["live_attempt"]["data_transport"], "usrp")
+        self.assertIn("USRP 混合链路", str(payload["source_label"]))
+        self.assertIn("2922", str(payload["message"]))
+        security = payload.get("live_attempt", {}).get("security", {})
+        self.assertEqual(security.get("protocol"), "mlkem_control")
+        self.assertEqual(security.get("handshake_ms"), 8.5)
+
+    def test_run_demo_inference_blocks_nontrusted_current_when_admission_stays_legacy_sha(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = Mock(configured=True, probe_ready=False, connection_ready=True)
+        state._trusted_current_sha = "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1"
+
+        class FakeVariantAccess:
+            def missing_inference_fields(self, variant: str) -> list[str]:
+                del variant
+                return []
+
+        with (
+            patch.object(state, "_live_board_access_for_variant", return_value=FakeVariantAccess()),
+            patch(
+                "server.expected_sha_for_variant",
+                return_value="bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+            ),
+            patch(
+                "server.describe_demo_variant_support",
+                return_value={"mode": "legacy_sha", "label": "Current live 仍走 legacy SHA", "launch_allowed": True},
+            ),
+            patch("server.launch_remote_reconstruction_job") as launch_job,
+            patch("server.query_live_status") as status_probe,
+        ):
+            payload = state.run_demo_inference(variant="current", image_index=0)
+
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["status_category"], "config_error")
+        self.assertIn("signed-manifest admission", str(payload["message"]))
+        self.assertIn("legacy SHA allowlist", str(payload["message"]))
+        launch_job.assert_not_called()
+        status_probe.assert_not_called()
+
+    def test_run_mlkem_inference_subprocess_failure_completes_as_fallback(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        preflight = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch("server.query_live_status", return_value=preflight),
+            patch(
+                "server.resolve_local_crypto_client",
+                return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")]),
+            ),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={
+                    "supports_daemon": True,
+                    "supports_count": True,
+                    "supports_json_summary": True,
+                    "supports_output": True,
+                    "supports_expect_result": False,
+                    "supports_batch_summary": True,
+                    "legacy_single_input_only": False,
+                },
+            ),
+            patch(
+                "server.build_local_crypto_client_command",
+                return_value=(["fake-python", "tcp_client.py"], {}),
+            ),
+            patch(
+                "server.subprocess.Popen",
+                return_value=FakePopen(stderr_text="simulated subprocess failure", returncode=1),
+            ),
+        ):
+            start_payload = state.run_mlkem_inference(variant="current", image_index=0, max_inputs=1)
+            self.assertEqual(start_payload["request_state"], "running")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                progress = state.get_inference_progress(str(start_payload["job_id"]))
+                if progress.get("request_state") == "completed":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("ML-KEM subprocess failure path stayed in running state")
+
+        self.assertEqual(progress["status"], "fallback")
+        self.assertEqual(progress["request_state"], "completed")
+        self.assertEqual(progress["live_progress"]["state"], "fallback")
+        self.assertIn("ML-KEM 批量失败", progress["live_progress"]["event_log"][0])
+
+    def test_run_mlkem_inference_daemon_fallback_preserves_completed_count(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+
+        class FakeMgr:
+            def __init__(self) -> None:
+                self.is_alive = True
+                self._host = "demo-board"
+                self._client_script = Path("/tmp/tcp_client.py")
+                self._handshake_ms = 9.0
+                self._calls = 0
+
+            def ensure_alive(self) -> None:
+                return None
+
+            def send_image(
+                self,
+                input_path: str,
+                job_id: str,
+                *,
+                run_tvm: bool = False,
+                expect_result: bool = False,
+            ) -> dict[str, object]:
+                del input_path, job_id, expect_result
+                self.run_tvm = run_tvm
+                self._calls += 1
+                if self._calls == 1:
+                    return {
+                        "status": "ok",
+                        "sha256_match": True,
+                        "result_received": True,
+                        "inference_ms": 5.0,
+                        "total_ms": 8.0,
+                    }
+                raise RuntimeError("daemon link lost")
+
+        fake_mgr = FakeMgr()
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=fake_mgr),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={
+                    "supports_daemon": True,
+                    "supports_count": True,
+                    "supports_json_summary": True,
+                    "supports_output": True,
+                    "supports_expect_result": True,
+                    "supports_batch_summary": True,
+                    "legacy_single_input_only": False,
+                },
+            ),
+            patch(
+                "server.build_local_crypto_client_command",
+                return_value=(["fake-python", "tcp_client.py"], {}),
+            ),
+            patch(
+                "server.subprocess.Popen",
+                return_value=FakePopen(
+                    stdout_lines=[
+                        "✓ remain-1\n",
+                        "✓ remain-2\n",
+                        '{"success": 2, "total": 2, "handshake_ms": 7.0, "per_image_ms": 11.0}\n',
+                    ],
+                    returncode=0,
+                ),
+            ) as popen_mock,
+        ):
+            start_payload = state.run_mlkem_inference(variant="current", image_index=0, max_inputs=3)
+            self.assertEqual(start_payload["request_state"], "running")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                progress = state.get_inference_progress(str(start_payload["job_id"]))
+                if progress.get("request_state") == "completed":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("ML-KEM daemon fallback path did not finish")
+
+        self.assertEqual(progress["status"], "success")
+        self.assertEqual(progress["live_progress"]["completed_count"], 3)
+        self.assertAlmostEqual(progress["timings"]["payload_ms"], 5.0)
+        self.assertAlmostEqual(progress["timings"]["total_ms"], 18.0)
+        popen_cmd = " ".join(popen_mock.call_args.args[0])
+        self.assertIn("--run-tvm", popen_cmd)
+        self.assertNotIn("--expect-result", popen_cmd)
+
+    def test_run_mlkem_inference_daemon_requires_board_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+
+        class FakeMgr:
+            def __init__(self) -> None:
+                self.is_alive = True
+                self._host = "demo-board"
+                self._client_script = Path("/tmp/tcp_client.py")
+                self._handshake_ms = 9.0
+
+            def ensure_alive(self) -> None:
+                return None
+
+            def send_image(
+                self,
+                input_path: str,
+                job_id: str,
+                *,
+                run_tvm: bool = False,
+                expect_result: bool = False,
+            ) -> dict[str, object]:
+                del input_path, job_id
+                self.run_tvm = run_tvm
+                self.expect_result = expect_result
+                return {
+                    "status": "ok",
+                    "sha256_match": True,
+                    "result_received": False,
+                    "inference_ms": None,
+                    "total_ms": 8.0,
+                }
+
+        fake_mgr = FakeMgr()
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=fake_mgr),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={
+                    "supports_daemon": True,
+                    "supports_count": True,
+                    "supports_json_summary": True,
+                    "supports_output": True,
+                    "supports_expect_result": True,
+                    "supports_batch_summary": True,
+                    "legacy_single_input_only": False,
+                },
+            ),
+        ):
+            start_payload = state.run_mlkem_inference(variant="current", image_index=0, max_inputs=1)
+            self.assertEqual(start_payload["request_state"], "running")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                progress = state.get_inference_progress(str(start_payload["job_id"]))
+                if progress.get("request_state") == "completed":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("ML-KEM daemon missing-result path did not finish")
+
+        self.assertTrue(fake_mgr.run_tvm)
+        self.assertTrue(fake_mgr.expect_result)
+        self.assertEqual(progress["status"], "fallback")
+        self.assertIn("未收到板端重建结果", progress["message"])
+
+    def test_reset_crypto_channel_closes_session_and_schedules_remote_restart_for_tcp(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        fake_mgr = Mock()
+        state._mlkem_session_mgr = fake_mgr
+        state._crypto_status_cache = {"channel_state": "ok"}
+        state._crypto_status_cache_ts = 123.0
+
+        fake_thread = Mock()
+        fake_thread.start = Mock()
+
+        with patch("server.threading.Thread", return_value=fake_thread) as thread_ctor:
+            payload = state.reset_crypto_channel()
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertTrue(payload["session_closed"])
+        self.assertTrue(payload["remote_restart_scheduled"])
+        fake_mgr.close.assert_called_once_with()
+        self.assertIsNone(state._mlkem_session_mgr)
+        self.assertIsNone(state._crypto_status_cache)
+        self.assertEqual(state._crypto_status_cache_ts, 0.0)
+        thread_ctor.assert_called_once()
+        fake_thread.start.assert_called_once_with()
+
+    def test_get_mlkem_session_manager_replaces_mismatched_existing_manager(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        env_values = {"MLKEM_TRANSPORT_MODE": "tcp"}
+        old_mgr = Mock()
+        old_mgr.matches_config.return_value = False
+        state._mlkem_session_mgr = old_mgr
+        new_mgr = Mock()
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={"supports_daemon": True},
+            ),
+            patch("server.MlkemSessionManager", return_value=new_mgr) as mgr_ctor,
+        ):
+            mgr = state._get_mlkem_session_manager(board_access, env_values)
+
+        self.assertIs(mgr, new_mgr)
+        old_mgr.close.assert_called_once_with()
+        mgr_ctor.assert_called_once_with(env_values, host="demo-board", client_script=Path("/tmp/tcp_client.py"))
+
+    def test_crypto_reset_endpoint_calls_dashboard_state(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.object(
+            state,
+            "reset_crypto_channel",
+            return_value={"status": "ok", "message": "reset ok"},
+        ) as reset_crypto_channel:
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/crypto-reset",
+                body=json.dumps({"restart_remote_server": False}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+        reset_crypto_channel.assert_called_once_with(restart_remote_server=False)
+
+    def test_run_mlkem_inference_legacy_client_compatibility_caps_single_launch(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        preflight = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+        run_calls: list[list[str]] = []
+
+        def fake_run(
+            cmd: list[str],
+            *,
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+            env: dict[str, str],
+        ):
+            del capture_output, text, timeout, env
+            run_calls.append(list(cmd))
+            self.assertNotIn("--daemon", cmd)
+            self.assertNotIn("--count", cmd)
+            self.assertNotIn("--json-summary", cmd)
+            input_path = Path(cmd[cmd.index("--input") + 1])
+            self.assertEqual(input_path.stat().st_size, 1 * 3 * 64 * 64 * 4)
+            stdout = "\n".join(
+                [
+                    "密码套件:  SM4_GCM",
+                    "KEM 后端:  mock-backend",
+                    "握手完成: 9.0ms",
+                    "加密发送: 49152B, 耗时 3.0ms",
+                    "✓ 传输成功",
+                    "  对端 SHA256 匹配: 是",
+                    "  TVM 推理耗时: 21.0ms",
+                    "  接收重建结果: 49152B, 耗时 4.0ms",
+                ]
+            )
+            return server.subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch("server.query_live_status", return_value=preflight),
+            patch(
+                "server.resolve_local_crypto_client",
+                return_value=(Path("/tmp/legacy_tcp_client.py"), [Path("/tmp/legacy_tcp_client.py")]),
+            ),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={
+                    "supports_daemon": False,
+                    "supports_count": False,
+                    "supports_json_summary": False,
+                    "supports_output": True,
+                    "supports_expect_result": False,
+                    "supports_batch_summary": False,
+                    "legacy_single_input_only": True,
+                },
+            ),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", "tcp_client.py", "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch("server.subprocess.run", side_effect=fake_run),
+        ):
+            start_payload = state.run_mlkem_inference(variant="current", image_index=0)
+            self.assertEqual(start_payload["request_state"], "running")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                progress = state.get_inference_progress(str(start_payload["job_id"]))
+                if progress.get("request_state") == "completed":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("ML-KEM legacy compatibility path did not finish")
+
+        self.assertEqual(len(run_calls), 1)
+        self.assertEqual(progress["status"], "success")
+        self.assertEqual(progress["live_progress"]["completed_count"], 1)
+        self.assertEqual(progress["live_progress"]["expected_count"], 1)
+        self.assertAlmostEqual(progress["timings"]["payload_ms"], 21.0)
+        self.assertAlmostEqual(progress["timings"]["total_ms"], 37.0)
+
+    def test_run_mlkem_inference_legacy_client_requires_reconstruction_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        preflight = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+            "logs": [],
+        }
+
+        def fake_run(
+            cmd: list[str],
+            *,
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+            env: dict[str, str],
+        ):
+            del capture_output, text, timeout, env
+            self.assertIn("--expect-result", cmd)
+            stdout = "\n".join(
+                [
+                    "密码套件:  SM4_GCM",
+                    "KEM 后端:  mock-backend",
+                    "握手完成: 9.0ms",
+                    "加密发送: 49152B, 耗时 3.0ms",
+                    "✓ 传输成功",
+                    "  对端 SHA256 匹配: 是",
+                    "  板端重建结果: 未回传",
+                ]
+            )
+            return server.subprocess.CompletedProcess(cmd, 2, stdout=stdout, stderr="")
+
+        with (
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch("server.query_live_status", return_value=preflight),
+            patch(
+                "server.resolve_local_crypto_client",
+                return_value=(Path("/tmp/local_wrapper_tcp_client.py"), [Path("/tmp/local_wrapper_tcp_client.py")]),
+            ),
+            patch(
+                "server.inspect_local_crypto_client_capabilities",
+                return_value={
+                    "supports_daemon": False,
+                    "supports_count": False,
+                    "supports_json_summary": False,
+                    "supports_output": True,
+                    "supports_expect_result": True,
+                    "supports_batch_summary": False,
+                    "legacy_single_input_only": True,
+                },
+            ),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", "tcp_client.py", "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch("server.subprocess.run", side_effect=fake_run),
+        ):
+            start_payload = state.run_mlkem_inference(variant="current", image_index=0)
+            self.assertEqual(start_payload["request_state"], "running")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                progress = state.get_inference_progress(str(start_payload["job_id"]))
+                if progress.get("request_state") == "completed":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("ML-KEM legacy result-required path did not finish")
+
+        self.assertEqual(progress["status"], "fallback")
+        self.assertIn("板端重建结果: 未回传", progress["message"])
+        self.assertEqual(progress["live_progress"]["expected_count"], 1)
+        self.assertEqual(progress["live_progress"]["count_label"], "0 / 1")
+        self.assertIsNone(progress["timings"]["payload_ms"])
+        self.assertIsNone(progress["timings"]["total_ms"])
+        self.assertEqual(progress["timings"]["stages"], [])
+
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+        self.assertEqual(status, 200)
+        self.assertIsNone(system_payload["recent_results"]["current"]["timings"]["payload_ms"])
+        self.assertIsNone(system_payload["recent_results"]["current"]["timings"]["total_ms"])
+
+    def test_ensure_board_aircraft_position_bridge_uploads_assets_and_enables_service(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "AIRCRAFT_POSITION_UPSTREAM_URL": "http://127.0.0.1:9000/gps",
+                    "AIRCRAFT_POSITION_BACKEND_BASE_URL": "http://demo-host:8079",
+                    "AIRCRAFT_POSITION_GROUND_SPEED_SCALE": "3.6",
+                }
+            ),
+        )
+        uploaded: dict[str, dict[str, object]] = {}
+
+        def fake_write_remote_text_file(
+            _board_access: server.BoardAccessConfig,
+            *,
+            remote_path: str,
+            content: str,
+            mode: int,
+            timeout: float,
+        ) -> None:
+            del _board_access, timeout
+            uploaded[remote_path] = {"content": content, "mode": mode}
+
+        with (
+            patch.object(state, "_write_remote_text_file", side_effect=fake_write_remote_text_file),
+            patch(
+                "server.run_ssh_command",
+                return_value=server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+            ) as run_ssh,
+        ):
+            state._ensure_board_aircraft_position_bridge(board_access)
+
+        remote_paths = server._aircraft_position_bridge_remote_paths(server.DEFAULT_AIRCRAFT_POSITION_REMOTE_ROOT)
+        self.assertIn(remote_paths["env_file"], uploaded)
+        self.assertIn(
+            "AIRCRAFT_POSITION_UPSTREAM_URL=http://127.0.0.1:9000/gps",
+            uploaded[remote_paths["env_file"]]["content"],
+        )
+        self.assertIn(
+            "AIRCRAFT_POSITION_BACKEND_BASE_URL=http://demo-host:8079",
+            uploaded[remote_paths["env_file"]]["content"],
+        )
+        self.assertEqual(uploaded[remote_paths["env_file"]]["mode"], 0o600)
+        self.assertIn(remote_paths["user_service"], uploaded)
+        self.assertIn(
+            "systemctl --user enable --now aircraft-position-bridge.service",
+            run_ssh.call_args.kwargs["remote_command"],
+        )
+
+    def test_ensure_board_position_api_service_uploads_assets_and_launches_service(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        uploaded: dict[str, dict[str, object]] = {}
+
+        def fake_write_remote_text_file(
+            _board_access: server.BoardAccessConfig,
+            *,
+            remote_path: str,
+            content: str,
+            mode: int,
+            timeout: float,
+        ) -> None:
+            del _board_access, timeout
+            uploaded[remote_path] = {"content": content, "mode": mode}
+
+        with (
+            patch.object(state, "_write_remote_text_file", side_effect=fake_write_remote_text_file),
+            patch(
+                "server.run_ssh_command",
+                return_value=server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+            ) as run_ssh,
+        ):
+            state._ensure_board_position_api_service(board_access)
+
+        remote_paths = server._board_position_api_remote_paths(server.DEFAULT_BOARD_POSITION_API_REMOTE_ROOT)
+        self.assertIn(remote_paths["env_file"], uploaded)
+        self.assertIn("BOARD_POSITION_API_BIND_HOST=127.0.0.1", uploaded[remote_paths["env_file"]]["content"])
+        self.assertIn("BOARD_POSITION_API_PORT=9000", uploaded[remote_paths["env_file"]]["content"])
+        self.assertIn(remote_paths["user_service"], uploaded)
+        self.assertEqual(run_ssh.call_count, 1)
+        self.assertIn("sudo -S -k bash -lc", run_ssh.call_args.kwargs["remote_command"])
+        self.assertIn("nohup", run_ssh.call_args.kwargs["remote_command"])
+        self.assertIn("run_board_position_api_service.sh", run_ssh.call_args.kwargs["remote_command"])
+        self.assertIn("$PY -c", run_ssh.call_args.kwargs["remote_command"])
+        self.assertIn("base64.b64decode", run_ssh.call_args.kwargs["remote_command"])
+
+    def test_ensure_board_position_api_service_propagates_external_http_position_env(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        ).with_env_overrides(
+            {
+                "AIRCRAFT_POSITION_UPSTREAM_URL": "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                "AIRCRAFT_POSITION_LATITUDE_PATH": "content.point.y",
+                "AIRCRAFT_POSITION_LONGITUDE_PATH": "content.point.x",
+                "AIRCRAFT_POSITION_SOURCE_LABEL": "百度IP定位",
+            }
+        )
+        uploaded: dict[str, str] = {}
+
+        def fake_write_remote_text_file(
+            _board_access: server.BoardAccessConfig,
+            *,
+            remote_path: str,
+            content: str,
+            mode: int,
+            timeout: float,
+        ) -> None:
+            del _board_access, mode, timeout
+            uploaded[remote_path] = content
+
+        with (
+            patch.object(state, "_write_remote_text_file", side_effect=fake_write_remote_text_file),
+            patch(
+                "server.run_ssh_command",
+                return_value=server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+            ),
+        ):
+            state._ensure_board_position_api_service(board_access)
+
+        remote_paths = server._board_position_api_remote_paths(server.DEFAULT_BOARD_POSITION_API_REMOTE_ROOT)
+        env_content = uploaded[remote_paths["env_file"]]
+        self.assertIn("export AIRCRAFT_POSITION_UPSTREAM_URL=", env_content)
+        self.assertIn("api.map.baidu.com/location/ip", env_content)
+        self.assertIn("export AIRCRAFT_POSITION_LATITUDE_PATH=content.point.y", env_content)
+        self.assertIn("export AIRCRAFT_POSITION_LONGITUDE_PATH=content.point.x", env_content)
+        self.assertIn("export BOARD_POSITION_API_SOURCE_ORDER=http,gpsd,nmea", env_content)
+
+    def test_ensure_board_position_api_service_reports_launch_failure(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with (
+            patch.object(state, "_write_remote_text_file", return_value=None),
+            patch(
+                "server.run_ssh_command",
+                side_effect=[
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="sudo failed"),
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="systemd failed"),
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="fallback failed"),
+                ],
+            ) as run_ssh,
+            patch("builtins.print") as print_mock,
+        ):
+            state._ensure_board_position_api_service(board_access)
+
+        self.assertEqual(run_ssh.call_count, 3)
+        self.assertIn("sudo -S -k bash -lc", run_ssh.call_args_list[0].kwargs["remote_command"])
+        self.assertIn("nohup", run_ssh.call_args_list[1].kwargs["remote_command"])
+        self.assertIn(
+            "systemctl --user enable --now board-position-api.service",
+            run_ssh.call_args_list[2].kwargs["remote_command"],
+        )
+        self.assertIn("$PY -c", run_ssh.call_args_list[2].kwargs["remote_command"])
+        self.assertIn("base64.b64decode", run_ssh.call_args_list[2].kwargs["remote_command"])
+        print_mock.assert_called()
+
+    def test_ensure_board_position_api_service_falls_back_to_systemd_when_direct_launch_fails(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with (
+            patch.object(state, "_write_remote_text_file", return_value=None),
+            patch(
+                "server.run_ssh_command",
+                side_effect=[
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="root launch failed"),
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="direct launch failed"),
+                    server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                ],
+            ) as run_ssh,
+        ):
+            state._ensure_board_position_api_service(board_access)
+
+        self.assertEqual(run_ssh.call_count, 3)
+        self.assertIn("sudo -S -k bash -lc", run_ssh.call_args_list[0].kwargs["remote_command"])
+        self.assertIn("nohup", run_ssh.call_args_list[1].kwargs["remote_command"])
+        self.assertIn(
+            "systemctl --user enable --now board-position-api.service",
+            run_ssh.call_args_list[2].kwargs["remote_command"],
+        )
+
+    def test_aircraft_bridge_runtime_auto_derives_backend_base_url_when_server_binds_publicly(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "AIRCRAFT_POSITION_UPSTREAM_URL": "http://127.0.0.1:9000/gps",
+                }
+            ),
+        )
+
+        with patch(
+            "server._default_backend_base_url_for_board",
+            return_value="http://100.116.93.120:8079",
+        ):
+            runtime = server._aircraft_position_bridge_runtime(
+                board_access,
+                bind_host=state._bind_host,
+                bind_port=state._bind_port,
+            )
+
+        self.assertTrue(runtime["configured"])
+        self.assertEqual(runtime["backend_base_url"], "http://100.116.93.120:8079")
+        self.assertEqual(
+            runtime["runtime_env"]["AIRCRAFT_POSITION_BACKEND_BASE_URL"],
+            "http://100.116.93.120:8079",
+        )
+
+    def test_aircraft_bridge_runtime_uses_auto_discovered_upstream_url(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with patch(
+            "server._default_backend_base_url_for_board",
+            return_value="http://100.116.93.120:8079",
+        ):
+            runtime = server._aircraft_position_bridge_runtime(
+                board_access,
+                bind_host=state._bind_host,
+                bind_port=state._bind_port,
+                discovered_upstream_url="http://127.0.0.1:9527/api/v1/position",
+            )
+
+        self.assertTrue(runtime["configured"])
+        self.assertEqual(runtime["upstream_url"], "http://127.0.0.1:9527/api/v1/position")
+        self.assertEqual(runtime["upstream_url_source"], "auto_discovered")
+        self.assertEqual(
+            runtime["runtime_env"]["AIRCRAFT_POSITION_UPSTREAM_URL"],
+            "http://127.0.0.1:9527/api/v1/position",
+        )
+
+    def test_autostart_board_aircraft_position_bridge_uses_discovered_upstream_url(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with (
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "detected",
+                    "selected_url": "http://127.0.0.1:9527/api/v1/position",
+                    "selected_source": "auto_discovered",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [],
+                },
+            ),
+            patch(
+                "server._default_backend_base_url_for_board",
+                return_value="http://100.116.93.120:8079",
+            ),
+            patch.object(state, "_ensure_board_aircraft_position_bridge") as ensure_bridge,
+        ):
+            state._autostart_board_aircraft_position_bridge(board_access)
+
+        effective_board_access = ensure_bridge.call_args.args[0]
+        self.assertEqual(
+            effective_board_access.build_env()["AIRCRAFT_POSITION_UPSTREAM_URL"],
+            "http://127.0.0.1:9527/api/v1/position",
+        )
+
+    def test_autostart_board_aircraft_position_bridge_starts_board_position_api_first(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        order: list[str] = []
+
+        with (
+            patch.object(state, "_ensure_board_position_api_service", side_effect=lambda *_args, **_kwargs: order.append("position_api")),
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "detected",
+                    "selected_url": "http://127.0.0.1:9000/api/v1/position",
+                    "selected_source": "auto_discovered",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [],
+                },
+            ),
+            patch(
+                "server._default_backend_base_url_for_board",
+                return_value="http://100.116.93.120:8079",
+            ),
+            patch.object(state, "_ensure_board_aircraft_position_bridge", side_effect=lambda *_args, **_kwargs: order.append("bridge")),
+        ):
+            state._autostart_board_aircraft_position_bridge(board_access)
+
+        self.assertEqual(order, ["position_api", "bridge"])
+
+    def test_ensure_board_aircraft_position_bridge_falls_back_to_nohup_when_systemd_user_fails(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "AIRCRAFT_POSITION_UPSTREAM_URL": "http://127.0.0.1:9000/gps",
+                    "AIRCRAFT_POSITION_BACKEND_BASE_URL": "http://demo-host:8079",
+                }
+            ),
+        )
+
+        with (
+            patch.object(state, "_write_remote_text_file", return_value=None),
+            patch(
+                "server.run_ssh_command",
+                side_effect=[
+                    server.subprocess.CompletedProcess([], 1, stdout="", stderr="systemd user bus unavailable"),
+                    server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                ],
+            ) as run_ssh,
+        ):
+            state._ensure_board_aircraft_position_bridge(board_access)
+
+        self.assertEqual(run_ssh.call_count, 2)
+        self.assertIn(
+            "systemctl --user enable --now aircraft-position-bridge.service",
+            run_ssh.call_args_list[0].kwargs["remote_command"],
+        )
+        self.assertIn("nohup", run_ssh.call_args_list[1].kwargs["remote_command"])
+
+    def test_ensure_board_tcp_server_uses_remote_home_tcp_server_when_mlkem_path_unspecified(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        captured: dict[str, object] = {}
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            if remote_command == 'printf %s "$HOME"':
+                return server.subprocess.CompletedProcess([], 0, stdout="/home/demo-user", stderr="")
+            captured.setdefault("commands", []).append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        def fake_build_remote_crypto_server_command(env_values: dict[str, str], *, local_server_script: Path | None = None) -> str:
+            del local_server_script
+            captured["env_values"] = dict(env_values)
+            return "echo start-remote-server"
+
+        with (
+            patch("server.fetch_json_direct", side_effect=RuntimeError("status down")),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/ICCompetition2026/scripts/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", side_effect=fake_build_remote_crypto_server_command),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertEqual(captured["env_values"]["MLKEM_REMOTE_SERVER_SCRIPT"], "/home/demo-user/tcp_server.py")
+        self.assertIn("echo start-remote-server", captured["commands"])
+
+    def test_ensure_board_tcp_server_restarts_when_running_process_uses_shell_wrapped_tvm_python(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "REMOTE_TVM_PYTHON": "env FOO=1 /opt/tvm/bin/python",
+                }
+            ),
+        )
+        captured: list[str] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            captured.append(remote_command)
+            if remote_command == "pgrep -af 'tcp_server.py' || true":
+                return server.subprocess.CompletedProcess(
+                    [],
+                    0,
+                    stdout=(
+                        "257019 /home/user/anaconda3/envs/mlkem/bin/python "
+                        "/home/user/tcp_server.py --tvm --tvm-python env FOO=1 /opt/tvm/bin/python\n"
+                    ),
+                    stderr="",
+                )
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch(
+                "server.fetch_json_direct",
+                side_effect=[
+                    {"cipher_suite": "sm4-gcm"},
+                    {"cipher_suite": "sm4-gcm"},
+                ],
+            ),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertIn("pgrep -af 'tcp_server.py' || true", captured)
+        self.assertIn("pkill -f 'tcp_server.py' || true", captured)
+        self.assertIn("echo restart-remote-server", captured)
+
+    def test_ensure_board_tcp_server_keeps_running_process_when_normalized_tvm_python_matches(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "REMOTE_TVM_PYTHON": (
+                        "env OMP_NUM_THREADS=3 TVM_NUM_THREADS=3 "
+                        "/opt/tvm/bin/python"
+                    ),
+                }
+            ),
+        )
+        captured: list[str] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            captured.append(remote_command)
+            if remote_command == "pgrep -af 'tcp_server.py' || true":
+                return server.subprocess.CompletedProcess(
+                    [],
+                    0,
+                    stdout=(
+                        "257019 /home/user/anaconda3/envs/mlkem/bin/python "
+                        "/home/user/tcp_server.py --tvm --tvm-python /opt/tvm/bin/python\n"
+                    ),
+                    stderr="",
+                )
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch("server.fetch_json_direct", return_value={"cipher_suite": "sm4-gcm"}),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server") as build_cmd,
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertIn("pgrep -af 'tcp_server.py' || true", captured)
+        self.assertNotIn("pkill -f 'tcp_server.py' || true", captured)
+        build_cmd.assert_not_called()
+
+    def test_ensure_board_tcp_server_restarts_stale_process_when_status_port_down(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"}
+            ),
+        )
+        captured: list[str] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            captured.append(remote_command)
+            if remote_command == "pgrep -af 'tcp_server.py' || true":
+                return server.subprocess.CompletedProcess(
+                    [],
+                    0,
+                    stdout=(
+                        "257019 /home/user/anaconda3/envs/mlkem/bin/python "
+                        "/home/demo-user/tcp_server.py --status-port 8080\n"
+                    ),
+                    stderr="",
+                )
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch(
+                "server.fetch_json_direct",
+                side_effect=[
+                    RuntimeError("status down"),
+                    RuntimeError("status down"),
+                    RuntimeError("status down"),
+                    RuntimeError("status down"),
+                    RuntimeError("status down"),
+                    {"cipher_suite": "sm4-gcm"},
+                ],
+            ),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertIn("pgrep -af 'tcp_server.py' || true", captured)
+        self.assertIn("pkill -f 'tcp_server.py' || true", captured)
+        self.assertIn("echo restart-remote-server", captured)
+
+    def test_sync_remote_mlkem_server_assets_uploads_server_helper_and_mlkem_link_once(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            scripts_dir = project_dir / "scripts"
+            scripts_dir.mkdir()
+            package_dir = project_dir / "mlkem_link"
+            package_dir.mkdir()
+            local_server_script = scripts_dir / "tcp_server.py"
+            local_helper_script = scripts_dir / "tvm_inference_helper.py"
+            local_server_script.write_text("#!/usr/bin/env python3\nprint('server')\n", encoding="utf-8")
+            local_helper_script.write_text("#!/usr/bin/env python3\nprint('helper')\n", encoding="utf-8")
+            (scripts_dir / "latent_transport.py").write_text("HELPER = 'latent'\n", encoding="utf-8")
+            (scripts_dir / "run_logger.py").write_text("HELPER = 'logger'\n", encoding="utf-8")
+            (package_dir / "__init__.py").write_text("PACKAGE = True\n", encoding="utf-8")
+            (package_dir / "kem.py").write_text("def demo():\n    return 'kem'\n", encoding="utf-8")
+            uploads: list[str] = []
+
+            def fake_write_remote_text_file(
+                _board_access: server.BoardAccessConfig,
+                *,
+                remote_path: str,
+                content: str,
+                mode: int,
+                timeout: float,
+            ) -> None:
+                del _board_access, content, mode, timeout
+                uploads.append(remote_path)
+
+            with patch.object(state, "_write_remote_text_file", side_effect=fake_write_remote_text_file):
+                first = state._sync_remote_mlkem_server_assets(
+                    board_access,
+                    runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
+                    local_server_script=local_server_script,
+                )
+                second = state._sync_remote_mlkem_server_assets(
+                    board_access,
+                    runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
+                    local_server_script=local_server_script,
+                )
+
+        self.assertTrue(first["updated"])
+        self.assertFalse(second["updated"])
+        self.assertEqual(
+            uploads,
+            [
+                "/home/demo-user/tcp_server.py",
+                "/home/demo-user/tvm_inference_helper.py",
+                "/home/demo-user/latent_transport.py",
+                "/home/demo-user/run_logger.py",
+                "/home/demo-user/mlkem_link/__init__.py",
+                "/home/demo-user/mlkem_link/kem.py",
+            ],
+        )
+
+    def test_get_crypto_status_fetches_board_status_without_proxy(self) -> None:
+        class FakeResponse:
+            def __init__(self, payload: bytes) -> None:
+                self._payload = payload
+
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return self._payload
+
+        class FakeOpener:
+            def __init__(self) -> None:
+                self.seen_request = None
+                self.seen_timeout = None
+
+            def open(self, request, *, timeout: float):
+                self.seen_request = request
+                self.seen_timeout = timeout
+                return FakeResponse(
+                    json.dumps(
+                        {
+                            "channel_state": "ready",
+                            "kem_backend": "tongsuo-ML-KEM-768",
+                            "cipher_suite": "aes-256-gcm",
+                        }
+                    ).encode("utf-8")
+                )
+
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides({"MLKEM_STATUS_PORT": "18080"}),
+        )
+        state._crypto_enabled = True
+        fake_opener = FakeOpener()
+
+        with patch("server.build_opener", return_value=fake_opener) as build_opener:
+            payload = state.get_crypto_status()
+
+        build_opener.assert_called_once()
+        self.assertEqual(fake_opener.seen_request.full_url, "http://100.121.87.73:18080/status")
+        self.assertEqual(fake_opener.seen_timeout, 3)
+        self.assertEqual(payload["channel_state"], "ready")
+        self.assertEqual(payload["kem_backend"], "tongsuo-ML-KEM-768")
+        self.assertEqual(payload["enabled"], True)
+        self.assertEqual(payload["board_configured"], True)
+
+    def test_get_crypto_status_reports_linked_service_mode_on_live(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        payload = state.get_crypto_status()
+
+        self.assertIn("service_mode", payload)
+        self.assertEqual(
+            payload["service_mode"],
+            {
+                "available": True,
+                "source": "live_linked",
+                "current_mode": "FULL_FRAME",
+                "allowed_mode": "FULL_FRAME",
+                "payload_strategy": "Full Frame tensor",
+                "mode_transitions": 1,
+                "last_transition": "Link Director Event",
+                "note": "上位机守护进程已通过 0x60/0x62 服务协议接管动态调度。",
+            },
+        )
+
+    def test_get_crypto_status_preserves_old_control_summary_with_linked_service_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.object(
+            state,
+            "_control_plane_summary",
+            return_value={
+                "control_guard_state": "READY",
+                "control_last_fault_code": "NONE",
+                "control_heartbeat_ok": 0,
+                "control_total_fault_count": 3,
+            },
+        ):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["control_guard_state"], "READY")
+        self.assertEqual(payload["control_last_fault_code"], "NONE")
+        self.assertEqual(payload["control_heartbeat_ok"], 0)
+        self.assertEqual(payload["control_total_fault_count"], 3)
+        self.assertTrue(payload["service_mode"]["available"])
+        self.assertEqual(payload["service_mode"]["current_mode"], "FULL_FRAME")
+
+    def test_refresh_control_plane_status_caches_probe_error(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        with patch("server.query_live_status", side_effect=RuntimeError("rpmsg bridge unavailable")):
+            payload = state._refresh_control_plane_status(
+                board_access,
+                source="unit_test_probe",
+            )
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], "rpmsg bridge unavailable")
+        self.assertEqual(state._last_control_probe_error["status_source"], "probe_error")
+        self.assertEqual(state._last_control_probe_error["message"], "rpmsg bridge unavailable")
+
+    def test_get_crypto_status_does_not_auto_probe_control_when_status_endpoint_fails(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides({"MLKEM_STATUS_PORT": "18080"}),
+        )
+
+        with (
+            patch("server.fetch_json_direct", side_effect=server.URLError("[Errno 111] Connection refused")),
+            patch.object(state, "_refresh_control_plane_status") as refresh_mock,
+        ):
+            payload = state.get_crypto_status()
+
+        refresh_mock.assert_not_called()
+        self.assertEqual(payload["control_guard_state"], "NOT_PROBED")
+        self.assertEqual(payload["control_last_fault_code"], "NOT_PROBED")
+        self.assertEqual(payload["status_source"], "not_probed")
+        self.assertEqual(payload["channel_state"], "idle")
+        self.assertTrue(payload["board_configured"])
+
+    def test_get_crypto_status_ignores_control_probe_error_until_explicit_probe(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        state._last_control_probe_error = {
+            "status": "error",
+            "status_source": "probe_error",
+            "message": "rpmsg unavailable",
+            "guard_state": "PROBE_ERROR",
+            "last_fault_code": "PROBE_ERROR",
+        }
+
+        with patch("server.fetch_json_direct", side_effect=server.URLError("[Errno 111] Connection refused")):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["control_guard_state"], "PROBE_ERROR")
+        self.assertEqual(payload["control_last_fault_code"], "PROBE_ERROR")
+        self.assertEqual(payload["status_source"], "probe_error")
+        self.assertEqual(payload["status_note"], "rpmsg unavailable")
+
+    def test_run_crypto_test_updates_status_cache_from_subprocess_metrics(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        stdout = "\n".join(
+            [
+                "密码套件:  SM4_GCM",
+                "KEM 后端:  mock-backend",
+                "握手完成: 9.0ms",
+                "身份认证:  已启用 (DUAL_REQUIRED)",
+                "服务端标识: phytium-board",
+                "加密发送: 49152B, 耗时 3.0ms",
+                "✓ 传输成功",
+                "  对端 SHA256 匹配: 是",
+                "  TVM 推理耗时: 21.0ms",
+                "  接收重建结果: 65536B, 耗时 4.0ms",
+            ]
+        )
+        control_probe = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "heartbeat_ok": 1,
+            "total_fault_count": 0,
+        }
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch(
+                "server.subprocess.run",
+                return_value=server.subprocess.CompletedProcess(
+                    ["fake-python", "tcp_client.py"],
+                    0,
+                    stdout=stdout,
+                    stderr="",
+                ),
+            ),
+            patch("server.query_live_status", return_value=control_probe) as query_status,
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        query_status.assert_called_once()
+        payload = state.get_crypto_status()
+        self.assertEqual(payload["channel_state"], "idle")
+        self.assertEqual(payload["kem_backend"], "mock-backend")
+        self.assertEqual(payload["cipher_suite"], "sm4-gcm")
+        self.assertEqual(payload["handshake_ms"], 9.0)
+        self.assertEqual(payload["encrypt_ms"], 3.0)
+        self.assertEqual(payload["decrypt_ms"], 4.0)
+        self.assertEqual(payload["inference_ms"], 21.0)
+        self.assertEqual(payload["bytes_sent"], 49152)
+        self.assertEqual(payload["bytes_received"], 65536)
+        self.assertEqual(payload["last_sha256_match"], True)
+        self.assertEqual(payload["session_count"], 1)
+        self.assertEqual(payload["auth_enabled"], True)
+        self.assertEqual(payload["sig_policy"], "DUAL_REQUIRED")
+        self.assertEqual(payload["server_id"], "phytium-board")
+        self.assertEqual(payload["control_guard_state"], "READY")
+        self.assertEqual(payload["control_last_fault_code"], "NONE")
+        self.assertEqual(payload["control_heartbeat_ok"], 1)
+        self.assertEqual(payload["control_total_fault_count"], 0)
+        self.assertIsNone(payload["error"])
+
+    def test_get_crypto_status_reuses_last_successful_crypto_test_when_status_probe_is_unreachable(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_STATUS_PORT": "18080",
+                    "TONGSUO_KEM_BRIDGE": "/tmp/libtongsuo_kem_bridge.so",
+                    "MLKEM_CIPHER_SUITE": "SM4_GCM",
+                }
+            ),
+        )
+
+        class FakeMgr:
+            def __init__(self) -> None:
+                self._handshake_ms = 12.3
+
+            def ensure_alive(self) -> None:
+                return None
+
+            def send_image(
+                self,
+                input_path: str,
+                job_id: str,
+                *,
+                run_tvm: bool = False,
+                expect_result: bool = False,
+            ) -> dict[str, object]:
+                del input_path, job_id, run_tvm, expect_result
+                return {
+                    "status": "ok",
+                    "sha256_match": True,
+                    "encrypt_ms": 7.0,
+                    "decrypt_ms": None,
+                    "inference_ms": None,
+                }
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=FakeMgr()),
+            patch("server.query_live_status", side_effect=RuntimeError("control probe failed")),
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        state._crypto_status_cache_ts = 0.0
+
+        with patch("server.fetch_json_direct", side_effect=server.URLError("[Errno 111] Connection refused")):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["channel_state"], "ready")
+        self.assertEqual(payload["kem_backend"], "tongsuo-ML-KEM-768")
+        self.assertEqual(payload["cipher_suite"], "sm4-gcm")
+        self.assertEqual(payload["handshake_ms"], 12.3)
+        self.assertEqual(payload["encrypt_ms"], 7.0)
+        self.assertTrue((payload["bytes_sent"] or 0) > 0)
+        self.assertEqual(payload["last_sha256_match"], True)
+        self.assertEqual(payload["session_count"], 1)
+        self.assertIn("board status endpoint unavailable", str(payload["error"]))
+
+    def test_set_board_access_applies_auth_policy_overrides(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        payload = state.set_board_access(
+            {
+                "password": "demo-pass",
+                "auth_enabled": True,
+                "auth_sig_policy": "MLDSA_ONLY",
+            }
+        )
+
+        self.assertTrue(payload["has_password"])
+        env = state._board_access.build_env()
+        self.assertEqual(env.get("MLKEM_AUTH_ENABLED"), "1")
+        self.assertEqual(env.get("MLKEM_AUTH_SIG_POLICY"), "MLDSA_ONLY")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_ID"), "phytium-board")
+
+    def test_session_board_access_rejects_unsupported_auth_sig_policy(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "auth_enabled": True, "auth_sig_policy": "RSA_ONLY"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertIn("unsupported auth_sig_policy", str(payload["message"]))
+
+
+class ServerMainTest(unittest.TestCase):
+    def test_server_script_help_runs_without_manual_pythonpath(self) -> None:
+        env = dict(os.environ)
+        env.pop("PYTHONPATH", None)
+
+        result = subprocess.run(
+            [sys.executable, str(DEMO_ROOT / "server.py"), "--help"],
+            cwd=DEMO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("usage: server.py", result.stdout)
+
+    def test_demo_startup_env_overrides_uses_default_baidu_position_config_without_env_file(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with patch.dict(
+            os.environ,
+            {key: "" for key in server.AIRCRAFT_POSITION_RUNTIME_ENV_KEYS},
+            clear=False,
+        ):
+            overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["AIRCRAFT_POSITION_EXECUTION_MODE"], "local")
+        self.assertEqual(
+            overrides["AIRCRAFT_POSITION_UPSTREAM_URL"],
+            server.DEFAULT_DEMO_AIRCRAFT_POSITION_LOCAL_OVERRIDES["AIRCRAFT_POSITION_UPSTREAM_URL"],
+        )
+        self.assertEqual(overrides["AIRCRAFT_POSITION_INTERVAL_SEC"], "30.0")
+        self.assertEqual(overrides["AIRCRAFT_POSITION_LATITUDE_PATH"], "content.point.y")
+        self.assertEqual(overrides["AIRCRAFT_POSITION_LONGITUDE_PATH"], "content.point.x")
+
+    def test_demo_startup_env_overrides_loads_aircraft_position_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = Path(tmpdir) / "aircraft_position.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "AIRCRAFT_POSITION_EXECUTION_MODE=local",
+                        "AIRCRAFT_POSITION_UPSTREAM_URL=https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                        "AIRCRAFT_POSITION_LATITUDE_PATH=content.point.y",
+                        "AIRCRAFT_POSITION_LONGITUDE_PATH=content.point.x",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            args = Namespace(
+                aircraft_position_env=str(env_path),
+                demo_admission_mode="",
+                signed_manifest_file="",
+                signed_manifest_public_key="",
+                baseline_admission_mode="",
+                baseline_signed_manifest_file="",
+                baseline_signed_manifest_public_key="",
+            )
+
+            overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["AIRCRAFT_POSITION_EXECUTION_MODE"], "local")
+        self.assertEqual(
+            overrides["AIRCRAFT_POSITION_UPSTREAM_URL"],
+            "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+        )
+        self.assertEqual(overrides["AIRCRAFT_POSITION_LATITUDE_PATH"], "content.point.y")
+
+    def test_demo_startup_env_overrides_keeps_usrp_runtime_env(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                "OPENAMP_DEMO_LOCAL_LATENT_DIR": "/tmp/latents",
+                "CHUNK_BYTES": "4096",
+                "USRP_WIRE_PREPARE_WORKERS": "2",
+                "USRP_WIRE_CACHE_ENABLED": "1",
+            },
+            clear=False,
+        ):
+            overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(overrides["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"], "/tmp/latents")
+        self.assertEqual(overrides["CHUNK_BYTES"], "4096")
+        self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
+        self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
+
+    def test_usrp_job_default_timeout_scales_with_batch_count(self) -> None:
+        self.assertEqual(
+            usrp_runtime._resolve_usrp_job_timeout_sec({}, expected_outputs=300),
+            1500.0,
+        )
+        self.assertEqual(
+            usrp_runtime._resolve_usrp_job_timeout_sec({"USRP_JOB_TIMEOUT_SEC": "60"}, expected_outputs=300),
+            120.0,
+        )
+        self.assertEqual(
+            usrp_runtime._resolve_usrp_job_timeout_sec({"USRP_JOB_TIMEOUT_SEC": "1800"}, expected_outputs=300),
+            1800.0,
+        )
+
+    def test_usrp_wire_prepare_limits_to_requested_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            source_dir = temp_dir / "latents"
+            output_dir = temp_dir / "prepared"
+            source_dir.mkdir()
+            for idx in range(5):
+                (source_dir / f"{idx:03d}.pt").write_bytes(b"latent")
+
+            def fake_build_transport_blob(path: str, *, job_id: str, payload_codec: str):
+                return (
+                    f"blob-{job_id}".encode("utf-8"),
+                    {"job_id": job_id, "original_filename": f"{job_id}.png"},
+                    {"payload_codec": payload_codec, "payload_bytes": 1, "original_filename": f"{job_id}.png"},
+                )
+
+            with patch.object(usrp_runtime, "build_transport_blob", side_effect=fake_build_transport_blob) as build_blob:
+                manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=output_dir,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=2,
+                    prepare_workers=1,
+                )
+
+        self.assertEqual(build_blob.call_count, 2)
+        self.assertEqual(manifest["available_count"], 5)
+        self.assertEqual(manifest["selected_count"], 2)
+        self.assertEqual(manifest["count"], 2)
+        self.assertEqual([Path(item["source"]).name for item in manifest["files"]], ["000.pt", "001.pt"])
+        self.assertEqual(manifest["files"][0]["source_image"], "000.png")
+        self.assertRegex(manifest["files"][0]["source_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_host_image_latent_manifest_rejects_changed_image(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            image_dir = temp_dir / "images"
+            output_dir = temp_dir / "latents"
+            image_dir.mkdir()
+            output_dir.mkdir()
+            image_path = image_dir / "000.png"
+            image_path.write_bytes(b"image-a")
+            records, available_count = usrp_runtime._host_image_records(image_dir, output_dir, 1)
+            latent_path = Path(records[0]["latent"])
+            latent_path.write_bytes(b"latent-a")
+            manifest = usrp_runtime._write_host_image_latent_manifest(
+                output_dir=output_dir,
+                image_dir=image_dir,
+                files=records,
+                config_str="6_6_6_6_6_6_6",
+                snr="10",
+                device="cpu",
+                elapsed_sec=0.1,
+                available_image_count=available_count,
+            )
+
+            valid = usrp_runtime._host_image_latent_cache_valid(
+                image_dir=image_dir,
+                output_dir=output_dir,
+                expected_count=1,
+                config_str="6_6_6_6_6_6_6",
+                snr="10",
+                device="cpu",
+            )
+            original_stat = image_path.stat()
+            image_path.write_bytes(b"image-b")
+            os.utime(image_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+            invalid = usrp_runtime._host_image_latent_cache_valid(
+                image_dir=image_dir,
+                output_dir=output_dir,
+                expected_count=1,
+                config_str="6_6_6_6_6_6_6",
+                snr="10",
+                device="cpu",
+            )
+
+        self.assertIsNotNone(valid)
+        self.assertEqual(valid[1][0], latent_path)
+        self.assertEqual(manifest["files"][0]["source_image_rel"], "000.png")
+        self.assertRegex(manifest["files"][0]["source_image_sha256"], r"^[0-9a-f]{64}$")
+        self.assertIsNone(invalid)
+
+    def test_usrp_wire_prepare_can_use_explicit_source_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            source_dir = temp_dir / "latents"
+            output_dir = temp_dir / "prepared"
+            source_dir.mkdir()
+            first = source_dir / "000.pt"
+            second = source_dir / "001.pt"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+
+            def fake_build_transport_blob(path: str, *, job_id: str, payload_codec: str):
+                return (
+                    Path(path).read_bytes(),
+                    {"job_id": job_id},
+                    {"payload_codec": payload_codec, "payload_bytes": 1},
+                )
+
+            with patch.object(usrp_runtime, "build_transport_blob", side_effect=fake_build_transport_blob) as build_blob:
+                manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=output_dir,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=1,
+                    prepare_workers=1,
+                    source_files=[second],
+                )
+            prepared_bytes = (output_dir / "001.pt.bin").read_bytes()
+
+        self.assertEqual(build_blob.call_count, 1)
+        self.assertEqual(manifest["selected_count"], 1)
+        self.assertEqual(Path(manifest["files"][0]["source"]).name, "001.pt")
+        self.assertEqual(prepared_bytes, b"second")
+
+    def test_usrp_wire_manifest_records_source_image_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            latent_path = temp_dir / "000.pt"
+            manifest_path = temp_dir / "prepared" / "usrp_input_manifest.json"
+            manifest_path.parent.mkdir()
+            latent_path.write_bytes(b"latent")
+            manifest = {
+                "files": [
+                    {
+                        "source": str(latent_path),
+                        "target": str(temp_dir / "prepared" / "000.pt.bin"),
+                    }
+                ]
+            }
+            host_manifest = {
+                "files": [
+                    {
+                        "latent": str(latent_path),
+                        "source_image": str(temp_dir / "images" / "000.png"),
+                        "source_image_rel": "000.png",
+                        "source_image_sha256": "a" * 64,
+                        "source_image_size": 7,
+                        "source_image_mtime_ns": 123,
+                        "original_filename": "000",
+                    }
+                ]
+            }
+
+            enriched = usrp_runtime._enrich_wire_manifest_with_host_images(
+                manifest,
+                host_manifest,
+                manifest_path,
+            )
+            saved = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(enriched["files"][0]["source_image"], "000")
+        self.assertEqual(enriched["files"][0]["source_image_rel"], "000.png")
+        self.assertEqual(enriched["files"][0]["source_image_sha256"], "a" * 64)
+        self.assertEqual(saved["files"][0]["source_image_sha256"], "a" * 64)
+
+    def test_usrp_wire_prepare_reuses_cached_wire_blobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            source_dir = temp_dir / "latents"
+            first_output = temp_dir / "prepared1"
+            second_output = temp_dir / "prepared2"
+            cache_dir = temp_dir / "cache"
+            source_dir.mkdir()
+            (source_dir / "000.pt").write_bytes(b"latent")
+
+            def fake_build_transport_blob(path: str, *, job_id: str, payload_codec: str):
+                return (
+                    f"blob-{job_id}".encode("utf-8"),
+                    {"job_id": job_id, "original_filename": f"{job_id}.png"},
+                    {"payload_codec": payload_codec, "payload_bytes": 1, "original_filename": f"{job_id}.png"},
+                )
+
+            with patch.object(usrp_runtime, "build_transport_blob", side_effect=fake_build_transport_blob) as build_blob:
+                first_manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=first_output,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=1,
+                    cache_dir=cache_dir,
+                    prepare_workers=1,
+                )
+                second_manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=second_output,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=1,
+                    cache_dir=cache_dir,
+                    prepare_workers=1,
+                )
+            second_bytes = (second_output / "000.pt.bin").read_bytes()
+
+        self.assertEqual(build_blob.call_count, 1)
+        self.assertEqual(first_manifest["cache_hit_count"], 0)
+        self.assertEqual(second_manifest["cache_hit_count"], 1)
+        self.assertEqual(second_manifest["files"][0]["source_image"], "000.png")
+        self.assertEqual(second_bytes, b"blob-000")
+
+    def test_usrp_wire_prepare_rejects_cache_when_source_hash_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            source_dir = temp_dir / "latents"
+            first_output = temp_dir / "prepared1"
+            second_output = temp_dir / "prepared2"
+            cache_dir = temp_dir / "cache"
+            source_dir.mkdir()
+            source_path = source_dir / "000.pt"
+            source_path.write_bytes(b"latent-a")
+
+            def fake_build_transport_blob(path: str, *, job_id: str, payload_codec: str):
+                payload = Path(path).read_bytes()
+                return (
+                    b"blob-" + payload,
+                    {"job_id": job_id},
+                    {"payload_codec": payload_codec, "payload_bytes": len(payload)},
+                )
+
+            with patch.object(usrp_runtime, "build_transport_blob", side_effect=fake_build_transport_blob) as build_blob:
+                first_manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=first_output,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=1,
+                    cache_dir=cache_dir,
+                    prepare_workers=1,
+                )
+                original_stat = source_path.stat()
+                source_path.write_bytes(b"latent-b")
+                os.utime(source_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+                second_manifest = usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=second_output,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=1,
+                    cache_dir=cache_dir,
+                    prepare_workers=1,
+                )
+            second_bytes = (second_output / "000.pt.bin").read_bytes()
+
+        self.assertEqual(build_blob.call_count, 2)
+        self.assertEqual(first_manifest["cache_hit_count"], 0)
+        self.assertEqual(second_manifest["cache_hit_count"], 0)
+        self.assertNotEqual(first_manifest["files"][0]["source_sha256"], second_manifest["files"][0]["source_sha256"])
+        self.assertEqual(second_bytes, b"blob-latent-b")
+
+    def test_usrp_wire_prepare_parallel_path_can_use_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            source_dir = temp_dir / "latents"
+            first_output = temp_dir / "prepared1"
+            second_output = temp_dir / "prepared2"
+            cache_dir = temp_dir / "cache"
+            source_dir.mkdir()
+            for idx in range(2):
+                (source_dir / f"{idx:03d}.pt").write_bytes(b"latent")
+
+            def fake_build_transport_blob(path: str, *, job_id: str, payload_codec: str):
+                return (
+                    f"blob-{job_id}".encode("utf-8"),
+                    {"job_id": job_id},
+                    {"payload_codec": payload_codec, "payload_bytes": 1},
+                )
+
+            with patch.object(usrp_runtime, "build_transport_blob", side_effect=fake_build_transport_blob):
+                usrp_runtime._prepare_wire_input_dir(
+                    source_dir=source_dir,
+                    output_dir=first_output,
+                    payload_codec="webp-lossless",
+                    pattern="*.pt",
+                    max_files=2,
+                    cache_dir=cache_dir,
+                    prepare_workers=1,
+                )
+            second_manifest = usrp_runtime._prepare_wire_input_dir(
+                source_dir=source_dir,
+                output_dir=second_output,
+                payload_codec="webp-lossless",
+                pattern="*.pt",
+                max_files=2,
+                cache_dir=cache_dir,
+                prepare_workers=2,
+            )
+            second_0 = (second_output / "000.pt.bin").read_bytes()
+            second_1 = (second_output / "001.pt.bin").read_bytes()
+
+        self.assertEqual(second_manifest["prepare_workers"], 2)
+        self.assertEqual(second_manifest["cache_hit_count"], 2)
+        self.assertEqual(second_0, b"blob-000")
+        self.assertEqual(second_1, b"blob-001")
+
+    def test_usrp_summary_recovers_progress_from_log_after_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            log_path = Path(temp_dir_name) / "cockpit_usrp.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "batch_progress round=0 batch=1/15 processed=20/300 pass=19 pending=281",
+                        "batch_progress round=0 batch=2/15 processed=40/300 pass=39 pending=261",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            summary = usrp_runtime._merge_log_progress_into_summary(
+                {"target_count": 300, "completed_count": 0, "pass_count": 0, "fail_count": 0},
+                log_path,
+                fallback_target=300,
+            )
+
+        self.assertEqual(summary["target_count"], 300)
+        self.assertEqual(summary["completed_count"], 40)
+        self.assertEqual(summary["pass_count"], 39)
+        self.assertEqual(summary["fail_count"], 1)
+        self.assertEqual(summary["pending_count"], 260)
+        self.assertFalse(summary["all_pass"])
+
+    def test_main_builds_server_and_serves_without_startup_probe(self) -> None:
+        args = Namespace(
+            host="0.0.0.0",
+            port=8090,
+            probe_env="config/openamp.env",
+            aircraft_position_env="",
+            probe_timeout_sec=12.5,
+            probe_startup=False,
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+        events: list[str] = []
+        fake_app_state = Mock()
+        fake_server = Mock()
+
+        def build_state(
+            probe_env: str,
+            probe_timeout_sec: float,
+            demo_startup_env_overrides: dict[str, str] | None = None,
+            event_archive_root: str | Path | None = None,
+            bind_host: str = "127.0.0.1",
+            bind_port: int = 8079,
+        ) -> Mock:
+            events.append("state_init")
+            self.assertEqual(probe_env, args.probe_env)
+            self.assertEqual(probe_timeout_sec, args.probe_timeout_sec)
+            self.assertEqual(demo_startup_env_overrides, {})
+            self.assertEqual(event_archive_root, server.default_event_archive_root())
+            self.assertEqual(bind_host, args.host)
+            self.assertEqual(bind_port, args.port)
+            return fake_app_state
+
+        def build_server(server_address: tuple[str, int], handler: type[DemoRequestHandler], app_state: Mock) -> Mock:
+            events.append("server_init")
+            self.assertEqual(server_address, (args.host, args.port))
+            self.assertIs(handler, DemoRequestHandler)
+            self.assertIs(app_state, fake_app_state)
+            return fake_server
+
+        fake_server.serve_forever.side_effect = lambda: events.append("serve_forever")
+
+        with (
+            patch("server.parse_args", return_value=args),
+            patch("server.DashboardState", side_effect=build_state) as state_cls,
+            patch("server.DemoHTTPServer", side_effect=build_server) as server_cls,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            exit_code = server.main()
+
+        state_cls.assert_called_once_with(
+            args.probe_env,
+            args.probe_timeout_sec,
+            demo_startup_env_overrides={},
+            event_archive_root=server.default_event_archive_root(),
+            bind_host=args.host,
+            bind_port=args.port,
+        )
+        server_cls.assert_called_once_with((args.host, args.port), DemoRequestHandler, fake_app_state)
+        fake_app_state.refresh_live_probe.assert_not_called()
+        fake_server.serve_forever.assert_called_once_with()
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(events, ["state_init", "server_init", "serve_forever"])
+        self.assertEqual(
+            stdout.getvalue().splitlines(),
+            [
+                "Feiteng semantic visual return demo dashboard: http://0.0.0.0:8090",
+                f"Project root: {server.PROJECT_ROOT}",
+            ],
+        )
+
+    def test_main_runs_startup_probe_before_starting_server(self) -> None:
+        args = Namespace(
+            host="127.0.0.1",
+            port=8079,
+            probe_env="config/probe.env",
+            aircraft_position_env="",
+            probe_timeout_sec=5.0,
+            probe_startup=True,
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+        events: list[str] = []
+        fake_app_state = Mock()
+        fake_server = Mock()
+
+        def build_state(
+            probe_env: str,
+            probe_timeout_sec: float,
+            demo_startup_env_overrides: dict[str, str] | None = None,
+            event_archive_root: str | Path | None = None,
+            bind_host: str = "127.0.0.1",
+            bind_port: int = 8079,
+        ) -> Mock:
+            events.append("state_init")
+            self.assertEqual(probe_env, args.probe_env)
+            self.assertEqual(probe_timeout_sec, args.probe_timeout_sec)
+            self.assertEqual(demo_startup_env_overrides, {})
+            self.assertEqual(event_archive_root, server.default_event_archive_root())
+            self.assertEqual(bind_host, args.host)
+            self.assertEqual(bind_port, args.port)
+            return fake_app_state
+
+        def build_server(server_address: tuple[str, int], handler: type[DemoRequestHandler], app_state: Mock) -> Mock:
+            events.append("server_init")
+            self.assertEqual(server_address, (args.host, args.port))
+            self.assertIs(handler, DemoRequestHandler)
+            self.assertIs(app_state, fake_app_state)
+            return fake_server
+
+        fake_app_state.refresh_live_probe.side_effect = lambda: events.append("refresh_live_probe")
+        fake_server.serve_forever.side_effect = lambda: events.append("serve_forever")
+
+        with (
+            patch("server.parse_args", return_value=args),
+            patch("server.DashboardState", side_effect=build_state) as state_cls,
+            patch("server.DemoHTTPServer", side_effect=build_server) as server_cls,
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            exit_code = server.main()
+
+        state_cls.assert_called_once_with(
+            args.probe_env,
+            args.probe_timeout_sec,
+            demo_startup_env_overrides={},
+            event_archive_root=server.default_event_archive_root(),
+            bind_host=args.host,
+            bind_port=args.port,
+        )
+        server_cls.assert_called_once_with((args.host, args.port), DemoRequestHandler, fake_app_state)
+        fake_app_state.refresh_live_probe.assert_called_once_with()
+        fake_server.serve_forever.assert_called_once_with()
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(events, ["state_init", "refresh_live_probe", "server_init", "serve_forever"])
+
+
+class DemoHTTPServerTest(unittest.TestCase):
+    def test_snapshot_endpoint_returns_expected_high_level_fields(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, payload = request_json(state, "GET", "/api/snapshot")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertIn("generated_at", payload)
+        self.assertEqual(payload["project"]["name"], "飞腾多核弱网安全语义视觉回传系统")
+        self.assertEqual(payload["mode"]["effective_label"], "仅展示证据")
+        self.assertIn("current_status", payload["board"])
+        self.assertIn("latest_live_status", payload)
+        self.assertIn("PyTorch reference archive", payload["latest_live_status"]["headline"])
+        self.assertEqual(payload["latest_live_status"]["baseline"]["completed"], "300 / 300 (archive)")
+        self.assertIn("fits", payload)
+        self.assertIsInstance(payload["fits"], list)
+
+    def test_health_endpoint_returns_ok_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, payload = request_json(state, "GET", "/api/health")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertEqual(payload, {"status": "ok"})
+
+    def test_link_director_status_endpoint_returns_default_scaffold_state(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, payload = request_json(state, "GET", "/api/link-director")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertEqual(payload["selected_profile_id"], "normal")
+        self.assertEqual(payload["selected_profile_label"], "正常链路")
+        self.assertEqual(payload["selected_profile"]["profile_id"], "normal")
+        self.assertEqual(payload["backend_binding"], "ui_scaffold_only")
+        self.assertEqual(payload["backend_status"], "ui_scaffold_only")
+        self.assertEqual(payload["selected_profile"]["evidence_binding"]["mode"], "live_anchor")
+        self.assertIn("不执行 tc/netem", payload["summary"])
+        self.assertIn("live 控制面与证据读数继续如实显示", payload["truth_note"])
+
+    def test_link_director_profile_endpoint_switches_profile_and_emits_event(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            status, headers, payload = request_json(
+                state,
+                "POST",
+                "/api/link-director/profile",
+                body=json.dumps({"profile_id": "lossy"}).encode("utf-8"),
+            )
+            current_status, _, current_payload = request_json(state, "GET", "/api/link-director")
+            event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=10")
+            archive = event_payload["aggregate"]["archive"]
+            events_path = Path(archive["events_jsonl"])
+            archived_events = [
+                json.loads(line)
+                for line in events_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertTrue(payload["change_applied"])
+        self.assertEqual(payload["previous_profile_id"], "normal")
+        self.assertEqual(payload["selected_profile_id"], "lossy")
+        self.assertEqual(payload["selected_profile_label"], "高丢包")
+        self.assertEqual(payload["selected_profile"]["evidence_binding"]["scenario_id"], "snr10_real_compare")
+        self.assertIn("未执行 tc/netem", payload["status_message"])
+        self.assertEqual(current_status, 200)
+        self.assertEqual(current_payload["selected_profile_id"], "lossy")
+        self.assertEqual(event_status, 200)
+        self.assertEqual(event_payload["aggregate"]["link_profile"]["selected_profile_id"], "lossy")
+        self.assertEqual(event_payload["aggregate"]["link_profile"]["selected_profile_label"], "高丢包")
+        event_types = [item["type"] for item in event_payload["recent_events"]]
+        self.assertIn("LINK_PROFILE_CHANGED", event_types)
+        self.assertIn("ARCHIVE_SNAPSHOT_WRITTEN", event_types)
+        link_profile_events = [event for event in archived_events if event["type"] == "LINK_PROFILE_CHANGED"]
+        self.assertEqual(len(link_profile_events), 1)
+        self.assertEqual(link_profile_events[0]["data"]["profile_id"], "lossy")
+        self.assertEqual(link_profile_events[0]["data"]["previous_profile_id"], "normal")
+
+    def test_link_director_profile_endpoint_is_honest_noop_when_profile_is_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/link-director/profile",
+                body=json.dumps({"profile_id": "normal"}).encode("utf-8"),
+            )
+            event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=10")
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["change_applied"])
+        self.assertEqual(payload["selected_profile_id"], "normal")
+        self.assertIn("UI/control-plane scaffold", payload["status_message"])
+        self.assertEqual(event_status, 200)
+        self.assertEqual(event_payload["aggregate"]["event_count"], 0)
+        self.assertEqual(event_payload["recent_events"], [])
+
+    def test_link_director_profile_endpoint_rejects_unsupported_profiles(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, payload = request_json(
+            state,
+            "POST",
+            "/api/link-director/profile",
+            body=json.dumps({"profile_id": "not-real"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload, {"status": "error", "message": "unsupported profile_id"})
+
+    def test_archive_sessions_endpoint_lists_local_archive_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            write_archive_session(
+                temp_dir,
+                session_id="session_archive_old",
+                events=[
+                    archive_event(
+                        session_id="session_archive_old",
+                        sequence=1,
+                        timestamp="2026-03-19T09:00:00+08:00",
+                        event_type="JOB_SUBMITTED",
+                        message="Old archive session submitted a demo job.",
+                    ),
+                    archive_event(
+                        session_id="session_archive_old",
+                        sequence=2,
+                        timestamp="2026-03-19T09:00:02+08:00",
+                        event_type="ARCHIVE_SNAPSHOT_WRITTEN",
+                        plane="archive",
+                        mode_scope="demo archive / local event evidence",
+                        message="Event spine snapshot written (job_done).",
+                        data={"reason": "job_done", "path": f"{temp_dir}/session_archive_old/state_snapshot.json"},
+                    ),
+                ],
+                snapshot={
+                    "generated_at": "2026-03-19T09:00:02+08:00",
+                    "session_id": "session_archive_old",
+                    "reason": "job_done",
+                    "mode_boundary_note": server.MODE_BOUNDARY_NOTE,
+                    "aggregate": {"session_id": "session_archive_old", "started_at": "2026-03-19T09:00:00+08:00"},
+                    "recent_events": [],
+                    "extra": {"variant": "current"},
+                },
+            )
+            write_archive_session(
+                temp_dir,
+                session_id="session_archive_new",
+                events=[
+                    archive_event(
+                        session_id="session_archive_new",
+                        sequence=1,
+                        timestamp="2026-03-19T11:15:00+08:00",
+                        event_type="SAFE_STOP_TRIGGERED",
+                        message="Heartbeat timeout triggered SAFE_STOP cleanup.",
+                        data={"reason": "heartbeat_timeout_cleanup"},
+                    ),
+                    archive_event(
+                        session_id="session_archive_new",
+                        sequence=2,
+                        timestamp="2026-03-19T11:15:03+08:00",
+                        event_type="ARCHIVE_SNAPSHOT_WRITTEN",
+                        plane="archive",
+                        mode_scope="demo archive / local event evidence",
+                        message="Event spine snapshot written (fault_heartbeat_timeout).",
+                        data={"reason": "fault_heartbeat_timeout", "path": f"{temp_dir}/session_archive_new/state_snapshot.json"},
+                    ),
+                ],
+                snapshot={
+                    "generated_at": "2026-03-19T11:15:03+08:00",
+                    "session_id": "session_archive_new",
+                    "reason": "fault_heartbeat_timeout",
+                    "mode_boundary_note": server.MODE_BOUNDARY_NOTE,
+                    "aggregate": {"session_id": "session_archive_new", "started_at": "2026-03-19T11:15:00+08:00"},
+                    "recent_events": [],
+                    "extra": {"fault_type": "heartbeat_timeout"},
+                },
+            )
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            status, headers, payload = request_json(state, "GET", "/api/archive/sessions?limit=10")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload["session_count"], 2)
+        self.assertEqual(
+            [item["session_id"] for item in payload["sessions"]],
+            ["session_archive_new", "session_archive_old"],
+        )
+        self.assertEqual(payload["sessions"][0]["last_snapshot_reason"], "fault_heartbeat_timeout")
+        self.assertTrue(payload["sessions"][0]["has_events"])
+        self.assertTrue(payload["sessions"][0]["has_snapshot"])
+        self.assertTrue(payload["sessions"][0]["paths"]["events_jsonl"].endswith("session_archive_new/events.jsonl"))
+
+    def test_archive_session_endpoint_replays_recent_events_and_snapshot_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_id = "session_archive_job_done"
+            events = [
+                archive_event(
+                    session_id=session_id,
+                    sequence=1,
+                    timestamp="2026-03-19T10:00:00+08:00",
+                    event_type="JOB_SUBMITTED",
+                    message="Current live launch entered the archive session.",
+                    job_id="job-42",
+                    data={"variant": "current"},
+                ),
+                archive_event(
+                    session_id=session_id,
+                    sequence=2,
+                    timestamp="2026-03-19T10:00:01+08:00",
+                    event_type="JOB_ADMITTED",
+                    message="OpenAMP admitted job-42.",
+                    job_id="job-42",
+                    data={"variant": "current"},
+                ),
+                archive_event(
+                    session_id=session_id,
+                    sequence=3,
+                    timestamp="2026-03-19T10:00:02+08:00",
+                    event_type="JOB_STARTED",
+                    plane="data",
+                    mode_scope=server.DATA_MODE_SCOPE,
+                    message="Reconstruction execution started for job-42.",
+                    job_id="job-42",
+                    data={"variant": "current"},
+                ),
+                archive_event(
+                    session_id=session_id,
+                    sequence=4,
+                    timestamp="2026-03-19T10:00:04+08:00",
+                    event_type="FRAME_RECON_READY",
+                    plane="data",
+                    mode_scope=server.DATA_MODE_SCOPE,
+                    message="Reconstruction output is ready for job-42.",
+                    job_id="job-42",
+                    data={"variant": "current"},
+                ),
+                archive_event(
+                    session_id=session_id,
+                    sequence=5,
+                    timestamp="2026-03-19T10:00:05+08:00",
+                    event_type="JOB_DONE",
+                    plane="data",
+                    mode_scope=server.DATA_MODE_SCOPE,
+                    message="Reconstruction job job-42 completed.",
+                    job_id="job-42",
+                    data={"variant": "current", "total_ms": 128.4},
+                ),
+                archive_event(
+                    session_id=session_id,
+                    sequence=6,
+                    timestamp="2026-03-19T10:00:06+08:00",
+                    event_type="ARCHIVE_SNAPSHOT_WRITTEN",
+                    plane="archive",
+                    mode_scope="demo archive / local event evidence",
+                    message="Event spine snapshot written (job_done).",
+                    job_id="job-42",
+                    data={"reason": "job_done", "path": f"{temp_dir}/{session_id}/state_snapshot.json"},
+                ),
+            ]
+            write_archive_session(
+                temp_dir,
+                session_id=session_id,
+                events=events,
+                snapshot={
+                    "generated_at": "2026-03-19T10:00:06+08:00",
+                    "session_id": session_id,
+                    "reason": "job_done",
+                    "mode_boundary_note": server.MODE_BOUNDARY_NOTE,
+                    "aggregate": {
+                        "session_id": session_id,
+                        "started_at": "2026-03-19T10:00:00+08:00",
+                        "event_count": 5,
+                    },
+                    "recent_events": events[-3:],
+                    "extra": {"variant": "current", "image_index": 12},
+                },
+            )
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            status, headers, payload = request_json(
+                state,
+                "GET",
+                f"/api/archive/session?session_id={session_id}&limit=3",
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload["summary"]["session_id"], session_id)
+        self.assertEqual(payload["summary"]["event_count"], 6)
+        self.assertEqual(payload["summary"]["last_snapshot_reason"], "job_done")
+        self.assertEqual(payload["aggregate"]["jobs"]["done_count"], 1)
+        self.assertEqual(payload["aggregate"]["frames"]["ready_count"], 1)
+        self.assertEqual(payload["snapshot"]["reason"], "job_done")
+        self.assertEqual(payload["snapshot"]["extra"]["image_index"], 12)
+        self.assertEqual(
+            [item["type"] for item in payload["recent_events"]],
+            ["ARCHIVE_SNAPSHOT_WRITTEN", "JOB_DONE", "FRAME_RECON_READY"],
+        )
+        self.assertEqual(payload["timeline"][0]["title"], "ARCHIVE_SNAPSHOT_WRITTEN")
+        self.assertEqual(payload["timeline"][1]["lane"], "data")
+        self.assertEqual(payload["timeline"][1]["job_id"], "job-42")
+        self.assertTrue(payload["paths"]["state_snapshot_json"].endswith(f"{session_id}/state_snapshot.json"))
+
+    def test_archive_session_endpoint_returns_404_for_missing_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            status, headers, payload = request_json(
+                state,
+                "GET",
+                "/api/archive/session?session_id=missing-session",
+            )
+
+        self.assertEqual(status, 404)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload, {"status": "error", "message": "archive session not found: missing-session"})
+
+    def test_event_spine_endpoint_tracks_live_inference_completion_and_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+            request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+            )
+            live_job = FakeInferenceJob(
+                [
+                    {
+                        "status": "running",
+                        "request_state": "running",
+                        "status_category": "running",
+                        "execution_mode": "live",
+                        "variant": "current",
+                        "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                        "runner_summary": {},
+                        "wrapper_summary": {},
+                        "diagnostics": {},
+                        "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                        "artifacts": {},
+                    },
+                    {
+                        "status": "success",
+                        "request_state": "completed",
+                        "status_category": "success",
+                        "execution_mode": "live",
+                        "variant": "current",
+                        "message": "OpenAMP 控制面已完成作业下发、板端执行与结果回收。",
+                        "runner_summary": {
+                            "load_ms": 3.2,
+                            "vm_init_ms": 0.8,
+                            "run_median_ms": 128.4,
+                            "artifact_sha256": "abcd" * 16,
+                        },
+                        "wrapper_summary": {"result": "success"},
+                        "diagnostics": {},
+                        "progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+                        "artifacts": {},
+                    },
+                ],
+                job_id="m0-event-job-001",
+            )
+
+            with (
+                patch(
+                    "server.query_live_status",
+                    return_value={
+                        "status": "success",
+                        "guard_state": "READY",
+                        "active_job_id": 0,
+                        "last_fault_code": "NONE",
+                        "total_fault_count": 0,
+                        "heartbeat_ok": 1,
+                        "logs": [],
+                    },
+                ),
+                patch("server.launch_remote_reconstruction_job", return_value=live_job),
+            ):
+                start_status, start_headers, start_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/run-inference",
+                    body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+                )
+                progress_status, _, progress_payload = request_json(
+                    state,
+                    "GET",
+                    f"/api/inference-progress?job_id={live_job.job_id}",
+                )
+                event_status, event_headers, event_payload = request_json(state, "GET", "/api/event-spine?limit=20")
+
+                archive = event_payload["aggregate"]["archive"]
+                events_path = Path(archive["events_jsonl"])
+                snapshot_path = Path(archive["state_snapshot_json"])
+                archived_types = [
+                    json.loads(line)["type"]
+                    for line in events_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+
+            self.assertEqual(start_status, 200)
+            self.assertEqual(start_headers["content-type"], "application/json; charset=utf-8")
+            self.assertEqual(start_payload["request_state"], "running")
+            self.assertEqual(progress_status, 200)
+            self.assertEqual(progress_payload["request_state"], "completed")
+            self.assertEqual(event_status, 200)
+            self.assertEqual(event_headers["cache-control"], "no-store")
+            self.assertEqual(event_payload["status"], "ok")
+            self.assertEqual(event_payload["aggregate"]["jobs"]["done_count"], 1)
+            self.assertEqual(event_payload["aggregate"]["frames"]["ready_count"], 1)
+            self.assertEqual(event_payload["aggregate"]["heartbeat"]["status"], "ok")
+            self.assertTrue(archive["enabled"])
+            self.assertTrue(events_path.is_file())
+            self.assertTrue(snapshot_path.is_file())
+            event_types = [item["type"] for item in event_payload["recent_events"]]
+            for expected_type in (
+                "JOB_SUBMITTED",
+                "JOB_ADMITTED",
+                "HEARTBEAT_OK",
+                "JOB_STARTED",
+                "FRAME_RECON_READY",
+                "JOB_DONE",
+                "ARCHIVE_SNAPSHOT_WRITTEN",
+            ):
+                with self.subTest(expected_type=expected_type):
+                    self.assertIn(expected_type, event_types)
+                    self.assertIn(expected_type, archived_types)
+
+    def test_event_spine_endpoint_tracks_rejected_inference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+
+            run_status, _, run_payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+            event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=10")
+
+            self.assertEqual(run_status, 200)
+            self.assertEqual(run_payload["status"], "fallback")
+            self.assertEqual(event_status, 200)
+            self.assertEqual(event_payload["aggregate"]["jobs"]["rejected_count"], 1)
+            event_types = [item["type"] for item in event_payload["recent_events"]]
+            self.assertIn("JOB_SUBMITTED", event_types)
+            self.assertIn("JOB_REJECTED", event_types)
+            self.assertIn("ARCHIVE_SNAPSHOT_WRITTEN", event_types)
+
+    def test_event_spine_endpoint_tracks_heartbeat_timeout_fault(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+            request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+            )
+
+            with patch(
+                "server.run_fault_action",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "last_fault_code": "HEARTBEAT_TIMEOUT",
+                    "board_response": {
+                        "decision": "ALLOW",
+                        "fault_code": "HEARTBEAT_TIMEOUT",
+                        "guard_state": "READY",
+                    },
+                    "logs": ["[02:36:22] heartbeat timeout live success"],
+                },
+            ):
+                fault_status, _, fault_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/inject-fault",
+                    body=json.dumps({"fault_type": "heartbeat_timeout"}).encode("utf-8"),
+                )
+                event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=20")
+
+            self.assertEqual(fault_status, 200)
+            self.assertEqual(fault_payload["status"], "injected")
+            self.assertEqual(event_status, 200)
+            self.assertEqual(event_payload["aggregate"]["heartbeat"]["status"], "lost")
+            self.assertFalse(event_payload["aggregate"]["safe_stop"]["active"])
+            event_types = [item["type"] for item in event_payload["recent_events"]]
+            for expected_type in (
+                "JOB_SUBMITTED",
+                "JOB_ADMITTED",
+                "HEARTBEAT_OK",
+                "HEARTBEAT_LOST",
+                "SAFE_STOP_TRIGGERED",
+                "SAFE_STOP_CLEARED",
+                "ARCHIVE_SNAPSHOT_WRITTEN",
+            ):
+                with self.subTest(expected_type=expected_type):
+                    self.assertIn(expected_type, event_types)
+
+    def test_job_manifest_gate_preview_endpoint_tracks_preview_only_allow_events(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+            request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+            )
+
+            with (
+                patch(
+                    "server.describe_demo_admission",
+                    return_value={
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Signed manifest v1",
+                        "tone": "online",
+                        "bundle_path": "/tmp/openamp_demo_signed_admission/current.bundle.json",
+                        "public_key_path": "/tmp/openamp_demo_signed_admission/current.public.pem",
+                        "manifest_sha256": "a" * 64,
+                        "artifact_sha256": "b" * 64,
+                        "key_id": "demo-live-20260316",
+                        "verified_locally": True,
+                        "artifact_match": True,
+                        "note": "key_id=demo-live-20260316 | bundle=current.bundle.json",
+                    },
+                ),
+                patch(
+                    "server.describe_demo_variant_support",
+                    return_value={
+                        "variant": "current",
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Current signed live 已支持",
+                        "tone": "online",
+                        "note": "Current signed-admission live path is supported.",
+                        "supported": True,
+                        "launch_allowed": True,
+                    },
+                ),
+                patch(
+                    "server.query_live_status",
+                    return_value={
+                        "status": "success",
+                        "guard_state": "READY",
+                        "active_job_id": 0,
+                        "last_fault_code": "NONE",
+                        "total_fault_count": 0,
+                        "logs": ["[12:00:00] STATUS_RESP: guard=READY / fault=NONE"],
+                    },
+                ),
+            ):
+                preview_status, _, preview_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/job-manifest-gate/preview",
+                    body=json.dumps({"variant": "current"}).encode("utf-8"),
+                )
+                event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=10")
+
+        self.assertEqual(preview_status, 200)
+        self.assertEqual(preview_payload["status"], "ok")
+        self.assertTrue(preview_payload["preview_only"])
+        self.assertEqual(preview_payload["gate"]["verdict"], "allow")
+        self.assertIn("未发送 JOB_REQ", preview_payload["message"])
+        self.assertEqual(event_status, 200)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["submitted_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["admitted_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_submitted_count"], 1)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_admitted_count"], 1)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_rejected_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["heartbeat"]["status"], "unknown")
+        event_types = [item["type"] for item in event_payload["recent_events"]]
+        self.assertIn("JOB_SUBMITTED", event_types)
+        self.assertIn("JOB_ADMITTED", event_types)
+        self.assertIn("ARCHIVE_SNAPSHOT_WRITTEN", event_types)
+        self.assertNotIn("JOB_STARTED", event_types)
+        self.assertNotIn("HEARTBEAT_OK", event_types)
+
+    def test_job_manifest_gate_preview_endpoint_tracks_preview_only_rejection_when_board_busy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+            request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+            )
+
+            with (
+                patch(
+                    "server.describe_demo_admission",
+                    return_value={
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Signed manifest v1",
+                        "tone": "online",
+                        "bundle_path": "/tmp/openamp_demo_signed_admission/current.bundle.json",
+                        "public_key_path": "/tmp/openamp_demo_signed_admission/current.public.pem",
+                        "manifest_sha256": "a" * 64,
+                        "artifact_sha256": "b" * 64,
+                        "key_id": "demo-live-20260316",
+                        "verified_locally": True,
+                        "artifact_match": True,
+                        "note": "key_id=demo-live-20260316 | bundle=current.bundle.json",
+                    },
+                ),
+                patch(
+                    "server.describe_demo_variant_support",
+                    return_value={
+                        "variant": "current",
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Current signed live 已支持",
+                        "tone": "online",
+                        "note": "Current signed-admission live path is supported.",
+                        "supported": True,
+                        "launch_allowed": True,
+                    },
+                ),
+                patch(
+                    "server.query_live_status",
+                    return_value={
+                        "status": "success",
+                        "guard_state": "JOB_ACTIVE",
+                        "active_job_id": 8093,
+                        "last_fault_code": "DUPLICATE_JOB_ID",
+                        "total_fault_count": 1,
+                        "logs": ["[12:00:00] STATUS_RESP: guard=JOB_ACTIVE"],
+                    },
+                ),
+            ):
+                preview_status, _, preview_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/job-manifest-gate/preview",
+                    body=json.dumps({"variant": "current"}).encode("utf-8"),
+                )
+                event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=10")
+
+        self.assertEqual(preview_status, 200)
+        self.assertEqual(preview_payload["status"], "ok")
+        self.assertEqual(preview_payload["gate"]["verdict"], "deny")
+        self.assertIn("guard_state=JOB_ACTIVE", " ".join(preview_payload["gate"]["reasons"]))
+        self.assertIn("未放行", preview_payload["message"])
+        self.assertEqual(event_status, 200)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["submitted_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["rejected_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_submitted_count"], 1)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_admitted_count"], 0)
+        self.assertEqual(event_payload["aggregate"]["jobs"]["preview_rejected_count"], 1)
+        event_types = [item["type"] for item in event_payload["recent_events"]]
+        self.assertIn("JOB_SUBMITTED", event_types)
+        self.assertIn("JOB_REJECTED", event_types)
+        self.assertNotIn("JOB_ADMITTED", event_types)
+
+    def test_system_status_endpoint_preloads_repo_defaults_without_password(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        expected_env_file = state._board_access.env_file.relative_to(REPO_ROOT).as_posix()
+
+        status, headers, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload["execution_mode"]["label"], "待补全密码")
+        self.assertTrue(payload["board_access"]["configured"])
+        self.assertFalse(payload["board_access"]["has_password"])
+        self.assertEqual(payload["board_access"]["host"], "100.121.87.73")
+        self.assertEqual(payload["board_access"]["user"], "user")
+        self.assertEqual(payload["board_access"]["port"], 22)
+        self.assertEqual(payload["board_access"]["env_file"], expected_env_file)
+        self.assertEqual(payload["board_access"]["missing_connection_fields"], ["password"])
+        self.assertEqual(payload["board_access"]["missing_inference_fields_by_variant"]["current"], ["password"])
+        self.assertEqual(payload["board_access"]["missing_inference_fields_by_variant"]["baseline"], ["password"])
+        self.assertEqual(payload["board_access"]["field_sources"]["host"], "preloaded")
+        self.assertEqual(payload["board_access"]["field_sources"]["password"], "missing")
+        self.assertEqual(
+            payload["board_access"]["preloaded_defaults"]["ssh_env_file"],
+            "session_bootstrap/config/phytium_pi_login.example.env",
+        )
+        self.assertEqual(
+            payload["board_access"]["preloaded_defaults"]["inference_env_file"],
+            expected_env_file,
+        )
+        self.assertNotIn("password", payload["board_access"])
+        self.assertEqual(
+            payload["live"]["admission"]["artifact_sha256"],
+            payload["live"]["trusted_sha"],
+        )
+        self.assertEqual(payload["live"]["variant_support"]["baseline"]["mode"], "legacy_sha")
+        self.assertEqual(payload["live"]["variant_support"]["baseline"]["label"], "PyTorch live 已支持")
+        self.assertIn(
+            "expected-SHA admission (legacy_sha)",
+            payload["live"]["variant_support"]["baseline"]["note"],
+        )
+        self.assertEqual(payload["live"]["variant_support"]["current"]["mode"], "signed_manifest_v1")
+        self.assertIn("signed-admission", payload["live"]["variant_support"]["current"]["note"])
+        self.assertTrue(payload["live"]["variant_support"]["baseline"]["launch_allowed"])
+        self.assertFalse(payload["active_inference"]["running"])
+        self.assertEqual(payload["active_inference"]["queue_depth"], 0)
+        self.assertEqual(payload["active_inference"]["progress"]["count_label"], "0 active / 0 queued")
+        self.assertEqual(payload["operator_cue"]["mode"], "operator_assist_only")
+        self.assertEqual(payload["operator_cue"]["current_scene_id"], "scene1")
+        self.assertEqual(payload["operator_cue"]["next_action"]["target_id"], "credentialPanel")
+        self.assertIn("Operator-assist only", payload["operator_cue"]["manual_boundary_note"])
+        self.assertEqual(payload["operator_cue"]["scenes"][0]["checks"][0]["label"], "会话已录入")
+        self.assertFalse(payload["operator_cue"]["scenes"][0]["checks"][0]["ready"])
+
+    def test_system_status_endpoint_exposes_redacted_board_access(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        save_status, _, save_payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "demo-pass",
+                    "port": "2202",
+                }
+            ).encode("utf-8"),
+        )
+        status, headers, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(save_status, 200)
+        self.assertEqual(save_payload["status"], "ok")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertTrue(payload["board_access"]["configured"])
+        self.assertEqual(payload["board_access"]["host"], "demo-board")
+        self.assertEqual(payload["board_access"]["user"], "demo-user")
+        self.assertTrue(payload["board_access"]["has_password"])
+        self.assertNotIn("password", payload["board_access"])
+
+    def test_system_status_endpoint_derives_safety_panel_from_live_recover_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._last_live_probe = live_probe_payload("2026-03-19T18:42:00+0800", "board reachable")
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "HEARTBEAT_TIMEOUT",
+            "active_job_id": 0,
+            "total_fault_count": 3,
+        }
+        state._last_fault_result = {
+            "fault_type": "recover",
+            "status": "recovered",
+            "status_category": "success",
+            "execution_mode": "live",
+            "source_label": "真机 SAFE_STOP 收口",
+            "message": "板端已回到 READY；last_fault_code 保留最近故障证据。",
+            "guard_state": "READY",
+            "last_fault_code": "HEARTBEAT_TIMEOUT",
+            "status_lamp": "yellow",
+            "log_entries": ["[02:36:22] ◀ STATUS_RESP: READY，last_fault=HEARTBEAT_TIMEOUT"],
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertIn("safety_panel", payload)
+        self.assertEqual(payload["safety_panel"]["panel_label"], "SAFE_STOP 已执行")
+        self.assertEqual(payload["safety_panel"]["safe_stop_state"], "RECOVERED")
+        self.assertEqual(payload["safety_panel"]["latch_state"], "LATCHED")
+        self.assertEqual(payload["safety_panel"]["guard_state"], "READY")
+        self.assertEqual(payload["safety_panel"]["last_fault_code"], "HEARTBEAT_TIMEOUT")
+        self.assertEqual(payload["safety_panel"]["total_fault_count"], 3)
+        self.assertTrue(payload["safety_panel"]["board_online"])
+        self.assertEqual(payload["safety_panel"]["status_source"], "live_control")
+        self.assertEqual(payload["safety_panel"]["status_note"], "已缓存最近一次 RPMsg 控制面读数。")
+        self.assertEqual(payload["safety_panel"]["last_fault_result"]["execution_mode"], "live")
+        self.assertEqual(payload["safety_panel"]["last_fault_result"]["source_label"], "真机 SAFE_STOP 收口")
+        self.assertEqual(
+            payload["safety_panel"]["last_fault_result"]["log_tail"],
+            "[02:36:22] ◀ STATUS_RESP: READY，last_fault=HEARTBEAT_TIMEOUT",
+        )
+        self.assertEqual(payload["safety_panel"]["recover_action"]["api_path"], "/api/recover")
+        self.assertEqual(payload["safety_panel"]["recover_action"]["method"], "POST")
+        self.assertIn(
+            "RTOS/Bare Metal owns physical SAFE_STOP/GPIO; Linux UI is mirror/control surface only.",
+            payload["safety_panel"]["ownership_note"],
+        )
+
+    def test_system_status_endpoint_derives_safety_panel_from_live_status_without_last_fault_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._last_live_probe = live_probe_payload("2026-03-19T18:45:00+0800", "board reachable")
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "JOB_ACTIVE",
+            "last_fault_code": "NONE",
+            "active_job_id": 8093,
+            "total_fault_count": 0,
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["safety_panel"]["panel_label"], "无告警")
+        self.assertEqual(payload["safety_panel"]["safe_stop_state"], "STANDBY")
+        self.assertEqual(payload["safety_panel"]["latch_state"], "CLEAR")
+        self.assertEqual(payload["safety_panel"]["guard_state"], "JOB_ACTIVE")
+        self.assertEqual(payload["safety_panel"]["last_fault_code"], "NONE")
+        self.assertEqual(payload["safety_panel"]["total_fault_count"], 0)
+        self.assertEqual(payload["safety_panel"]["last_fault_result"], {})
+        self.assertEqual(payload["safety_panel"]["recover_action"]["label"], "SAFE_STOP 收口")
+        self.assertIn("不会自动 SAFE_STOP", payload["safety_panel"]["status_note"])
+
+    def test_system_status_endpoint_advances_operator_cue_to_compare_after_current_live_result(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-03-19T19:10:00+0800", "board reachable")
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "NONE",
+            "active_job_id": 0,
+            "total_fault_count": 0,
+        }
+        state._last_inference_result = {
+            "variant": "current",
+            "request_state": "completed",
+            "status": "success",
+            "execution_mode": "live",
+            "source_label": "Current live 数据面",
+            "message": "Current live 结果已经回到页面。",
+            "job_id": "demo-job-compare",
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["job_manifest_gate"]["verdict"], "allow")
+        self.assertEqual(payload["operator_cue"]["current_scene_id"], "scene3")
+        self.assertEqual(payload["operator_cue"]["status_label"], "第三幕 / Compare 与性能口径")
+        self.assertEqual(payload["operator_cue"]["next_action"]["target_id"], "compareViewerShell")
+        self.assertEqual(payload["operator_cue"]["next_action"]["act_id"], "act3")
+        self.assertIn("4-core", payload["operator_cue"]["boundary_note"])
+        self.assertTrue(payload["operator_cue"]["scenes"][2]["checks"][0]["ready"])
+        self.assertTrue(payload["operator_cue"]["scenes"][2]["checks"][1]["ready"])
+
+    def test_system_status_endpoint_includes_backend_aircraft_position_contract(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertIn("aircraft_position", payload)
+        self.assertEqual(payload["aircraft_position"]["contract_version"], "aircraft_position.v1")
+        self.assertEqual(payload["aircraft_position"]["source_api_path"], "/api/aircraft-position")
+        self.assertEqual(payload["aircraft_position"]["source_kind"], "backend_stub")
+        self.assertEqual(payload["aircraft_position"]["source_status"], "stub")
+        self.assertEqual(payload["aircraft_position"]["source_label"], "Backend stub contract")
+        self.assertIn("upper-computer/backend contract", payload["aircraft_position"]["ownership_note"])
+        self.assertFalse(payload["aircraft_position"]["feed_contract"]["primary_source"]["active"])
+        self.assertTrue(payload["aircraft_position"]["feed_contract"]["fallback_source"]["active"])
+        self.assertEqual(payload["aircraft_position"]["sample"]["sequence"], 0)
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["status"], "config_missing")
+        self.assertEqual(
+            payload["aircraft_position"]["bridge_runtime"]["missing_env"],
+            ["AIRCRAFT_POSITION_UPSTREAM_URL", "AIRCRAFT_POSITION_BACKEND_BASE_URL"],
+        )
+        self.assertEqual(payload["aircraft_position"]["position_api_runtime"]["status"], "waiting_session")
+        self.assertEqual(payload["live"]["aircraft_bridge"]["status"], "config_missing")
+        self.assertEqual(payload["live"]["board_position_api"]["status"], "waiting_session")
+
+    def test_query_board_position_api_health_parses_remote_health_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        stdout = json.dumps(
+            {
+                "status": "ok",
+                "url": "http://127.0.0.1:9000/health",
+                "http_status": 200,
+                "payload": {
+                    "status": "starting",
+                    "source_order": ["gpsd", "nmea"],
+                    "last_error": "gpsd:[Errno 111] Connection refused",
+                    "sample": None,
+                },
+                "body": "{}",
+                "error": "",
+            },
+            ensure_ascii=False,
+        )
+
+        with patch(
+            "server.run_ssh_command",
+            return_value=server.subprocess.CompletedProcess([], 0, stdout=stdout, stderr=""),
+        ):
+            payload = server.query_board_position_api_health(
+                board_access,
+                runtime_env={"BOARD_POSITION_API_BIND_HOST": "127.0.0.1", "BOARD_POSITION_API_PORT": "9000"},
+                timeout_sec=3.0,
+            )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["http_status"], 200)
+        self.assertEqual(payload["payload"]["status"], "starting")
+
+    def test_board_position_api_status_promotes_live_sample_from_position_endpoint(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        ).with_env_overrides(
+            {
+                "AIRCRAFT_POSITION_UPSTREAM_URL": "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                "AIRCRAFT_POSITION_LATITUDE_PATH": "content.point.y",
+                "AIRCRAFT_POSITION_LONGITUDE_PATH": "content.point.x",
+            }
+        )
+
+        with (
+            patch(
+                "server.query_board_position_api_health",
+                return_value={
+                    "status": "ok",
+                    "http_status": 200,
+                    "payload": {
+                        "status": "starting",
+                        "source_order": ["http", "gpsd", "nmea"],
+                        "last_error": "",
+                        "sample": None,
+                    },
+                },
+            ),
+            patch(
+                "server.query_board_position_api_sample",
+                return_value={
+                    "status": "ok",
+                    "http_status": 200,
+                    "payload": {
+                        "status": "live",
+                        "source": "http:https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                        "source_kind": "http",
+                        "latitude": 22.943853,
+                        "longitude": 113.390465,
+                        "captured_at": "2026-04-11T20:24:08+0800",
+                        "sequence": 1,
+                    },
+                },
+            ),
+        ):
+            payload = server._board_position_api_status(board_access, timeout_sec=3.0)
+
+        self.assertEqual(payload["status"], "live")
+        self.assertTrue(payload["sample_ready"])
+        self.assertEqual(payload["sample"]["source_kind"], "http")
+        self.assertAlmostEqual(payload["sample"]["latitude"], 22.943853)
+
+    def test_system_status_reports_board_position_api_source_unavailable_from_health_probe(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "not_found",
+                    "selected_url": "",
+                    "selected_source": "",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [],
+                },
+            ),
+            patch(
+                "server._board_position_api_status",
+                return_value={
+                    "status": "source_unavailable",
+                    "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
+                    "service_reachable": True,
+                    "http_status": 200,
+                    "health_url": "http://127.0.0.1:9000/health",
+                    "remote_root": server.DEFAULT_BOARD_POSITION_API_REMOTE_ROOT,
+                    "sample_ready": False,
+                    "service_state": "starting",
+                    "last_error": "gpsd:[Errno 111] Connection refused; nmea:/dev/ttyS1: [Errno 13] Permission denied",
+                    "source_order": ["gpsd", "nmea"],
+                    "sample": None,
+                },
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["aircraft_position"]["position_api_runtime"]["status"], "source_unavailable")
+        self.assertEqual(payload["live"]["board_position_api"]["status"], "source_unavailable")
+        self.assertTrue(payload["live"]["board_position_api"]["service_reachable"])
+
+    def test_query_board_telemetry_parses_cpu_and_memory_usage(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        stdout = "\n".join(
+            [
+                "MemTotal:        2048000 kB",
+                "MemFree:          128000 kB",
+                "MemAvailable:     512000 kB",
+                "Buffers:           64000 kB",
+                "Cached:           256000 kB",
+                "__CODEX_MEMINFO_END__",
+                "cpu  100 0 50 850 0 0 0 0 0 0",
+                "__CODEX_STAT1_END__",
+                "cpu  130 0 60 870 0 0 0 0 0 0",
+                "__CODEX_STAT2_END__",
+                "1.25 0.50 0.25 1/100 1234",
+                "__CODEX_LOADAVG_END__",
+                "4",
+            ]
+        )
+
+        with patch(
+            "server.run_ssh_command",
+            return_value=server.subprocess.CompletedProcess([], 0, stdout=stdout, stderr=""),
+        ):
+            telemetry = server.query_board_telemetry(board_access, timeout_sec=3.0)
+
+        self.assertEqual(telemetry["status"], "ok")
+        self.assertEqual(telemetry["compute_label"], "CPU")
+        self.assertAlmostEqual(telemetry["compute_pct"], 66.667, places=3)
+        self.assertAlmostEqual(telemetry["memory_pct"], 75.0, places=3)
+        self.assertAlmostEqual(telemetry["memory_used_mb"], 1500.0, places=1)
+        self.assertAlmostEqual(telemetry["memory_total_mb"], 2000.0, places=1)
+        self.assertEqual(telemetry["cpu_cores"], 4)
+
+    def test_system_status_endpoint_exposes_board_telemetry(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-11T03:33:00+0800", "board reachable")
+
+        with patch(
+            "server.query_board_telemetry",
+            return_value={
+                "status": "ok",
+                "stale": False,
+                "source": "ssh_procfs",
+                "collected_at": "2026-04-11T03:33:05+0800",
+                "compute_label": "CPU",
+                "compute_pct": 48.5,
+                "memory_pct": 61.2,
+                "memory_used_mb": 1254.0,
+                "memory_available_mb": 796.0,
+                "memory_total_mb": 2050.0,
+                "loadavg_1m": 1.42,
+                "cpu_cores": 4,
+            },
+        ), patch.object(
+            state,
+            "_aircraft_position_upstream_probe_snapshot",
+            return_value={
+                "status": "not_found",
+                "selected_url": "",
+                "selected_source": "",
+                "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                "results": [],
+            },
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["telemetry"]["status"], "ok")
+        self.assertEqual(payload["live"]["telemetry"]["compute_label"], "CPU")
+        self.assertAlmostEqual(payload["live"]["telemetry"]["compute_pct"], 48.5)
+        self.assertAlmostEqual(payload["live"]["telemetry"]["memory_pct"], 61.2)
+        self.assertAlmostEqual(payload["live"]["telemetry"]["memory_used_mb"], 1254.0)
+
+    def test_system_status_reuses_cached_board_telemetry_while_refreshing(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-11T03:33:00+0800", "board reachable")
+        state._board_telemetry_cache = {
+            "status": "ok",
+            "stale": False,
+            "source": "ssh_procfs",
+            "collected_at": "2026-04-11T03:33:05+0800",
+            "compute_label": "CPU",
+            "compute_pct": 48.5,
+            "memory_pct": 61.2,
+            "memory_used_mb": 1254.0,
+            "memory_available_mb": 796.0,
+            "memory_total_mb": 2050.0,
+            "loadavg_1m": 1.42,
+            "cpu_cores": 4,
+        }
+        state._board_telemetry_cache_ts = time.monotonic() - (server.BOARD_TELEMETRY_TTL_SEC + 1.0)
+
+        fake_thread = Mock()
+        fake_thread.start = Mock()
+
+        with (
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "not_found",
+                    "selected_url": "",
+                    "selected_source": "",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [],
+                },
+            ),
+            patch.object(
+                state,
+                "_board_position_api_snapshot",
+                return_value={
+                    "status": "source_unavailable",
+                    "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
+                },
+            ),
+            patch("server.threading.Thread", return_value=fake_thread) as thread_cls,
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
+        self.assertAlmostEqual(payload["live"]["telemetry"]["memory_pct"], 61.2)
+        self.assertIn("后台刷新中", payload["live"]["telemetry"]["note"])
+        thread_cls.assert_called_once()
+        fake_thread.start.assert_called_once()
+
+    def test_board_position_api_snapshot_reuses_cached_payload_while_refreshing(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+        state._board_position_api_cache = {
+            "status": "source_unavailable",
+            "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
+            "service_reachable": True,
+            "http_status": 200,
+            "sample_ready": False,
+        }
+        state._board_position_api_cache_ts = time.monotonic() - (server.BOARD_POSITION_API_TTL_SEC + 1.0)
+
+        fake_thread = Mock()
+        fake_thread.start = Mock()
+
+        with patch("server.threading.Thread", return_value=fake_thread) as thread_cls:
+            payload = state._board_position_api_snapshot(state._board_access)
+
+        self.assertEqual(payload["status"], "source_unavailable")
+        self.assertTrue(payload["stale"])
+        self.assertIn("后台刷新中", payload["note"])
+        thread_cls.assert_called_once()
+        fake_thread.start.assert_called_once()
+
+    def test_system_status_skips_remote_refreshes_while_tvm_batch_is_running(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-21T15:43:00+0800", "board reachable")
+        state._batch_state = {
+            "status": "running",
+            "batch_job_id": "batch-123",
+            "engine": "tvm",
+            "total": 300,
+            "completed": 128,
+            "service_mode": "FULL_FRAME",
+            "_samples": {},
+            "benchmark": None,
+        }
+        state._board_telemetry_cache = {
+            "status": "ok",
+            "stale": False,
+            "source": "ssh_procfs",
+            "collected_at": "2026-04-21T15:42:55+0800",
+            "compute_label": "CPU",
+            "compute_pct": 43.2,
+            "memory_pct": 58.1,
+            "memory_used_mb": 1204.0,
+            "memory_available_mb": 846.0,
+            "memory_total_mb": 2050.0,
+            "loadavg_1m": 1.42,
+            "cpu_cores": 4,
+        }
+        state._board_telemetry_cache_ts = time.monotonic() - (server.BOARD_TELEMETRY_TTL_SEC + 1.0)
+        state._board_position_api_cache = {
+            "status": "source_unavailable",
+            "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
+            "service_reachable": True,
+            "http_status": 200,
+            "sample_ready": False,
+        }
+        state._board_position_api_cache_ts = time.monotonic() - (server.BOARD_POSITION_API_TTL_SEC + 1.0)
+        state._aircraft_position_upstream_probe_cache = {
+            "status": "not_found",
+            "selected_url": "",
+            "selected_source": "",
+            "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+            "results": [],
+            "checked_at": "2026-04-21T15:42:50+0800",
+        }
+        state._aircraft_position_upstream_probe_cache_ts = (
+            time.monotonic() - (server.AIRCRAFT_POSITION_UPSTREAM_DISCOVERY_TTL_SEC + 1.0)
+        )
+
+        with (
+            patch("server.query_board_telemetry") as query_telemetry,
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
+            patch("server._board_position_api_status") as board_position_status,
+            patch.object(state, "_start_board_position_api_refresh") as start_position_refresh,
+            patch("server.query_board_aircraft_position_upstream") as query_upstream,
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
+        self.assertIn("暂缓", payload["live"]["telemetry"]["note"])
+        self.assertTrue(payload["live"]["board_position_api"]["stale"])
+        self.assertIn("暂缓", payload["live"]["board_position_api"]["note"])
+        self.assertEqual(payload["live"]["aircraft_bridge"]["upstream_probe"]["status"], "not_found")
+        self.assertIn("暂缓", payload["live"]["aircraft_bridge"]["upstream_probe"]["note"])
+        query_telemetry.assert_not_called()
+        start_telemetry_refresh.assert_not_called()
+        board_position_status.assert_not_called()
+        start_position_refresh.assert_not_called()
+        query_upstream.assert_not_called()
+
+    def test_system_status_reports_upstream_not_found_when_probe_finds_no_candidate(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch(
+                "server._default_backend_base_url_for_board",
+                return_value="http://100.116.93.120:8079",
+            ),
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "not_found",
+                    "selected_url": "",
+                    "selected_source": "",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [{"url": "http://127.0.0.1:9000/gps", "error": "url_error:connection refused"}],
+                },
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["status"], "upstream_not_found")
+        self.assertFalse(payload["aircraft_position"]["bridge_runtime"]["configured"])
+        self.assertEqual(payload["live"]["aircraft_bridge"]["status"], "upstream_not_found")
+
+    def test_system_status_reports_autodiscovered_upstream_when_probe_finds_candidate(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch(
+                "server._default_backend_base_url_for_board",
+                return_value="http://100.116.93.120:8079",
+            ),
+            patch.object(
+                state,
+                "_aircraft_position_upstream_probe_snapshot",
+                return_value={
+                    "status": "detected",
+                    "selected_url": "http://127.0.0.1:9527/api/v1/position",
+                    "selected_source": "auto_discovered",
+                    "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
+                    "results": [{"url": "http://127.0.0.1:9527/api/v1/position", "has_coordinates": True}],
+                },
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["status"], "autodiscovered")
+        self.assertTrue(payload["aircraft_position"]["bridge_runtime"]["configured"])
+        self.assertEqual(
+            payload["aircraft_position"]["bridge_runtime"]["upstream_url"],
+            "http://127.0.0.1:9527/api/v1/position",
+        )
+        self.assertEqual(
+            payload["aircraft_position"]["bridge_runtime"]["upstream_url_source"],
+            "auto_discovered",
+        )
+        self.assertEqual(payload["live"]["aircraft_bridge"]["status"], "autodiscovered")
+
+    def test_aircraft_position_endpoint_updates_backend_feed(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/aircraft-position",
+            body=json.dumps(
+                {
+                    "source_kind": "upper_computer_gps",
+                    "source_status": "live",
+                    "source_label": "Upper Computer GPS live feed",
+                    "position": {"latitude": 31.205, "longitude": 121.551},
+                    "kinematics": {"heading_deg": 145.0, "ground_speed_kph": 275.5, "altitude_m": 3201.2},
+                    "fix": {"type": "RTK", "confidence_m": 2.1, "satellites": 19},
+                    "sample": {
+                        "captured_at": "2026-03-20T09:41:00+0800",
+                        "sequence": 12,
+                        "transport": "backend_http_post",
+                        "producer_id": "upper-computer-gps-daemon",
+                    },
+                }
+            ).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["source_kind"], "upper_computer_gps")
+        self.assertEqual(payload["source_status"], "live")
+        self.assertAlmostEqual(payload["position"]["latitude"], 31.205)
+        self.assertAlmostEqual(payload["position"]["longitude"], 121.551)
+        self.assertEqual(payload["fix"]["type"], "RTK")
+        self.assertEqual(payload["sample"]["sequence"], 12)
+        self.assertEqual(payload["sample"]["captured_at"], "2026-03-20T09:41:00+0800")
+        self.assertTrue(payload["feed_contract"]["primary_source"]["active"])
+        self.assertFalse(payload["feed_contract"]["fallback_source"]["active"])
+
+        status, _, latest = request_json(state, "GET", "/api/aircraft-position")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(latest["source_status"], "live")
+        self.assertAlmostEqual(latest["kinematics"]["ground_speed_kph"], 275.5)
+        self.assertAlmostEqual(latest["kinematics"]["altitude_m"], 3201.2)
+        self.assertEqual(latest["sample"]["sequence"], 12)
+        self.assertEqual(latest["feed_contract"]["active_source_label"], "Upper Computer GPS")
+
+    def test_system_status_marks_aircraft_bridge_live_when_live_feed_is_active(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides(
+            {
+                "AIRCRAFT_POSITION_UPSTREAM_URL": "http://127.0.0.1:9000/gps",
+                "AIRCRAFT_POSITION_BACKEND_BASE_URL": "http://demo-host:8079",
+            }
+        )
+        request_json(
+            state,
+            "POST",
+            "/api/aircraft-position",
+            body=json.dumps(
+                {
+                    "source_kind": "upper_computer_gps",
+                    "source_status": "live",
+                    "position": {"latitude": 31.205, "longitude": 121.551},
+                }
+            ).encode("utf-8"),
+        )
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["status"], "live")
+        self.assertTrue(payload["aircraft_position"]["bridge_runtime"]["configured"])
+        self.assertTrue(payload["aircraft_position"]["bridge_runtime"]["live_feed_active"])
+        self.assertEqual(payload["live"]["aircraft_bridge"]["status"], "live")
+
+    def test_system_status_marks_external_aircraft_bridge_as_local(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides(
+            {
+                "AIRCRAFT_POSITION_EXECUTION_MODE": "local",
+                "AIRCRAFT_POSITION_UPSTREAM_URL": "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                "AIRCRAFT_POSITION_LATITUDE_PATH": "content.point.y",
+                "AIRCRAFT_POSITION_LONGITUDE_PATH": "content.point.x",
+                "AIRCRAFT_POSITION_SOURCE_LABEL": "百度IP定位",
+            }
+        )
+        with patch.object(
+            state,
+            "_aircraft_position_upstream_probe_snapshot",
+            return_value={
+                "status": "configured",
+                "selected_url": "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                "selected_source": "env",
+                "candidate_urls": [],
+                "results": [],
+            },
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["status"], "armed_local")
+        self.assertEqual(payload["aircraft_position"]["bridge_runtime"]["execution_mode"], "local")
+        self.assertEqual(payload["live"]["aircraft_bridge"]["status"], "armed_local")
+
+    def test_run_local_aircraft_position_bridge_once_updates_backend_feed(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides(
+            {
+                "AIRCRAFT_POSITION_EXECUTION_MODE": "local",
+                "AIRCRAFT_POSITION_UPSTREAM_URL": "https://api.map.baidu.com/location/ip?coor=bd09ll&output=json&ak=demo",
+                "AIRCRAFT_POSITION_LATITUDE_PATH": "content.point.y",
+                "AIRCRAFT_POSITION_LONGITUDE_PATH": "content.point.x",
+                "AIRCRAFT_POSITION_SOURCE_LABEL": "百度IP定位",
+                "AIRCRAFT_POSITION_INTERVAL_SEC": "1.0",
+            }
+        )
+
+        with patch(
+            "server.fetch_normalized_payload",
+            return_value={
+                "source_kind": "upper_computer_gps",
+                "source_status": "live",
+                "source_label": "百度IP定位",
+                "position": {"latitude": 22.943853, "longitude": 113.390465},
+                "sample": {"captured_at": "2026-04-11T12:00:00+08:00", "upstream_url": "https://api.map.baidu.com/location/ip"},
+            },
+        ):
+            result = state._run_local_aircraft_position_bridge_once()
+
+        self.assertTrue(result)
+        latest = state.current_aircraft_position()
+        self.assertEqual(latest["source_status"], "live")
+        self.assertAlmostEqual(latest["position"]["latitude"], 22.943853)
+        self.assertAlmostEqual(latest["position"]["longitude"], 113.390465)
+        self.assertEqual(state._local_aircraft_bridge_state["status"], "running")
+
+    def test_aircraft_position_endpoint_auto_sequences_live_samples_when_feed_metadata_is_implicit(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        first_status, _, first_payload = request_json(
+            state,
+            "POST",
+            "/api/aircraft-position",
+            body=json.dumps({"position": {"latitude": 31.2, "longitude": 121.5}}).encode("utf-8"),
+        )
+        second_status, _, second_payload = request_json(
+            state,
+            "POST",
+            "/api/aircraft-position",
+            body=json.dumps({"position": {"latitude": 31.21, "longitude": 121.51}}).encode("utf-8"),
+        )
+
+        self.assertEqual(first_status, 200)
+        self.assertEqual(second_status, 200)
+        self.assertEqual(first_payload["source_kind"], "upper_computer_gps")
+        self.assertEqual(first_payload["source_status"], "live")
+        self.assertEqual(first_payload["sample"]["sequence"], 1)
+        self.assertEqual(second_payload["sample"]["sequence"], 2)
+        self.assertTrue(second_payload["sample"]["captured_at"])
+        self.assertIn("Upper Computer GPS", second_payload["feed_contract"]["active_source_label"])
+
+    def test_system_status_endpoint_prioritizes_operator_cue_scene4_when_fault_is_latched(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-03-19T19:15:00+0800", "board reachable")
+        state._last_control_status = {
+            "status": "success",
+            "guard_state": "READY",
+            "last_fault_code": "HEARTBEAT_TIMEOUT",
+            "active_job_id": 0,
+            "total_fault_count": 1,
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["operator_cue"]["current_scene_id"], "scene4")
+        self.assertEqual(payload["operator_cue"]["next_action"]["target_id"], "act4Panel")
+        self.assertEqual(payload["operator_cue"]["next_action"]["act_id"], "act4")
+        self.assertIn("SAFE_STOP", payload["operator_cue"]["presenter_line"])
+        self.assertEqual(payload["operator_cue"]["scenes"][3]["checks"][1]["label"], "Blackbox timeline")
+
+    def test_system_status_endpoint_exposes_recent_results_for_refresh_hydration(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload["job_id"] = "baseline-archive-001"
+        current_payload = server.build_prerecorded_inference_result(0, "current")
+        current_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "status_category": "success",
+                "source_label": "真实在线推进 + 归档样例图",
+                "message": "Current live 结果已经回到页面。",
+                "job_id": "demo-job-live-001",
+                "request_state": "completed",
+                "live_progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+            }
+        )
+
+        state._update_last_inference_summary(baseline_payload, "baseline")
+        state._update_last_inference_summary(current_payload, "current")
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["last_inference"]["variant"], "current")
+        self.assertEqual(payload["recent_results"]["current"]["job_id"], "demo-job-live-001")
+        self.assertEqual(payload["recent_results"]["current"]["execution_mode"], "live")
+        self.assertEqual(payload["recent_results"]["current"]["sample"]["label"], current_payload["sample"]["label"])
+        self.assertTrue(payload["recent_results"]["current"]["reconstructed_image_b64"].startswith("data:image/png;base64,"))
+        self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-archive-001")
+        self.assertEqual(payload["recent_results"]["baseline"]["execution_mode"], "reference")
+
+    def test_operator_readiness_smoke_state_covers_required_page_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)
+            request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+            )
+            state._last_live_probe = live_probe_payload("2026-03-19T19:22:00+0800", "board reachable")
+            state._last_control_status = {
+                "status": "success",
+                "guard_state": "READY",
+                "last_fault_code": "NONE",
+                "active_job_id": 0,
+                "total_fault_count": 0,
+                "logs": ["[19:22:00] STATUS_RESP: READY / fault=NONE"],
+            }
+
+            with (
+                patch(
+                    "server.describe_demo_admission",
+                    return_value={
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Signed manifest v1",
+                        "tone": "online",
+                        "bundle_path": "/tmp/openamp_demo_signed_admission/current.bundle.json",
+                        "public_key_path": "/tmp/openamp_demo_signed_admission/current.public.pem",
+                        "manifest_sha256": "a" * 64,
+                        "artifact_sha256": "b" * 64,
+                        "key_id": "demo-live-20260316",
+                        "verified_locally": True,
+                        "artifact_match": True,
+                        "note": "key_id=demo-live-20260316 | bundle=current.bundle.json",
+                    },
+                ),
+                patch(
+                    "server.describe_demo_variant_support",
+                    side_effect=[
+                        {
+                            "variant": "current",
+                            "status": "ready",
+                            "mode": "signed_manifest_v1",
+                            "label": "Current signed live 已支持",
+                            "tone": "online",
+                            "note": "Current signed-admission live path is supported.",
+                            "supported": True,
+                            "launch_allowed": True,
+                        },
+                        {
+                            "variant": "baseline",
+                            "status": "ready",
+                            "mode": "legacy_sha",
+                            "label": "PyTorch live 已支持",
+                            "tone": "online",
+                            "note": "PyTorch live path currently uses expected-SHA admission (legacy_sha).",
+                            "supported": True,
+                            "launch_allowed": True,
+                        },
+                        {
+                            "variant": "current",
+                            "status": "ready",
+                            "mode": "signed_manifest_v1",
+                            "label": "Current signed live 已支持",
+                            "tone": "online",
+                            "note": "Current signed-admission live path is supported.",
+                            "supported": True,
+                            "launch_allowed": True,
+                        },
+                        {
+                            "variant": "baseline",
+                            "status": "ready",
+                            "mode": "legacy_sha",
+                            "label": "PyTorch live 已支持",
+                            "tone": "online",
+                            "note": "PyTorch live path currently uses expected-SHA admission (legacy_sha).",
+                            "supported": True,
+                            "launch_allowed": True,
+                        },
+                    ],
+                ),
+                patch(
+                    "server.query_live_status",
+                    return_value={
+                        "status": "success",
+                        "guard_state": "READY",
+                        "active_job_id": 0,
+                        "last_fault_code": "NONE",
+                        "total_fault_count": 0,
+                        "logs": ["[19:22:01] STATUS_RESP: READY / fault=NONE"],
+                    },
+                ),
+            ):
+                preview_status, _, preview_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/job-manifest-gate/preview",
+                    body=json.dumps({"variant": "current"}).encode("utf-8"),
+                )
+                link_status, _, link_payload = request_json(
+                    state,
+                    "POST",
+                    "/api/link-director/profile",
+                    body=json.dumps({"profile_id": "lossy"}).encode("utf-8"),
+                )
+
+                baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+                baseline_payload["job_id"] = "baseline-archive-300"
+                current_payload = server.build_prerecorded_inference_result(0, "current")
+                current_payload.update(
+                    {
+                        "status": "success",
+                        "execution_mode": "live",
+                        "status_category": "success",
+                        "source_label": "真实在线推进 + 归档样例图",
+                        "message": "Current live 结果已经回到页面。",
+                        "job_id": "demo-job-compare-300",
+                        "request_state": "completed",
+                        "live_progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+                    }
+                )
+                state._update_last_inference_summary(baseline_payload, "baseline")
+                state._update_last_inference_summary(current_payload, "current")
+
+                status, _, payload = request_json(state, "GET", "/api/system-status")
+                archive_list_status, _, archive_list_payload = request_json(state, "GET", "/api/archive/sessions?limit=10")
+                current_session_id = archive_list_payload["current_session_id"] or archive_list_payload["sessions"][0]["session_id"]
+                archive_status, _, archive_payload = request_json(
+                    state,
+                    "GET",
+                    f"/api/archive/session?session_id={current_session_id}&limit=10",
+                )
+
+        self.assertEqual(preview_status, 200)
+        self.assertEqual(preview_payload["gate"]["verdict"], "allow")
+        self.assertEqual(link_status, 200)
+        self.assertEqual(link_payload["selected_profile_id"], "lossy")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["operator_cue"]["current_scene_id"], "scene3")
+        self.assertEqual(payload["operator_cue"]["next_action"]["target_id"], "compareViewerShell")
+        self.assertEqual(payload["link_director"]["selected_profile_id"], "lossy")
+        self.assertEqual(payload["job_manifest_gate"]["verdict"], "allow")
+        self.assertEqual(payload["recent_results"]["current"]["execution_mode"], "live")
+        self.assertEqual(payload["recent_results"]["baseline"]["execution_mode"], "reference")
+        self.assertEqual(payload["safety_panel"]["panel_label"], "无告警")
+        self.assertEqual(payload["safety_panel"]["safe_stop_state"], "IDLE")
+        self.assertGreaterEqual(payload["event_spine"]["event_count"], 4)
+        self.assertEqual(archive_list_status, 200)
+        self.assertGreaterEqual(archive_list_payload["session_count"], 1)
+        self.assertTrue(current_session_id)
+        self.assertEqual(archive_status, 200)
+        self.assertEqual(archive_payload["summary"]["session_id"], current_session_id)
+        self.assertGreaterEqual(archive_payload["summary"]["event_count"], 1)
+        self.assertTrue(archive_payload["timeline"])
+        self.assertTrue(
+            {"JOB_SUBMITTED", "JOB_ADMITTED", "LINK_PROFILE_CHANGED", "ARCHIVE_SNAPSHOT_WRITTEN"}
+            & {item["title"] for item in archive_payload["timeline"]}
+        )
+
+    def test_system_status_endpoint_includes_demo_admission_summary(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with (
+            patch(
+                "server.describe_demo_admission",
+                return_value={
+                    "status": "ready",
+                    "mode": "signed_manifest_v1",
+                    "label": "Signed manifest v1",
+                    "tone": "online",
+                    "bundle_path": "/tmp/openamp_demo_signed_admission/current.bundle.json",
+                    "public_key_path": "/tmp/openamp_demo_signed_admission/current.public.pem",
+                    "manifest_sha256": "a" * 64,
+                    "artifact_sha256": "b" * 64,
+                    "key_id": "demo-live-20260316",
+                    "verified_locally": True,
+                    "artifact_match": True,
+                    "note": "key_id=demo-live-20260316 | bundle=current.bundle.json",
+                },
+            ),
+            patch(
+                "server.describe_demo_variant_support",
+                side_effect=[
+                    {
+                        "variant": "current",
+                        "status": "ready",
+                        "mode": "signed_manifest_v1",
+                        "label": "Current signed live 已支持",
+                        "tone": "online",
+                        "note": "Current signed-admission live path is supported.",
+                        "supported": True,
+                        "launch_allowed": True,
+                    },
+                    {
+                        "variant": "baseline",
+                        "status": "ready",
+                        "mode": "legacy_sha",
+                        "label": "PyTorch live 已支持",
+                        "tone": "online",
+                        "note": "PyTorch live path currently uses expected-SHA admission (legacy_sha).",
+                        "supported": True,
+                        "launch_allowed": True,
+                    },
+                ],
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["admission"]["mode"], "signed_manifest_v1")
+        self.assertEqual(payload["live"]["admission"]["key_id"], "demo-live-20260316")
+        self.assertTrue(payload["live"]["admission"]["verified_locally"])
+        self.assertEqual(payload["live"]["variant_support"]["current"]["label"], "Current signed live 已支持")
+        self.assertEqual(payload["live"]["variant_support"]["baseline"]["label"], "PyTorch live 已支持")
+        self.assertTrue(payload["live"]["variant_support"]["baseline"]["launch_allowed"])
+        self.assertEqual(payload["job_manifest_gate"]["admission_mode"], "signed_manifest_v1")
+        self.assertEqual(payload["job_manifest_gate"]["variant"], "current")
+
+    def test_job_manifest_gate_endpoint_returns_current_gate_details(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with (
+            patch(
+                "server.describe_demo_admission",
+                return_value={
+                    "status": "ready",
+                    "mode": "signed_manifest_v1",
+                    "label": "Signed manifest v1",
+                    "tone": "online",
+                    "bundle_path": "/tmp/openamp_demo_signed_admission/current.bundle.json",
+                    "public_key_path": "/tmp/openamp_demo_signed_admission/current.public.pem",
+                    "manifest_sha256": "a" * 64,
+                    "artifact_sha256": "b" * 64,
+                    "key_id": "demo-live-20260316",
+                    "verified_locally": True,
+                    "artifact_match": True,
+                    "note": "key_id=demo-live-20260316 | bundle=current.bundle.json",
+                },
+            ),
+            patch(
+                "server.describe_demo_variant_support",
+                return_value={
+                    "variant": "current",
+                    "status": "ready",
+                    "mode": "signed_manifest_v1",
+                    "label": "Current signed live 已支持",
+                    "tone": "online",
+                    "note": "Current signed-admission live path is supported.",
+                    "supported": True,
+                    "launch_allowed": True,
+                },
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/job-manifest-gate")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["gate"]["variant"], "current")
+        self.assertEqual(payload["gate"]["admission_mode"], "signed_manifest_v1")
+        self.assertEqual(payload["gate"]["verdict"], "hold")
+        self.assertTrue(any("missing password" in reason for reason in payload["gate"]["reasons"]))
+        self.assertIn("wire schema", payload["gate"]["protocol_boundary_note"])
+
+    def test_system_status_endpoint_surfaces_running_active_inference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        running_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="demo-job-active",
+        )
+        state._inference_jobs[running_job.job_id] = {
+            "job": running_job,
+            "job_id": running_job.job_id,
+            "variant": "current",
+            "image_index": 0,
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["active_inference"]["running"])
+        self.assertEqual(payload["active_inference"]["job_id"], "demo-job-active")
+        self.assertEqual(payload["active_inference"]["variant"], "current")
+        self.assertEqual(payload["active_inference"]["queue_depth"], 1)
+        self.assertEqual(payload["active_inference"]["progress"]["current_stage"], "板端执行中")
+
+    def test_board_access_endpoint_accepts_password_only_and_keeps_preloaded_defaults(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        expected_env_file = state._board_access.env_file.relative_to(REPO_ROOT).as_posix()
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["host"], "100.121.87.73")
+        self.assertEqual(payload["board_access"]["user"], "user")
+        self.assertEqual(payload["board_access"]["port"], 22)
+        self.assertEqual(payload["board_access"]["env_file"], expected_env_file)
+        self.assertTrue(payload["board_access"]["has_password"])
+        self.assertTrue(payload["board_access"]["connection_ready"])
+        self.assertTrue(payload["board_access"]["inference_ready_variants"]["current"])
+        self.assertTrue(payload["board_access"]["inference_ready_variants"]["baseline"])
+        self.assertEqual(payload["board_access"]["field_sources"]["password"], "session")
+
+    def test_board_access_endpoint_accepts_transport_mode_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(payload["board_access"]["transport_label"], "USRP 模式")
+        self.assertEqual(payload["board_access"]["transport_tone"], "online")
+        self.assertIn("USRP", payload["board_access"]["transport_label"])
+        self.assertEqual(
+            payload["board_access"]["transport_summary"],
+            "USRP 模式：认证/控制面仍走 Tailscale/TCP，重建数据面走 USRP OTA。",
+        )
+        self.assertEqual(state._board_access.build_env()["MLKEM_TRANSPORT_MODE"], "usrp")
+        self.assertEqual(state._board_access.build_env()["MLKEM_USRP_MODE"], "ota")
+        self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+
+        system_status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(system_status, 200)
+        self.assertEqual(system_payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(system_payload["board_access"]["transport_label"], "USRP 模式")
+        self.assertEqual(system_payload["board_access"]["input_source_mode"], "usrp")
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "tcp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "tcp")
+        self.assertEqual(payload["board_access"]["input_source_mode"], "prerecorded")
+        self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "prerecorded")
+
+    def test_board_access_endpoint_rejects_unsupported_transport_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "bluetooth"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], "unsupported transport_mode; expected tcp or usrp")
+
+    def test_board_access_usrp_defaults_prefer_local_airfield300_image_dir(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["board_access"]["local_usrp_image_dir"].endswith("host_pic_to_latent/airfield300"))
+        self.assertTrue(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"].endswith("host_pic_to_latent/airfield300"))
+
+    def test_board_access_env_switch_refreshes_current_trusted_sha_runtime(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        legacy_env = "session_bootstrap/tmp/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.env"
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "env_file": legacy_env}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["env_file"], legacy_env)
+        self.assertEqual(state._trusted_current_sha, "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1")
+
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            system_payload["live"]["trusted_sha"],
+            "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+        )
+        self.assertEqual(
+            system_payload["live"]["admission"]["artifact_sha256"],
+            "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+        )
+
+    def test_probe_board_endpoint_updates_snapshot_after_success(self) -> None:
+        success = live_probe_payload("2026-03-15T12:00:00+0800", "board reachable")
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch("server.run_live_probe", return_value=success):
+            probe_status, _, probe_payload = request_json(state, "POST", "/api/probe-board", body=b"{}")
+            snapshot_status, _, snapshot_payload = request_json(state, "GET", "/api/snapshot")
+
+        self.assertEqual(probe_status, 200)
+        self.assertEqual(probe_payload, success)
+        self.assertEqual(snapshot_status, 200)
+        self.assertEqual(snapshot_payload["mode"]["effective_label"], "在线读数可用")
+        self.assertEqual(snapshot_payload["board"]["current_status"]["label"], "最新只读 SSH 探板")
+        self.assertEqual(snapshot_payload["board"]["current_status"]["requested_at"], success["requested_at"])
+        self.assertTrue(snapshot_payload["board"]["current_status"]["reachable"])
+
+    def test_probe_board_endpoint_uses_saved_session_access_when_present(self) -> None:
+        success = live_probe_payload("2026-03-15T12:00:00+0800", "board reachable")
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "demo-pass",
+                    "port": "2202",
+                }
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch("server.run_live_probe", return_value=success) as run_probe,
+            patch("server.query_live_status", return_value={"status": "error", "message": "skip"}) as query_status,
+        ):
+            probe_status, _, probe_payload = request_json(state, "POST", "/api/probe-board", body=b"{}")
+
+        self.assertEqual(probe_status, 200)
+        self.assertEqual(probe_payload["requested_at"], success["requested_at"])
+        run_probe.assert_called_once()
+        self.assertEqual(run_probe.call_args.kwargs["env_values"]["REMOTE_HOST"], "demo-board")
+        self.assertEqual(run_probe.call_args.kwargs["env_values"]["REMOTE_USER"], "demo-user")
+        self.assertEqual(run_probe.call_args.kwargs["env_values"]["REMOTE_PASS"], "demo-pass")
+        self.assertEqual(run_probe.call_args.kwargs["env_values"]["REMOTE_SSH_PORT"], "2202")
+        query_status.assert_called_once()
+
+    def test_probe_board_endpoint_returns_failure_without_mutating_snapshot(self) -> None:
+        failure = failed_probe_payload(
+            "2026-03-15T12:05:00+0800",
+            "probe failed",
+            "ssh timeout",
+        )
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch("server.run_live_probe", return_value=failure):
+            probe_status, _, probe_payload = request_json(state, "POST", "/api/probe-board", body=b"{}")
+            snapshot_status, _, snapshot_payload = request_json(state, "GET", "/api/snapshot")
+
+        self.assertEqual(probe_status, 200)
+        self.assertEqual(probe_payload, failure)
+        self.assertEqual(snapshot_status, 200)
+        self.assertEqual(snapshot_payload["mode"]["effective_label"], "仅展示证据")
+        self.assertEqual(snapshot_payload["board"]["current_status"]["label"], "暂无在线探板")
+        self.assertFalse(snapshot_payload["board"]["current_status"]["reachable"])
+        self.assertEqual(snapshot_payload["board"]["current_status"]["requested_at"], "")
+
+    def test_run_inference_endpoint_falls_back_until_password_is_provided(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, payload = request_json(
+            state,
+            "POST",
+            "/api/run-inference",
+            body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        self.assertEqual(payload["execution_mode"], "prerecorded")
+        self.assertEqual(payload["variant"], "current")
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["request_state"], "completed")
+        self.assertEqual(payload["status_category"], "config_error")
+        self.assertIn("配置不完整或不可用", payload["message"])
+        self.assertEqual(payload["live_attempt"]["status"], "config_error")
+        self.assertEqual(payload["live_attempt"]["diagnostics"]["missing_fields"], ["password"])
+        self.assertEqual(payload["live_progress"]["completed_count"], 0)
+        self.assertEqual(payload["live_progress"]["expected_count"], server.DEFAULT_MAX_INPUTS)
+        self.assertEqual(payload["live_progress"]["count_label"], f"0 / {server.DEFAULT_MAX_INPUTS}")
+        self.assertIsNone(payload["timings"]["payload_ms"])
+        self.assertIsNone(payload["timings"]["total_ms"])
+        self.assertEqual(payload["timings"]["stages"], [])
+        self.assertIn("guided_demo", state.current_snapshot())
+
+    def test_run_inference_endpoint_starts_live_job_with_preloaded_env_after_password_only_save(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        saved_access = state._board_access
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ]
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch(
+                "server.launch_remote_reconstruction_job",
+                return_value=live_job,
+            ) as launch_job,
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["request_state"], "running")
+        self.assertEqual(payload["job_id"], live_job.job_id)
+        access = launch_job.call_args.args[0]
+        self.assertIs(access, saved_access)
+        self.assertEqual(access.host, "100.121.87.73")
+        self.assertEqual(access.user, "user")
+        self.assertEqual(access.password, "demo-pass")
+        self.assertEqual(access.env_file, saved_access.env_file)
+        self.assertEqual(
+            access.build_env()["INFERENCE_CURRENT_EXPECTED_SHA256"],
+            "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+        )
+
+    def test_run_inference_endpoint_blocks_when_demo_already_has_running_live_job(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        running_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="demo-job-001",
+        )
+        state._inference_jobs[running_job.job_id] = {
+            "job": running_job,
+            "job_id": running_job.job_id,
+            "variant": "current",
+            "image_index": 0,
+        }
+
+        with patch("server.launch_remote_reconstruction_job") as launch_job:
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["status_category"], "board_busy")
+        self.assertIn("demo-job-001", payload["message"])
+        self.assertEqual(payload["live_attempt"]["status"], "blocked")
+        launch_job.assert_not_called()
+
+    def test_run_inference_endpoint_blocks_when_live_status_reports_job_active(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+
+        with (
+            patch(
+                "server.describe_demo_variant_support",
+                return_value={
+                    "variant": "current",
+                    "status": "ready",
+                    "mode": "signed_manifest_v1",
+                    "label": "Current signed live 已支持",
+                    "tone": "online",
+                    "note": "Current signed-admission live path is supported.",
+                    "supported": True,
+                    "launch_allowed": True,
+                },
+            ),
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "JOB_ACTIVE",
+                    "active_job_id": 8093,
+                    "last_fault_code": "DUPLICATE_JOB_ID",
+                    "logs": ["[02:27:52] STATUS_RESP: guard=JOB_ACTIVE"],
+                },
+            ),
+            patch("server.launch_remote_reconstruction_job") as launch_job,
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["status_category"], "board_busy")
+        self.assertIn("Current signed-admission live path 已支持", payload["message"])
+        self.assertIn("guard_state=JOB_ACTIVE", payload["message"])
+        self.assertEqual(payload["live_attempt"]["diagnostics"]["board_status"]["active_job_id"], 8093)
+        launch_job.assert_not_called()
+
+    def test_run_inference_endpoint_falls_back_to_runner_only_live_when_status_preflight_fails(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "Current live 已切到 SSH 兼容模式，界面正在同步板端执行进度。",
+                    "control_transport": "none",
+                    "control_handshake_complete": False,
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {
+                        "control_preflight": {
+                            "status": "timeout",
+                            "status_category": "timeout",
+                        }
+                    },
+                    "progress": live_progress_payload("真实在线执行（控制面降级）", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="compat-live-001",
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "timeout",
+                    "status_category": "timeout",
+                    "message": "远端状态查询超时，请确认板卡在线后重试。",
+                    "diagnostics": {"error": "STATUS_REQ tx_ok_rx_timeout"},
+                    "logs": [],
+                },
+            ),
+            patch("server.launch_remote_reconstruction_job", return_value=live_job) as launch_job,
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["source_label"], "真实在线执行（控制面降级）")
+        self.assertIn("SSH 兼容模式", payload["message"])
+        self.assertEqual(payload["live_attempt"]["control_transport"], "none")
+        self.assertFalse(payload["live_attempt"]["control_handshake_complete"])
+        launch_job.assert_called_once()
+        _, kwargs = launch_job.call_args
+        self.assertEqual(kwargs["control_transport"], "none")
+        self.assertEqual(
+            kwargs["control_preflight"]["status"],
+            "timeout",
+        )
+
+    def test_run_baseline_endpoint_starts_pytorch_live_job(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "baseline",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="demo-pytorch-001",
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch("server.launch_remote_reconstruction_job", return_value=live_job) as launch_job,
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-baseline",
+                body=json.dumps({"image_index": 0}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["request_state"], "running")
+        self.assertEqual(payload["variant"], "baseline")
+        self.assertEqual(payload["job_id"], "demo-pytorch-001")
+        self.assertEqual(payload["source_label"], "真实在线推进")
+        self.assertIn("OpenAMP 控制面已接管", payload["message"])
+        launch_job.assert_called_once()
+        self.assertEqual(launch_job.call_args.kwargs["max_inputs"], server.DEFAULT_MAX_INPUTS)
+
+    def test_inference_progress_endpoint_returns_completed_live_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                },
+                {
+                    "status": "success",
+                    "request_state": "completed",
+                    "status_category": "success",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已完成作业下发、板端执行与结果回收。",
+                    "runner_summary": {
+                        "load_ms": 3.2,
+                        "vm_init_ms": 0.8,
+                        "run_median_ms": 128.4,
+                        "artifact_sha256": "abcd" * 16,
+                    },
+                    "wrapper_summary": {"result": "success"},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+                    "artifacts": {},
+                },
+            ]
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch(
+                "server.launch_remote_reconstruction_job",
+                return_value=live_job,
+            ) as launch_job,
+        ):
+            start_status, _, start_payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+            status, _, payload = request_json(
+                state,
+                "GET",
+                f"/api/inference-progress?job_id={live_job.job_id}",
+            )
+
+        self.assertEqual(start_status, 200)
+        self.assertEqual(start_payload["request_state"], "running")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["request_state"], "completed")
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["source_label"], "真实在线推进 + 归档样例图")
+        self.assertAlmostEqual(payload["timings"]["total_ms"], 132.4)
+        self.assertEqual(payload["artifact_sha"], "abcd" * 16)
+        self.assertEqual(payload["live_progress"]["completed_count"], server.DEFAULT_MAX_INPUTS)
+        self.assertEqual(payload["live_progress"]["expected_count"], server.DEFAULT_MAX_INPUTS)
+        self.assertEqual(payload["live_progress"]["count_source"], "runner_summary.processed_count")
+        launch_job.assert_called_once()
+        access = launch_job.call_args.args[0]
+        self.assertEqual(
+            access.build_env()["INFERENCE_CURRENT_EXPECTED_SHA256"],
+            "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+        )
+
+    def test_inference_progress_endpoint_uses_nested_pipeline_summary_for_live_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+        nested_pipeline_sha = "beef" * 16
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已接管本次演示，界面正在同步板端阶段。",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                },
+                {
+                    "status": "success",
+                    "request_state": "completed",
+                    "status_category": "success",
+                    "execution_mode": "live",
+                    "variant": "current",
+                    "message": "OpenAMP 控制面已完成作业下发、板端执行与结果回收。",
+                    "runner_summary": {
+                        "pipeline": {
+                            "load_ms": 3.2,
+                            "vm_init_ms": 0.8,
+                            "ms_per_image": 239.4,
+                            "run_median_ms": 168.1,
+                            "artifact_sha256": nested_pipeline_sha,
+                        }
+                    },
+                    "wrapper_summary": {"result": "success"},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线推进", "completed", 100, "已返回结果"),
+                    "artifacts": {},
+                },
+            ],
+            job_id="demo-pipeline-001",
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch("server.launch_remote_reconstruction_job", return_value=live_job),
+        ):
+            start_status, _, start_payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+            status, _, payload = request_json(
+                state,
+                "GET",
+                f"/api/inference-progress?job_id={live_job.job_id}",
+            )
+
+        self.assertEqual(start_status, 200)
+        self.assertEqual(start_payload["request_state"], "running")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["request_state"], "completed")
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertAlmostEqual(payload["timings"]["payload_ms"], 239.4)
+        self.assertAlmostEqual(payload["timings"]["prepare_ms"], 4.0)
+        self.assertAlmostEqual(payload["timings"]["total_ms"], 239.4)
+        self.assertEqual(payload["timings"]["stages"][0]["label"], "板端重建（流水线）")
+        self.assertEqual(payload["artifact_sha"], nested_pipeline_sha)
+
+    def test_inference_progress_endpoint_returns_not_found_for_unknown_job(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "GET",
+            "/api/inference-progress?job_id=missing-job",
+        )
+
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], "job not found")
+
+    def test_inference_progress_endpoint_preserves_live_failure_diagnostics_on_fallback(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "placeholder-pass",
+                    "port": "22",
+                    "env_file": "session_bootstrap/config/inference_tvm310_safe.2026-03-10.phytium_pi.env",
+                }
+            ).encode("utf-8"),
+        )
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "error",
+                    "request_state": "completed",
+                    "status_category": "auth_error",
+                    "execution_mode": "fallback",
+                    "variant": "current",
+                    "message": "远端推理认证失败，请检查板卡用户名、密码或 SSH 端口设置。 当前已回退到预录结果。",
+                    "runner_summary": {},
+                    "wrapper_summary": {"result": "runner_failed"},
+                    "diagnostics": {"stderr": "Permission denied (publickey,password).", "returncode": 255},
+                    "progress": live_progress_payload("在线失败已回退", "completed", 100, "已返回结果"),
+                    "artifacts": {},
+                }
+            ]
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch(
+                "server.launch_remote_reconstruction_job",
+                return_value=live_job,
+            ),
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "prerecorded")
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["status_category"], "auth_error")
+        self.assertIn("认证失败", payload["message"])
+        self.assertNotIn("Permission denied", payload["message"])
+        self.assertEqual(payload["live_attempt"]["diagnostics"]["stderr"], "Permission denied (publickey,password).")
+        self.assertEqual(payload["live_progress"]["label"], "在线失败已回退")
+        self.assertIsNone(payload["timings"]["payload_ms"])
+        self.assertIsNone(payload["timings"]["total_ms"])
+        self.assertEqual(payload["timings"]["stages"], [])
+
+    def test_inference_timeout_fallback_marks_handshake_incomplete_and_archive_only(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "placeholder-pass",
+                    "port": "22",
+                    "env_file": "session_bootstrap/config/inference_tvm310_safe.2026-03-10.phytium_pi.env",
+                }
+            ).encode("utf-8"),
+        )
+        live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "error",
+                    "request_state": "completed",
+                    "status_category": "timeout",
+                    "execution_mode": "fallback",
+                    "variant": "current",
+                    "message": (
+                        "STATUS_REQ 已写入 RPMsg，但超时前未收到 STATUS_RESP；"
+                        "JOB_REQ 已写入 RPMsg，但超时前未收到 JOB_ACK。"
+                        "本次板端握手未完成，界面已回退到预录结果。"
+                    ),
+                    "control_handshake_complete": False,
+                    "runner_summary": {},
+                    "wrapper_summary": {"result": "denied_by_control_hook"},
+                    "diagnostics": {
+                        "control_handshake": {
+                            "complete": False,
+                            "status_req_transport": "tx_ok_rx_timeout",
+                            "job_req_transport": "tx_ok_rx_timeout",
+                        }
+                    },
+                    "progress": live_progress_payload("握手未完成，已回退", "completed", 0, "连接失败"),
+                    "artifacts": {},
+                }
+            ]
+        )
+
+        with (
+            patch(
+                "server.query_live_status",
+                return_value={
+                    "status": "success",
+                    "guard_state": "READY",
+                    "active_job_id": 0,
+                    "last_fault_code": "NONE",
+                    "total_fault_count": 0,
+                    "logs": [],
+                },
+            ),
+            patch(
+                "server.launch_remote_reconstruction_job",
+                return_value=live_job,
+            ),
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/run-inference",
+                body=json.dumps({"image_index": 0, "mode": "current"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "prerecorded")
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["status_category"], "timeout")
+        self.assertEqual(payload["source_label"], "握手未完成，回退展示（归档样例）")
+        self.assertIn("不宣称本次 live 已完成", payload["message"])
+        self.assertFalse(payload["live_attempt"]["control_handshake_complete"])
+        self.assertEqual(payload["live_progress"]["label"], "握手未完成，已回退")
+        self.assertIsNone(payload["timings"]["payload_ms"])
+        self.assertIsNone(payload["timings"]["total_ms"])
+        self.assertEqual(payload["timings"]["stages"], [])
+
+    def test_inject_fault_endpoint_keeps_live_attempt_diagnostics_on_replay_fallback(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "placeholder-pass",
+                    "port": "22",
+                }
+            ).encode("utf-8"),
+        )
+
+        with patch(
+            "server.run_fault_action",
+            return_value={
+                "status": "parse_error",
+                "status_category": "auth_error",
+                "message": "远端故障注入认证失败，请检查板卡用户名、密码或 SSH 端口设置。",
+                "diagnostics": {"stderr": "Permission denied (publickey,password).", "returncode": 255},
+                "logs": [],
+            },
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/inject-fault",
+                body=json.dumps({"fault_type": "wrong_sha"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "replay")
+        self.assertEqual(payload["status_category"], "auth_error")
+        self.assertIn("认证失败", payload["message"])
+        self.assertNotIn("Permission denied", payload["message"])
+        self.assertEqual(payload["live_attempt"]["diagnostics"]["stderr"], "Permission denied (publickey,password).")
+
+    def test_inject_fault_endpoint_returns_replay_when_not_configured(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/inject-fault",
+            body=json.dumps({"fault_type": "wrong_sha"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "replay")
+        self.assertEqual(payload["fit_id"], "FIT-01")
+        self.assertIn("回放", payload["source_label"])
+
+    def test_inject_fault_endpoint_uses_updated_current_sha_after_env_switch(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "password": "placeholder-pass",
+                    "env_file": "session_bootstrap/tmp/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.env",
+                }
+            ).encode("utf-8"),
+        )
+
+        with patch(
+            "server.run_fault_action",
+            return_value={
+                "status": "parse_error",
+                "status_category": "auth_error",
+                "message": "远端故障注入认证失败，请检查板卡用户名、密码或 SSH 端口设置。",
+                "diagnostics": {"stderr": "Permission denied (publickey,password).", "returncode": 255},
+                "logs": [],
+            },
+        ) as run_fault_action:
+            request_json(
+                state,
+                "POST",
+                "/api/inject-fault",
+                body=json.dumps({"fault_type": "wrong_sha"}).encode("utf-8"),
+            )
+
+        self.assertEqual(
+            run_fault_action.call_args.kwargs["trusted_sha"],
+            "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+        )
+
+    def test_recover_endpoint_keeps_retained_fault_visible_on_live_safe_stop(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "placeholder-pass",
+                    "port": "22",
+                }
+            ).encode("utf-8"),
+        )
+
+        with patch(
+            "server.run_recover_action",
+            return_value={
+                "status": "success",
+                "guard_state": "READY",
+                "last_fault_code": "HEARTBEAT_TIMEOUT",
+                "board_response": {
+                    "decision": "ACK",
+                    "fault_code": "HEARTBEAT_TIMEOUT",
+                    "guard_state": "READY",
+                },
+                "logs": ["[02:36:22] ◀ STATUS_RESP: READY，last_fault=HEARTBEAT_TIMEOUT"],
+            },
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/recover",
+                body=json.dumps({}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "live")
+        self.assertEqual(payload["source_label"], "真机 SAFE_STOP 收口")
+        self.assertEqual(payload["guard_state"], "READY")
+        self.assertEqual(payload["last_fault_code"], "HEARTBEAT_TIMEOUT")
+        self.assertEqual(payload["status_lamp"], "yellow")
+        self.assertIn("不宣称已清零", payload["message"])
+
+    def test_recover_endpoint_uses_updated_current_sha_after_env_switch(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "password": "placeholder-pass",
+                    "env_file": "session_bootstrap/tmp/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.env",
+                }
+            ).encode("utf-8"),
+        )
+
+        with patch(
+            "server.run_recover_action",
+            return_value={
+                "status": "parse_error",
+                "status_category": "auth_error",
+                "message": "远端恢复认证失败，请检查板卡用户名、密码或 SSH 端口设置。",
+                "diagnostics": {"stderr": "Permission denied (publickey,password).", "returncode": 255},
+                "logs": [],
+            },
+        ) as run_recover_action:
+            request_json(
+                state,
+                "POST",
+                "/api/recover",
+                body=json.dumps({}).encode("utf-8"),
+            )
+
+        self.assertEqual(
+            run_recover_action.call_args.kwargs["trusted_sha"],
+            "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+        )
+
+    def test_recover_endpoint_replay_preserves_latest_fault_code(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._last_fault_result = {
+            "fault_type": "wrong_sha",
+            "status": "injected",
+            "status_category": "success",
+            "execution_mode": "replay",
+            "message": "cached replay",
+            "guard_state": "READY",
+            "last_fault_code": "ARTIFACT_SHA_MISMATCH",
+        }
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/recover",
+            body=json.dumps({}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "replay")
+        self.assertEqual(payload["source_label"], "SAFE_STOP 收口回放")
+        self.assertEqual(payload["guard_state"], "READY")
+        self.assertEqual(payload["last_fault_code"], "ARTIFACT_SHA_MISMATCH")
+        self.assertEqual(payload["status_lamp"], "yellow")
+        self.assertIn("保留最近 fault code", payload["message"])
+
+    def test_root_serves_dashboard_entry_page(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, body = request_text(state, "GET", "/")
+
+        self.assertEqual(status, 200)
+        self.assertTrue(headers["content-type"].startswith("text/html"))
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertIn("<title>飞腾多核弱网安全语义视觉回传演示系统</title>", body)
+        self.assertIn("飞腾多核弱网安全语义视觉回传系统", body)
+        self.assertIn('id="cockpitShell"', body)
+        self.assertIn('id="flightStage"', body)
+        self.assertIn('id="aircraftVector"', body)
+        self.assertIn('id="aircraftContractStrip"', body)
+        self.assertIn('<div class="mission-stage-main">', body)
+        self.assertIn('id="missionCoreCard"', body)
+        self.assertIn('id="comparePeekCard"', body)
+        self.assertIn('id="missionCurrentLaunch"', body)
+        self.assertIn('id="missionRunCurrentButton"', body)
+        self.assertIn("启动远端 Current 重建", body)
+        self.assertIn("展开 Current 重建详情", body)
+        self.assertIn('id="missionCurrentProgressBadge"', body)
+        self.assertIn('id="missionCurrentProgressCount"', body)
+        self.assertIn('id="missionCurrentProgressBar"', body)
+        self.assertIn('id="missionCurrentProgressStage"', body)
+        self.assertIn('id="missionCurrentProgressMeta"', body)
+        self.assertIn('id="missionPasswordInline"', body)
+        self.assertIn('id="missionPasswordStatus"', body)
+        self.assertIn('id="missionPasswordInput"', body)
+        self.assertIn('id="missionPasswordSaveButton"', body)
+        self.assertIn('id="weakNetworkConsole"', body)
+        self.assertIn('id="operatorCueShell"', body)
+        self.assertIn('id="mainSafetyMirror"', body)
+        self.assertIn('id="sessionDrawer"', body)
+        self.assertIn('id="compareDrawer"', body)
+        self.assertIn('id="safetyDrawer"', body)
+        self.assertIn('id="compareViewerBoard"', body)
+        self.assertIn('id="compareViewerSampleLabel"', body)
+        self.assertIn('id="baselineProgressTitle"', body)
+        self.assertIn("PyTorch reference 300 张图", body)
+        self.assertIn("运行 PyTorch live 数据面 300 张图", body)
+        self.assertIn('<script src="/app.js"></script>', body)
+
+    def test_app_js_serves_dashboard_javascript(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, body = request_text(state, "GET", "/app.js")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/javascript; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertIn("const state = {", body)
+        self.assertIn('fetchJSON("/api/snapshot")', body)
+        self.assertIn('fetchJSON("/api/system-status")', body)
+        self.assertIn('fetchJSON("/api/link-director")', body)
+        self.assertIn('fetchJSON("/api/archive/sessions?limit=25")', body)
+        self.assertIn('fetchJSON(`/api/archive/session?session_id=${encodeURIComponent(nextArchiveSessionId)}&limit=25`)', body)
+        self.assertIn('fetchJSON("/api/link-director/profile"', body)
+        self.assertIn("systemStatus?.aircraft_position", body)
+        self.assertIn('document.getElementById("aircraftContractStrip")', body)
+        self.assertIn("aircraft.feed_contract?.summary", body)
+        self.assertIn("renderCockpitShell", body)
+        self.assertIn("openDrawer", body)
+        self.assertIn("closeDrawer", body)
+        self.assertIn("normalizeOperatorCue", body)
+        self.assertIn("renderOperatorCue", body)
+        self.assertIn("renderWeakNetworkConsole", body)
+        self.assertNotIn("navigator.geolocation", body)
+        self.assertIn("hydrateRecentResultsFromSystemStatus", body)
+        self.assertIn("systemStatus?.recent_results", body)
+        self.assertIn("state.currentResult = recentResults.current;", body)
+        self.assertIn("state.baselineResult = recentResults.baseline;", body)
+        self.assertIn('document.getElementById("operatorCueShell")', body)
+        self.assertIn("systemStatus.operator_cue", body)
+        self.assertIn("buildCommandCenterModel", body)
+        self.assertIn("resolveWeakNetworkSelection", body)
+        self.assertIn("jumpToTarget", body)
+        self.assertIn("focusMissionPasswordInput", body)
+        self.assertIn("renderMissionPasswordInline", body)
+        self.assertIn('document.getElementById("missionPasswordInput")', body)
+        self.assertIn("renderMissionCurrentLaunch", body)
+        self.assertIn("currentMissionProgressState", body)
+        self.assertIn('document.getElementById("missionRunCurrentButton")', body)
+        self.assertIn('badgeId: "missionCurrentProgressBadge"', body)
+        self.assertIn('stageId: "missionCurrentProgressStage"', body)
+        self.assertIn("submitBoardAccess", body)
+        self.assertIn("saveMissionPassword", body)
+        self.assertIn('document.getElementById("missionCoreCard")', body)
+        self.assertIn('document.getElementById("weakNetworkConsole")', body)
+        self.assertIn('document.getElementById("comparePeekCard")', body)
+        self.assertIn("data-jump-target", body)
+        self.assertIn("data-open-drawer", body)
+        self.assertIn("data-weak-scenario-id", body)
+        self.assertIn("effectiveSafetyPanel", body)
+        self.assertIn("renderSafetyFrontPanel", body)
+        self.assertIn("systemStatus.safety_panel", body)
+        self.assertIn('"/api/recover"', body)
+        self.assertIn("selectedCompareViewerSample", body)
+        self.assertIn('document.getElementById("compareViewerBoard")', body)
+        self.assertIn("baselineLiveDisplayLabel", body)
+        self.assertIn("PyTorch reference archive", body)
+        self.assertIn("PyTorch signed live", body)
+        self.assertNotIn("去 Session / Gate 填密码", body)
+
+    def test_app_js_keeps_homepage_current_launch_on_home_surface(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, body = request_text(state, "GET", "/app.js")
+
+        self.assertEqual(status, 200)
+        self.assertIn("async function runCurrentInferenceFromHomepage()", body)
+        self.assertIn("runCurrentInference({ switchActOptions: { openDrawer: false, user: false } });", body)
+        self.assertIn("if (options.openDrawer === false) {", body)
+        self.assertIn("switchAct(actId, switchActOptions);", body)
+        self.assertIn("runCurrentInferenceFromHomepage();", body)
+
+    def test_app_css_serves_dashboard_stylesheet(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, headers, body = request_text(state, "GET", "/app.css")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "text/css; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertIn(":root {", body)
+        self.assertIn("--accent: #59d8ff;", body)
+        self.assertIn(".cockpit-shell", body)
+        self.assertIn(".flight-stage", body)
+        self.assertIn(".details-drawer", body)
+        self.assertIn(".aircraft-vector", body)
+        self.assertIn(".cockpit-signal-strip", body)
+        self.assertIn(".flight-stage-sweep", body)
+        self.assertIn(".operator-cue-shell", body)
+        self.assertIn(".weak-console-metrics", body)
+        self.assertIn(
+            ".mission-stage-panel {\n"
+            "  grid-template-rows: auto minmax(0, 1fr) auto auto;\n"
+            "  overflow-y: auto;\n"
+            "  overflow-x: hidden;\n"
+            "}",
+            body,
+        )
+
+    def test_docs_endpoint_renders_repo_relative_markdown_document(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        doc_path = "session_bootstrap/demo/openamp_control_plane_demo/README.md"
+        expected_line = (REPO_ROOT / doc_path).read_text(encoding="utf-8").splitlines()[0]
+
+        status, headers, body = request_text(state, "GET", f"/docs?path={quote(doc_path, safe='')}")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertIn(f"<title>{doc_path}</title>", body)
+        self.assertIn(f'<div class="path">{doc_path}</div>', body)
+        self.assertIn(html.escape(expected_line), body)
+
+    def test_docs_endpoint_rejects_missing_invalid_and_missing_file_paths(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        cases = (
+            ("/docs", 400, "missing path"),
+            (f"/docs?path={quote('/etc/passwd', safe='')}", 400, "invalid path"),
+            ("/docs?path=session_bootstrap/demo/openamp_control_plane_demo/not-real.md", 404, "file not found"),
+        )
+
+        for request_path, expected_status, expected_message in cases:
+            with self.subTest(request_path=request_path):
+                status, headers, body = request_text(state, "GET", request_path)
+                self.assertEqual(status, expected_status)
+                self.assertTrue(headers["content-type"].startswith("text/html"))
+                self.assertEqual(headers["cache-control"], "no-store")
+                self.assertIn(expected_message, body)
+
+    def test_docs_endpoint_pretty_prints_json_documents(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        doc_path = "session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/fit_summary.json"
+        raw_json = (REPO_ROOT / doc_path).read_text(encoding="utf-8")
+        expected_json = html.escape(json.dumps(json.loads(raw_json), ensure_ascii=False, indent=2))
+
+        status, headers, body = request_text(state, "GET", f"/docs?path={quote(doc_path, safe='')}")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertIn(f'<div class="path">{doc_path}</div>', body)
+        self.assertIn(expected_json, body)
+
+
+class DemoHTTPServerSocketSmokeTest(unittest.TestCase):
+    def test_health_endpoint_smoke_via_real_localhost_socket(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        try:
+            http_server = server.DemoHTTPServer(("127.0.0.1", 0), DemoRequestHandler, state)
+        except PermissionError as exc:
+            self.skipTest(f"Local socket binding is not permitted in this runtime: {exc}")
+
+        server_thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+        server_thread.start()
+
+        try:
+            host, port = http_server.server_address
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(f"http://{host}:{port}/api/health", timeout=2) as response:
+                status = response.status
+                headers = dict(response.headers.items())
+                payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            http_server.shutdown()
+            http_server.server_close()
+            server_thread.join(timeout=2)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
+        self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(payload, {"status": "ok"})
+        self.assertFalse(server_thread.is_alive())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,190 @@
+{
+  "generated_at": "2026-03-13T23:01:54+08:00",
+  "label": "local_wsl",
+  "host": {
+    "hostname": "lenovo",
+    "kernel_release": "6.6.87.2-microsoft-standard-WSL2",
+    "kernel_version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:31:42 UTC 2025",
+    "machine": "aarch64",
+    "system": "Linux",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-aarch64-with-glibc2.39",
+    "looks_like_phytium_board": "no",
+    "os_release": {
+      "PRETTY_NAME": "Ubuntu 24.04.4 LTS",
+      "NAME": "Ubuntu",
+      "VERSION_ID": "24.04",
+      "VERSION": "24.04.4 LTS (Noble Numbat)",
+      "VERSION_CODENAME": "noble",
+      "ID": "ubuntu",
+      "ID_LIKE": "debian",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "UBUNTU_CODENAME": "noble",
+      "LOGO": "ubuntu-logo"
+    }
+  },
+  "sysfs": {
+    "/sys/class/remoteproc": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/bus/rpmsg": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/class/rpmsg": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/kernel/config": {
+      "exists": true,
+      "is_dir": true,
+      "sample_children": [
+        "pci_ep"
+      ]
+    },
+    "/sys/module/remoteproc": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/module/rpmsg": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/module/rpmsg_char": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    },
+    "/sys/module/virtio_rpmsg_bus": {
+      "exists": false,
+      "is_dir": false,
+      "sample_children": []
+    }
+  },
+  "device_nodes": {
+    "rpmsg_ctrl": [],
+    "rpmsg_endpoints": [],
+    "tty_rpmsg": []
+  },
+  "remoteproc_entries": [],
+  "rpmsg_bus_entries": [],
+  "modules": {
+    "loaded_modules": [],
+    "expected_loaded": {
+      "remoteproc": false,
+      "rpmsg": false,
+      "rpmsg_char": false,
+      "rpmsg_ctrl": false,
+      "virtio_rpmsg_bus": false,
+      "rpmsg_ns": false,
+      "mailbox": false
+    },
+    "module_root_exists": true,
+    "module_root": "/lib/modules/6.6.87.2-microsoft-standard-WSL2",
+    "available_module_paths": [
+      "/lib/modules/6.6.87.2-microsoft-standard-WSL2/kernel/drivers/mailbox/bcm-flexrm-mailbox.ko"
+    ]
+  },
+  "kernel_config": {
+    "_source": "/proc/config.gz",
+    "CONFIG_REMOTEPROC": "missing",
+    "CONFIG_RPMSG": "missing",
+    "CONFIG_RPMSG_CHAR": "missing",
+    "CONFIG_RPMSG_CTRL": "missing",
+    "CONFIG_RPMSG_NS": "missing",
+    "CONFIG_RPMSG_VIRTIO": "missing",
+    "CONFIG_MAILBOX": "y"
+  },
+  "commands": {
+    "uname_a": {
+      "ok": true,
+      "returncode": 0,
+      "stdout": "Linux lenovo 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:31:42 UTC 2025 aarch64 aarch64 aarch64 GNU/Linux\n",
+      "stderr": ""
+    },
+    "lsmod_filtered": {
+      "ok": true,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "dmesg_filtered": {
+      "ok": true,
+      "returncode": 0,
+      "stdout": "[    0.114601] virtio-pci 5582:00:00.0: enabling device (0000 -> 0002)\n[    0.690512] virtio-pci f373:00:00.0: enabling device (0000 -> 0002)\n[    0.706940] virtiofs virtio1: Cache len: 0x200000000 @ 0xc00000000\n",
+      "stderr": ""
+    }
+  },
+  "audit_checklist": [
+    {
+      "category": "用户态入口",
+      "item": "/dev/rpmsg_ctrl*、/dev/rpmsg*、/dev/ttyRPMSG* 是否存在且权限可读写"
+    },
+    {
+      "category": "sysfs",
+      "item": "/sys/class/remoteproc/remoteprocX 的 name/state/firmware/recovery/coredump"
+    },
+    {
+      "category": "sysfs",
+      "item": "/sys/bus/rpmsg/devices/* 的 channel 名称、src/dst、绑定 driver"
+    },
+    {
+      "category": "内核模块",
+      "item": "remoteproc、rpmsg、rpmsg_char、virtio_rpmsg_bus、mailbox 是否已加载"
+    },
+    {
+      "category": "内核配置",
+      "item": "CONFIG_REMOTEPROC / CONFIG_RPMSG / CONFIG_RPMSG_CHAR / CONFIG_RPMSG_VIRTIO"
+    },
+    {
+      "category": "日志证据",
+      "item": "dmesg 中是否出现 remoteproc boot、virtio rpmsg、name service、mailbox 错误"
+    },
+    {
+      "category": "联调前置",
+      "item": "先 STATUS_REQ/RESP，再 JOB_REQ/JOB_ACK，再 heartbeat/deadline/safe-stop"
+    }
+  ],
+  "minimum_debug_path": [
+    "先确认 remoteproc 实例存在，并能读取 name/state/firmware；若 state=offline，再确认从核固件装载路径和启动方式。",
+    "确认 RPMsg 用户态入口至少具备一项：/dev/rpmsg_ctrl*、/dev/rpmsg* 或厂商封装的 /dev/ttyRPMSG*。",
+    "确认内核侧至少暴露 remoteproc + rpmsg_char/virtio_rpmsg_bus，若未自动加载则补驱动或设备树绑定。",
+    "先打通 STATUS_REQ/STATUS_RESP，验证 Linux -> 从核 -> Linux 的最短控制回环，再接 JOB_REQ/JOB_ACK。",
+    "最后再用独立控制面 wrapper 包裹现有 trusted current runner，只在执行前后加控制消息与心跳，不改推理数据面。"
+  ],
+  "remote_pending_commands": [
+    "STAMP=\"$(date +%Y%m%d_%H%M%S)\"",
+    "python3 ./session_bootstrap/scripts/audit_openamp_linux_platform.py \\",
+    "  --label phytium_remote \\",
+    "  --output-json \"./session_bootstrap/reports/openamp_platform_audit_phytium_${STAMP}.json\" \\",
+    "  --output-md \"./session_bootstrap/reports/openamp_platform_audit_phytium_${STAMP}.md\"",
+    "ls -l /dev/rpmsg* /dev/ttyRPMSG* 2>/dev/null || true",
+    "lsmod | grep -E 'rpmsg|remoteproc|virtio_rpmsg|mailbox|openamp' || true",
+    "for p in /sys/class/remoteproc/remoteproc*; do [ -e \"$p\" ] || continue; echo \"== $p ==\"; for f in name state firmware recovery coredump; do [ -f \"$p/$f\" ] && printf '%s=%s\\n' \"$f\" \"$(cat \"$p/$f\")\"; done; done",
+    "for p in /sys/bus/rpmsg/devices/*; do [ -e \"$p\" ] || continue; basename \"$p\"; for f in name src dst modalias; do [ -f \"$p/$f\" ] && printf '  %s=%s\\n' \"$f\" \"$(cat \"$p/$f\")\"; done; done",
+    "dmesg | grep -Ei 'rpmsg|remoteproc|virtio_rpmsg|mailbox|openamp|virtio' | tail -n 80"
+  ],
+  "assessment": {
+    "readiness": "absent",
+    "findings": [
+      "缺少 /sys/class/remoteproc，说明当前宿主机没有暴露 remoteproc 用户态入口。",
+      "缺少 /sys/bus/rpmsg，RPMsg 总线未暴露。",
+      "未发现 /dev/rpmsg_ctrl*、/dev/rpmsg* 或 /dev/ttyRPMSG* 设备节点。",
+      "当前内核未加载 remoteproc/rpmsg 相关模块。"
+    ],
+    "common_gaps": [
+      "remoteproc sysfs 缺失",
+      "rpmsg bus 缺失",
+      "rpmsg 设备节点缺失",
+      "相关内核模块未加载"
+    ]
+  }
+}

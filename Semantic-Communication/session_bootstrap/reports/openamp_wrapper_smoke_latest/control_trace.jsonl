@@ -1,0 +1,3 @@
+{"at": "2026-03-13T23:03:46+0800", "phase": "STATUS_REQ", "payload": {"job_id": 1773414226, "variant": "smoke", "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "job_flags": "smoke"}}
+{"at": "2026-03-13T23:03:46+0800", "phase": "JOB_REQ", "payload": {"job_id": 1773414226, "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "deadline_ms": 300000, "expected_outputs": 1, "job_flags": "smoke", "runner_cmd": "python3 - <<'PY'\nimport time\nprint(\"runner smoke ok\")\ntime.sleep(0.2)\nPY"}}
+{"at": "2026-03-13T23:03:46+0800", "phase": "JOB_ACK", "payload": {"job_id": 1773414226, "decision": "ALLOW"}}

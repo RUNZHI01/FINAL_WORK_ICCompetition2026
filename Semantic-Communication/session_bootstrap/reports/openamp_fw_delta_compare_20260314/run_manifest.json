@@ -1,0 +1,10 @@
+{
+  "timestamp_utc": "2026-03-13T20:23:43.834884+00:00",
+  "cwd": "/home/tianxing/tvm_metaschedule_execution_project",
+  "argv": [
+    "session_bootstrap/scripts/compare_openamp_firmware_delta.py",
+    "--remote-pass",
+    "user",
+    "--allow-size-only-fallback"
+  ]
+}

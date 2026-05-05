@@ -1,0 +1,644 @@
+[current-real] variant=current artifact=/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so output_dir=/home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current snr=12 batch_size=1 python=env TVM_FFI_DISABLE_TORCH_C_DLPACK=1 LD_LIBRARY_PATH=/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages/tvm_ffi/lib:/home/user/tvm_samegen_safe_20260309/build TVM_LIBRARY_PATH=/home/user/tvm_samegen_safe_20260309/build PYTHONPATH=/home/user/tvm_samegen_20260307/python:/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages /home/user/anaconda3/envs/tvm310_safe/bin/python
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[05:36:21] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+2026-03-18 05:36:27,825 - INFO - TVM 模型加载成功
+2026-03-18 05:36:28,241 - INFO - 批量推理时间（1 个样本）: 0.415325 秒
+2026-03-18 05:36:28,242 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000208_recon.png
+2026-03-18 05:36:28,597 - INFO - 批量推理时间（1 个样本）: 0.354831 秒
+2026-03-18 05:36:28,597 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000209_recon.png
+2026-03-18 05:36:28,938 - INFO - 批量推理时间（1 个样本）: 0.340542 秒
+2026-03-18 05:36:28,938 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000210_recon.png
+2026-03-18 05:36:29,275 - INFO - 批量推理时间（1 个样本）: 0.336288 秒
+2026-03-18 05:36:29,275 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000211_recon.png
+2026-03-18 05:36:29,625 - INFO - 批量推理时间（1 个样本）: 0.349066 秒
+2026-03-18 05:36:29,625 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000212_recon.png
+2026-03-18 05:36:29,974 - INFO - 批量推理时间（1 个样本）: 0.348811 秒
+2026-03-18 05:36:29,975 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000213_recon.png
+2026-03-18 05:36:30,318 - INFO - 批量推理时间（1 个样本）: 0.342025 秒
+2026-03-18 05:36:30,318 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000214_recon.png
+2026-03-18 05:36:30,652 - INFO - 批量推理时间（1 个样本）: 0.333912 秒
+2026-03-18 05:36:30,652 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000215_recon.png
+2026-03-18 05:36:31,004 - INFO - 批量推理时间（1 个样本）: 0.350962 秒
+2026-03-18 05:36:31,004 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000216_recon.png
+2026-03-18 05:36:31,352 - INFO - 批量推理时间（1 个样本）: 0.347348 秒
+2026-03-18 05:36:31,352 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000217_recon.png
+2026-03-18 05:36:31,706 - INFO - 批量推理时间（1 个样本）: 0.353082 秒
+2026-03-18 05:36:31,707 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000218_recon.png
+2026-03-18 05:36:32,071 - INFO - 批量推理时间（1 个样本）: 0.364361 秒
+2026-03-18 05:36:32,072 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000219_recon.png
+2026-03-18 05:36:32,435 - INFO - 批量推理时间（1 个样本）: 0.362012 秒
+2026-03-18 05:36:32,435 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000220_recon.png
+2026-03-18 05:36:32,775 - INFO - 批量推理时间（1 个样本）: 0.340205 秒
+2026-03-18 05:36:32,776 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000221_recon.png
+2026-03-18 05:36:33,125 - INFO - 批量推理时间（1 个样本）: 0.348248 秒
+2026-03-18 05:36:33,125 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000222_recon.png
+2026-03-18 05:36:33,475 - INFO - 批量推理时间（1 个样本）: 0.349297 秒
+2026-03-18 05:36:33,475 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000223_recon.png
+2026-03-18 05:36:33,823 - INFO - 批量推理时间（1 个样本）: 0.347612 秒
+2026-03-18 05:36:33,823 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000224_recon.png
+2026-03-18 05:36:34,180 - INFO - 批量推理时间（1 个样本）: 0.355444 秒
+2026-03-18 05:36:34,180 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000225_recon.png
+2026-03-18 05:36:34,513 - INFO - 批量推理时间（1 个样本）: 0.332583 秒
+2026-03-18 05:36:34,513 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000226_recon.png
+2026-03-18 05:36:34,887 - INFO - 批量推理时间（1 个样本）: 0.373571 秒
+2026-03-18 05:36:34,888 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000227_recon.png
+2026-03-18 05:36:35,245 - INFO - 批量推理时间（1 个样本）: 0.356435 秒
+2026-03-18 05:36:35,245 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000228_recon.png
+2026-03-18 05:36:35,616 - INFO - 批量推理时间（1 个样本）: 0.370018 秒
+2026-03-18 05:36:35,616 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000229_recon.png
+2026-03-18 05:36:35,984 - INFO - 批量推理时间（1 个样本）: 0.368068 秒
+2026-03-18 05:36:35,985 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000230_recon.png
+2026-03-18 05:36:36,339 - INFO - 批量推理时间（1 个样本）: 0.354045 秒
+2026-03-18 05:36:36,340 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000231_recon.png
+2026-03-18 05:36:36,686 - INFO - 批量推理时间（1 个样本）: 0.346001 秒
+2026-03-18 05:36:36,686 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000232_recon.png
+2026-03-18 05:36:37,021 - INFO - 批量推理时间（1 个样本）: 0.333525 秒
+2026-03-18 05:36:37,021 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000233_recon.png
+2026-03-18 05:36:37,379 - INFO - 批量推理时间（1 个样本）: 0.357820 秒
+2026-03-18 05:36:37,379 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000234_recon.png
+2026-03-18 05:36:37,702 - INFO - 批量推理时间（1 个样本）: 0.321722 秒
+2026-03-18 05:36:37,702 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000235_recon.png
+2026-03-18 05:36:38,033 - INFO - 批量推理时间（1 个样本）: 0.330827 秒
+2026-03-18 05:36:38,034 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000236_recon.png
+2026-03-18 05:36:38,379 - INFO - 批量推理时间（1 个样本）: 0.345132 秒
+2026-03-18 05:36:38,380 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000237_recon.png
+2026-03-18 05:36:38,741 - INFO - 批量推理时间（1 个样本）: 0.361059 秒
+2026-03-18 05:36:38,741 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000238_recon.png
+2026-03-18 05:36:39,089 - INFO - 批量推理时间（1 个样本）: 0.347277 秒
+2026-03-18 05:36:39,090 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000239_recon.png
+2026-03-18 05:36:39,433 - INFO - 批量推理时间（1 个样本）: 0.343342 秒
+2026-03-18 05:36:39,434 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000240_recon.png
+2026-03-18 05:36:39,772 - INFO - 批量推理时间（1 个样本）: 0.337387 秒
+2026-03-18 05:36:39,772 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000241_recon.png
+2026-03-18 05:36:40,119 - INFO - 批量推理时间（1 个样本）: 0.346847 秒
+2026-03-18 05:36:40,120 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000242_recon.png
+2026-03-18 05:36:40,480 - INFO - 批量推理时间（1 个样本）: 0.360003 秒
+2026-03-18 05:36:40,481 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000243_recon.png
+2026-03-18 05:36:40,847 - INFO - 批量推理时间（1 个样本）: 0.366187 秒
+2026-03-18 05:36:40,848 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000244_recon.png
+2026-03-18 05:36:41,203 - INFO - 批量推理时间（1 个样本）: 0.354838 秒
+2026-03-18 05:36:41,203 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000245_recon.png
+2026-03-18 05:36:41,553 - INFO - 批量推理时间（1 个样本）: 0.348898 秒
+2026-03-18 05:36:41,553 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000246_recon.png
+2026-03-18 05:36:41,912 - INFO - 批量推理时间（1 个样本）: 0.358664 秒
+2026-03-18 05:36:41,913 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000247_recon.png
+2026-03-18 05:36:42,266 - INFO - 批量推理时间（1 个样本）: 0.353526 秒
+2026-03-18 05:36:42,267 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000248_recon.png
+2026-03-18 05:36:42,645 - INFO - 批量推理时间（1 个样本）: 0.377766 秒
+2026-03-18 05:36:42,646 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000249_recon.png
+2026-03-18 05:36:43,012 - INFO - 批量推理时间（1 个样本）: 0.366235 秒
+2026-03-18 05:36:43,012 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000250_recon.png
+2026-03-18 05:36:43,372 - INFO - 批量推理时间（1 个样本）: 0.358626 秒
+2026-03-18 05:36:43,372 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000251_recon.png
+2026-03-18 05:36:43,713 - INFO - 批量推理时间（1 个样本）: 0.340370 秒
+2026-03-18 05:36:43,713 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000252_recon.png
+2026-03-18 05:36:44,065 - INFO - 批量推理时间（1 个样本）: 0.351497 秒
+2026-03-18 05:36:44,066 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000253_recon.png
+2026-03-18 05:36:44,414 - INFO - 批量推理时间（1 个样本）: 0.347456 秒
+2026-03-18 05:36:44,414 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000254_recon.png
+2026-03-18 05:36:44,787 - INFO - 批量推理时间（1 个样本）: 0.372580 秒
+2026-03-18 05:36:44,788 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000255_recon.png
+2026-03-18 05:36:45,136 - INFO - 批量推理时间（1 个样本）: 0.348149 秒
+2026-03-18 05:36:45,136 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000256_recon.png
+2026-03-18 05:36:45,491 - INFO - 批量推理时间（1 个样本）: 0.353602 秒
+2026-03-18 05:36:45,491 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000257_recon.png
+2026-03-18 05:36:45,825 - INFO - 批量推理时间（1 个样本）: 0.333793 秒
+2026-03-18 05:36:45,825 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000258_recon.png
+2026-03-18 05:36:46,185 - INFO - 批量推理时间（1 个样本）: 0.358827 秒
+2026-03-18 05:36:46,186 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000259_recon.png
+2026-03-18 05:36:46,546 - INFO - 批量推理时间（1 个样本）: 0.359848 秒
+2026-03-18 05:36:46,546 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000260_recon.png
+2026-03-18 05:36:46,876 - INFO - 批量推理时间（1 个样本）: 0.329703 秒
+2026-03-18 05:36:46,877 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000261_recon.png
+2026-03-18 05:36:47,188 - INFO - 批量推理时间（1 个样本）: 0.311140 秒
+2026-03-18 05:36:47,188 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000262_recon.png
+2026-03-18 05:36:47,523 - INFO - 批量推理时间（1 个样本）: 0.333635 秒
+2026-03-18 05:36:47,523 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000263_recon.png
+2026-03-18 05:36:47,870 - INFO - 批量推理时间（1 个样本）: 0.346796 秒
+2026-03-18 05:36:47,871 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000264_recon.png
+2026-03-18 05:36:48,199 - INFO - 批量推理时间（1 个样本）: 0.327429 秒
+2026-03-18 05:36:48,199 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000265_recon.png
+2026-03-18 05:36:48,556 - INFO - 批量推理时间（1 个样本）: 0.356941 秒
+2026-03-18 05:36:48,557 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000266_recon.png
+2026-03-18 05:36:48,892 - INFO - 批量推理时间（1 个样本）: 0.334487 秒
+2026-03-18 05:36:48,892 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000267_recon.png
+2026-03-18 05:36:49,241 - INFO - 批量推理时间（1 个样本）: 0.348501 秒
+2026-03-18 05:36:49,241 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000268_recon.png
+2026-03-18 05:36:49,581 - INFO - 批量推理时间（1 个样本）: 0.339226 秒
+2026-03-18 05:36:49,582 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000269_recon.png
+2026-03-18 05:36:49,929 - INFO - 批量推理时间（1 个样本）: 0.347469 秒
+2026-03-18 05:36:49,930 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000270_recon.png
+2026-03-18 05:36:50,279 - INFO - 批量推理时间（1 个样本）: 0.348294 秒
+2026-03-18 05:36:50,279 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000271_recon.png
+2026-03-18 05:36:50,629 - INFO - 批量推理时间（1 个样本）: 0.349498 秒
+2026-03-18 05:36:50,629 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000272_recon.png
+2026-03-18 05:36:50,982 - INFO - 批量推理时间（1 个样本）: 0.351587 秒
+2026-03-18 05:36:50,982 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000273_recon.png
+2026-03-18 05:36:51,317 - INFO - 批量推理时间（1 个样本）: 0.334567 秒
+2026-03-18 05:36:51,317 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000274_recon.png
+2026-03-18 05:36:51,667 - INFO - 批量推理时间（1 个样本）: 0.349082 秒
+2026-03-18 05:36:51,667 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000275_recon.png
+2026-03-18 05:36:52,019 - INFO - 批量推理时间（1 个样本）: 0.351809 秒
+2026-03-18 05:36:52,020 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000276_recon.png
+2026-03-18 05:36:52,388 - INFO - 批量推理时间（1 个样本）: 0.367659 秒
+2026-03-18 05:36:52,388 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000277_recon.png
+2026-03-18 05:36:52,749 - INFO - 批量推理时间（1 个样本）: 0.360197 秒
+2026-03-18 05:36:52,749 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000278_recon.png
+2026-03-18 05:36:53,089 - INFO - 批量推理时间（1 个样本）: 0.339419 秒
+2026-03-18 05:36:53,090 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000279_recon.png
+2026-03-18 05:36:53,442 - INFO - 批量推理时间（1 个样本）: 0.352568 秒
+2026-03-18 05:36:53,443 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000280_recon.png
+2026-03-18 05:36:53,780 - INFO - 批量推理时间（1 个样本）: 0.336520 秒
+2026-03-18 05:36:53,780 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000281_recon.png
+2026-03-18 05:36:54,135 - INFO - 批量推理时间（1 个样本）: 0.354857 秒
+2026-03-18 05:36:54,136 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000282_recon.png
+2026-03-18 05:36:54,509 - INFO - 批量推理时间（1 个样本）: 0.371986 秒
+2026-03-18 05:36:54,509 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000283_recon.png
+2026-03-18 05:36:54,872 - INFO - 批量推理时间（1 个样本）: 0.362832 秒
+2026-03-18 05:36:54,872 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000284_recon.png
+2026-03-18 05:36:55,213 - INFO - 批量推理时间（1 个样本）: 0.340341 秒
+2026-03-18 05:36:55,214 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000285_recon.png
+2026-03-18 05:36:55,636 - INFO - 批量推理时间（1 个样本）: 0.421894 秒
+2026-03-18 05:36:55,636 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000286_recon.png
+2026-03-18 05:36:56,005 - INFO - 批量推理时间（1 个样本）: 0.367923 秒
+2026-03-18 05:36:56,005 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000287_recon.png
+2026-03-18 05:36:56,379 - INFO - 批量推理时间（1 个样本）: 0.373311 秒
+2026-03-18 05:36:56,379 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000288_recon.png
+2026-03-18 05:36:56,734 - INFO - 批量推理时间（1 个样本）: 0.354018 秒
+2026-03-18 05:36:56,735 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000289_recon.png
+2026-03-18 05:36:57,079 - INFO - 批量推理时间（1 个样本）: 0.344540 秒
+2026-03-18 05:36:57,080 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000290_recon.png
+2026-03-18 05:36:57,435 - INFO - 批量推理时间（1 个样本）: 0.354752 秒
+2026-03-18 05:36:57,436 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000291_recon.png
+2026-03-18 05:36:57,763 - INFO - 批量推理时间（1 个样本）: 0.326615 秒
+2026-03-18 05:36:57,763 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000292_recon.png
+2026-03-18 05:36:58,108 - INFO - 批量推理时间（1 个样本）: 0.344675 秒
+2026-03-18 05:36:58,109 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000293_recon.png
+2026-03-18 05:36:58,443 - INFO - 批量推理时间（1 个样本）: 0.333850 秒
+2026-03-18 05:36:58,443 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000294_recon.png
+2026-03-18 05:36:58,797 - INFO - 批量推理时间（1 个样本）: 0.353392 秒
+2026-03-18 05:36:58,798 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000295_recon.png
+2026-03-18 05:36:59,121 - INFO - 批量推理时间（1 个样本）: 0.323573 秒
+2026-03-18 05:36:59,122 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000296_recon.png
+2026-03-18 05:36:59,458 - INFO - 批量推理时间（1 个样本）: 0.335216 秒
+2026-03-18 05:36:59,458 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000297_recon.png
+2026-03-18 05:36:59,802 - INFO - 批量推理时间（1 个样本）: 0.343712 秒
+2026-03-18 05:36:59,802 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000298_recon.png
+2026-03-18 05:37:00,137 - INFO - 批量推理时间（1 个样本）: 0.333512 秒
+2026-03-18 05:37:00,137 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000299_recon.png
+2026-03-18 05:37:00,494 - INFO - 批量推理时间（1 个样本）: 0.357031 秒
+2026-03-18 05:37:00,495 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000300_recon.png
+2026-03-18 05:37:00,846 - INFO - 批量推理时间（1 个样本）: 0.350507 秒
+2026-03-18 05:37:00,846 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000301_recon.png
+2026-03-18 05:37:01,178 - INFO - 批量推理时间（1 个样本）: 0.331219 秒
+2026-03-18 05:37:01,178 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000302_recon.png
+2026-03-18 05:37:01,517 - INFO - 批量推理时间（1 个样本）: 0.337909 秒
+2026-03-18 05:37:01,517 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000303_recon.png
+2026-03-18 05:37:01,865 - INFO - 批量推理时间（1 个样本）: 0.347173 秒
+2026-03-18 05:37:01,865 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000304_recon.png
+2026-03-18 05:37:02,204 - INFO - 批量推理时间（1 个样本）: 0.338516 秒
+2026-03-18 05:37:02,205 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000305_recon.png
+2026-03-18 05:37:02,545 - INFO - 批量推理时间（1 个样本）: 0.339793 秒
+2026-03-18 05:37:02,545 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000306_recon.png
+2026-03-18 05:37:02,889 - INFO - 批量推理时间（1 个样本）: 0.343235 秒
+2026-03-18 05:37:02,889 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000307_recon.png
+2026-03-18 05:37:03,210 - INFO - 批量推理时间（1 个样本）: 0.320452 秒
+2026-03-18 05:37:03,210 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000308_recon.png
+2026-03-18 05:37:03,584 - INFO - 批量推理时间（1 个样本）: 0.372517 秒
+2026-03-18 05:37:03,584 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000309_recon.png
+2026-03-18 05:37:03,955 - INFO - 批量推理时间（1 个样本）: 0.370776 秒
+2026-03-18 05:37:03,955 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000310_recon.png
+2026-03-18 05:37:04,296 - INFO - 批量推理时间（1 个样本）: 0.340073 秒
+2026-03-18 05:37:04,296 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000311_recon.png
+2026-03-18 05:37:04,635 - INFO - 批量推理时间（1 个样本）: 0.338737 秒
+2026-03-18 05:37:04,636 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000312_recon.png
+2026-03-18 05:37:04,990 - INFO - 批量推理时间（1 个样本）: 0.353021 秒
+2026-03-18 05:37:04,990 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000313_recon.png
+2026-03-18 05:37:05,361 - INFO - 批量推理时间（1 个样本）: 0.370548 秒
+2026-03-18 05:37:05,361 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000314_recon.png
+2026-03-18 05:37:05,729 - INFO - 批量推理时间（1 个样本）: 0.366714 秒
+2026-03-18 05:37:05,729 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000315_recon.png
+2026-03-18 05:37:06,084 - INFO - 批量推理时间（1 个样本）: 0.354498 秒
+2026-03-18 05:37:06,084 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000316_recon.png
+2026-03-18 05:37:06,421 - INFO - 批量推理时间（1 个样本）: 0.336656 秒
+2026-03-18 05:37:06,422 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000317_recon.png
+2026-03-18 05:37:06,779 - INFO - 批量推理时间（1 个样本）: 0.357391 秒
+2026-03-18 05:37:06,780 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000318_recon.png
+2026-03-18 05:37:07,137 - INFO - 批量推理时间（1 个样本）: 0.356426 秒
+2026-03-18 05:37:07,137 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000319_recon.png
+2026-03-18 05:37:07,502 - INFO - 批量推理时间（1 个样本）: 0.364583 秒
+2026-03-18 05:37:07,502 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000320_recon.png
+2026-03-18 05:37:07,841 - INFO - 批量推理时间（1 个样本）: 0.337815 秒
+2026-03-18 05:37:07,841 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000321_recon.png
+2026-03-18 05:37:08,171 - INFO - 批量推理时间（1 个样本）: 0.328994 秒
+2026-03-18 05:37:08,171 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000322_recon.png
+2026-03-18 05:37:08,499 - INFO - 批量推理时间（1 个样本）: 0.327050 秒
+2026-03-18 05:37:08,499 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000323_recon.png
+2026-03-18 05:37:08,833 - INFO - 批量推理时间（1 个样本）: 0.333804 秒
+2026-03-18 05:37:08,833 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000324_recon.png
+2026-03-18 05:37:09,196 - INFO - 批量推理时间（1 个样本）: 0.362022 秒
+2026-03-18 05:37:09,197 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000325_recon.png
+2026-03-18 05:37:09,556 - INFO - 批量推理时间（1 个样本）: 0.358807 秒
+2026-03-18 05:37:09,556 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000326_recon.png
+2026-03-18 05:37:09,901 - INFO - 批量推理时间（1 个样本）: 0.344273 秒
+2026-03-18 05:37:09,901 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000327_recon.png
+2026-03-18 05:37:10,256 - INFO - 批量推理时间（1 个样本）: 0.354772 秒
+2026-03-18 05:37:10,257 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000328_recon.png
+2026-03-18 05:37:10,655 - INFO - 批量推理时间（1 个样本）: 0.397292 秒
+2026-03-18 05:37:10,655 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000329_recon.png
+2026-03-18 05:37:10,983 - INFO - 批量推理时间（1 个样本）: 0.327573 秒
+2026-03-18 05:37:10,983 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000330_recon.png
+2026-03-18 05:37:11,340 - INFO - 批量推理时间（1 个样本）: 0.355673 秒
+2026-03-18 05:37:11,340 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000331_recon.png
+2026-03-18 05:37:11,694 - INFO - 批量推理时间（1 个样本）: 0.353736 秒
+2026-03-18 05:37:11,694 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000332_recon.png
+2026-03-18 05:37:12,058 - INFO - 批量推理时间（1 个样本）: 0.363236 秒
+2026-03-18 05:37:12,059 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000333_recon.png
+2026-03-18 05:37:12,397 - INFO - 批量推理时间（1 个样本）: 0.337591 秒
+2026-03-18 05:37:12,397 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000334_recon.png
+2026-03-18 05:37:12,745 - INFO - 批量推理时间（1 个样本）: 0.347097 秒
+2026-03-18 05:37:12,745 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000335_recon.png
+2026-03-18 05:37:13,093 - INFO - 批量推理时间（1 个样本）: 0.347173 秒
+2026-03-18 05:37:13,093 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000336_recon.png
+2026-03-18 05:37:13,415 - INFO - 批量推理时间（1 个样本）: 0.320906 秒
+2026-03-18 05:37:13,415 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000337_recon.png
+2026-03-18 05:37:13,734 - INFO - 批量推理时间（1 个样本）: 0.319162 秒
+2026-03-18 05:37:13,735 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000338_recon.png
+2026-03-18 05:37:14,105 - INFO - 批量推理时间（1 个样本）: 0.368888 秒
+2026-03-18 05:37:14,105 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000339_recon.png
+2026-03-18 05:37:14,435 - INFO - 批量推理时间（1 个样本）: 0.329611 秒
+2026-03-18 05:37:14,435 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000340_recon.png
+2026-03-18 05:37:14,792 - INFO - 批量推理时间（1 个样本）: 0.356126 秒
+2026-03-18 05:37:14,792 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000341_recon.png
+2026-03-18 05:37:15,150 - INFO - 批量推理时间（1 个样本）: 0.357161 秒
+2026-03-18 05:37:15,150 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000342_recon.png
+2026-03-18 05:37:15,484 - INFO - 批量推理时间（1 个样本）: 0.333273 秒
+2026-03-18 05:37:15,485 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000343_recon.png
+2026-03-18 05:37:15,833 - INFO - 批量推理时间（1 个样本）: 0.348226 秒
+2026-03-18 05:37:15,833 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000344_recon.png
+2026-03-18 05:37:16,175 - INFO - 批量推理时间（1 个样本）: 0.340334 秒
+2026-03-18 05:37:16,175 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000345_recon.png
+2026-03-18 05:37:16,516 - INFO - 批量推理时间（1 个样本）: 0.340333 秒
+2026-03-18 05:37:16,516 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000346_recon.png
+2026-03-18 05:37:16,877 - INFO - 批量推理时间（1 个样本）: 0.360178 秒
+2026-03-18 05:37:16,877 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000347_recon.png
+2026-03-18 05:37:17,226 - INFO - 批量推理时间（1 个样本）: 0.348976 秒
+2026-03-18 05:37:17,227 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000348_recon.png
+2026-03-18 05:37:17,577 - INFO - 批量推理时间（1 个样本）: 0.349591 秒
+2026-03-18 05:37:17,577 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000349_recon.png
+2026-03-18 05:37:17,911 - INFO - 批量推理时间（1 个样本）: 0.333748 秒
+2026-03-18 05:37:17,912 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000350_recon.png
+2026-03-18 05:37:18,242 - INFO - 批量推理时间（1 个样本）: 0.329468 秒
+2026-03-18 05:37:18,242 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000351_recon.png
+2026-03-18 05:37:18,618 - INFO - 批量推理时间（1 个样本）: 0.375344 秒
+2026-03-18 05:37:18,618 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000352_recon.png
+2026-03-18 05:37:18,955 - INFO - 批量推理时间（1 个样本）: 0.335792 秒
+2026-03-18 05:37:18,955 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000353_recon.png
+2026-03-18 05:37:19,311 - INFO - 批量推理时间（1 个样本）: 0.355590 秒
+2026-03-18 05:37:19,311 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000354_recon.png
+2026-03-18 05:37:19,622 - INFO - 批量推理时间（1 个样本）: 0.309073 秒
+2026-03-18 05:37:19,622 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000355_recon.png
+2026-03-18 05:37:19,974 - INFO - 批量推理时间（1 个样本）: 0.351513 秒
+2026-03-18 05:37:19,974 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000356_recon.png
+2026-03-18 05:37:20,327 - INFO - 批量推理时间（1 个样本）: 0.351802 秒
+2026-03-18 05:37:20,327 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000357_recon.png
+2026-03-18 05:37:20,657 - INFO - 批量推理时间（1 个样本）: 0.329628 秒
+2026-03-18 05:37:20,657 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000358_recon.png
+2026-03-18 05:37:21,007 - INFO - 批量推理时间（1 个样本）: 0.348451 秒
+2026-03-18 05:37:21,007 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000359_recon.png
+2026-03-18 05:37:21,364 - INFO - 批量推理时间（1 个样本）: 0.357052 秒
+2026-03-18 05:37:21,365 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000360_recon.png
+2026-03-18 05:37:21,724 - INFO - 批量推理时间（1 个样本）: 0.357976 秒
+2026-03-18 05:37:21,724 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000361_recon.png
+2026-03-18 05:37:22,066 - INFO - 批量推理时间（1 个样本）: 0.341974 秒
+2026-03-18 05:37:22,067 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000362_recon.png
+2026-03-18 05:37:22,432 - INFO - 批量推理时间（1 个样本）: 0.364651 秒
+2026-03-18 05:37:22,432 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000363_recon.png
+2026-03-18 05:37:22,768 - INFO - 批量推理时间（1 个样本）: 0.334965 秒
+2026-03-18 05:37:22,768 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000364_recon.png
+2026-03-18 05:37:23,108 - INFO - 批量推理时间（1 个样本）: 0.339530 秒
+2026-03-18 05:37:23,109 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000365_recon.png
+2026-03-18 05:37:23,436 - INFO - 批量推理时间（1 个样本）: 0.327016 秒
+2026-03-18 05:37:23,436 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000366_recon.png
+2026-03-18 05:37:23,782 - INFO - 批量推理时间（1 个样本）: 0.344961 秒
+2026-03-18 05:37:23,783 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000367_recon.png
+2026-03-18 05:37:24,142 - INFO - 批量推理时间（1 个样本）: 0.359409 秒
+2026-03-18 05:37:24,143 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000368_recon.png
+2026-03-18 05:37:24,456 - INFO - 批量推理时间（1 个样本）: 0.312937 秒
+2026-03-18 05:37:24,457 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000369_recon.png
+2026-03-18 05:37:24,814 - INFO - 批量推理时间（1 个样本）: 0.356774 秒
+2026-03-18 05:37:24,814 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000370_recon.png
+2026-03-18 05:37:25,155 - INFO - 批量推理时间（1 个样本）: 0.340548 秒
+2026-03-18 05:37:25,156 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000371_recon.png
+2026-03-18 05:37:25,508 - INFO - 批量推理时间（1 个样本）: 0.351710 秒
+2026-03-18 05:37:25,508 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000372_recon.png
+2026-03-18 05:37:25,866 - INFO - 批量推理时间（1 个样本）: 0.357233 秒
+2026-03-18 05:37:25,867 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000373_recon.png
+2026-03-18 05:37:26,204 - INFO - 批量推理时间（1 个样本）: 0.337422 秒
+2026-03-18 05:37:26,205 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000374_recon.png
+2026-03-18 05:37:26,550 - INFO - 批量推理时间（1 个样本）: 0.344159 秒
+2026-03-18 05:37:26,550 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000375_recon.png
+2026-03-18 05:37:26,891 - INFO - 批量推理时间（1 个样本）: 0.340714 秒
+2026-03-18 05:37:26,891 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000376_recon.png
+2026-03-18 05:37:27,222 - INFO - 批量推理时间（1 个样本）: 0.330320 秒
+2026-03-18 05:37:27,223 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000377_recon.png
+2026-03-18 05:37:27,552 - INFO - 批量推理时间（1 个样本）: 0.328737 秒
+2026-03-18 05:37:27,552 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000378_recon.png
+2026-03-18 05:37:27,893 - INFO - 批量推理时间（1 个样本）: 0.340711 秒
+2026-03-18 05:37:27,894 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000379_recon.png
+2026-03-18 05:37:28,222 - INFO - 批量推理时间（1 个样本）: 0.327724 秒
+2026-03-18 05:37:28,222 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000380_recon.png
+2026-03-18 05:37:28,568 - INFO - 批量推理时间（1 个样本）: 0.345161 秒
+2026-03-18 05:37:28,568 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000381_recon.png
+2026-03-18 05:37:28,928 - INFO - 批量推理时间（1 个样本）: 0.359447 秒
+2026-03-18 05:37:28,928 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000382_recon.png
+2026-03-18 05:37:29,260 - INFO - 批量推理时间（1 个样本）: 0.330307 秒
+2026-03-18 05:37:29,260 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000383_recon.png
+2026-03-18 05:37:29,608 - INFO - 批量推理时间（1 个样本）: 0.348180 秒
+2026-03-18 05:37:29,609 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000384_recon.png
+2026-03-18 05:37:29,947 - INFO - 批量推理时间（1 个样本）: 0.337861 秒
+2026-03-18 05:37:29,948 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000385_recon.png
+2026-03-18 05:37:30,296 - INFO - 批量推理时间（1 个样本）: 0.348064 秒
+2026-03-18 05:37:30,296 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000386_recon.png
+2026-03-18 05:37:30,654 - INFO - 批量推理时间（1 个样本）: 0.356627 秒
+2026-03-18 05:37:30,654 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000387_recon.png
+2026-03-18 05:37:31,012 - INFO - 批量推理时间（1 个样本）: 0.358269 秒
+2026-03-18 05:37:31,013 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000388_recon.png
+2026-03-18 05:37:31,341 - INFO - 批量推理时间（1 个样本）: 0.327653 秒
+2026-03-18 05:37:31,342 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000389_recon.png
+2026-03-18 05:37:31,700 - INFO - 批量推理时间（1 个样本）: 0.358503 秒
+2026-03-18 05:37:31,701 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000390_recon.png
+2026-03-18 05:37:32,071 - INFO - 批量推理时间（1 个样本）: 0.369083 秒
+2026-03-18 05:37:32,071 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000391_recon.png
+2026-03-18 05:37:32,428 - INFO - 批量推理时间（1 个样本）: 0.356599 秒
+2026-03-18 05:37:32,428 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000392_recon.png
+2026-03-18 05:37:32,779 - INFO - 批量推理时间（1 个样本）: 0.349851 秒
+2026-03-18 05:37:32,779 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000393_recon.png
+2026-03-18 05:37:33,110 - INFO - 批量推理时间（1 个样本）: 0.330502 秒
+2026-03-18 05:37:33,110 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000394_recon.png
+2026-03-18 05:37:33,431 - INFO - 批量推理时间（1 个样本）: 0.320085 秒
+2026-03-18 05:37:33,432 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000395_recon.png
+2026-03-18 05:37:33,792 - INFO - 批量推理时间（1 个样本）: 0.360275 秒
+2026-03-18 05:37:33,792 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000396_recon.png
+2026-03-18 05:37:34,134 - INFO - 批量推理时间（1 个样本）: 0.340494 秒
+2026-03-18 05:37:34,134 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000397_recon.png
+2026-03-18 05:37:34,492 - INFO - 批量推理时间（1 个样本）: 0.357698 秒
+2026-03-18 05:37:34,492 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000398_recon.png
+2026-03-18 05:37:34,834 - INFO - 批量推理时间（1 个样本）: 0.341331 秒
+2026-03-18 05:37:34,835 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000399_recon.png
+2026-03-18 05:37:35,200 - INFO - 批量推理时间（1 个样本）: 0.364855 秒
+2026-03-18 05:37:35,200 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000400_recon.png
+2026-03-18 05:37:35,573 - INFO - 批量推理时间（1 个样本）: 0.372245 秒
+2026-03-18 05:37:35,573 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000401_recon.png
+2026-03-18 05:37:35,930 - INFO - 批量推理时间（1 个样本）: 0.356667 秒
+2026-03-18 05:37:35,931 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000402_recon.png
+2026-03-18 05:37:36,290 - INFO - 批量推理时间（1 个样本）: 0.358107 秒
+2026-03-18 05:37:36,290 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000403_recon.png
+2026-03-18 05:37:36,629 - INFO - 批量推理时间（1 个样本）: 0.338815 秒
+2026-03-18 05:37:36,629 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000404_recon.png
+2026-03-18 05:37:36,999 - INFO - 批量推理时间（1 个样本）: 0.368524 秒
+2026-03-18 05:37:36,999 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000405_recon.png
+2026-03-18 05:37:37,349 - INFO - 批量推理时间（1 个样本）: 0.350083 秒
+2026-03-18 05:37:37,350 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000406_recon.png
+2026-03-18 05:37:37,677 - INFO - 批量推理时间（1 个样本）: 0.326199 秒
+2026-03-18 05:37:37,677 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000407_recon.png
+2026-03-18 05:37:38,025 - INFO - 批量推理时间（1 个样本）: 0.347467 秒
+2026-03-18 05:37:38,025 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000408_recon.png
+2026-03-18 05:37:38,359 - INFO - 批量推理时间（1 个样本）: 0.333288 秒
+2026-03-18 05:37:38,359 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000409_recon.png
+2026-03-18 05:37:38,694 - INFO - 批量推理时间（1 个样本）: 0.334623 秒
+2026-03-18 05:37:38,695 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000410_recon.png
+2026-03-18 05:37:39,032 - INFO - 批量推理时间（1 个样本）: 0.336602 秒
+2026-03-18 05:37:39,032 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000411_recon.png
+2026-03-18 05:37:39,379 - INFO - 批量推理时间（1 个样本）: 0.346117 秒
+2026-03-18 05:37:39,379 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000412_recon.png
+2026-03-18 05:37:39,741 - INFO - 批量推理时间（1 个样本）: 0.360863 秒
+2026-03-18 05:37:39,741 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000413_recon.png
+2026-03-18 05:37:40,089 - INFO - 批量推理时间（1 个样本）: 0.347953 秒
+2026-03-18 05:37:40,090 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000414_recon.png
+2026-03-18 05:37:40,448 - INFO - 批量推理时间（1 个样本）: 0.357420 秒
+2026-03-18 05:37:40,448 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000415_recon.png
+2026-03-18 05:37:40,784 - INFO - 批量推理时间（1 个样本）: 0.335386 秒
+2026-03-18 05:37:40,784 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000416_recon.png
+2026-03-18 05:37:41,144 - INFO - 批量推理时间（1 个样本）: 0.358898 秒
+2026-03-18 05:37:41,144 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000417_recon.png
+2026-03-18 05:37:41,472 - INFO - 批量推理时间（1 个样本）: 0.327520 秒
+2026-03-18 05:37:41,472 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000418_recon.png
+2026-03-18 05:37:41,801 - INFO - 批量推理时间（1 个样本）: 0.327562 秒
+2026-03-18 05:37:41,801 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000419_recon.png
+2026-03-18 05:37:42,123 - INFO - 批量推理时间（1 个样本）: 0.321841 秒
+2026-03-18 05:37:42,124 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000420_recon.png
+2026-03-18 05:37:42,484 - INFO - 批量推理时间（1 个样本）: 0.359739 秒
+2026-03-18 05:37:42,484 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000421_recon.png
+2026-03-18 05:37:42,832 - INFO - 批量推理时间（1 个样本）: 0.347140 秒
+2026-03-18 05:37:42,832 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000422_recon.png
+2026-03-18 05:37:43,177 - INFO - 批量推理时间（1 个样本）: 0.343938 秒
+2026-03-18 05:37:43,177 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000423_recon.png
+2026-03-18 05:37:43,527 - INFO - 批量推理时间（1 个样本）: 0.349377 秒
+2026-03-18 05:37:43,527 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000424_recon.png
+2026-03-18 05:37:43,871 - INFO - 批量推理时间（1 个样本）: 0.343013 秒
+2026-03-18 05:37:43,871 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000425_recon.png
+2026-03-18 05:37:44,212 - INFO - 批量推理时间（1 个样本）: 0.339981 秒
+2026-03-18 05:37:44,212 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000426_recon.png
+2026-03-18 05:37:44,537 - INFO - 批量推理时间（1 个样本）: 0.324493 秒
+2026-03-18 05:37:44,538 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000427_recon.png
+2026-03-18 05:37:44,869 - INFO - 批量推理时间（1 个样本）: 0.331535 秒
+2026-03-18 05:37:44,870 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000428_recon.png
+2026-03-18 05:37:45,231 - INFO - 批量推理时间（1 个样本）: 0.360955 秒
+2026-03-18 05:37:45,232 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000429_recon.png
+2026-03-18 05:37:45,607 - INFO - 批量推理时间（1 个样本）: 0.375334 秒
+2026-03-18 05:37:45,608 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000430_recon.png
+2026-03-18 05:37:45,964 - INFO - 批量推理时间（1 个样本）: 0.355297 秒
+2026-03-18 05:37:45,964 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000431_recon.png
+2026-03-18 05:37:46,314 - INFO - 批量推理时间（1 个样本）: 0.349345 秒
+2026-03-18 05:37:46,314 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000432_recon.png
+2026-03-18 05:37:46,629 - INFO - 批量推理时间（1 个样本）: 0.313973 秒
+2026-03-18 05:37:46,629 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000433_recon.png
+2026-03-18 05:37:46,955 - INFO - 批量推理时间（1 个样本）: 0.325807 秒
+2026-03-18 05:37:46,956 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000434_recon.png
+2026-03-18 05:37:47,311 - INFO - 批量推理时间（1 个样本）: 0.354957 秒
+2026-03-18 05:37:47,312 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000435_recon.png
+2026-03-18 05:37:47,646 - INFO - 批量推理时间（1 个样本）: 0.333923 秒
+2026-03-18 05:37:47,646 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000436_recon.png
+2026-03-18 05:37:47,997 - INFO - 批量推理时间（1 个样本）: 0.350111 秒
+2026-03-18 05:37:47,997 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000437_recon.png
+2026-03-18 05:37:48,335 - INFO - 批量推理时间（1 个样本）: 0.337463 秒
+2026-03-18 05:37:48,335 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000438_recon.png
+2026-03-18 05:37:48,682 - INFO - 批量推理时间（1 个样本）: 0.345797 秒
+2026-03-18 05:37:48,682 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000439_recon.png
+2026-03-18 05:37:49,025 - INFO - 批量推理时间（1 个样本）: 0.342492 秒
+2026-03-18 05:37:49,026 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000440_recon.png
+2026-03-18 05:37:49,359 - INFO - 批量推理时间（1 个样本）: 0.332409 秒
+2026-03-18 05:37:49,359 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000441_recon.png
+2026-03-18 05:37:49,710 - INFO - 批量推理时间（1 个样本）: 0.351010 秒
+2026-03-18 05:37:49,711 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000442_recon.png
+2026-03-18 05:37:50,048 - INFO - 批量推理时间（1 个样本）: 0.336177 秒
+2026-03-18 05:37:50,048 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000443_recon.png
+2026-03-18 05:37:50,392 - INFO - 批量推理时间（1 个样本）: 0.343206 秒
+2026-03-18 05:37:50,392 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000444_recon.png
+2026-03-18 05:37:50,768 - INFO - 批量推理时间（1 个样本）: 0.375642 秒
+2026-03-18 05:37:50,769 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000445_recon.png
+2026-03-18 05:37:51,128 - INFO - 批量推理时间（1 个样本）: 0.358655 秒
+2026-03-18 05:37:51,128 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000446_recon.png
+2026-03-18 05:37:51,485 - INFO - 批量推理时间（1 个样本）: 0.356078 秒
+2026-03-18 05:37:51,485 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000447_recon.png
+2026-03-18 05:37:51,848 - INFO - 批量推理时间（1 个样本）: 0.362705 秒
+2026-03-18 05:37:51,848 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000448_recon.png
+2026-03-18 05:37:52,181 - INFO - 批量推理时间（1 个样本）: 0.331651 秒
+2026-03-18 05:37:52,181 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000449_recon.png
+2026-03-18 05:37:52,528 - INFO - 批量推理时间（1 个样本）: 0.346733 秒
+2026-03-18 05:37:52,528 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000450_recon.png
+2026-03-18 05:37:52,876 - INFO - 批量推理时间（1 个样本）: 0.346597 秒
+2026-03-18 05:37:52,876 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000451_recon.png
+2026-03-18 05:37:53,207 - INFO - 批量推理时间（1 个样本）: 0.330516 秒
+2026-03-18 05:37:53,207 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000452_recon.png
+2026-03-18 05:37:53,544 - INFO - 批量推理时间（1 个样本）: 0.335784 秒
+2026-03-18 05:37:53,544 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000453_recon.png
+2026-03-18 05:37:53,890 - INFO - 批量推理时间（1 个样本）: 0.345989 秒
+2026-03-18 05:37:53,891 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000454_recon.png
+2026-03-18 05:37:54,252 - INFO - 批量推理时间（1 个样本）: 0.360910 秒
+2026-03-18 05:37:54,253 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000455_recon.png
+2026-03-18 05:37:54,585 - INFO - 批量推理时间（1 个样本）: 0.331851 秒
+2026-03-18 05:37:54,585 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000456_recon.png
+2026-03-18 05:37:54,940 - INFO - 批量推理时间（1 个样本）: 0.353882 秒
+2026-03-18 05:37:54,940 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000457_recon.png
+2026-03-18 05:37:55,292 - INFO - 批量推理时间（1 个样本）: 0.351933 秒
+2026-03-18 05:37:55,293 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000458_recon.png
+2026-03-18 05:37:55,607 - INFO - 批量推理时间（1 个样本）: 0.313599 秒
+2026-03-18 05:37:55,607 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000459_recon.png
+2026-03-18 05:37:55,975 - INFO - 批量推理时间（1 个样本）: 0.366984 秒
+2026-03-18 05:37:55,975 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000460_recon.png
+2026-03-18 05:37:56,356 - INFO - 批量推理时间（1 个样本）: 0.380509 秒
+2026-03-18 05:37:56,357 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000461_recon.png
+2026-03-18 05:37:56,697 - INFO - 批量推理时间（1 个样本）: 0.339737 秒
+2026-03-18 05:37:56,697 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000462_recon.png
+2026-03-18 05:37:57,059 - INFO - 批量推理时间（1 个样本）: 0.360996 秒
+2026-03-18 05:37:57,059 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000463_recon.png
+2026-03-18 05:37:57,422 - INFO - 批量推理时间（1 个样本）: 0.362842 秒
+2026-03-18 05:37:57,422 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000464_recon.png
+2026-03-18 05:37:57,780 - INFO - 批量推理时间（1 个样本）: 0.356700 秒
+2026-03-18 05:37:57,780 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000465_recon.png
+2026-03-18 05:37:58,124 - INFO - 批量推理时间（1 个样本）: 0.343757 秒
+2026-03-18 05:37:58,125 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000466_recon.png
+2026-03-18 05:37:58,480 - INFO - 批量推理时间（1 个样本）: 0.355038 秒
+2026-03-18 05:37:58,481 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000467_recon.png
+2026-03-18 05:37:58,831 - INFO - 批量推理时间（1 个样本）: 0.350351 秒
+2026-03-18 05:37:58,832 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000468_recon.png
+2026-03-18 05:37:59,182 - INFO - 批量推理时间（1 个样本）: 0.349879 秒
+2026-03-18 05:37:59,183 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000469_recon.png
+2026-03-18 05:37:59,535 - INFO - 批量推理时间（1 个样本）: 0.352329 秒
+2026-03-18 05:37:59,536 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000470_recon.png
+2026-03-18 05:37:59,883 - INFO - 批量推理时间（1 个样本）: 0.346645 秒
+2026-03-18 05:37:59,883 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000471_recon.png
+2026-03-18 05:38:00,205 - INFO - 批量推理时间（1 个样本）: 0.321883 秒
+2026-03-18 05:38:00,206 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000472_recon.png
+2026-03-18 05:38:00,541 - INFO - 批量推理时间（1 个样本）: 0.334425 秒
+2026-03-18 05:38:00,541 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000473_recon.png
+2026-03-18 05:38:00,877 - INFO - 批量推理时间（1 个样本）: 0.335263 秒
+2026-03-18 05:38:00,877 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000474_recon.png
+2026-03-18 05:38:01,256 - INFO - 批量推理时间（1 个样本）: 0.378583 秒
+2026-03-18 05:38:01,257 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000475_recon.png
+2026-03-18 05:38:01,599 - INFO - 批量推理时间（1 个样本）: 0.341898 秒
+2026-03-18 05:38:01,599 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000476_recon.png
+2026-03-18 05:38:01,932 - INFO - 批量推理时间（1 个样本）: 0.332422 秒
+2026-03-18 05:38:01,933 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000477_recon.png
+2026-03-18 05:38:02,273 - INFO - 批量推理时间（1 个样本）: 0.339530 秒
+2026-03-18 05:38:02,273 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000478_recon.png
+2026-03-18 05:38:02,612 - INFO - 批量推理时间（1 个样本）: 0.337971 秒
+2026-03-18 05:38:02,612 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000479_recon.png
+2026-03-18 05:38:02,937 - INFO - 批量推理时间（1 个样本）: 0.324817 秒
+2026-03-18 05:38:02,937 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000480_recon.png
+2026-03-18 05:38:03,288 - INFO - 批量推理时间（1 个样本）: 0.350320 秒
+2026-03-18 05:38:03,289 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000481_recon.png
+2026-03-18 05:38:03,629 - INFO - 批量推理时间（1 个样本）: 0.340410 秒
+2026-03-18 05:38:03,630 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000482_recon.png
+2026-03-18 05:38:03,983 - INFO - 批量推理时间（1 个样本）: 0.352134 秒
+2026-03-18 05:38:03,983 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000483_recon.png
+2026-03-18 05:38:04,297 - INFO - 批量推理时间（1 个样本）: 0.313687 秒
+2026-03-18 05:38:04,297 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000484_recon.png
+2026-03-18 05:38:04,636 - INFO - 批量推理时间（1 个样本）: 0.338350 秒
+2026-03-18 05:38:04,637 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000485_recon.png
+2026-03-18 05:38:04,992 - INFO - 批量推理时间（1 个样本）: 0.354748 秒
+2026-03-18 05:38:04,992 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000486_recon.png
+2026-03-18 05:38:05,348 - INFO - 批量推理时间（1 个样本）: 0.354827 秒
+2026-03-18 05:38:05,348 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000487_recon.png
+2026-03-18 05:38:05,746 - INFO - 批量推理时间（1 个样本）: 0.398214 秒
+2026-03-18 05:38:05,747 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000488_recon.png
+2026-03-18 05:38:06,074 - INFO - 批量推理时间（1 个样本）: 0.326774 秒
+2026-03-18 05:38:06,075 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000489_recon.png
+2026-03-18 05:38:06,436 - INFO - 批量推理时间（1 个样本）: 0.361022 秒
+2026-03-18 05:38:06,436 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000490_recon.png
+2026-03-18 05:38:06,779 - INFO - 批量推理时间（1 个样本）: 0.341655 秒
+2026-03-18 05:38:06,779 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000491_recon.png
+2026-03-18 05:38:07,131 - INFO - 批量推理时间（1 个样本）: 0.351852 秒
+2026-03-18 05:38:07,132 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000492_recon.png
+2026-03-18 05:38:07,467 - INFO - 批量推理时间（1 个样本）: 0.334121 秒
+2026-03-18 05:38:07,467 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000493_recon.png
+2026-03-18 05:38:07,782 - INFO - 批量推理时间（1 个样本）: 0.314351 秒
+2026-03-18 05:38:07,782 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000494_recon.png
+2026-03-18 05:38:08,142 - INFO - 批量推理时间（1 个样本）: 0.358716 秒
+2026-03-18 05:38:08,142 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000495_recon.png
+2026-03-18 05:38:08,477 - INFO - 批量推理时间（1 个样本）: 0.335327 秒
+2026-03-18 05:38:08,478 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000496_recon.png
+2026-03-18 05:38:08,810 - INFO - 批量推理时间（1 个样本）: 0.331628 秒
+2026-03-18 05:38:08,811 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000497_recon.png
+2026-03-18 05:38:09,140 - INFO - 批量推理时间（1 个样本）: 0.329070 秒
+2026-03-18 05:38:09,140 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000498_recon.png
+2026-03-18 05:38:09,495 - INFO - 批量推理时间（1 个样本）: 0.354140 秒
+2026-03-18 05:38:09,495 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000499_recon.png
+2026-03-18 05:38:09,861 - INFO - 批量推理时间（1 个样本）: 0.365260 秒
+2026-03-18 05:38:09,861 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000500_recon.png
+2026-03-18 05:38:10,220 - INFO - 批量推理时间（1 个样本）: 0.358274 秒
+2026-03-18 05:38:10,221 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000501_recon.png
+2026-03-18 05:38:10,555 - INFO - 批量推理时间（1 个样本）: 0.334282 秒
+2026-03-18 05:38:10,556 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000502_recon.png
+2026-03-18 05:38:10,900 - INFO - 批量推理时间（1 个样本）: 0.343710 秒
+2026-03-18 05:38:10,900 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000503_recon.png
+2026-03-18 05:38:11,269 - INFO - 批量推理时间（1 个样本）: 0.368271 秒
+2026-03-18 05:38:11,269 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000504_recon.png
+2026-03-18 05:38:11,619 - INFO - 批量推理时间（1 个样本）: 0.349091 秒
+2026-03-18 05:38:11,619 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000505_recon.png
+2026-03-18 05:38:11,973 - INFO - 批量推理时间（1 个样本）: 0.353504 秒
+2026-03-18 05:38:11,973 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000506_recon.png
+2026-03-18 05:38:12,298 - INFO - 批量推理时间（1 个样本）: 0.323966 秒
+2026-03-18 05:38:12,299 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions/Places365_val_00000507_recon.png
+2026-03-18 05:38:12,299 - INFO - 处理完成: 300/300 文件成功
+{"variant": "current", "artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so", "artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_match": true, "input_dir": "/home/user/Downloads/jscc-test/简化版latent", "output_dir": "/home/user/Downloads/jscc-test/big_little_runs/inference_real_reconstruction_current/reconstructions", "output_count": 300, "processed_count": 300, "input_count": 300, "available_input_count": 300, "load_ms": 2.367, "vm_init_ms": 0.453, "run_count": 300, "run_samples_ms": [415.325, 354.831, 340.542, 336.288, 349.066, 348.811, 342.025, 333.912, 350.962, 347.348, 353.082, 364.361, 362.012, 340.205, 348.248, 349.297, 347.612, 355.444, 332.583, 373.571, 356.435, 370.018, 368.068, 354.045, 346.001, 333.525, 357.82, 321.722, 330.827, 345.132, 361.059, 347.277, 343.342, 337.387, 346.847, 360.003, 366.187, 354.838, 348.898, 358.664, 353.526, 377.766, 366.235, 358.626, 340.37, 351.497, 347.456, 372.58, 348.149, 353.602, 333.793, 358.827, 359.848, 329.703, 311.14, 333.635, 346.796, 327.429, 356.941, 334.487, 348.501, 339.226, 347.469, 348.294, 349.498, 351.587, 334.567, 349.082, 351.809, 367.659, 360.197, 339.419, 352.568, 336.52, 354.857, 371.986, 362.832, 340.341, 421.894, 367.923, 373.311, 354.018, 344.54, 354.752, 326.615, 344.675, 333.85, 353.392, 323.573, 335.216, 343.712, 333.512, 357.031, 350.507, 331.219, 337.909, 347.173, 338.516, 339.793, 343.235, 320.452, 372.517, 370.776, 340.073, 338.737, 353.021, 370.548, 366.714, 354.498, 336.656, 357.391, 356.426, 364.583, 337.815, 328.994, 327.05, 333.804, 362.022, 358.807, 344.273, 354.772, 397.292, 327.573, 355.673, 353.736, 363.236, 337.591, 347.097, 347.173, 320.906, 319.162, 368.888, 329.611, 356.126, 357.161, 333.273, 348.226, 340.334, 340.333, 360.178, 348.976, 349.591, 333.748, 329.468, 375.344, 335.792, 355.59, 309.073, 351.513, 351.802, 329.628, 348.451, 357.052, 357.976, 341.974, 364.651, 334.965, 339.53, 327.016, 344.961, 359.409, 312.937, 356.774, 340.548, 351.71, 357.233, 337.422, 344.159, 340.714, 330.32, 328.737, 340.711, 327.724, 345.161, 359.447, 330.307, 348.18, 337.861, 348.064, 356.627, 358.269, 327.653, 358.503, 369.083, 356.599, 349.851, 330.502, 320.085, 360.275, 340.494, 357.698, 341.331, 364.855, 372.245, 356.667, 358.107, 338.815, 368.524, 350.083, 326.199, 347.467, 333.288, 334.623, 336.602, 346.117, 360.863, 347.953, 357.42, 335.386, 358.898, 327.52, 327.562, 321.841, 359.739, 347.14, 343.938, 349.377, 343.013, 339.981, 324.493, 331.535, 360.955, 375.334, 355.297, 349.345, 313.973, 325.807, 354.957, 333.923, 350.111, 337.463, 345.797, 342.492, 332.409, 351.01, 336.177, 343.206, 375.642, 358.655, 356.078, 362.705, 331.651, 346.733, 346.597, 330.516, 335.784, 345.989, 360.91, 331.851, 353.882, 351.933, 313.599, 366.984, 380.509, 339.737, 360.996, 362.842, 356.7, 343.757, 355.038, 350.351, 349.879, 352.329, 346.645, 321.883, 334.425, 335.263, 378.583, 341.898, 332.422, 339.53, 337.971, 324.817, 350.32, 340.41, 352.134, 313.687, 338.35, 354.748, 354.827, 398.214, 326.774, 361.022, 341.655, 351.852, 334.121, 314.351, 358.716, 335.327, 331.628, 329.07, 354.14, 365.26, 358.274, 334.282, 343.71, 368.271, 349.091, 353.504, 323.966], "run_median_ms": 347.783, "run_mean_ms": 347.384, "run_min_ms": 309.073, "run_max_ms": 421.894, "run_variance_ms2": 245.980763, "output_shape": [1, 3, 256, 256], "output_dtype": "float32", "snr": 12.0, "batch_size": 1, "save_format": "png", "seed": null, "max_inputs": 0, "runtime_profiling": {"requested": false, "profile_samples_requested": 0, "attempted_samples": 0, "successful_samples": 0, "supported": null, "status": "not_requested", "top_ops": [], "sample_results": []}}

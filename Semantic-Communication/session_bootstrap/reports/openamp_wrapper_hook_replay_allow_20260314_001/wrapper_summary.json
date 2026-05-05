@@ -1,0 +1,39 @@
+{
+  "finished_at": "2026-03-14T18:43:06+0800",
+  "job_id": 9111,
+  "result": "success",
+  "status_response": {
+    "returncode": 0,
+    "stdout": "{\"phase\": \"STATUS_REQ\", \"source\": \"replayed_live_status_resp\", \"transport_status\": \"status_resp_received\", \"protocol_semantics\": \"implemented\", \"note\": \"local replay of live STATUS_RESP evidence\"}\n",
+    "stderr": "",
+    "response": {
+      "phase": "STATUS_REQ",
+      "source": "replayed_live_status_resp",
+      "transport_status": "status_resp_received",
+      "protocol_semantics": "implemented",
+      "note": "local replay of live STATUS_RESP evidence"
+    }
+  },
+  "job_req_response": {
+    "returncode": 0,
+    "stdout": "{\"phase\": \"JOB_REQ\", \"decision\": \"ALLOW\", \"source\": \"firmware_job_ack\", \"fault_code\": 0, \"fault_name\": \"NONE\", \"guard_state\": 2, \"guard_state_name\": \"JOB_ACTIVE\", \"transport_status\": \"job_ack_received\", \"protocol_semantics\": \"implemented\", \"note\": \"local replay of 2026-03-14 live JOB_ACK(ALLOW) evidence\"}\n",
+    "stderr": "",
+    "response": {
+      "phase": "JOB_REQ",
+      "decision": "ALLOW",
+      "source": "firmware_job_ack",
+      "fault_code": 0,
+      "fault_name": "NONE",
+      "guard_state": 2,
+      "guard_state_name": "JOB_ACTIVE",
+      "transport_status": "job_ack_received",
+      "protocol_semantics": "implemented",
+      "note": "local replay of 2026-03-14 live JOB_ACK(ALLOW) evidence"
+    }
+  },
+  "runner_exit_code": 0,
+  "runner_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_replay_allow_20260314_001/runner.log",
+  "manifest_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_replay_allow_20260314_001/job_manifest.json",
+  "control_trace_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_replay_allow_20260314_001/control_trace.jsonl",
+  "summary_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_replay_allow_20260314_001/wrapper_summary.json"
+}

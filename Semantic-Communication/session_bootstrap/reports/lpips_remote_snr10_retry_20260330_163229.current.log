@@ -1,0 +1,644 @@
+[current-real] variant=current artifact=/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so output_dir=/home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current snr=10 batch_size=1 python=env TVM_FFI_DISABLE_TORCH_C_DLPACK=1 LD_LIBRARY_PATH=/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages/tvm_ffi/lib:/home/user/tvm_samegen_safe_20260309/build TVM_LIBRARY_PATH=/home/user/tvm_samegen_safe_20260309/build PYTHONPATH=/home/user/tvm_samegen_20260307/python:/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages:/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages /home/user/anaconda3/envs/tvm310_safe/bin/python
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[16:35:23] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+2026-03-30 16:35:25,993 - INFO - TVM 模型加载成功
+2026-03-30 16:35:26,461 - INFO - 批量推理时间（1 个样本）: 0.466831 秒
+2026-03-30 16:35:26,462 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000208_recon.png
+2026-03-30 16:35:26,705 - INFO - 批量推理时间（1 个样本）: 0.242832 秒
+2026-03-30 16:35:26,705 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000209_recon.png
+2026-03-30 16:35:26,934 - INFO - 批量推理时间（1 个样本）: 0.228323 秒
+2026-03-30 16:35:26,934 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000210_recon.png
+2026-03-30 16:35:27,158 - INFO - 批量推理时间（1 个样本）: 0.223812 秒
+2026-03-30 16:35:27,158 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000211_recon.png
+2026-03-30 16:35:27,396 - INFO - 批量推理时间（1 个样本）: 0.236509 秒
+2026-03-30 16:35:27,396 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000212_recon.png
+2026-03-30 16:35:27,635 - INFO - 批量推理时间（1 个样本）: 0.238763 秒
+2026-03-30 16:35:27,636 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000213_recon.png
+2026-03-30 16:35:27,870 - INFO - 批量推理时间（1 个样本）: 0.233306 秒
+2026-03-30 16:35:27,870 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000214_recon.png
+2026-03-30 16:35:28,078 - INFO - 批量推理时间（1 个样本）: 0.207880 秒
+2026-03-30 16:35:28,079 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000215_recon.png
+2026-03-30 16:35:28,318 - INFO - 批量推理时间（1 个样本）: 0.238611 秒
+2026-03-30 16:35:28,319 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000216_recon.png
+2026-03-30 16:35:28,556 - INFO - 批量推理时间（1 个样本）: 0.237402 秒
+2026-03-30 16:35:28,557 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000217_recon.png
+2026-03-30 16:35:28,797 - INFO - 批量推理时间（1 个样本）: 0.238954 秒
+2026-03-30 16:35:28,797 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000218_recon.png
+2026-03-30 16:35:29,046 - INFO - 批量推理时间（1 个样本）: 0.248380 秒
+2026-03-30 16:35:29,046 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000219_recon.png
+2026-03-30 16:35:29,297 - INFO - 批量推理时间（1 个样本）: 0.250060 秒
+2026-03-30 16:35:29,297 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000220_recon.png
+2026-03-30 16:35:29,529 - INFO - 批量推理时间（1 个样本）: 0.231212 秒
+2026-03-30 16:35:29,529 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000221_recon.png
+2026-03-30 16:35:29,765 - INFO - 批量推理时间（1 个样本）: 0.234987 秒
+2026-03-30 16:35:29,765 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000222_recon.png
+2026-03-30 16:35:30,002 - INFO - 批量推理时间（1 个样本）: 0.236006 秒
+2026-03-30 16:35:30,002 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000223_recon.png
+2026-03-30 16:35:30,239 - INFO - 批量推理时间（1 个样本）: 0.236186 秒
+2026-03-30 16:35:30,239 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000224_recon.png
+2026-03-30 16:35:30,482 - INFO - 批量推理时间（1 个样本）: 0.241946 秒
+2026-03-30 16:35:30,482 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000225_recon.png
+2026-03-30 16:35:30,707 - INFO - 批量推理时间（1 个样本）: 0.224799 秒
+2026-03-30 16:35:30,707 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000226_recon.png
+2026-03-30 16:35:30,969 - INFO - 批量推理时间（1 个样本）: 0.260341 秒
+2026-03-30 16:35:30,969 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000227_recon.png
+2026-03-30 16:35:31,194 - INFO - 批量推理时间（1 个样本）: 0.225006 秒
+2026-03-30 16:35:31,195 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000228_recon.png
+2026-03-30 16:35:31,438 - INFO - 批量推理时间（1 个样本）: 0.243168 秒
+2026-03-30 16:35:31,438 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000229_recon.png
+2026-03-30 16:35:31,692 - INFO - 批量推理时间（1 个样本）: 0.252428 秒
+2026-03-30 16:35:31,692 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000230_recon.png
+2026-03-30 16:35:31,933 - INFO - 批量推理时间（1 个样本）: 0.241203 秒
+2026-03-30 16:35:31,934 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000231_recon.png
+2026-03-30 16:35:32,171 - INFO - 批量推理时间（1 个样本）: 0.236723 秒
+2026-03-30 16:35:32,172 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000232_recon.png
+2026-03-30 16:35:32,390 - INFO - 批量推理时间（1 个样本）: 0.218177 秒
+2026-03-30 16:35:32,390 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000233_recon.png
+2026-03-30 16:35:32,641 - INFO - 批量推理时间（1 个样本）: 0.249831 秒
+2026-03-30 16:35:32,641 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000234_recon.png
+2026-03-30 16:35:32,848 - INFO - 批量推理时间（1 个样本）: 0.206357 秒
+2026-03-30 16:35:32,848 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000235_recon.png
+2026-03-30 16:35:33,069 - INFO - 批量推理时间（1 个样本）: 0.219660 秒
+2026-03-30 16:35:33,069 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000236_recon.png
+2026-03-30 16:35:33,298 - INFO - 批量推理时间（1 个样本）: 0.228600 秒
+2026-03-30 16:35:33,298 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000237_recon.png
+2026-03-30 16:35:33,552 - INFO - 批量推理时间（1 个样本）: 0.252479 秒
+2026-03-30 16:35:33,552 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000238_recon.png
+2026-03-30 16:35:33,785 - INFO - 批量推理时间（1 个样本）: 0.232281 秒
+2026-03-30 16:35:33,785 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000239_recon.png
+2026-03-30 16:35:34,019 - INFO - 批量推理时间（1 个样本）: 0.232765 秒
+2026-03-30 16:35:34,019 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000240_recon.png
+2026-03-30 16:35:34,243 - INFO - 批量推理时间（1 个样本）: 0.223294 秒
+2026-03-30 16:35:34,243 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000241_recon.png
+2026-03-30 16:35:34,482 - INFO - 批量推理时间（1 个样本）: 0.238184 秒
+2026-03-30 16:35:34,482 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000242_recon.png
+2026-03-30 16:35:34,725 - INFO - 批量推理时间（1 个样本）: 0.242172 秒
+2026-03-30 16:35:34,725 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000243_recon.png
+2026-03-30 16:35:34,982 - INFO - 批量推理时间（1 个样本）: 0.255992 秒
+2026-03-30 16:35:34,982 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000244_recon.png
+2026-03-30 16:35:35,222 - INFO - 批量推理时间（1 个样本）: 0.239854 秒
+2026-03-30 16:35:35,223 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000245_recon.png
+2026-03-30 16:35:35,461 - INFO - 批量推理时间（1 个样本）: 0.237858 秒
+2026-03-30 16:35:35,462 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000246_recon.png
+2026-03-30 16:35:35,708 - INFO - 批量推理时间（1 个样本）: 0.245850 秒
+2026-03-30 16:35:35,708 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000247_recon.png
+2026-03-30 16:35:35,952 - INFO - 批量推理时间（1 个样本）: 0.242803 秒
+2026-03-30 16:35:35,952 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000248_recon.png
+2026-03-30 16:35:36,212 - INFO - 批量推理时间（1 个样本）: 0.258955 秒
+2026-03-30 16:35:36,212 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000249_recon.png
+2026-03-30 16:35:36,455 - INFO - 批量推理时间（1 个样本）: 0.242539 秒
+2026-03-30 16:35:36,455 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000250_recon.png
+2026-03-30 16:35:36,704 - INFO - 批量推理时间（1 个样本）: 0.247652 秒
+2026-03-30 16:35:36,704 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000251_recon.png
+2026-03-30 16:35:36,934 - INFO - 批量推理时间（1 个样本）: 0.229274 秒
+2026-03-30 16:35:36,934 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000252_recon.png
+2026-03-30 16:35:37,174 - INFO - 批量推理时间（1 个样本）: 0.238600 秒
+2026-03-30 16:35:37,174 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000253_recon.png
+2026-03-30 16:35:37,411 - INFO - 批量推理时间（1 个样本）: 0.236427 秒
+2026-03-30 16:35:37,411 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000254_recon.png
+2026-03-30 16:35:37,675 - INFO - 批量推理时间（1 个样本）: 0.262744 秒
+2026-03-30 16:35:37,675 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000255_recon.png
+2026-03-30 16:35:37,911 - INFO - 批量推理时间（1 个样本）: 0.235368 秒
+2026-03-30 16:35:37,911 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000256_recon.png
+2026-03-30 16:35:38,148 - INFO - 批量推理时间（1 个样本）: 0.236966 秒
+2026-03-30 16:35:38,148 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000257_recon.png
+2026-03-30 16:35:38,374 - INFO - 批量推理时间（1 个样本）: 0.224253 秒
+2026-03-30 16:35:38,374 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000258_recon.png
+2026-03-30 16:35:38,626 - INFO - 批量推理时间（1 个样本）: 0.252268 秒
+2026-03-30 16:35:38,627 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000259_recon.png
+2026-03-30 16:35:38,885 - INFO - 批量推理时间（1 个样本）: 0.257350 秒
+2026-03-30 16:35:38,885 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000260_recon.png
+2026-03-30 16:35:39,104 - INFO - 批量推理时间（1 个样本）: 0.218268 秒
+2026-03-30 16:35:39,104 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000261_recon.png
+2026-03-30 16:35:39,306 - INFO - 批量推理时间（1 个样本）: 0.200881 秒
+2026-03-30 16:35:39,306 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000262_recon.png
+2026-03-30 16:35:39,525 - INFO - 批量推理时间（1 个样本）: 0.218511 秒
+2026-03-30 16:35:39,525 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000263_recon.png
+2026-03-30 16:35:39,764 - INFO - 批量推理时间（1 个样本）: 0.237994 秒
+2026-03-30 16:35:39,765 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000264_recon.png
+2026-03-30 16:35:39,977 - INFO - 批量推理时间（1 个样本）: 0.212483 秒
+2026-03-30 16:35:39,978 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000265_recon.png
+2026-03-30 16:35:40,227 - INFO - 批量推理时间（1 个样本）: 0.248581 秒
+2026-03-30 16:35:40,228 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000266_recon.png
+2026-03-30 16:35:40,448 - INFO - 批量推理时间（1 个样本）: 0.220646 秒
+2026-03-30 16:35:40,449 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000267_recon.png
+2026-03-30 16:35:40,688 - INFO - 批量推理时间（1 个样本）: 0.238491 秒
+2026-03-30 16:35:40,688 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000268_recon.png
+2026-03-30 16:35:40,913 - INFO - 批量推理时间（1 个样本）: 0.224775 秒
+2026-03-30 16:35:40,914 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000269_recon.png
+2026-03-30 16:35:41,153 - INFO - 批量推理时间（1 个样本）: 0.238444 秒
+2026-03-30 16:35:41,153 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000270_recon.png
+2026-03-30 16:35:41,387 - INFO - 批量推理时间（1 个样本）: 0.233769 秒
+2026-03-30 16:35:41,388 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000271_recon.png
+2026-03-30 16:35:41,628 - INFO - 批量推理时间（1 个样本）: 0.239858 秒
+2026-03-30 16:35:41,629 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000272_recon.png
+2026-03-30 16:35:41,865 - INFO - 批量推理时间（1 个样本）: 0.236415 秒
+2026-03-30 16:35:41,866 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000273_recon.png
+2026-03-30 16:35:42,092 - INFO - 批量推理时间（1 个样本）: 0.225467 秒
+2026-03-30 16:35:42,092 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000274_recon.png
+2026-03-30 16:35:42,326 - INFO - 批量推理时间（1 个样本）: 0.233647 秒
+2026-03-30 16:35:42,327 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000275_recon.png
+2026-03-30 16:35:42,571 - INFO - 批量推理时间（1 个样本）: 0.243115 秒
+2026-03-30 16:35:42,571 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000276_recon.png
+2026-03-30 16:35:42,825 - INFO - 批量推理时间（1 个样本）: 0.253124 秒
+2026-03-30 16:35:42,825 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000277_recon.png
+2026-03-30 16:35:43,077 - INFO - 批量推理时间（1 个样本）: 0.251183 秒
+2026-03-30 16:35:43,077 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000278_recon.png
+2026-03-30 16:35:43,302 - INFO - 批量推理时间（1 个样本）: 0.224637 秒
+2026-03-30 16:35:43,303 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000279_recon.png
+2026-03-30 16:35:43,548 - INFO - 批量推理时间（1 个样本）: 0.244533 秒
+2026-03-30 16:35:43,548 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000280_recon.png
+2026-03-30 16:35:43,772 - INFO - 批量推理时间（1 个样本）: 0.223874 秒
+2026-03-30 16:35:43,773 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000281_recon.png
+2026-03-30 16:35:44,022 - INFO - 批量推理时间（1 个样本）: 0.248081 秒
+2026-03-30 16:35:44,022 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000282_recon.png
+2026-03-30 16:35:44,283 - INFO - 批量推理时间（1 个样本）: 0.260264 秒
+2026-03-30 16:35:44,283 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000283_recon.png
+2026-03-30 16:35:44,537 - INFO - 批量推理时间（1 个样本）: 0.253328 秒
+2026-03-30 16:35:44,538 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000284_recon.png
+2026-03-30 16:35:44,764 - INFO - 批量推理时间（1 个样本）: 0.226045 秒
+2026-03-30 16:35:44,764 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000285_recon.png
+2026-03-30 16:35:45,011 - INFO - 批量推理时间（1 个样本）: 0.247068 秒
+2026-03-30 16:35:45,012 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000286_recon.png
+2026-03-30 16:35:45,268 - INFO - 批量推理时间（1 个样本）: 0.254994 秒
+2026-03-30 16:35:45,268 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000287_recon.png
+2026-03-30 16:35:45,530 - INFO - 批量推理时间（1 个样本）: 0.261491 秒
+2026-03-30 16:35:45,530 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000288_recon.png
+2026-03-30 16:35:45,773 - INFO - 批量推理时间（1 个样本）: 0.242013 秒
+2026-03-30 16:35:45,774 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000289_recon.png
+2026-03-30 16:35:46,006 - INFO - 批量推理时间（1 个样本）: 0.232320 秒
+2026-03-30 16:35:46,006 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000290_recon.png
+2026-03-30 16:35:46,245 - INFO - 批量推理时间（1 个样本）: 0.237700 秒
+2026-03-30 16:35:46,245 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000291_recon.png
+2026-03-30 16:35:46,459 - INFO - 批量推理时间（1 个样本）: 0.213320 秒
+2026-03-30 16:35:46,459 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000292_recon.png
+2026-03-30 16:35:46,694 - INFO - 批量推理时间（1 个样本）: 0.233523 秒
+2026-03-30 16:35:46,694 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000293_recon.png
+2026-03-30 16:35:46,917 - INFO - 批量推理时间（1 个样本）: 0.222606 秒
+2026-03-30 16:35:46,917 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000294_recon.png
+2026-03-30 16:35:47,158 - INFO - 批量推理时间（1 个样本）: 0.239366 秒
+2026-03-30 16:35:47,158 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000295_recon.png
+2026-03-30 16:35:47,370 - INFO - 批量推理时间（1 个样本）: 0.211452 秒
+2026-03-30 16:35:47,370 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000296_recon.png
+2026-03-30 16:35:47,595 - INFO - 批量推理时间（1 个样本）: 0.223830 秒
+2026-03-30 16:35:47,595 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000297_recon.png
+2026-03-30 16:35:47,828 - INFO - 批量推理时间（1 个样本）: 0.232623 秒
+2026-03-30 16:35:47,828 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000298_recon.png
+2026-03-30 16:35:48,050 - INFO - 批量推理时间（1 个样本）: 0.220306 秒
+2026-03-30 16:35:48,050 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000299_recon.png
+2026-03-30 16:35:48,291 - INFO - 批量推理时间（1 个样本）: 0.241132 秒
+2026-03-30 16:35:48,292 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000300_recon.png
+2026-03-30 16:35:48,531 - INFO - 批量推理时间（1 个样本）: 0.238608 秒
+2026-03-30 16:35:48,532 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000301_recon.png
+2026-03-30 16:35:48,750 - INFO - 批量推理时间（1 个样本）: 0.218407 秒
+2026-03-30 16:35:48,751 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000302_recon.png
+2026-03-30 16:35:48,979 - INFO - 批量推理时间（1 个样本）: 0.227873 秒
+2026-03-30 16:35:48,980 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000303_recon.png
+2026-03-30 16:35:49,214 - INFO - 批量推理时间（1 个样本）: 0.234221 秒
+2026-03-30 16:35:49,215 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000304_recon.png
+2026-03-30 16:35:49,441 - INFO - 批量推理时间（1 个样本）: 0.225587 秒
+2026-03-30 16:35:49,441 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000305_recon.png
+2026-03-30 16:35:49,668 - INFO - 批量推理时间（1 个样本）: 0.226644 秒
+2026-03-30 16:35:49,669 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000306_recon.png
+2026-03-30 16:35:49,900 - INFO - 批量推理时间（1 个样本）: 0.230131 秒
+2026-03-30 16:35:49,900 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000307_recon.png
+2026-03-30 16:35:50,109 - INFO - 批量推理时间（1 个样本）: 0.209165 秒
+2026-03-30 16:35:50,110 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000308_recon.png
+2026-03-30 16:35:50,373 - INFO - 批量推理时间（1 个样本）: 0.262099 秒
+2026-03-30 16:35:50,373 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000309_recon.png
+2026-03-30 16:35:50,632 - INFO - 批量推理时间（1 个样本）: 0.258867 秒
+2026-03-30 16:35:50,633 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000310_recon.png
+2026-03-30 16:35:50,862 - INFO - 批量推理时间（1 个样本）: 0.228919 秒
+2026-03-30 16:35:50,863 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000311_recon.png
+2026-03-30 16:35:51,091 - INFO - 批量推理时间（1 个样本）: 0.227868 秒
+2026-03-30 16:35:51,091 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000312_recon.png
+2026-03-30 16:35:51,332 - INFO - 批量推理时间（1 个样本）: 0.239855 秒
+2026-03-30 16:35:51,332 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000313_recon.png
+2026-03-30 16:35:51,593 - INFO - 批量推理时间（1 个样本）: 0.259404 秒
+2026-03-30 16:35:51,593 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000314_recon.png
+2026-03-30 16:35:51,845 - INFO - 批量推理时间（1 个样本）: 0.252047 秒
+2026-03-30 16:35:51,846 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000315_recon.png
+2026-03-30 16:35:52,092 - INFO - 批量推理时间（1 个样本）: 0.245142 秒
+2026-03-30 16:35:52,092 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000316_recon.png
+2026-03-30 16:35:52,315 - INFO - 批量推理时间（1 个样本）: 0.222527 秒
+2026-03-30 16:35:52,315 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000317_recon.png
+2026-03-30 16:35:52,563 - INFO - 批量推理时间（1 个样本）: 0.247267 秒
+2026-03-30 16:35:52,564 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000318_recon.png
+2026-03-30 16:35:52,806 - INFO - 批量推理时间（1 个样本）: 0.242015 秒
+2026-03-30 16:35:52,806 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000319_recon.png
+2026-03-30 16:35:53,062 - INFO - 批量推理时间（1 个样本）: 0.254928 秒
+2026-03-30 16:35:53,062 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000320_recon.png
+2026-03-30 16:35:53,287 - INFO - 批量推理时间（1 个样本）: 0.224267 秒
+2026-03-30 16:35:53,287 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000321_recon.png
+2026-03-30 16:35:53,505 - INFO - 批量推理时间（1 个样本）: 0.217474 秒
+2026-03-30 16:35:53,505 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000322_recon.png
+2026-03-30 16:35:53,722 - INFO - 批量推理时间（1 个样本）: 0.215179 秒
+2026-03-30 16:35:53,722 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000323_recon.png
+2026-03-30 16:35:53,943 - INFO - 批量推理时间（1 个样本）: 0.221286 秒
+2026-03-30 16:35:53,944 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000324_recon.png
+2026-03-30 16:35:54,194 - INFO - 批量推理时间（1 个样本）: 0.249574 秒
+2026-03-30 16:35:54,195 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000325_recon.png
+2026-03-30 16:35:54,442 - INFO - 批量推理时间（1 个样本）: 0.247140 秒
+2026-03-30 16:35:54,442 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000326_recon.png
+2026-03-30 16:35:54,674 - INFO - 批量推理时间（1 个样本）: 0.230167 秒
+2026-03-30 16:35:54,675 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000327_recon.png
+2026-03-30 16:35:54,915 - INFO - 批量推理时间（1 个样本）: 0.240008 秒
+2026-03-30 16:35:54,915 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000328_recon.png
+2026-03-30 16:35:55,154 - INFO - 批量推理时间（1 个样本）: 0.237598 秒
+2026-03-30 16:35:55,154 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000329_recon.png
+2026-03-30 16:35:55,371 - INFO - 批量推理时间（1 个样本）: 0.216262 秒
+2026-03-30 16:35:55,371 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000330_recon.png
+2026-03-30 16:35:55,615 - INFO - 批量推理时间（1 个样本）: 0.243108 秒
+2026-03-30 16:35:55,615 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000331_recon.png
+2026-03-30 16:35:55,855 - INFO - 批量推理时间（1 个样本）: 0.239738 秒
+2026-03-30 16:35:55,856 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000332_recon.png
+2026-03-30 16:35:56,109 - INFO - 批量推理时间（1 个样本）: 0.252460 秒
+2026-03-30 16:35:56,109 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000333_recon.png
+2026-03-30 16:35:56,338 - INFO - 批量推理时间（1 个样本）: 0.228516 秒
+2026-03-30 16:35:56,338 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000334_recon.png
+2026-03-30 16:35:56,571 - INFO - 批量推理时间（1 个样本）: 0.232234 秒
+2026-03-30 16:35:56,571 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000335_recon.png
+2026-03-30 16:35:56,811 - INFO - 批量推理时间（1 个样本）: 0.238771 秒
+2026-03-30 16:35:56,811 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000336_recon.png
+2026-03-30 16:35:57,020 - INFO - 批量推理时间（1 个样本）: 0.208595 秒
+2026-03-30 16:35:57,020 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000337_recon.png
+2026-03-30 16:35:57,232 - INFO - 批量推理时间（1 个样本）: 0.210338 秒
+2026-03-30 16:35:57,232 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000338_recon.png
+2026-03-30 16:35:57,489 - INFO - 批量推理时间（1 个样本）: 0.256973 秒
+2026-03-30 16:35:57,490 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000339_recon.png
+2026-03-30 16:35:57,713 - INFO - 批量推理时间（1 个样本）: 0.222017 秒
+2026-03-30 16:35:57,713 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000340_recon.png
+2026-03-30 16:35:57,954 - INFO - 批量推理时间（1 个样本）: 0.240935 秒
+2026-03-30 16:35:57,955 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000341_recon.png
+2026-03-30 16:35:58,204 - INFO - 批量推理时间（1 个样本）: 0.248746 秒
+2026-03-30 16:35:58,204 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000342_recon.png
+2026-03-30 16:35:58,423 - INFO - 批量推理时间（1 个样本）: 0.218537 秒
+2026-03-30 16:35:58,424 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000343_recon.png
+2026-03-30 16:35:58,663 - INFO - 批量推理时间（1 个样本）: 0.238029 秒
+2026-03-30 16:35:58,663 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000344_recon.png
+2026-03-30 16:35:58,891 - INFO - 批量推理时间（1 个样本）: 0.227600 秒
+2026-03-30 16:35:58,891 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000345_recon.png
+2026-03-30 16:35:59,123 - INFO - 批量推理时间（1 个样本）: 0.230803 秒
+2026-03-30 16:35:59,123 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000346_recon.png
+2026-03-30 16:35:59,371 - INFO - 批量推理时间（1 个样本）: 0.246939 秒
+2026-03-30 16:35:59,371 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000347_recon.png
+2026-03-30 16:35:59,609 - INFO - 批量推理时间（1 个样本）: 0.237599 秒
+2026-03-30 16:35:59,609 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000348_recon.png
+2026-03-30 16:35:59,850 - INFO - 批量推理时间（1 个样本）: 0.239905 秒
+2026-03-30 16:35:59,851 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000349_recon.png
+2026-03-30 16:36:00,074 - INFO - 批量推理时间（1 个样本）: 0.222651 秒
+2026-03-30 16:36:00,074 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000350_recon.png
+2026-03-30 16:36:00,288 - INFO - 批量推理时间（1 个样本）: 0.213817 秒
+2026-03-30 16:36:00,288 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000351_recon.png
+2026-03-30 16:36:00,555 - INFO - 批量推理时间（1 个样本）: 0.265862 秒
+2026-03-30 16:36:00,555 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000352_recon.png
+2026-03-30 16:36:00,776 - INFO - 批量推理时间（1 个样本）: 0.220174 秒
+2026-03-30 16:36:00,776 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000353_recon.png
+2026-03-30 16:36:01,023 - INFO - 批量推理时间（1 个样本）: 0.245669 秒
+2026-03-30 16:36:01,023 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000354_recon.png
+2026-03-30 16:36:01,220 - INFO - 批量推理时间（1 个样本）: 0.196312 秒
+2026-03-30 16:36:01,221 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000355_recon.png
+2026-03-30 16:36:01,460 - INFO - 批量推理时间（1 个样本）: 0.238795 秒
+2026-03-30 16:36:01,460 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000356_recon.png
+2026-03-30 16:36:01,701 - INFO - 批量推理时间（1 个样本）: 0.239627 秒
+2026-03-30 16:36:01,701 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000357_recon.png
+2026-03-30 16:36:01,911 - INFO - 批量推理时间（1 个样本）: 0.210135 秒
+2026-03-30 16:36:01,912 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000358_recon.png
+2026-03-30 16:36:02,146 - INFO - 批量推理时间（1 个样本）: 0.234599 秒
+2026-03-30 16:36:02,147 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000359_recon.png
+2026-03-30 16:36:02,393 - INFO - 批量推理时间（1 个样本）: 0.245425 秒
+2026-03-30 16:36:02,394 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000360_recon.png
+2026-03-30 16:36:02,637 - INFO - 批量推理时间（1 个样本）: 0.243074 秒
+2026-03-30 16:36:02,637 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000361_recon.png
+2026-03-30 16:36:02,869 - INFO - 批量推理时间（1 个样本）: 0.230466 秒
+2026-03-30 16:36:02,869 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000362_recon.png
+2026-03-30 16:36:03,121 - INFO - 批量推理时间（1 个样本）: 0.251528 秒
+2026-03-30 16:36:03,121 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000363_recon.png
+2026-03-30 16:36:03,346 - INFO - 批量推理时间（1 个样本）: 0.224558 秒
+2026-03-30 16:36:03,347 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000364_recon.png
+2026-03-30 16:36:03,572 - INFO - 批量推理时间（1 个样本）: 0.224786 秒
+2026-03-30 16:36:03,572 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000365_recon.png
+2026-03-30 16:36:03,791 - INFO - 批量推理时间（1 个样本）: 0.217803 秒
+2026-03-30 16:36:03,791 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000366_recon.png
+2026-03-30 16:36:04,020 - INFO - 批量推理时间（1 个样本）: 0.228938 秒
+2026-03-30 16:36:04,021 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000367_recon.png
+2026-03-30 16:36:04,269 - INFO - 批量推理时间（1 个样本）: 0.247900 秒
+2026-03-30 16:36:04,269 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000368_recon.png
+2026-03-30 16:36:04,472 - INFO - 批量推理时间（1 个样本）: 0.201300 秒
+2026-03-30 16:36:04,472 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000369_recon.png
+2026-03-30 16:36:04,718 - INFO - 批量推理时间（1 个样本）: 0.245326 秒
+2026-03-30 16:36:04,718 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000370_recon.png
+2026-03-30 16:36:04,944 - INFO - 批量推理时间（1 个样本）: 0.225295 秒
+2026-03-30 16:36:04,945 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000371_recon.png
+2026-03-30 16:36:05,185 - INFO - 批量推理时间（1 个样本）: 0.240266 秒
+2026-03-30 16:36:05,185 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000372_recon.png
+2026-03-30 16:36:05,417 - INFO - 批量推理时间（1 个样本）: 0.231415 秒
+2026-03-30 16:36:05,417 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000373_recon.png
+2026-03-30 16:36:05,646 - INFO - 批量推理时间（1 个样本）: 0.227307 秒
+2026-03-30 16:36:05,646 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000374_recon.png
+2026-03-30 16:36:05,875 - INFO - 批量推理时间（1 个样本）: 0.228849 秒
+2026-03-30 16:36:05,875 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000375_recon.png
+2026-03-30 16:36:06,107 - INFO - 批量推理时间（1 个样本）: 0.230483 秒
+2026-03-30 16:36:06,107 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000376_recon.png
+2026-03-30 16:36:06,322 - INFO - 批量推理时间（1 个样本）: 0.214585 秒
+2026-03-30 16:36:06,322 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000377_recon.png
+2026-03-30 16:36:06,543 - INFO - 批量推理时间（1 个样本）: 0.219389 秒
+2026-03-30 16:36:06,543 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000378_recon.png
+2026-03-30 16:36:06,767 - INFO - 批量推理时间（1 个样本）: 0.223808 秒
+2026-03-30 16:36:06,768 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000379_recon.png
+2026-03-30 16:36:06,985 - INFO - 批量推理时间（1 个样本）: 0.216808 秒
+2026-03-30 16:36:06,986 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000380_recon.png
+2026-03-30 16:36:07,217 - INFO - 批量推理时间（1 个样本）: 0.231519 秒
+2026-03-30 16:36:07,218 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000381_recon.png
+2026-03-30 16:36:07,470 - INFO - 批量推理时间（1 个样本）: 0.251817 秒
+2026-03-30 16:36:07,471 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000382_recon.png
+2026-03-30 16:36:07,685 - INFO - 批量推理时间（1 个样本）: 0.213968 秒
+2026-03-30 16:36:07,685 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000383_recon.png
+2026-03-30 16:36:07,925 - INFO - 批量推理时间（1 个样本）: 0.239129 秒
+2026-03-30 16:36:07,926 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000384_recon.png
+2026-03-30 16:36:08,150 - INFO - 批量推理时间（1 个样本）: 0.223874 秒
+2026-03-30 16:36:08,150 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000385_recon.png
+2026-03-30 16:36:08,389 - INFO - 批量推理时间（1 个样本）: 0.237881 秒
+2026-03-30 16:36:08,389 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000386_recon.png
+2026-03-30 16:36:08,633 - INFO - 批量推理时间（1 个样本）: 0.242893 秒
+2026-03-30 16:36:08,633 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000387_recon.png
+2026-03-30 16:36:08,882 - INFO - 批量推理时间（1 个样本）: 0.248147 秒
+2026-03-30 16:36:08,882 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000388_recon.png
+2026-03-30 16:36:09,099 - INFO - 批量推理时间（1 个样本）: 0.215742 秒
+2026-03-30 16:36:09,099 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000389_recon.png
+2026-03-30 16:36:09,345 - INFO - 批量推理时间（1 个样本）: 0.245061 秒
+2026-03-30 16:36:09,345 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000390_recon.png
+2026-03-30 16:36:09,604 - INFO - 批量推理时间（1 个样本）: 0.257781 秒
+2026-03-30 16:36:09,604 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000391_recon.png
+2026-03-30 16:36:09,849 - INFO - 批量推理时间（1 个样本）: 0.244913 秒
+2026-03-30 16:36:09,850 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000392_recon.png
+2026-03-30 16:36:10,088 - INFO - 批量推理时间（1 个样本）: 0.238315 秒
+2026-03-30 16:36:10,088 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000393_recon.png
+2026-03-30 16:36:10,312 - INFO - 批量推理时间（1 个样本）: 0.222473 秒
+2026-03-30 16:36:10,312 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000394_recon.png
+2026-03-30 16:36:10,517 - INFO - 批量推理时间（1 个样本）: 0.204239 秒
+2026-03-30 16:36:10,517 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000395_recon.png
+2026-03-30 16:36:10,769 - INFO - 批量推理时间（1 个样本）: 0.250755 秒
+2026-03-30 16:36:10,769 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000396_recon.png
+2026-03-30 16:36:10,995 - INFO - 批量推理时间（1 个样本）: 0.225370 秒
+2026-03-30 16:36:10,995 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000397_recon.png
+2026-03-30 16:36:11,240 - INFO - 批量推理时间（1 个样本）: 0.244332 秒
+2026-03-30 16:36:11,241 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000398_recon.png
+2026-03-30 16:36:11,465 - INFO - 批量推理时间（1 个样本）: 0.224298 秒
+2026-03-30 16:36:11,465 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000399_recon.png
+2026-03-30 16:36:11,721 - INFO - 批量推理时间（1 个样本）: 0.254656 秒
+2026-03-30 16:36:11,721 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000400_recon.png
+2026-03-30 16:36:11,967 - INFO - 批量推理时间（1 个样本）: 0.245131 秒
+2026-03-30 16:36:11,967 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000401_recon.png
+2026-03-30 16:36:12,215 - INFO - 批量推理时间（1 个样本）: 0.246670 秒
+2026-03-30 16:36:12,215 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000402_recon.png
+2026-03-30 16:36:12,460 - INFO - 批量推理时间（1 个样本）: 0.244646 秒
+2026-03-30 16:36:12,460 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000403_recon.png
+2026-03-30 16:36:12,691 - INFO - 批量推理时间（1 个样本）: 0.229641 秒
+2026-03-30 16:36:12,691 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000404_recon.png
+2026-03-30 16:36:12,947 - INFO - 批量推理时间（1 个样本）: 0.255577 秒
+2026-03-30 16:36:12,947 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000405_recon.png
+2026-03-30 16:36:13,189 - INFO - 批量推理时间（1 个样本）: 0.240954 秒
+2026-03-30 16:36:13,190 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000406_recon.png
+2026-03-30 16:36:13,402 - INFO - 批量推理时间（1 个样本）: 0.211953 秒
+2026-03-30 16:36:13,402 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000407_recon.png
+2026-03-30 16:36:13,642 - INFO - 批量推理时间（1 个样本）: 0.239009 秒
+2026-03-30 16:36:13,642 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000408_recon.png
+2026-03-30 16:36:13,861 - INFO - 批量推理时间（1 个样本）: 0.218593 秒
+2026-03-30 16:36:13,862 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000409_recon.png
+2026-03-30 16:36:14,089 - INFO - 批量推理时间（1 个样本）: 0.226796 秒
+2026-03-30 16:36:14,090 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000410_recon.png
+2026-03-30 16:36:14,314 - INFO - 批量推理时间（1 个样本）: 0.224012 秒
+2026-03-30 16:36:14,314 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000411_recon.png
+2026-03-30 16:36:14,551 - INFO - 批量推理时间（1 个样本）: 0.235600 秒
+2026-03-30 16:36:14,551 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000412_recon.png
+2026-03-30 16:36:14,796 - INFO - 批量推理时间（1 个样本）: 0.245157 秒
+2026-03-30 16:36:14,797 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000413_recon.png
+2026-03-30 16:36:15,032 - INFO - 批量推理时间（1 个样本）: 0.234652 秒
+2026-03-30 16:36:15,032 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000414_recon.png
+2026-03-30 16:36:15,276 - INFO - 批量推理时间（1 个样本）: 0.243429 秒
+2026-03-30 16:36:15,277 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000415_recon.png
+2026-03-30 16:36:15,503 - INFO - 批量推理时间（1 个样本）: 0.224982 秒
+2026-03-30 16:36:15,503 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000416_recon.png
+2026-03-30 16:36:15,750 - INFO - 批量推理时间（1 个样本）: 0.246383 秒
+2026-03-30 16:36:15,750 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000417_recon.png
+2026-03-30 16:36:15,970 - INFO - 批量推理时间（1 个样本）: 0.219438 秒
+2026-03-30 16:36:15,971 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000418_recon.png
+2026-03-30 16:36:16,184 - INFO - 批量推理时间（1 个样本）: 0.213049 秒
+2026-03-30 16:36:16,184 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000419_recon.png
+2026-03-30 16:36:16,394 - INFO - 批量推理时间（1 个样本）: 0.209893 秒
+2026-03-30 16:36:16,395 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000420_recon.png
+2026-03-30 16:36:16,641 - INFO - 批量推理时间（1 个样本）: 0.245507 秒
+2026-03-30 16:36:16,642 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000421_recon.png
+2026-03-30 16:36:16,877 - INFO - 批量推理时间（1 个样本）: 0.235344 秒
+2026-03-30 16:36:16,877 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000422_recon.png
+2026-03-30 16:36:17,110 - INFO - 批量推理时间（1 个样本）: 0.231342 秒
+2026-03-30 16:36:17,110 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000423_recon.png
+2026-03-30 16:36:17,347 - INFO - 批量推理时间（1 个样本）: 0.236427 秒
+2026-03-30 16:36:17,347 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000424_recon.png
+2026-03-30 16:36:17,578 - INFO - 批量推理时间（1 个样本）: 0.230288 秒
+2026-03-30 16:36:17,579 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000425_recon.png
+2026-03-30 16:36:17,807 - INFO - 批量推理时间（1 个样本）: 0.227879 秒
+2026-03-30 16:36:17,807 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000426_recon.png
+2026-03-30 16:36:18,021 - INFO - 批量推理时间（1 个样本）: 0.212813 秒
+2026-03-30 16:36:18,021 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000427_recon.png
+2026-03-30 16:36:18,240 - INFO - 批量推理时间（1 个样本）: 0.218701 秒
+2026-03-30 16:36:18,241 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000428_recon.png
+2026-03-30 16:36:18,486 - INFO - 批量推理时间（1 个样本）: 0.244984 秒
+2026-03-30 16:36:18,486 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000429_recon.png
+2026-03-30 16:36:18,719 - INFO - 批量推理时间（1 个样本）: 0.231566 秒
+2026-03-30 16:36:18,719 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000430_recon.png
+2026-03-30 16:36:18,959 - INFO - 批量推理时间（1 个样本）: 0.239564 秒
+2026-03-30 16:36:18,959 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000431_recon.png
+2026-03-30 16:36:19,201 - INFO - 批量推理时间（1 个样本）: 0.240814 秒
+2026-03-30 16:36:19,201 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000432_recon.png
+2026-03-30 16:36:19,401 - INFO - 批量推理时间（1 个样本）: 0.199139 秒
+2026-03-30 16:36:19,401 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000433_recon.png
+2026-03-30 16:36:19,618 - INFO - 批量推理时间（1 个样本）: 0.216311 秒
+2026-03-30 16:36:19,619 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000434_recon.png
+2026-03-30 16:36:19,861 - INFO - 批量推理时间（1 个样本）: 0.242147 秒
+2026-03-30 16:36:19,861 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000435_recon.png
+2026-03-30 16:36:20,087 - INFO - 批量推理时间（1 个样本）: 0.224878 秒
+2026-03-30 16:36:20,087 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000436_recon.png
+2026-03-30 16:36:20,321 - INFO - 批量推理时间（1 个样本）: 0.233554 秒
+2026-03-30 16:36:20,322 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000437_recon.png
+2026-03-30 16:36:20,552 - INFO - 批量推理时间（1 个样本）: 0.229658 秒
+2026-03-30 16:36:20,553 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000438_recon.png
+2026-03-30 16:36:20,784 - INFO - 批量推理时间（1 个样本）: 0.231649 秒
+2026-03-30 16:36:20,785 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000439_recon.png
+2026-03-30 16:36:21,018 - INFO - 批量推理时间（1 个样本）: 0.232349 秒
+2026-03-30 16:36:21,018 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000440_recon.png
+2026-03-30 16:36:21,238 - INFO - 批量推理时间（1 个样本）: 0.219400 秒
+2026-03-30 16:36:21,238 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000441_recon.png
+2026-03-30 16:36:21,477 - INFO - 批量推理时间（1 个样本）: 0.237771 秒
+2026-03-30 16:36:21,477 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000442_recon.png
+2026-03-30 16:36:21,701 - INFO - 批量推理时间（1 个样本）: 0.222929 秒
+2026-03-30 16:36:21,701 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000443_recon.png
+2026-03-30 16:36:21,931 - INFO - 批量推理时间（1 个样本）: 0.229428 秒
+2026-03-30 16:36:21,931 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000444_recon.png
+2026-03-30 16:36:22,196 - INFO - 批量推理时间（1 个样本）: 0.263633 秒
+2026-03-30 16:36:22,196 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000445_recon.png
+2026-03-30 16:36:22,442 - INFO - 批量推理时间（1 个样本）: 0.245613 秒
+2026-03-30 16:36:22,443 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000446_recon.png
+2026-03-30 16:36:22,689 - INFO - 批量推理时间（1 个样本）: 0.245184 秒
+2026-03-30 16:36:22,689 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000447_recon.png
+2026-03-30 16:36:22,941 - INFO - 批量推理时间（1 个样本）: 0.252123 秒
+2026-03-30 16:36:22,942 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000448_recon.png
+2026-03-30 16:36:23,197 - INFO - 批量推理时间（1 个样本）: 0.254591 秒
+2026-03-30 16:36:23,198 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000449_recon.png
+2026-03-30 16:36:23,435 - INFO - 批量推理时间（1 个样本）: 0.237205 秒
+2026-03-30 16:36:23,435 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000450_recon.png
+2026-03-30 16:36:23,671 - INFO - 批量推理时间（1 个样本）: 0.235122 秒
+2026-03-30 16:36:23,672 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000451_recon.png
+2026-03-30 16:36:23,891 - INFO - 批量推理时间（1 个样本）: 0.219476 秒
+2026-03-30 16:36:23,892 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000452_recon.png
+2026-03-30 16:36:24,113 - INFO - 批量推理时间（1 个样本）: 0.220506 秒
+2026-03-30 16:36:24,113 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000453_recon.png
+2026-03-30 16:36:24,350 - INFO - 批量推理时间（1 个样本）: 0.236748 秒
+2026-03-30 16:36:24,351 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000454_recon.png
+2026-03-30 16:36:24,598 - INFO - 批量推理时间（1 个样本）: 0.247333 秒
+2026-03-30 16:36:24,599 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000455_recon.png
+2026-03-30 16:36:24,822 - INFO - 批量推理时间（1 个样本）: 0.222084 秒
+2026-03-30 16:36:24,822 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000456_recon.png
+2026-03-30 16:36:25,062 - INFO - 批量推理时间（1 个样本）: 0.240076 秒
+2026-03-30 16:36:25,063 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000457_recon.png
+2026-03-30 16:36:25,305 - INFO - 批量推理时间（1 个样本）: 0.241694 秒
+2026-03-30 16:36:25,306 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000458_recon.png
+2026-03-30 16:36:25,504 - INFO - 批量推理时间（1 个样本）: 0.197628 秒
+2026-03-30 16:36:25,504 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000459_recon.png
+2026-03-30 16:36:25,762 - INFO - 批量推理时间（1 个样本）: 0.257048 秒
+2026-03-30 16:36:25,762 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000460_recon.png
+2026-03-30 16:36:26,030 - INFO - 批量推理时间（1 个样本）: 0.268044 秒
+2026-03-30 16:36:26,031 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000461_recon.png
+2026-03-30 16:36:26,262 - INFO - 批量推理时间（1 个样本）: 0.230323 秒
+2026-03-30 16:36:26,262 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000462_recon.png
+2026-03-30 16:36:26,512 - INFO - 批量推理时间（1 个样本）: 0.249477 秒
+2026-03-30 16:36:26,512 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000463_recon.png
+2026-03-30 16:36:26,766 - INFO - 批量推理时间（1 个样本）: 0.252432 秒
+2026-03-30 16:36:26,766 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000464_recon.png
+2026-03-30 16:36:27,014 - INFO - 批量推理时间（1 个样本）: 0.246771 秒
+2026-03-30 16:36:27,014 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000465_recon.png
+2026-03-30 16:36:27,246 - INFO - 批量推理时间（1 个样本）: 0.231749 秒
+2026-03-30 16:36:27,246 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000466_recon.png
+2026-03-30 16:36:27,492 - INFO - 批量推理时间（1 个样本）: 0.245388 秒
+2026-03-30 16:36:27,493 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000467_recon.png
+2026-03-30 16:36:27,728 - INFO - 批量推理时间（1 个样本）: 0.234930 秒
+2026-03-30 16:36:27,728 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000468_recon.png
+2026-03-30 16:36:27,966 - INFO - 批量推理时间（1 个样本）: 0.237061 秒
+2026-03-30 16:36:27,967 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000469_recon.png
+2026-03-30 16:36:28,207 - INFO - 批量推理时间（1 个样本）: 0.240645 秒
+2026-03-30 16:36:28,208 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000470_recon.png
+2026-03-30 16:36:28,442 - INFO - 批量推理时间（1 个样本）: 0.233005 秒
+2026-03-30 16:36:28,442 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000471_recon.png
+2026-03-30 16:36:28,654 - INFO - 批量推理时间（1 个样本）: 0.211549 秒
+2026-03-30 16:36:28,654 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000472_recon.png
+2026-03-30 16:36:28,873 - INFO - 批量推理时间（1 个样本）: 0.218152 秒
+2026-03-30 16:36:28,873 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000473_recon.png
+2026-03-30 16:36:29,099 - INFO - 批量推理时间（1 个样本）: 0.225490 秒
+2026-03-30 16:36:29,100 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000474_recon.png
+2026-03-30 16:36:29,366 - INFO - 批量推理时间（1 个样本）: 0.265886 秒
+2026-03-30 16:36:29,366 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000475_recon.png
+2026-03-30 16:36:29,602 - INFO - 批量推理时间（1 个样本）: 0.234571 秒
+2026-03-30 16:36:29,602 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000476_recon.png
+2026-03-30 16:36:29,819 - INFO - 批量推理时间（1 个样本）: 0.216802 秒
+2026-03-30 16:36:29,819 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000477_recon.png
+2026-03-30 16:36:30,047 - INFO - 批量推理时间（1 个样本）: 0.226989 秒
+2026-03-30 16:36:30,048 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000478_recon.png
+2026-03-30 16:36:30,270 - INFO - 批量推理时间（1 个样本）: 0.222620 秒
+2026-03-30 16:36:30,271 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000479_recon.png
+2026-03-30 16:36:30,487 - INFO - 批量推理时间（1 个样本）: 0.214844 秒
+2026-03-30 16:36:30,487 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000480_recon.png
+2026-03-30 16:36:30,726 - INFO - 批量推理时间（1 个样本）: 0.238404 秒
+2026-03-30 16:36:30,726 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000481_recon.png
+2026-03-30 16:36:30,955 - INFO - 批量推理时间（1 个样本）: 0.228489 秒
+2026-03-30 16:36:30,955 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000482_recon.png
+2026-03-30 16:36:31,197 - INFO - 批量推理时间（1 个样本）: 0.241160 秒
+2026-03-30 16:36:31,197 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000483_recon.png
+2026-03-30 16:36:31,399 - INFO - 批量推理时间（1 个样本）: 0.201359 秒
+2026-03-30 16:36:31,399 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000484_recon.png
+2026-03-30 16:36:31,628 - INFO - 批量推理时间（1 个样本）: 0.227807 秒
+2026-03-30 16:36:31,628 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000485_recon.png
+2026-03-30 16:36:31,873 - INFO - 批量推理时间（1 个样本）: 0.244869 秒
+2026-03-30 16:36:31,874 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000486_recon.png
+2026-03-30 16:36:32,117 - INFO - 批量推理时间（1 个样本）: 0.242943 秒
+2026-03-30 16:36:32,118 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000487_recon.png
+2026-03-30 16:36:32,359 - INFO - 批量推理时间（1 个样本）: 0.240471 秒
+2026-03-30 16:36:32,359 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000488_recon.png
+2026-03-30 16:36:32,576 - INFO - 批量推理时间（1 个样本）: 0.215940 秒
+2026-03-30 16:36:32,576 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000489_recon.png
+2026-03-30 16:36:32,822 - INFO - 批量推理时间（1 个样本）: 0.246289 秒
+2026-03-30 16:36:32,823 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000490_recon.png
+2026-03-30 16:36:33,052 - INFO - 批量推理时间（1 个样本）: 0.228123 秒
+2026-03-30 16:36:33,052 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000491_recon.png
+2026-03-30 16:36:33,291 - INFO - 批量推理时间（1 个样本）: 0.238200 秒
+2026-03-30 16:36:33,291 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000492_recon.png
+2026-03-30 16:36:33,511 - INFO - 批量推理时间（1 个样本）: 0.218861 秒
+2026-03-30 16:36:33,511 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000493_recon.png
+2026-03-30 16:36:33,711 - INFO - 批量推理时间（1 个样本）: 0.199637 秒
+2026-03-30 16:36:33,711 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000494_recon.png
+2026-03-30 16:36:33,957 - INFO - 批量推理时间（1 个样本）: 0.245449 秒
+2026-03-30 16:36:33,958 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000495_recon.png
+2026-03-30 16:36:34,177 - INFO - 批量推理时间（1 个样本）: 0.218912 秒
+2026-03-30 16:36:34,177 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000496_recon.png
+2026-03-30 16:36:34,395 - INFO - 批量推理时间（1 个样本）: 0.217208 秒
+2026-03-30 16:36:34,396 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000497_recon.png
+2026-03-30 16:36:34,612 - INFO - 批量推理时间（1 个样本）: 0.215854 秒
+2026-03-30 16:36:34,612 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000498_recon.png
+2026-03-30 16:36:34,852 - INFO - 批量推理时间（1 个样本）: 0.238915 秒
+2026-03-30 16:36:34,852 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000499_recon.png
+2026-03-30 16:36:35,103 - INFO - 批量推理时间（1 个样本）: 0.250699 秒
+2026-03-30 16:36:35,103 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000500_recon.png
+2026-03-30 16:36:35,349 - INFO - 批量推理时间（1 个样本）: 0.244557 秒
+2026-03-30 16:36:35,349 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000501_recon.png
+2026-03-30 16:36:35,569 - INFO - 批量推理时间（1 个样本）: 0.219669 秒
+2026-03-30 16:36:35,570 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000502_recon.png
+2026-03-30 16:36:35,800 - INFO - 批量推理时间（1 个样本）: 0.229866 秒
+2026-03-30 16:36:35,801 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000503_recon.png
+2026-03-30 16:36:36,054 - INFO - 批量推理时间（1 个样本）: 0.252707 秒
+2026-03-30 16:36:36,054 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000504_recon.png
+2026-03-30 16:36:36,290 - INFO - 批量推理时间（1 个样本）: 0.234956 秒
+2026-03-30 16:36:36,290 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000505_recon.png
+2026-03-30 16:36:36,525 - INFO - 批量推理时间（1 个样本）: 0.234689 秒
+2026-03-30 16:36:36,525 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000506_recon.png
+2026-03-30 16:36:36,736 - INFO - 批量推理时间（1 个样本）: 0.209706 秒
+2026-03-30 16:36:36,736 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions/Places365_val_00000507_recon.png
+2026-03-30 16:36:36,736 - INFO - 处理完成: 300/300 文件成功
+{"variant": "current", "artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so", "artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_match": true, "input_dir": "/home/user/Downloads/jscc-test/简化版latent", "output_dir": "/home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_retry_20260330_163229_current/reconstructions", "output_count": 300, "processed_count": 300, "input_count": 300, "available_input_count": 300, "load_ms": 2.632, "vm_init_ms": 3.061, "run_count": 300, "run_samples_ms": [466.831, 242.832, 228.323, 223.812, 236.509, 238.763, 233.306, 207.88, 238.611, 237.402, 238.954, 248.38, 250.06, 231.212, 234.987, 236.006, 236.186, 241.946, 224.799, 260.341, 225.006, 243.168, 252.428, 241.203, 236.723, 218.177, 249.831, 206.357, 219.66, 228.6, 252.479, 232.281, 232.765, 223.294, 238.184, 242.172, 255.992, 239.854, 237.858, 245.85, 242.803, 258.955, 242.539, 247.652, 229.274, 238.6, 236.427, 262.744, 235.368, 236.966, 224.253, 252.268, 257.35, 218.268, 200.881, 218.511, 237.994, 212.483, 248.581, 220.646, 238.491, 224.775, 238.444, 233.769, 239.858, 236.415, 225.467, 233.647, 243.115, 253.124, 251.183, 224.637, 244.533, 223.874, 248.081, 260.264, 253.328, 226.045, 247.068, 254.994, 261.491, 242.013, 232.32, 237.7, 213.32, 233.523, 222.606, 239.366, 211.452, 223.83, 232.623, 220.306, 241.132, 238.608, 218.407, 227.873, 234.221, 225.587, 226.644, 230.131, 209.165, 262.099, 258.867, 228.919, 227.868, 239.855, 259.404, 252.047, 245.142, 222.527, 247.267, 242.015, 254.928, 224.267, 217.474, 215.179, 221.286, 249.574, 247.14, 230.167, 240.008, 237.598, 216.262, 243.108, 239.738, 252.46, 228.516, 232.234, 238.771, 208.595, 210.338, 256.973, 222.017, 240.935, 248.746, 218.537, 238.029, 227.6, 230.803, 246.939, 237.599, 239.905, 222.651, 213.817, 265.862, 220.174, 245.669, 196.312, 238.795, 239.627, 210.135, 234.599, 245.425, 243.074, 230.466, 251.528, 224.558, 224.786, 217.803, 228.938, 247.9, 201.3, 245.326, 225.295, 240.266, 231.415, 227.307, 228.849, 230.483, 214.585, 219.389, 223.808, 216.808, 231.519, 251.817, 213.968, 239.129, 223.874, 237.881, 242.893, 248.147, 215.742, 245.061, 257.781, 244.913, 238.315, 222.473, 204.239, 250.755, 225.37, 244.332, 224.298, 254.656, 245.131, 246.67, 244.646, 229.641, 255.577, 240.954, 211.953, 239.009, 218.593, 226.796, 224.012, 235.6, 245.157, 234.652, 243.429, 224.982, 246.383, 219.438, 213.049, 209.893, 245.507, 235.344, 231.342, 236.427, 230.288, 227.879, 212.813, 218.701, 244.984, 231.566, 239.564, 240.814, 199.139, 216.311, 242.147, 224.878, 233.554, 229.658, 231.649, 232.349, 219.4, 237.771, 222.929, 229.428, 263.633, 245.613, 245.184, 252.123, 254.591, 237.205, 235.122, 219.476, 220.506, 236.748, 247.333, 222.084, 240.076, 241.694, 197.628, 257.048, 268.044, 230.323, 249.477, 252.432, 246.771, 231.749, 245.388, 234.93, 237.061, 240.645, 233.005, 211.549, 218.152, 225.49, 265.886, 234.571, 216.802, 226.989, 222.62, 214.844, 238.404, 228.489, 241.16, 201.359, 227.807, 244.869, 242.943, 240.471, 215.94, 246.289, 228.123, 238.2, 218.861, 199.637, 245.449, 218.912, 217.208, 215.854, 238.915, 250.699, 244.557, 219.669, 229.866, 252.707, 234.956, 234.689, 209.706], "run_median_ms": 235.484, "run_mean_ms": 234.898, "run_min_ms": 196.312, "run_max_ms": 466.831, "run_variance_ms2": 378.112128, "output_shape": [1, 3, 256, 256], "output_dtype": "float32", "snr": 10.0, "batch_size": 1, "save_format": "png", "seed": null, "max_inputs": 0, "runtime_profiling": {"requested": false, "profile_samples_requested": 0, "attempted_samples": 0, "successful_samples": 0, "supported": null, "status": "not_requested", "top_ops": [], "sample_results": []}}

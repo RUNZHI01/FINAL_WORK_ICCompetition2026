@@ -1,0 +1,54 @@
+.cueList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  transition: border-color 200ms var(--easing-standard), background-color 200ms var(--easing-standard);
+}
+
+.cueItem:hover {
+  border-color: var(--color-border-base);
+  background: var(--color-bg-section);
+}
+
+.cueHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.cueTitle {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.cueTimestamp {
+  font-family: var(--font-family-mono);
+  font-feature-settings: 'tnum' 1;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.cueMessage {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  padding: var(--space-sm) 0;
+}

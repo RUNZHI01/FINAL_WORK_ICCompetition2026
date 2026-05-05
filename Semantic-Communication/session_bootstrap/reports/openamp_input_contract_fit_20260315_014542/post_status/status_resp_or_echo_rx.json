@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-03-15T01:45:49+0800",
+  "byte_len": 48,
+  "hex": "4d4f4353010009000200000056240000180000002f257e1a010000000000000009000000000000000000000001000000",
+  "rx_timeout": false,
+  "parsed_frame": {
+    "raw_len": 48,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 9,
+    "msg_name": "STATUS_RESP",
+    "seq": 2,
+    "job_id": 9302,
+    "payload_len": 24,
+    "header_crc32": 444474671,
+    "expected_header_crc32": 444474671,
+    "payload_hex": "010000000000000009000000000000000000000001000000",
+    "status_resp": {
+      "payload_len": 24,
+      "parsed": true,
+      "guard_state": 1,
+      "guard_state_name": "READY",
+      "active_job_id": 0,
+      "last_fault_code": 9,
+      "last_fault_name": "ILLEGAL_PARAM_RANGE",
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  }
+}

@@ -1,0 +1,27 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+[sudo] user 的密码： {
+  "rpmsg_exists": true,
+  "job_req_tx_hex": "4d4f43530100010001000000292300002c000000ad3b27916f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000100000003000000",
+  "job_ack_rx_hex": "",
+  "job_ack_len": 0,
+  "status_req_tx_hex": "4d4f4353010008000200000029230000000000009b060ba2",
+  "status_resp_rx_hex": "4d4f4353010009000200000029230000180000009d98a9aa010000000000000000000000000000000000000000000000",
+  "status_resp_len": 48,
+  "status_resp_hdr": {
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 9,
+    "seq": 2,
+    "job_id": 9001,
+    "payload_len": 24,
+    "header_crc32": 2863241373
+  },
+  "status_resp": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 0,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 0
+  }
+}

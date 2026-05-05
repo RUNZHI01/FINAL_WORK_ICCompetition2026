@@ -1,0 +1,51 @@
+{
+  "date": "2026-03-14",
+  "context": "release_v1.4.0 baseline + minimal STATUS_REQ/RESP patch",
+  "live_firmware": {
+    "path": "/lib/firmware/openamp_core0.elf",
+    "size": 1635728,
+    "sha256": "daf889e376a2da8165ddcf0444fcf29182110066eeb82b9aebe3b6f6acd3fcb6"
+  },
+  "transport": {
+    "remoteproc_state": "running",
+    "channel": "rpmsg-openamp-demo-channel",
+    "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+    "rpmsg_dev": "/dev/rpmsg0"
+  },
+  "tx": {
+    "magic": "0x53434F4D",
+    "version": 1,
+    "msg_type": 8,
+    "msg_name": "STATUS_REQ",
+    "seq": 1,
+    "job_id": 5001,
+    "payload_len": 0,
+    "hex": "4d4f435301000800010000008913000000000000b596bbd7"
+  },
+  "rx": {
+    "hex": "4d4f435301000900010000008913000018000000b30819df010000000000000000000000000000000000000000000000",
+    "len": 48,
+    "parsed_header": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "msg_name": "STATUS_RESP",
+      "seq": 1,
+      "job_id": 5001,
+      "payload_len": 24,
+      "header_crc32": 3742959795
+    },
+    "status_payload": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 0,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    }
+  },
+  "result": {
+    "status_resp_received": true,
+    "protocol_semantics": "implemented_minimal_status_resp"
+  }
+}

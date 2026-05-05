@@ -1,0 +1,984 @@
+{
+  "run_id": "judge_quality_formal_report_20260330",
+  "generated_at": "2026-03-30T15:23:44+08:00",
+  "title": "Formal Quality Report",
+  "report_json": "session_bootstrap/reports/judge_quality_formal_report_20260330.json",
+  "report_markdown": "session_bootstrap/reports/judge_quality_formal_report_20260330.md",
+  "rows": [
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "run_id": "quality_metrics_20260312_pytorch_vs_tvm_baseline",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_baseline.json",
+      "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_baseline.md",
+      "status": "success",
+      "matched_png_count": 300,
+      "compared_image_count": 300,
+      "missing_in_test_count": 0,
+      "extra_in_test_count": 0,
+      "cropped_pair_count": 300,
+      "shape_mismatch_status": null,
+      "shape_mismatch_message": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+      "psnr": {
+        "count": 300,
+        "mean": 34.47948504003322,
+        "median": 34.65463445557447,
+        "std": 2.182962577981479,
+        "ci95_half_width": 0.24702547027758331,
+        "min": 25.839511521136647,
+        "max": 40.174438929742635,
+        "aggregate_mean": 34.47948504003321,
+        "aggregate_median": 34.65463445557447,
+        "aggregate_std": 2.179321270062001,
+        "aggregate_min": 25.839511521136647,
+        "aggregate_max": 40.174438929742635
+      },
+      "ssim": {
+        "count": 300,
+        "mean": 0.9703583280206586,
+        "median": 0.9705531048275724,
+        "std": 0.005518461705363474,
+        "ci95_half_width": 0.0006244727288164315,
+        "min": 0.9359435351526462,
+        "max": 0.9822756889787283,
+        "aggregate_mean": 0.9703583280206586,
+        "aggregate_median": 0.9705531048275724,
+        "aggregate_std": 0.00550925659185683,
+        "aggregate_min": 0.9359435351526462,
+        "aggregate_max": 0.9822756889787283
+      },
+      "lpips": {
+        "count": 0,
+        "mean": null,
+        "median": null,
+        "std": null,
+        "ci95_half_width": null,
+        "min": null,
+        "max": null,
+        "aggregate_mean": null,
+        "aggregate_median": null,
+        "aggregate_std": null,
+        "aggregate_min": null,
+        "aggregate_max": null
+      },
+      "worst_cases": [
+        {
+          "relative_path": "Places365_val_00000449_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000449_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000449_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 25.839511521136647,
+          "ssim": 0.9486254486172132,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000290_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000290_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000290_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 26.30120554292258,
+          "ssim": 0.9639767728376625,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000386_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000386_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000386_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 27.10028514688464,
+          "ssim": 0.9674529452060111,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000362_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000362_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000362_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 27.863780185724526,
+          "ssim": 0.9359435351526462,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000486_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000486_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000486_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 28.448267931368964,
+          "ssim": 0.9753316790332147,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000347_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000347_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000347_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.04106100210823,
+          "ssim": 0.9664925550857707,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000214_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000214_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000214_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.2799158016733,
+          "ssim": 0.9662218146921017,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000249_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000249_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000249_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.38125923540667,
+          "ssim": 0.9698248354875074,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000434_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000434_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000434_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.78407915352198,
+          "ssim": 0.9637482917386234,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000251_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000251_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000251_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            249,
+            249,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 30.121412155413214,
+          "ssim": 0.9698027223650746,
+          "lpips": null
+        }
+      ]
+    },
+    {
+      "comparison_label": "pytorch_vs_tvm_current",
+      "run_id": "quality_metrics_20260312_pytorch_vs_tvm_current",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_current.json",
+      "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_current.md",
+      "status": "success",
+      "matched_png_count": 300,
+      "compared_image_count": 300,
+      "missing_in_test_count": 0,
+      "extra_in_test_count": 0,
+      "cropped_pair_count": 0,
+      "shape_mismatch_status": null,
+      "shape_mismatch_message": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+      "psnr": {
+        "count": 300,
+        "mean": 35.69418754066526,
+        "median": 35.72977134885079,
+        "std": 1.6105903994382609,
+        "ci95_half_width": 0.1822554609313017,
+        "min": 31.695486217119072,
+        "max": 40.7935559079884,
+        "aggregate_mean": 35.694187540665254,
+        "aggregate_median": 35.72977134885079,
+        "aggregate_std": 1.6079038414387496,
+        "aggregate_min": 31.695486217119072,
+        "aggregate_max": 40.7935559079884
+      },
+      "ssim": {
+        "count": 300,
+        "mean": 0.9728362713251338,
+        "median": 0.9729424228831426,
+        "std": 0.004902470938214184,
+        "ci95_half_width": 0.0005547668115109661,
+        "min": 0.9507430014485796,
+        "max": 0.9832469594388402,
+        "aggregate_mean": 0.9728362713251338,
+        "aggregate_median": 0.9729424228831426,
+        "aggregate_std": 0.004894293332957737,
+        "aggregate_min": 0.9507430014485796,
+        "aggregate_max": 0.9832469594388402
+      },
+      "lpips": {
+        "count": 0,
+        "mean": null,
+        "median": null,
+        "std": null,
+        "ci95_half_width": null,
+        "min": null,
+        "max": null,
+        "aggregate_mean": null,
+        "aggregate_median": null,
+        "aggregate_std": null,
+        "aggregate_min": null,
+        "aggregate_max": null
+      },
+      "worst_cases": [
+        {
+          "relative_path": "Places365_val_00000355_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000355_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000355_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 31.695486217119072,
+          "ssim": 0.9693821199523504,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000433_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000433_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000433_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 31.928196063204524,
+          "ssim": 0.9627470073274873,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000395_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000395_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000395_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.09867566200125,
+          "ssim": 0.9683165832470771,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000235_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000235_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000235_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.20580902372734,
+          "ssim": 0.9660028226544212,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000366_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000366_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000366_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.30213423153684,
+          "ssim": 0.9608187410977355,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000262_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000262_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000262_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.3492897599112,
+          "ssim": 0.965451285909683,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000369_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000369_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000369_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.35399989231995,
+          "ssim": 0.9637436386079151,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000484_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000484_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000484_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.502121623854975,
+          "ssim": 0.9574008203021608,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000452_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000452_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000452_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.74367279365547,
+          "ssim": 0.9507430014485796,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000389_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/reconstructions/Places365_val_00000389_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000389_recon.png",
+          "ref_shape": [
+            256,
+            256,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            256,
+            256,
+            3
+          ],
+          "cropped": false,
+          "psnr_db": 32.77091362164923,
+          "ssim": 0.9669247912161869,
+          "lpips": null
+        }
+      ]
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "run_id": "quality_metrics_20260312_tvm_baseline_vs_tvm_current",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_tvm_baseline_vs_tvm_current.json",
+      "source_markdown": "session_bootstrap/reports/quality_metrics_20260312_tvm_baseline_vs_tvm_current.md",
+      "status": "success",
+      "matched_png_count": 300,
+      "compared_image_count": 300,
+      "missing_in_test_count": 0,
+      "extra_in_test_count": 0,
+      "cropped_pair_count": 300,
+      "shape_mismatch_status": null,
+      "shape_mismatch_message": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped",
+      "psnr": {
+        "count": 300,
+        "mean": 34.529852149146066,
+        "median": 34.60044266656402,
+        "std": 2.1237469817468564,
+        "ci95_half_width": 0.2403245947540317,
+        "min": 26.198328545192023,
+        "max": 40.23475572827276,
+        "aggregate_mean": 34.529852149146066,
+        "aggregate_median": 34.60044266656402,
+        "aggregate_std": 2.1202044488690124,
+        "aggregate_min": 26.198328545192023,
+        "aggregate_max": 40.23475572827276
+      },
+      "ssim": {
+        "count": 300,
+        "mean": 0.9704320174669013,
+        "median": 0.9704312518412365,
+        "std": 0.005365180953130595,
+        "ci95_half_width": 0.0006071273788380363,
+        "min": 0.9361508814899341,
+        "max": 0.9819535186673767,
+        "aggregate_mean": 0.9704320174669012,
+        "aggregate_median": 0.9704312518412365,
+        "aggregate_std": 0.00535623152078983,
+        "aggregate_min": 0.9361508814899341,
+        "aggregate_max": 0.9819535186673767
+      },
+      "lpips": {
+        "count": 0,
+        "mean": null,
+        "median": null,
+        "std": null,
+        "ci95_half_width": null,
+        "min": null,
+        "max": null,
+        "aggregate_mean": null,
+        "aggregate_median": null,
+        "aggregate_std": null,
+        "aggregate_min": null,
+        "aggregate_max": null
+      },
+      "worst_cases": [
+        {
+          "relative_path": "Places365_val_00000449_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000449_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000449_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 26.198328545192023,
+          "ssim": 0.9503883169409936,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000290_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000290_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000290_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 27.640941159199016,
+          "ssim": 0.9648900560273033,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000386_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000386_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000386_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 27.817911003975595,
+          "ssim": 0.9676952620883177,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000362_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000362_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000362_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 28.142845849129525,
+          "ssim": 0.9361508814899341,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000486_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000486_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000486_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 28.91329030926022,
+          "ssim": 0.9750253007654679,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000214_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000214_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000214_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 28.967767337781133,
+          "ssim": 0.965130499963539,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000347_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000347_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000347_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.02961582249908,
+          "ssim": 0.9678907151035929,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000249_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000249_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000249_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 29.0544133395143,
+          "ssim": 0.9700645531112936,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000482_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000482_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000482_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 30.172673503779812,
+          "ssim": 0.9679853864431545,
+          "lpips": null
+        },
+        {
+          "relative_path": "Places365_val_00000454_recon.png",
+          "ref_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/baseline/reconstructions/Places365_val_00000454_recon.png",
+          "test_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/quality_metrics_inputs_20260312/current/reconstructions/Places365_val_00000454_recon.png",
+          "ref_shape": [
+            249,
+            249,
+            3
+          ],
+          "test_shape": [
+            256,
+            256,
+            3
+          ],
+          "compared_shape": [
+            249,
+            249,
+            3
+          ],
+          "cropped": true,
+          "psnr_db": 30.427400285894848,
+          "ssim": 0.968180792882444,
+          "lpips": null
+        }
+      ]
+    }
+  ],
+  "findings": [
+    "Against the same PyTorch reference, current is 1.2147 dB higher in mean PSNR and 0.002478 higher in mean SSIM than baseline.",
+    "Direct TVM baseline-vs-current divergence is 34.5299 dB PSNR and 0.970432 SSIM.",
+    "LPIPS is missing for at least one comparison; keep PSNR/SSIM as the formal minimum set and treat LPIPS as environment-gated complementary evidence.",
+    "At least one comparison required spatial normalization; judge-facing tables should footnote the crop policy."
+  ],
+  "worst_cases": [
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "relative_path": "Places365_val_00000449_recon.png",
+      "psnr_db": 25.839511521136647,
+      "ssim": 0.9486254486172132,
+      "lpips": null
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "relative_path": "Places365_val_00000449_recon.png",
+      "psnr_db": 26.198328545192023,
+      "ssim": 0.9503883169409936,
+      "lpips": null
+    },
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "relative_path": "Places365_val_00000290_recon.png",
+      "psnr_db": 26.30120554292258,
+      "ssim": 0.9639767728376625,
+      "lpips": null
+    },
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "relative_path": "Places365_val_00000386_recon.png",
+      "psnr_db": 27.10028514688464,
+      "ssim": 0.9674529452060111,
+      "lpips": null
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "relative_path": "Places365_val_00000290_recon.png",
+      "psnr_db": 27.640941159199016,
+      "ssim": 0.9648900560273033,
+      "lpips": null
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "relative_path": "Places365_val_00000386_recon.png",
+      "psnr_db": 27.817911003975595,
+      "ssim": 0.9676952620883177,
+      "lpips": null
+    },
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "relative_path": "Places365_val_00000362_recon.png",
+      "psnr_db": 27.863780185724526,
+      "ssim": 0.9359435351526462,
+      "lpips": null
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "relative_path": "Places365_val_00000362_recon.png",
+      "psnr_db": 28.142845849129525,
+      "ssim": 0.9361508814899341,
+      "lpips": null
+    },
+    {
+      "comparison_label": "pytorch_vs_tvm_baseline",
+      "relative_path": "Places365_val_00000486_recon.png",
+      "psnr_db": 28.448267931368964,
+      "ssim": 0.9753316790332147,
+      "lpips": null
+    },
+    {
+      "comparison_label": "tvm_baseline_vs_tvm_current",
+      "relative_path": "Places365_val_00000486_recon.png",
+      "psnr_db": 28.91329030926022,
+      "ssim": 0.9750253007654679,
+      "lpips": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--elevation-1);
+  transition: box-shadow 250ms var(--easing-standard),
+              border-color 250ms var(--easing-standard);
+  margin-bottom: 12px;
+}
+
+.card:hover {
+  box-shadow: var(--elevation-2);
+  border-color: var(--color-border-base);
+}
+
+/* Highlight variant — left accent line */
+.cardHighlight {
+  composes: card;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-bg-card);
+}
+
+/* Glass variant — frosted translucent */
+.cardGlass {
+  composes: card;
+  background: var(--color-bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--color-border-light);
+}
+
+/* Card head */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-md);
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.titleIcon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.extra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Card body */
+.body {
+  padding: var(--space-md);
+}
+
+.bodyCompact {
+  composes: body;
+  padding: 12px;
+}
+
+.bodyPadded {
+  composes: body;
+  padding: 0;
+}

@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-03-15T01:09:03+0800",
+  "fit_id": "FIT-01",
+  "tc_id": "TC-003",
+  "run_id": "openamp_wrong_sha_fit_20260315_010828",
+  "scenario": "wrong expected_sha256 JOB_REQ on real board path",
+  "risk_item": "unknown artifact execution risk",
+  "status": "BLOCKED",
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "wrong_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+  "board_access": {
+    "mode": "ssh",
+    "host": "100.121.87.73",
+    "port": "22",
+    "reachable": false,
+    "ssh_probe": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/ssh_probe/connect_probe.json",
+    "blocker": "socket: Operation not permitted\nssh: connect to host 100.121.87.73 port 22: failure"
+  },
+  "expected_result": {
+    "decision": "DENY",
+    "fault_code": 1,
+    "fault_name": "ARTIFACT_SHA_MISMATCH",
+    "guard_state": "READY",
+    "runner_should_not_start": true
+  },
+  "observed_result": {
+    "decision": null,
+    "last_fault": null,
+    "guard_final": null,
+    "wrapper_result": "blocked_remote_access"
+  },
+  "evidence_bundle": {
+    "run_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/run_manifest.json",
+    "pre_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/pre_status/status_snapshot.json",
+    "wrapper_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/job_manifest.json",
+    "wrapper_trace": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/control_trace.jsonl",
+    "wrapper_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/wrapper_summary.json",
+    "post_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/post_status/status_snapshot.json",
+    "fit_report": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/fit_report_FIT-01.md",
+    "coverage_matrix": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/coverage_matrix.md"
+  }
+}

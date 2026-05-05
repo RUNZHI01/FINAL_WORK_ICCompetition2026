@@ -1,0 +1,76 @@
+{
+  "generated_at_utc": "2026-03-31T15:06:20Z",
+  "operator": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+  "phase": "scheduled_form_candidate_v1_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v1_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v1_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "reference_tir_sha256": "98c2917f9ae4754a7f2b7ad69bbfd5a87b4b9bc660ffdb86e0c171f4a64a498c",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply",
+    "reference_source": {
+      "task_summary_json": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/task_summary.json",
+      "database_dir": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/tuning_logs",
+      "operator_global_var": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+      "post_db_operator_tir_is_scheduled": false,
+      "structural_equal_to_database_query_ir_module_main": null,
+      "source_seam_id": "post_database_scheduled_primfunc_swap"
+    },
+    "reference_task_rows": {
+      "task_summary_row": {
+        "rank": 22,
+        "task_name": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      },
+      "reconstructed_task_row": {
+        "rank": 22,
+        "task_name": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      }
+    }
+  },
+  "current_edit_state": {
+    "status": "seed_synced_unedited",
+    "applied_at_utc": "2026-03-31T15:06:20Z",
+    "working_copy_tir_sha256": "cf8a5c4867c4fcfb324bc1c42e25a8cf1ed801e3b74535bdb7c006fe760b89ce",
+    "concrete_change": "No operator-side handwritten change yet. This working copy is an editable scheduled-form clone of the checked-in post-db scheduled reference seed for fused_mean4_subtract4_divide4_multiply4_add14_relu3.",
+    "preserved_non_changes": [
+      "the scheduled reference seed remains the frozen source of truth",
+      "no tiling, buffer, or epilogue edits have been applied yet",
+      "the file is still local-only, diagnostic-only, and not hook-facing"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v1_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v1_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the checked-in post-db scheduled reference seed so the first mean4 edits start from a scheduled form.",
+    "Keep the scheduled reference seed frozen and refresh this working copy when the reference seed changes.",
+    "The current checked-in working copy is intentionally unedited and only opens the local scheduled-form edit surface.",
+    "This handoff is local-only and diagnostic-only; it does not make performance claims."
+  ]
+}

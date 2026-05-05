@@ -1,0 +1,43 @@
+{
+  "variant": "current",
+  "archive": "/home/user/Downloads/jscc-test/jscc",
+  "entry": "main",
+  "shape": [
+    1,
+    32,
+    32,
+    32
+  ],
+  "dtype": "float32",
+  "warmup_runs": 2,
+  "repeat": 10,
+  "tvm_version": "0.24.dev0",
+  "device": "cpu:0",
+  "load_ms": 3.891,
+  "vm_init_ms": 0.465,
+  "run_count": 10,
+  "run_samples_ms": [
+    2491.482,
+    2487.355,
+    2495.565,
+    2494.16,
+    2488.572,
+    2490.836,
+    2487.159,
+    2489.787,
+    2488.035,
+    2489.879
+  ],
+  "run_median_ms": 2489.833,
+  "run_mean_ms": 2490.283,
+  "run_min_ms": 2487.159,
+  "run_max_ms": 2495.565,
+  "run_variance_ms2": 7.140033,
+  "output_shape": [
+    1,
+    3,
+    256,
+    256
+  ],
+  "output_dtype": "float32"
+}

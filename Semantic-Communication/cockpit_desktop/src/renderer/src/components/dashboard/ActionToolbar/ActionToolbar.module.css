@@ -1,0 +1,44 @@
+.toolbar {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  margin-top: var(--space-sm);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--elevation-1);
+  position: relative;
+}
+
+/* Subtle top accent gradient */
+.toolbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  opacity: 0.15;
+  border-radius: 1px;
+}
+
+.separator {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.primaryAction {
+  box-shadow: var(--elevation-1);
+}
+
+/* Touch target size */
+.toolbar button {
+  min-height: 40px;
+  min-width: 40px;
+  font-size: 14px;
+}

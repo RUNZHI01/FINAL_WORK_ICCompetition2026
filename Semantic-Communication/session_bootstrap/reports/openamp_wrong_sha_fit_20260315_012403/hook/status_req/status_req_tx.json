@@ -1,0 +1,20 @@
+{
+  "captured_at": "2026-03-15T01:24:34+0800",
+  "byte_len": 24,
+  "hex": "4d4f4353010008000100000055240000000000003a6ecdeb",
+  "parsed_frame": {
+    "raw_len": 24,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 8,
+    "msg_name": "STATUS_REQ",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 0,
+    "header_crc32": 3956108858,
+    "expected_header_crc32": 3956108858,
+    "payload_hex": ""
+  }
+}

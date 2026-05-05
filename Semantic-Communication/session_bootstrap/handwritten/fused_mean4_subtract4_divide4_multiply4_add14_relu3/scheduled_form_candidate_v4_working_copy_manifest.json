@@ -1,0 +1,59 @@
+{
+  "generated_at_utc": "2026-04-06T06:10:00Z",
+  "operator": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+  "phase": "scheduled_form_candidate_v4_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v4_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v4_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v3.py",
+    "candidate_version": "v3_working_copy",
+    "status": "local_ablation_only_not_board_validated",
+    "remote_report": null,
+    "remote_median_ms": null
+  },
+  "current_edit_state": {
+    "status": "v4_channel_param_hoist_fused_epilogue_applied",
+  "working_copy_tir_sha256": "8b6e53130381e29c0dc0738c960d1d49f7fba25bb91932b728b8a705d9870c4b",
+    "concrete_change": "Keep the mean reduction and per-channel divide stage from v3, but hoist mean/std/weight/bias once per channel into local buffers and fuse subtract/divide/multiply/add/relu into a single 256x256 pass so the hot path no longer materializes four full-frame intermediates.",
+    "preserved_non_changes": [
+      "the checked-in v1 seed-clone baseline remains frozen in its own files",
+      "the checked-in v2 scalar-epilogue candidate remains intact as the board-regressed branch",
+      "the checked-in v3 local-mean-handoff-only ablation remains intact for isolation",
+      "the reduction domain remains 256 x 256 per channel",
+      "the arithmetic order stays subtract -> divide -> multiply -> add -> relu",
+      "the output signature and ReLU semantics remain unchanged"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "previous_v2_candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v2.py",
+    "previous_v2_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v2_working_copy_tir.py",
+    "previous_v2_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v2_working_copy_manifest.json",
+    "previous_v3_candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v3.py",
+    "previous_v3_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v3_working_copy_tir.py",
+    "previous_v3_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v3_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v4_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v4_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is the first mean4 branch that explicitly targets the Cortex-A72 L1d pressure described in the repo hardware notes.",
+    "The branch stays local-only and diagnostic-only until local build and board payload validation are completed.",
+    "The intent is to test operator-specific channel-parameter hoisting, not another cross-operator pattern transfer."
+  ]
+}

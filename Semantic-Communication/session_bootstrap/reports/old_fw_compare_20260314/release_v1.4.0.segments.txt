@@ -1,0 +1,15 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+
+Elf 文件类型为 EXEC (可执行文件)
+Entry point 0xb0100000
+There are 2 program headers, starting at offset 64
+
+程序头：
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  LOAD           0x010000 0x00000000b0100000 0x00000000b0100000 0x01c000 0x67a000 RWE 0x10000
+  LOAD           0x030000 0x00000000c0000000 0x00000000c0000000 0x001000 0x001000 RW  0x10000
+
+ Section to Segment mapping:
+  段节...
+   00     .text .end_text .rodata .end_rodata .data .bss .heap .stack .end_ram 
+   01     .resource_table 

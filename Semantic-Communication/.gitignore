@@ -1,0 +1,42 @@
+session_bootstrap/logs/
+session_bootstrap/tmp/
+session_bootstrap/scripts/__pycache__/
+__pycache__/
+*.py[cod]
+session_bootstrap/config/big_little_pipeline.current.runtime_*.env
+
+# Native cockpit local env
+cockpit_native/.venv/
+
+# Local caches and editor files
+.codex_tmp/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+*.swp
+.DS_Store
+
+# Runtime/demo outputs
+cockpit_native/runtime/
+session_bootstrap/demo/openamp_control_plane_demo/runtime/
+output/
+server.log
+server.pid
+session_bootstrap/board_snapshots/
+session_bootstrap/state/
+
+# LaTeX build artifacts
+cicc_tech_doc/*.aux
+cicc_tech_doc/*.bcf
+cicc_tech_doc/*.bcf-SAVE-ERROR
+cicc_tech_doc/*.bbl-SAVE-ERROR
+cicc_tech_doc/*.blg
+cicc_tech_doc/*.fdb_latexmk
+cicc_tech_doc/*.fls
+cicc_tech_doc/*.log
+cicc_tech_doc/*.out
+cicc_tech_doc/*.run.xml
+cicc_tech_doc/*.toc
+cicc_tech_doc/*.xdv

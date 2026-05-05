@@ -1,0 +1,45 @@
+{
+  "date": "2026-03-14",
+  "context": "release_v1.4.0 baseline + STATUS_REQ/RESP + JOB_REQ/JOB_ACK + HEARTBEAT + SAFE_STOP minimal patch",
+  "live_firmware": {
+    "path": "/lib/firmware/openamp_core0.elf",
+    "size": 1647272,
+    "sha256": "3e7512fef57b0581afd319aaccd0a3144cf0e08052b30b043c2c87908dfe0424"
+  },
+  "transport": {
+    "remoteproc_state": "running",
+    "channel": "rpmsg-openamp-demo-channel",
+    "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+    "rpmsg_dev": "/dev/rpmsg0"
+  },
+  "job_req": {
+    "job_id": 9601,
+    "decision": 1,
+    "fault_code": 0,
+    "guard_state": 2
+  },
+  "heartbeat_ack": {
+    "guard_state": 2,
+    "heartbeat_ok": 1
+  },
+  "safe_stop_status": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 10,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 1
+  },
+  "status_after_safe_stop": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 10,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 1
+  },
+  "result": {
+    "safe_stop_applied": true,
+    "protocol_semantics": "implemented_minimal_safe_stop"
+  }
+}

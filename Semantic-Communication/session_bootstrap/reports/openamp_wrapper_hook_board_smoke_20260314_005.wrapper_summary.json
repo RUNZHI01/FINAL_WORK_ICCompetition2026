@@ -1,0 +1,26 @@
+{
+  "finished_at": "2026-03-14T19:24:48+0800",
+  "job_id": 9205,
+  "result": "success",
+  "status_response": {
+    "phase": "STATUS_REQ",
+    "source": "replayed_live_status_resp",
+    "transport_status": "status_resp_received",
+    "protocol_semantics": "implemented",
+    "note": "board-backed wrapper smoke skips redundant STATUS_REQ write and reuses known-good live status path"
+  },
+  "job_req_response": {
+    "phase": "JOB_REQ",
+    "decision": "ALLOW",
+    "fault_code": 0,
+    "fault_name": "NONE",
+    "guard_state": 2,
+    "guard_state_name": "JOB_ACTIVE",
+    "source": "firmware_job_ack",
+    "transport_status": "job_ack_received",
+    "protocol_semantics": "implemented"
+  },
+  "runner_exit_code": 0,
+  "board_smoke": true,
+  "evidence_origin": "remote /tmp/openamp_wrapper_hook_smoke/reports/openamp_wrapper_hook_board_smoke_20260314_005"
+}

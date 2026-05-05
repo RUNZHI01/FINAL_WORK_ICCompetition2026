@@ -1,0 +1,231 @@
+--- a/example/system/amp/openamp_for_linux/src/slaver_00_example.c
++++ b/example/system/amp/openamp_for_linux/src/slaver_00_example.c
+@@ -54,7 +54,19 @@
+ #define SHUTDOWN_MSG                0xEF56A55A
+ #define SC_CTRL_MAGIC               0x53434F4DU
+ #define SC_CTRL_VERSION             1U
++#define SC_MSG_JOB_REQ              0x0001U
++#define SC_MSG_JOB_ACK              0x0002U
+ #define SC_MSG_STATUS_REQ           0x0008U
+ #define SC_MSG_STATUS_RESP          0x0009U
++#define SC_FLAG_PAYLOAD             0x00000001U
++#define SC_FLAG_RECONSTRUCTION      0x00000002U
++#define SC_FLAG_SMOKE               0x00000003U
++#define SC_DECISION_DENY            0U
++#define SC_DECISION_ALLOW           1U
+ #define SC_GUARD_STATE_READY        1U
++#define SC_GUARD_STATE_JOB_ACTIVE   2U
++#define SC_FAULT_NONE               0U
++#define SC_FAULT_ARTIFACT_SHA_MISMATCH 1U
++#define SC_FAULT_DUPLICATE_JOB_ID   8U
++#define SC_FAULT_ILLEGAL_PARAM_RANGE 9U
+ /************************** Variable Definitions *****************************/
+ static volatile int shutdown_req = 0;
+ 
+@@ -160,6 +172,37 @@ typedef struct
+     ScCtrlHdr header;
+     ScStatusResp payload;
+ } ScStatusRespFrame;
++typedef struct
++{
++    uint8_t expected_sha256[32];
++    uint32_t deadline_ms;
++    uint32_t expected_outputs;
++    uint32_t flags;
++} ScJobReq;
++typedef struct
++{
++    uint32_t decision;
++    uint32_t fault_code;
++    uint32_t guard_state;
++} ScJobAck;
++typedef struct
++{
++    ScCtrlHdr header;
++    ScJobAck payload;
++} ScJobAckFrame;
++static const uint8_t sc_trusted_sha256[32] =
++{
++    0x6f, 0x23, 0x6b, 0x07, 0xf9, 0xb0, 0xbf, 0x98,
++    0x1b, 0x67, 0x62, 0xdd, 0xb7, 0x24, 0x49, 0xe2,
++    0x33, 0x32, 0xd2, 0xd9, 0x2c, 0x76, 0xb3, 0x8a,
++    0xcd, 0xca, 0xdc, 0x1d, 0x9b, 0x53, 0x6d, 0xc1
++};
++static uint32_t sc_guard_state = SC_GUARD_STATE_READY;
++static uint32_t sc_active_job_id = 0U;
++static uint32_t sc_last_fault_code = SC_FAULT_NONE;
++static uint32_t sc_sticky_fault = 0U;
++static uint32_t sc_total_fault_count = 0U;
++static uint32_t sc_last_job_ack_decision = SC_DECISION_DENY;
+ /************************** Function Prototypes ******************************/
+ static uint32_t sc_ctrl_crc32(const void *data, size_t len)
+ {
+@@ -207,22 +250,104 @@ static int sc_ctrl_send_status_resp(struct rpmsg_endpoint *ept, uint32_t src,
+     response.header.seq = request_header->seq;
+     response.header.job_id = request_header->job_id;
+     response.header.payload_len = sizeof(response.payload);
+     response.header.header_crc32 = sc_ctrl_compute_header_crc(&response.header);
+-    response.payload.guard_state = SC_GUARD_STATE_READY;
+-
++    response.payload.guard_state = sc_guard_state;
++    response.payload.active_job_id = sc_active_job_id;
++    response.payload.last_fault_code = sc_last_fault_code;
++    response.payload.heartbeat_ok = (sc_guard_state == SC_GUARD_STATE_JOB_ACTIVE) ? 1U : 0U;
++    response.payload.sticky_fault = sc_sticky_fault;
++    response.payload.total_fault_count = sc_total_fault_count;
+     return rpmsg_send(ept, &response, sizeof(response));
+ }
++static int sc_ctrl_send_job_ack(struct rpmsg_endpoint *ept, uint32_t src,
++                                const ScCtrlHdr *request_header,
++                                uint32_t decision, uint32_t fault_code)
++{
++    ScJobAckFrame response;
++
++    memset(&response, 0, sizeof(response));
++    ept->dest_addr = src;
++    response.header.magic = SC_CTRL_MAGIC;
++    response.header.version = SC_CTRL_VERSION;
++    response.header.msg_type = SC_MSG_JOB_ACK;
++    response.header.seq = request_header->seq;
++    response.header.job_id = request_header->job_id;
++    response.header.payload_len = sizeof(response.payload);
++    response.header.header_crc32 = sc_ctrl_compute_header_crc(&response.header);
++    response.payload.decision = decision;
++    response.payload.fault_code = fault_code;
++    response.payload.guard_state = sc_guard_state;
++    sc_last_job_ack_decision = decision;
++    return rpmsg_send(ept, &response, sizeof(response));
++}
++static uint32_t sc_ctrl_validate_job_req(const ScJobReq *request)
++{
++    if ((sc_guard_state != SC_GUARD_STATE_READY) || (sc_active_job_id != 0U))
++    {
++        return SC_FAULT_DUPLICATE_JOB_ID;
++    }
++    if (memcmp(request->expected_sha256, sc_trusted_sha256, sizeof(sc_trusted_sha256)) != 0)
++    {
++        return SC_FAULT_ARTIFACT_SHA_MISMATCH;
++    }
++    if (request->deadline_ms == 0U)
++    {
++        return SC_FAULT_ILLEGAL_PARAM_RANGE;
++    }
++    if ((request->expected_outputs != 1U) && (request->expected_outputs != 300U))
++    {
++        return SC_FAULT_ILLEGAL_PARAM_RANGE;
++    }
++    switch (request->flags)
++    {
++        case SC_FLAG_PAYLOAD:
++        case SC_FLAG_RECONSTRUCTION:
++        case SC_FLAG_SMOKE:
++            return SC_FAULT_NONE;
++        default:
++            return SC_FAULT_ILLEGAL_PARAM_RANGE;
++    }
++}
++static int sc_ctrl_handle_job_req(struct rpmsg_endpoint *ept, uint32_t src,
++                                  const ScCtrlHdr *request_header,
++                                  const void *payload)
++{
++    ScJobReq request;
++    uint32_t fault_code;
++
++    if (request_header->payload_len != sizeof(request))
++    {
++        sc_last_fault_code = SC_FAULT_ILLEGAL_PARAM_RANGE;
++        sc_total_fault_count += 1U;
++        return sc_ctrl_send_job_ack(ept, src, request_header,
++                                    SC_DECISION_DENY, sc_last_fault_code);
++    }
++    memcpy(&request, payload, sizeof(request));
++    fault_code = sc_ctrl_validate_job_req(&request);
++    if (fault_code != SC_FAULT_NONE)
++    {
++        sc_last_fault_code = fault_code;
++        sc_total_fault_count += 1U;
++        return sc_ctrl_send_job_ack(ept, src, request_header,
++                                    SC_DECISION_DENY, fault_code);
++    }
++    sc_last_fault_code = SC_FAULT_NONE;
++    sc_sticky_fault = 0U;
++    sc_active_job_id = request_header->job_id;
++    sc_guard_state = SC_GUARD_STATE_JOB_ACTIVE;
++    return sc_ctrl_send_job_ack(ept, src, request_header,
++                                SC_DECISION_ALLOW, SC_FAULT_NONE);
++}
+ 
+ /*-----------------------------------------------------------------------------*
+  *  RPMSG endpoint callbacks
+  *-----------------------------------------------------------------------------*/
+ static int rpmsg_endpoint_cb(struct rpmsg_endpoint *ept, void *data, size_t len, uint32_t src, void *priv)
+@@ -264,27 +389,44 @@ static int rpmsg_endpoint_cb(struct rpmsg_endpoint *ept, void *data, size_t len,
+                       (unsigned long)len, ret);
+         return RPMSG_SUCCESS;
+     }
+-
+-    if (header.msg_type != SC_MSG_STATUS_REQ)
++    if (header.msg_type == SC_MSG_STATUS_REQ)
+     {
+-        SLAVE_DEBUG_W("ignore unsupported msg_type:0x%x, seq:%u, job_id:%u",
+-                      (unsigned int)header.msg_type,
+-                      (unsigned int)header.seq,
+-                      (unsigned int)header.job_id);
++        if (header.payload_len != 0U)
++        {
++            SLAVE_DEBUG_W("ignore STATUS_REQ with payload_len:%u",
++                          (unsigned int)header.payload_len);
++            return RPMSG_SUCCESS;
++        }
++        ret = sc_ctrl_send_status_resp(ept, src, &header);
++        if (ret < 0)
++        {
++            SLAVE_DEBUG_E("rpmsg_send status resp failed.\r\n");
++            return ret;
++        }
++        SLAVE_DEBUG_I("STATUS_REQ seq:%u job_id:%u -> STATUS_RESP state:%u active:%u",
++                      (unsigned int)header.seq,
++                      (unsigned int)header.job_id,
++                      (unsigned int)sc_guard_state,
++                      (unsigned int)sc_active_job_id);
+         return RPMSG_SUCCESS;
+     }
+-
+-    if (header.payload_len != 0U)
++    if (header.msg_type == SC_MSG_JOB_REQ)
+     {
+-        SLAVE_DEBUG_W("ignore STATUS_REQ with payload_len:%u",
+-                      (unsigned int)header.payload_len);
++        ret = sc_ctrl_handle_job_req(ept, src, &header,
++                                    ((const uint8_t *)data) + sizeof(ScCtrlHdr));
++        if (ret < 0)
++        {
++            SLAVE_DEBUG_E("rpmsg_send job ack failed.\r\n");
++            return ret;
++        }
++        SLAVE_DEBUG_I("JOB_REQ seq:%u job_id:%u -> JOB_ACK decision:%u fault:%u state:%u active:%u",
++                      (unsigned int)header.seq,
++                      (unsigned int)header.job_id,
++                      (unsigned int)sc_last_job_ack_decision,
++                      (unsigned int)sc_last_fault_code,
++                      (unsigned int)sc_guard_state,
++                      (unsigned int)sc_active_job_id);
+         return RPMSG_SUCCESS;
+     }
+-
+-    ret = sc_ctrl_send_status_resp(ept, src, &header);
+-    if (ret < 0)
+-    {
+-        SLAVE_DEBUG_E("rpmsg_send status resp failed.\r\n");
+-        return ret;
+-    }
+-
+-    SLAVE_DEBUG_I("STATUS_REQ seq:%u job_id:%u -> STATUS_RESP",
+-                  (unsigned int)header.seq,
+-                  (unsigned int)header.job_id);
++    SLAVE_DEBUG_W("ignore unsupported msg_type:0x%x, seq:%u, job_id:%u",
++                  (unsigned int)header.msg_type,
++                  (unsigned int)header.seq,
++                  (unsigned int)header.job_id);
+     return RPMSG_SUCCESS;
+ }

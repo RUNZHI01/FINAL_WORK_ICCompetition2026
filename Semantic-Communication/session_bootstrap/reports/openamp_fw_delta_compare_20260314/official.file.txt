@@ -1,0 +1,1 @@
+/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/old_fw_compare_20260314/openamp_core0_official.elf: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, with debug_info, not stripped

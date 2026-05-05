@@ -1,0 +1,5 @@
+first_rodata_diff=0xb0117000 build-path and compile-timestamp strings differ immediately
+first_text_opcode_diff=main@0xb0101578 rodata-string offset materialization changes first
+data_diff_pattern=initialized pointers rebase from old rodata addresses to shifted candidate rodata addresses
+text_symbol_stability=355/361 single-occurrence text symbols unchanged; only six moved, all metal_* helpers
+refined_category=string-pool plus link-layout drift stronger than substantive control-flow divergence

@@ -1,0 +1,77 @@
+{
+  "date": "2026-03-14",
+  "context": "release_v1.4.0 baseline + STATUS_REQ/RESP + JOB_REQ/JOB_ACK minimal patch",
+  "live_firmware": {
+    "path": "/lib/firmware/openamp_core0.elf",
+    "size": 1640048,
+    "sha256": "98ab501c1e71f9e1d20013a7ccf7ee83c2289a423d08bdb371dbf0171f48647e"
+  },
+  "transport": {
+    "remoteproc_state": "running",
+    "channel": "rpmsg-openamp-demo-channel",
+    "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+    "rpmsg_dev": "/dev/rpmsg0"
+  },
+  "job_req": {
+    "msg_type": 1,
+    "msg_name": "JOB_REQ",
+    "seq": 1,
+    "job_id": 9001,
+    "payload_len": 44,
+    "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+    "deadline_ms": 60000,
+    "expected_outputs": 1,
+    "flags": 3,
+    "flags_name": "smoke",
+    "hex": "4d4f43530100010001000000292300002c000000ad3b27916f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000100000003000000"
+  },
+  "job_ack": {
+    "hex": "4d4f43530100020001000000292300000c00000048b1744d010000000000000002000000",
+    "len": 36,
+    "parsed_header": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 2,
+      "msg_name": "JOB_ACK",
+      "seq": 1,
+      "job_id": 9001,
+      "payload_len": 12,
+      "header_crc32": 1299493192
+    },
+    "payload": {
+      "decision": 1,
+      "decision_name": "ALLOW",
+      "fault_code": 0,
+      "guard_state": 2
+    }
+  },
+  "status_follow_up": {
+    "tx_hex": "4d4f4353010008000200000029230000000000009b060ba2",
+    "rx_hex": "4d4f4353010009000200000029230000180000009d98a9aa020000002923000000000000010000000000000000000000",
+    "len": 48,
+    "parsed_header": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "msg_name": "STATUS_RESP",
+      "seq": 2,
+      "job_id": 9001,
+      "payload_len": 24,
+      "header_crc32": 2863241373
+    },
+    "payload": {
+      "guard_state": 2,
+      "active_job_id": 9001,
+      "last_fault_code": 0,
+      "heartbeat_ok": 1,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    }
+  },
+  "result": {
+    "job_ack_received": true,
+    "decision": "ALLOW",
+    "state_transition_observed": true,
+    "protocol_semantics": "implemented_minimal_job_admission"
+  }
+}

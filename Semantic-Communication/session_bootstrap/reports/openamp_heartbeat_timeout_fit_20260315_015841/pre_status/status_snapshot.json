@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-03-15T02:00:46+0800",
+  "phase": "pre_status",
+  "status": "captured",
+  "guard_state": 1,
+  "active_job_id": 0,
+  "last_fault_code": 0,
+  "heartbeat_ok": 0,
+  "sticky_fault": 0,
+  "total_fault_count": 0
+}

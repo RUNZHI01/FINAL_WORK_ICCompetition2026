@@ -1,0 +1,41 @@
+# RPC Command Templates
+
+- generated_at: 2026-03-01T16:09:04+08:00
+- env_file: /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_armv8.phytium_pi.2026-03-01.env
+
+## 1) Tracker（开发机，builder/orchestrator 侧）
+
+```bash
+/home/user/venv/bin/python -m tvm.exec.rpc_tracker --host "0.0.0.0" --port "9190"
+```
+
+## 2) RPC Server（ARMv8 真机，runner 侧）
+
+```bash
+/home/user/venv/bin/python -m tvm.exec.rpc_server --tracker "10.194.7.123:9190" --key "armv8" --host "0.0.0.0" --port "9090" --port-end "9099"
+```
+
+## 3) Client（开发机，quick/full 触发）
+
+```bash
+bash "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_quick.sh" --env "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_armv8.phytium_pi.2026-03-01.env"
+bash "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_full_placeholder.sh" --env "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_armv8.phytium_pi.2026-03-01.env"
+```
+
+## 4) Client（一键首轮闭环入口）
+
+```bash
+bash "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_rpc_first_round.sh" --env "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_armv8.phytium_pi.2026-03-01.env"
+```
+
+## 5) 当前 env 中的 quick/full payload 命令
+
+```bash
+# quick
+bash ./session_bootstrap/scripts/ssh_with_password.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --pass "$REMOTE_PASS" -- "test -f \"$REMOTE_TVM_PRIMARY_SO\" && test -f \"$REMOTE_TVM_PRIMARY_DB_RECORD\" && test -f \"$REMOTE_TVM_PRIMARY_DB_WORKLOAD\" && \"$REMOTE_TVM_PYTHON\" -c \"import tvm; print(tvm.__version__)\""
+bash ./session_bootstrap/scripts/ssh_with_password.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --pass "$REMOTE_PASS" -- "test -d \"$REMOTE_TVM_ALT_DIR\" && test -f \"$REMOTE_TVM_ALT_SO\" && ls -lh \"$REMOTE_TVM_ALT_SO\""
+
+# full
+bash ./session_bootstrap/scripts/ssh_with_password.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --pass "$REMOTE_PASS" -- "sha256sum \"$REMOTE_TVM_PRIMARY_SO\" \"$REMOTE_TVM_PRIMARY_DB_RECORD\" \"$REMOTE_TVM_PRIMARY_DB_WORKLOAD\""
+bash ./session_bootstrap/scripts/ssh_with_password.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --pass "$REMOTE_PASS" -- "find \"$REMOTE_DOWNLOADS_DIR\" -type f -name \"optimized_model.so\" | sort && echo \"---\" && find \"$REMOTE_DOWNLOADS_DIR\" -type f -name \"database_tuning_record.json\" | sort && find \"$REMOTE_DOWNLOADS_DIR\" -type f -name \"database_workload.json\" | sort"
+```

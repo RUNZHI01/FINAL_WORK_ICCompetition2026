@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-03-15T01:47:41+0800",
+  "phase": "post_status",
+  "status": "captured",
+  "transport_status": "status_resp_received",
+  "protocol_semantics": "implemented",
+  "guard_state": 1,
+  "guard_state_name": "READY",
+  "active_job_id": 0,
+  "last_fault_code": 9,
+  "last_fault_name": "ILLEGAL_PARAM_RANGE",
+  "heartbeat_ok": 0,
+  "sticky_fault": 0,
+  "total_fault_count": 1,
+  "bridge_summary_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/post_status/bridge_summary.json"
+}

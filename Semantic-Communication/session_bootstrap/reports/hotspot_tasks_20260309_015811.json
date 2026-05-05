@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-03-09T01:58:11+0800",
+  "onnx_path": "/home/tianxing/TVM_LAST/finalWork/服务端/jscc-test/jscc/model.onnx",
+  "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"generic\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+  "input_shape": "1,32,32,32",
+  "total_tasks": 3,
+  "top_k": 8,
+  "tasks": [
+    {
+      "rank": 1,
+      "task_name": "mirror_pad1",
+      "weight": 10,
+      "dispatched_count": 1,
+      "prim_funcs": [
+        "main"
+      ],
+      "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"generic\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+    },
+    {
+      "rank": 2,
+      "task_name": "mirror_pad2",
+      "weight": 1,
+      "dispatched_count": 1,
+      "prim_funcs": [
+        "main"
+      ],
+      "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"generic\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+    },
+    {
+      "rank": 3,
+      "task_name": "mirror_pad",
+      "weight": 1,
+      "dispatched_count": 1,
+      "prim_funcs": [
+        "main"
+      ],
+      "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"generic\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+    }
+  ]
+}

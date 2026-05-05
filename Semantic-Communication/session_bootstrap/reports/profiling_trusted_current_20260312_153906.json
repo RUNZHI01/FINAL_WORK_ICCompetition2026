@@ -1,0 +1,266 @@
+{
+  "run_id": "trusted_current_20260312_153906",
+  "mode": "stage_weight_hotspot_analysis",
+  "generated_at": "2026-03-12T15:39:08+0800",
+  "env_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_current_safe.baseline_seeded_warm_start.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env",
+  "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+  "onnx_path": "/home/tianxing/TVM_LAST/finalWork/服务端/jscc-test/jscc/model.onnx",
+  "input_shape": "1,32,32,32",
+  "trusted_target_line": "Phytium Pi current-safe / cortex-a72 + neon",
+  "local_python": "/home/tianxing/.venvs/tvm-ms/bin/python",
+  "runtime_profiling_status": {
+    "status": "not_productized",
+    "note": "The repo has stage-weight hotspot extraction and the TVM VM profile API exists locally, but there is no validated trusted remote per-op profiling wrapper yet. This 5.1 artifact promotes the current stage-weight hotspot path to first-class status.",
+    "local_vm_profile_api_available": true,
+    "local_tvm_version": "0.24.dev0",
+    "local_profiling_report_methods": [
+      "calls",
+      "configuration",
+      "csv",
+      "device_metrics",
+      "from_json",
+      "json",
+      "same_as",
+      "table"
+    ]
+  },
+  "extract_hotspots_stdout": [
+    "task_stage_used_for_recommendation=legalized_fused_tir",
+    "tuned_stage_pipeline=LegalizeOps -> AnnotateTIROpPattern -> FuseOps -> FuseTIR",
+    "total_tasks=33",
+    "raw_import_total_tasks=3",
+    "top_k=8",
+    "recommended_full_hotspot_tasks=reshape2,fused_variance1_add3_tir_sqrt1,reshape1,fused_mean1_subtract1_divide1_multiply1_add4,fused_conv2d1_add2,fused_conv2d2_add2,mirror_pad1,fused_mean1_subtract1_divide1_multiply1_add4_relu",
+    "markdown_report=/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.md",
+    "json_report=/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.json",
+    "task rank=1 name=reshape2 weight=42 dispatched=1 prim_funcs=main",
+    "task rank=2 name=fused_variance1_add3_tir_sqrt1 weight=21 dispatched=1 prim_funcs=main",
+    "task rank=3 name=reshape1 weight=21 dispatched=1 prim_funcs=main",
+    "task rank=4 name=fused_mean1_subtract1_divide1_multiply1_add4 weight=11 dispatched=1 prim_funcs=main",
+    "task rank=5 name=fused_conv2d1_add2 weight=10 dispatched=1 prim_funcs=main",
+    "task rank=6 name=fused_conv2d2_add2 weight=10 dispatched=1 prim_funcs=main",
+    "task rank=7 name=mirror_pad1 weight=10 dispatched=1 prim_funcs=main",
+    "task rank=8 name=fused_mean1_subtract1_divide1_multiply1_add4_relu weight=5 dispatched=1 prim_funcs=main",
+    "raw_import_stage_preview_begin",
+    "raw_task rank=1 name=mirror_pad1 weight=10 dispatched=1 prim_funcs=main",
+    "raw_task rank=2 name=mirror_pad weight=1 dispatched=1 prim_funcs=main",
+    "raw_task rank=3 name=mirror_pad2 weight=1 dispatched=1 prim_funcs=main",
+    "raw_import_stage_preview_end"
+  ],
+  "raw_import_total_tasks": 3,
+  "stage_weight_summary": {
+    "stage_name": "legalized_fused_tir",
+    "total_tasks": 33,
+    "total_weight": 162,
+    "top_k": 8,
+    "top_rows": [
+      {
+        "rank": 1,
+        "task_name": "reshape2",
+        "weight": 42,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "reshape",
+        "weight_share_pct": 25.926,
+        "cumulative_weight_share_pct": 25.926
+      },
+      {
+        "rank": 2,
+        "task_name": "fused_variance1_add3_tir_sqrt1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "norm_stats",
+        "weight_share_pct": 12.963,
+        "cumulative_weight_share_pct": 38.889
+      },
+      {
+        "rank": 3,
+        "task_name": "reshape1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "reshape",
+        "weight_share_pct": 12.963,
+        "cumulative_weight_share_pct": 51.852
+      },
+      {
+        "rank": 4,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4",
+        "weight": 11,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "norm_stats",
+        "weight_share_pct": 6.79,
+        "cumulative_weight_share_pct": 58.642
+      },
+      {
+        "rank": 5,
+        "task_name": "fused_conv2d1_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "conv2d",
+        "weight_share_pct": 6.173,
+        "cumulative_weight_share_pct": 64.815
+      },
+      {
+        "rank": 6,
+        "task_name": "fused_conv2d2_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "conv2d",
+        "weight_share_pct": 6.173,
+        "cumulative_weight_share_pct": 70.988
+      },
+      {
+        "rank": 7,
+        "task_name": "mirror_pad1",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "pad",
+        "weight_share_pct": 6.173,
+        "cumulative_weight_share_pct": 77.16
+      },
+      {
+        "rank": 8,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4_relu",
+        "weight": 5,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "family": "norm_stats",
+        "weight_share_pct": 3.086,
+        "cumulative_weight_share_pct": 80.247
+      }
+    ],
+    "top_k_weight_share_pct": 80.247,
+    "recommended_full_hotspot_tasks": "reshape2,fused_variance1_add3_tir_sqrt1,reshape1,fused_mean1_subtract1_divide1_multiply1_add4,fused_conv2d1_add2,fused_conv2d2_add2,mirror_pad1,fused_mean1_subtract1_divide1_multiply1_add4_relu",
+    "families": [
+      {
+        "family": "reshape",
+        "weight": 75,
+        "weight_share_pct": 46.296,
+        "top_tasks": [
+          "reshape2",
+          "reshape1",
+          "reshape"
+        ]
+      },
+      {
+        "family": "norm_stats",
+        "weight": 50,
+        "weight_share_pct": 30.864,
+        "top_tasks": [
+          "fused_variance1_add3_tir_sqrt1",
+          "fused_mean1_subtract1_divide1_multiply1_add4",
+          "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+        ]
+      },
+      {
+        "family": "conv2d",
+        "weight": 25,
+        "weight_share_pct": 15.432,
+        "top_tasks": [
+          "fused_conv2d1_add2",
+          "fused_conv2d2_add2",
+          "fused_conv2d3_add15"
+        ]
+      },
+      {
+        "family": "pad",
+        "weight": 12,
+        "weight_share_pct": 7.407,
+        "top_tasks": [
+          "mirror_pad1",
+          "mirror_pad",
+          "mirror_pad2"
+        ]
+      }
+    ]
+  },
+  "resource_profile_summary": {
+    "resource_profile_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_trusted_current_20260312_001.json",
+    "run_id": "resource_profile_trusted_current_20260312_001",
+    "wall_time_seconds": 98,
+    "avg_cpu_user_pct": 67.266,
+    "avg_cpu_system_pct": 11.83,
+    "avg_cpu_idle_pct": 20.16,
+    "avg_cpu_wait_pct": 0.83,
+    "avg_runnable": 3.755,
+    "max_runnable": 8,
+    "min_free_kb": 115408,
+    "run_median_ms": 264.912,
+    "run_mean_ms": 268.442,
+    "run_count": 300,
+    "artifact_sha256": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+    "artifact_sha256_match": true,
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ]
+  },
+  "quality_summary": {
+    "quality_report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quality_metrics_20260312_tvm_baseline_vs_tvm_current.json",
+    "run_id": "quality_metrics_20260312_tvm_baseline_vs_tvm_current",
+    "status": "success",
+    "matched_png_count": 300,
+    "psnr_mean_db": 34.529852149146066,
+    "psnr_median_db": 34.60044266656402,
+    "ssim_mean": 0.9704320174669012,
+    "ssim_median": 0.9704312518412365
+  },
+  "reference_comparison": {
+    "reference_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_20260311_0008.json",
+    "same_top_k": true,
+    "reference_top_k": [
+      "reshape2",
+      "fused_variance1_add3_tir_sqrt1",
+      "reshape1",
+      "fused_mean1_subtract1_divide1_multiply1_add4",
+      "fused_conv2d1_add2",
+      "fused_conv2d2_add2",
+      "mirror_pad1",
+      "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+    ],
+    "added_vs_reference": [],
+    "removed_vs_reference": []
+  },
+  "stage_hotspot_markdown": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.md",
+  "stage_hotspot_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.json",
+  "profiling_markdown": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_153906.md",
+  "profiling_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_153906.json",
+  "next_4_2_command": "TUNE_OP_NAMES=reshape2,fused_variance1_add3_tir_sqrt1,reshape1,fused_mean1_subtract1_divide1_multiply1_add4,fused_conv2d1_add2,fused_conv2d2_add2,mirror_pad1,fused_mean1_subtract1_divide1_multiply1_add4_relu \\\nbash ./session_bootstrap/scripts/run_phytium_baseline_seeded_warm_start_current_incremental.sh \\\n  --rebuild-env /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_current_safe.baseline_seeded_warm_start.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env \\\n  --inference-env ./session_bootstrap/config/inference_tvm310_safe.2026-03-10.phytium_pi.env \\\n  --total-trials 2000 \\\n  --report-id \"phytium_baseline_seeded_warm_start_current_incremental_hotspot_$(date +%Y%m%d_%H%M%S)\" \\\n  --repeat 10 \\\n  --warmup-runs 2",
+  "limitations": [
+    "This report uses tuned-stage MetaSchedule weight as a hotspot proxy, not true remote per-op wall time.",
+    "Trusted resource evidence says the current path is compute-heavy, but it does not attribute latency to individual operators.",
+    "Do not lock 7.1 manual TIR targets from reshape-heavy stage weights alone; get runtime or focused micro-benchmark evidence first."
+  ]
+}

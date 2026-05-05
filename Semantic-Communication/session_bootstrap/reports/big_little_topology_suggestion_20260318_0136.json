@@ -1,0 +1,42 @@
+{
+  "status": "ok",
+  "source": "local_parse",
+  "summary": {
+    "architecture": "aarch64",
+    "model_name": "",
+    "cpu_count": "4",
+    "online_cpu_list": "0-2"
+  },
+  "topology": {
+    "online_cpus": [0, 1, 2],
+    "columns": ["CPU", "CORE", "SOCKET", "NODE", "MAXMHZ", "MINMHZ"],
+    "rows": [
+      {"cpu": 0, "core": 0, "socket": 0, "node": null, "online": true, "maxmhz": 1500.0, "minmhz": 187.5, "mhz": null},
+      {"cpu": 1, "core": 1, "socket": 0, "node": null, "online": true, "maxmhz": 1500.0, "minmhz": 187.5, "mhz": null},
+      {"cpu": 2, "core": 2, "socket": 1, "node": null, "online": true, "maxmhz": 1800.0, "minmhz": 225.0, "mhz": null},
+      {"cpu": 3, "core": null, "socket": null, "node": null, "online": false, "maxmhz": 1800.0, "minmhz": 225.0, "mhz": null}
+    ]
+  },
+  "suggestion": {
+    "status": "ok",
+    "confidence": "high",
+    "basis": "maxmhz",
+    "big_cores": [2],
+    "little_cores": [0, 1],
+    "big_cores_env": "2",
+    "little_cores_env": "0,1",
+    "largest_gap_mhz": 300.0,
+    "gap_threshold_mhz": 90.0,
+    "big_values": [1800.0],
+    "little_values": [1500.0],
+    "explanation": "Per-CPU MAXMHZ splits online CPUs into a higher-frequency group 2 and a lower-frequency group 0,1."
+  },
+  "warnings": [],
+  "input": {
+    "input_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/big_little_topology_capture_20260318_0136.txt",
+    "lscpu_path": "",
+    "lscpu_e_path": "",
+    "stdin_used": false,
+    "stdin_kind": "capture"
+  }
+}

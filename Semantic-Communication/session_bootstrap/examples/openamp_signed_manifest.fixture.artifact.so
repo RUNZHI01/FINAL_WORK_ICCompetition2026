@@ -1,0 +1,4 @@
+OPENAMP-SIGNED-FIXTURE-ARTIFACT
+schema=openamp_signed_manifest_fixture
+variant=current
+format=tvm-module-shared-object

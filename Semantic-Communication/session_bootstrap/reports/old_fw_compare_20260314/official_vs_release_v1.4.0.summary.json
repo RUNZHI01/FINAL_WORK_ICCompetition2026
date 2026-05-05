@@ -1,0 +1,436 @@
+{
+  "official": {
+    "path": "session_bootstrap/reports/old_fw_compare_20260314/openamp_core0_official.elf",
+    "size": 1650448,
+    "section_header_offset": 1648976,
+    "sections": {
+      "NULL": {
+        "addr": 0,
+        "offset": 0,
+        "size": 0
+      },
+      ".text": {
+        "addr": 2953838592,
+        "offset": 65536,
+        "size": 92800
+      },
+      ".rodata": {
+        "addr": 2953932800,
+        "offset": 159744,
+        "size": 11217
+      },
+      ".le_shell": {
+        "addr": 2953944064,
+        "offset": 170961,
+        "size": 1024
+      },
+      ".gcc_except_table": {
+        "addr": 2953945088,
+        "offset": 200704,
+        "size": 0
+      },
+      ".data": {
+        "addr": 2953945088,
+        "offset": 172032,
+        "size": 8192
+      },
+      ".bss": {
+        "addr": 2953969664,
+        "offset": 180224,
+        "size": 5606080
+      },
+      ".heap": {
+        "addr": 2959575744,
+        "offset": 180224,
+        "size": 1048576
+      },
+      ".stack": {
+        "addr": 2960624320,
+        "offset": 180224,
+        "size": 4096
+      },
+      ".resource_table": {
+        "addr": 3221225472,
+        "offset": 196608,
+        "size": 4096
+      },
+      ".debug_info": {
+        "addr": 0,
+        "offset": 200704,
+        "size": 365907
+      },
+      ".debug_abbrev": {
+        "addr": 0,
+        "offset": 566611,
+        "size": 64286
+      },
+      ".debug_aranges": {
+        "addr": 0,
+        "offset": 630912,
+        "size": 12544
+      },
+      ".debug_ranges": {
+        "addr": 0,
+        "offset": 643456,
+        "size": 41472
+      },
+      ".debug_macro": {
+        "addr": 0,
+        "offset": 684928,
+        "size": 55857
+      },
+      ".debug_line": {
+        "addr": 0,
+        "offset": 740785,
+        "size": 250634
+      },
+      ".debug_str": {
+        "addr": 0,
+        "offset": 991419,
+        "size": 167645
+      },
+      ".comment": {
+        "addr": 0,
+        "offset": 1159064,
+        "size": 93
+      },
+      ".debug_frame": {
+        "addr": 0,
+        "offset": 1159160,
+        "size": 25640
+      },
+      ".debug_loc": {
+        "addr": 0,
+        "offset": 1184800,
+        "size": 429407
+      },
+      ".symtab": {
+        "addr": 0,
+        "offset": 1614208,
+        "size": 25608
+      },
+      ".strtab": {
+        "addr": 0,
+        "offset": 1639816,
+        "size": 8927
+      },
+      ".shstrtab": {
+        "addr": 0,
+        "offset": 1648743,
+        "size": 233
+      }
+    },
+    "segments": [
+      {
+        "offset": 65536,
+        "vaddr": 2953838592,
+        "paddr": 2953838592,
+        "filesz": 114688,
+        "memsz": 6789824
+      },
+      {
+        "offset": 196608,
+        "vaddr": 3221225472,
+        "paddr": 3221225472,
+        "filesz": 4096,
+        "memsz": 4096
+      }
+    ],
+    "region_hashes": {
+      "load0": {
+        "offset": 65536,
+        "size": 114688,
+        "sha256": "fcca5482c78753e412cd9f849996e98e9092fbe451e9d7896fa16319ba428581"
+      },
+      "load1": {
+        "offset": 196608,
+        "size": 4096,
+        "sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794"
+      },
+      ".text": {
+        "offset": 65536,
+        "size": 92800,
+        "sha256": "9c2773f50deb6705096443054b5deb44f0a0a361ddfaef4de1dd0e0fa102758e"
+      },
+      ".rodata": {
+        "offset": 159744,
+        "size": 11217,
+        "sha256": "2be5ecce03e2de8896f233f5156e471be93b304a689afd0ad0a8a0b2d3ca9fc1"
+      },
+      ".data": {
+        "offset": 172032,
+        "size": 8192,
+        "sha256": "7e2c039d4a5f3e437ed6c1edcd76d21cf38901ef8c5068cb27011d678b3fcf92"
+      },
+      ".resource_table": {
+        "offset": 196608,
+        "size": 4096,
+        "sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794"
+      }
+    },
+    "debug_total": 1413392,
+    "metadata_total": 34861,
+    "runtime_file_resident_total": 116305
+  },
+  "candidate": {
+    "path": "/home/user/phytium-dev/release_v1.4.0/example/system/amp/openamp_for_linux/phytiumpi_aarch64_firefly_openamp_core0.elf",
+    "size": 1627224,
+    "section_header_offset": 1625560,
+    "sections": {
+      "NULL": {
+        "addr": 0,
+        "offset": 0,
+        "size": 0
+      },
+      ".text": {
+        "addr": 2953838592,
+        "offset": 65536,
+        "size": 92800
+      },
+      ".end_text": {
+        "addr": 2953931392,
+        "offset": 158336,
+        "size": 1408
+      },
+      ".rodata": {
+        "addr": 2953932800,
+        "offset": 159744,
+        "size": 10801
+      },
+      ".end_rodata": {
+        "addr": 2953943601,
+        "offset": 170545,
+        "size": 1487
+      },
+      ".le_shell": {
+        "addr": 2953945088,
+        "offset": 200704,
+        "size": 0
+      },
+      ".gcc_except_table": {
+        "addr": 2953945088,
+        "offset": 200704,
+        "size": 0
+      },
+      ".data": {
+        "addr": 2953945088,
+        "offset": 172032,
+        "size": 8192
+      },
+      ".bss": {
+        "addr": 2953969664,
+        "offset": 180224,
+        "size": 5606080
+      },
+      ".heap": {
+        "addr": 2959575744,
+        "offset": 180224,
+        "size": 1048576
+      },
+      ".stack": {
+        "addr": 2960624320,
+        "offset": 180224,
+        "size": 4096
+      },
+      ".end_ram": {
+        "addr": 2960628416,
+        "offset": 180224,
+        "size": 1344
+      },
+      ".resource_table": {
+        "addr": 3221225472,
+        "offset": 196608,
+        "size": 4096
+      },
+      ".debug_info": {
+        "addr": 0,
+        "offset": 200704,
+        "size": 365907
+      },
+      ".debug_abbrev": {
+        "addr": 0,
+        "offset": 566611,
+        "size": 64286
+      },
+      ".debug_aranges": {
+        "addr": 0,
+        "offset": 630912,
+        "size": 12544
+      },
+      ".debug_ranges": {
+        "addr": 0,
+        "offset": 643456,
+        "size": 41472
+      },
+      ".debug_macro": {
+        "addr": 0,
+        "offset": 684928,
+        "size": 55974
+      },
+      ".debug_line": {
+        "addr": 0,
+        "offset": 740902,
+        "size": 228447
+      },
+      ".debug_str": {
+        "addr": 0,
+        "offset": 969349,
+        "size": 166196
+      },
+      ".comment": {
+        "addr": 0,
+        "offset": 1135545,
+        "size": 93
+      },
+      ".debug_frame": {
+        "addr": 0,
+        "offset": 1135640,
+        "size": 25640
+      },
+      ".debug_loc": {
+        "addr": 0,
+        "offset": 1161280,
+        "size": 429407
+      },
+      ".symtab": {
+        "addr": 0,
+        "offset": 1590688,
+        "size": 25680
+      },
+      ".strtab": {
+        "addr": 0,
+        "offset": 1616368,
+        "size": 8927
+      },
+      ".shstrtab": {
+        "addr": 0,
+        "offset": 1625295,
+        "size": 264
+      }
+    },
+    "segments": [
+      {
+        "offset": 65536,
+        "vaddr": 2953838592,
+        "paddr": 2953838592,
+        "filesz": 114688,
+        "memsz": 6791168
+      },
+      {
+        "offset": 196608,
+        "vaddr": 3221225472,
+        "paddr": 3221225472,
+        "filesz": 4096,
+        "memsz": 4096
+      }
+    ],
+    "region_hashes": {
+      "load0": {
+        "offset": 65536,
+        "size": 114688,
+        "sha256": "80aecca80e44afac452809dbc8297b73601103a24e0bebd501023c8cadcdbc76"
+      },
+      "load1": {
+        "offset": 196608,
+        "size": 4096,
+        "sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794"
+      },
+      ".text": {
+        "offset": 65536,
+        "size": 92800,
+        "sha256": "db5ffe9be8c8b673a3090e12e04f89501cd12f766bf28c54172253083b531db2"
+      },
+      ".rodata": {
+        "offset": 159744,
+        "size": 11217,
+        "sha256": "27694ee5d1810ba5b56b5180effa53c6f6a2eb3551cb40e79e2c0a5858dd52e4"
+      },
+      ".data": {
+        "offset": 172032,
+        "size": 8192,
+        "sha256": "77863a0402a83183118fb7d03afa213dbdd58ca851961336aa750b453c72589a"
+      },
+      ".resource_table": {
+        "offset": 196608,
+        "size": 4096,
+        "sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794"
+      }
+    },
+    "debug_total": 1389873,
+    "metadata_total": 34964,
+    "runtime_file_resident_total": 115889
+  },
+  "size_delta": 23224,
+  "differences": [
+    {
+      "name": ".debug_line",
+      "official_size": 250634,
+      "candidate_size": 228447,
+      "delta_official_minus_candidate": 22187,
+      "bucket": "debug"
+    },
+    {
+      "name": ".debug_macro",
+      "official_size": 55857,
+      "candidate_size": 55974,
+      "delta_official_minus_candidate": -117,
+      "bucket": "debug"
+    },
+    {
+      "name": ".debug_str",
+      "official_size": 167645,
+      "candidate_size": 166196,
+      "delta_official_minus_candidate": 1449,
+      "bucket": "debug"
+    },
+    {
+      "name": ".end_ram",
+      "official_size": 0,
+      "candidate_size": 1344,
+      "delta_official_minus_candidate": -1344,
+      "bucket": "alloc_or_nobits"
+    },
+    {
+      "name": ".end_rodata",
+      "official_size": 0,
+      "candidate_size": 1487,
+      "delta_official_minus_candidate": -1487,
+      "bucket": "alloc_or_nobits"
+    },
+    {
+      "name": ".end_text",
+      "official_size": 0,
+      "candidate_size": 1408,
+      "delta_official_minus_candidate": -1408,
+      "bucket": "alloc_or_nobits"
+    },
+    {
+      "name": ".le_shell",
+      "official_size": 1024,
+      "candidate_size": 0,
+      "delta_official_minus_candidate": 1024,
+      "bucket": "alloc_or_nobits"
+    },
+    {
+      "name": ".rodata",
+      "official_size": 11217,
+      "candidate_size": 10801,
+      "delta_official_minus_candidate": 416,
+      "bucket": "alloc_or_nobits"
+    },
+    {
+      "name": ".shstrtab",
+      "official_size": 233,
+      "candidate_size": 264,
+      "delta_official_minus_candidate": -31,
+      "bucket": "metadata"
+    },
+    {
+      "name": ".symtab",
+      "official_size": 25608,
+      "candidate_size": 25680,
+      "delta_official_minus_candidate": -72,
+      "bucket": "metadata"
+    }
+  ]
+}

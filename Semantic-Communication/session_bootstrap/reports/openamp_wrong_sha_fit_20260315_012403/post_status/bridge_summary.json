@@ -1,0 +1,83 @@
+{
+  "phase": "STATUS_REQ",
+  "transport_status": "status_resp_received",
+  "protocol_semantics": "implemented",
+  "note": "Received a decodable STATUS_RESP frame.",
+  "tx_frame": {
+    "raw_len": 24,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 8,
+    "msg_name": "STATUS_REQ",
+    "seq": 2,
+    "job_id": 9301,
+    "payload_len": 0,
+    "header_crc32": 2622733514,
+    "expected_header_crc32": 2622733514,
+    "payload_hex": ""
+  },
+  "rx_frame": {
+    "raw_len": 48,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 9,
+    "msg_name": "STATUS_RESP",
+    "seq": 2,
+    "job_id": 9301,
+    "payload_len": 24,
+    "header_crc32": 2498831052,
+    "expected_header_crc32": 2498831052,
+    "payload_hex": "010000000000000001000000000000000000000001000000",
+    "status_resp": {
+      "payload_len": 24,
+      "parsed": true,
+      "guard_state": 1,
+      "guard_state_name": "READY",
+      "active_job_id": 0,
+      "last_fault_code": 1,
+      "last_fault_name": "ARTIFACT_SHA_MISMATCH",
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  },
+  "generated_at": "2026-03-15T01:24:35+0800",
+  "job_id": 9301,
+  "seq": 2,
+  "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+  "rpmsg_dev": "/dev/rpmsg0",
+  "device_status": {
+    "rpmsg_ctrl": {
+      "path": "/dev/rpmsg_ctrl0",
+      "exists": true,
+      "used_for": "presence_check_only_in_phase5_prep"
+    },
+    "rpmsg_dev": {
+      "path": "/dev/rpmsg0",
+      "exists": true,
+      "used_for": "read_write_transport"
+    },
+    "require_devices": true
+  },
+  "bridge_mode": "direct",
+  "hook_event_phase": null,
+  "hook_event_payload": null,
+  "written_bytes": 24,
+  "drained_bytes_hex": "",
+  "rx_bytes_hex": "4d4f435301000900020000005524000018000000cc22f194010000000000000001000000000000000000000001000000",
+  "output_dir": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status",
+  "artifact_paths": {
+    "stdin_event": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/stdin_event.json",
+    "tx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_req_tx.bin",
+    "tx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_req_tx.hex",
+    "tx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_req_tx.json",
+    "rx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_resp_or_echo_rx.bin",
+    "rx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_resp_or_echo_rx.hex",
+    "rx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/status_resp_or_echo_rx.json",
+    "summary": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/bridge_summary.json"
+  }
+}

@@ -1,0 +1,4 @@
+rank,task,baseline_avg_ms,current_avg_ms,delta_ms_current_minus_baseline,improvement_pct
+1,conv2d_nchw_1,4.257,3.053,-1.204,28.28
+2,dense_1,3.518,2.859,-0.659,18.73
+3,layernorm_1,3.419,2.930,-0.489,14.30

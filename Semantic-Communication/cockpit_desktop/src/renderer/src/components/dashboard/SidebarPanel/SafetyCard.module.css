@@ -1,0 +1,23 @@
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.statusText {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.noteText {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}

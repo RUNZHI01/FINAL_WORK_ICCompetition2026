@@ -1,0 +1,18 @@
+{
+  "created_at": "2026-03-15T01:45:47+0800",
+  "job_id": 9302,
+  "variant": "invalid_expected_outputs_fit",
+  "job_flags": "smoke",
+  "runner_cmd": "touch '/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/runner_should_not_run.txt'",
+  "runner_cmd_shell_quoted": "bash -lc 'touch '\"'\"'/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/runner_should_not_run.txt'\"'\"''",
+  "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "expected_outputs": 2,
+  "deadline_ms": 60000,
+  "heartbeat_interval_sec": 5.0,
+  "runner_timeout_sec": 0.0,
+  "transport": "hook",
+  "control_hook_cmd": "python3 ./session_bootstrap/scripts/openamp_wrong_sha_fit_hook.py --output-root /tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/hook --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0",
+  "dry_run": false,
+  "output_dir": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper",
+  "boundary_note": "control plane only; the wrapped runner remains the existing inference data path"
+}

@@ -1,0 +1,63 @@
+{
+  "generated_at_utc": "2026-04-05T18:30:00Z",
+  "operator": "fused_conv2d_transpose1_add9",
+  "phase": "scheduled_form_candidate_v10_local_proof",
+  "working_copy_role": "editable_scheduled_form_candidate_v10_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v10_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v7.py",
+    "candidate_version": "v7_working_copy",
+    "status": "v7_dc0_slice_staging_on_top_of_v6_applied",
+    "remote_report": "./session_bootstrap/reports/transpose1_v7_remote_benchmark_20260402_182039.md",
+    "remote_median_ms": 156.785
+  },
+  "current_edit_state": {
+    "status": "v10_disjoint_second_h1_consumer_buffer_local_proof_failed_against_v7",
+    "working_copy_tir_sha256": "3ec1d541efaebaaf99bffd10e0635771967a1b3bb251738612e73847677e768d",
+    "concrete_change": "Keep v7's one-h_1-at-a-time 34 x 10 stripe, one dc_0 4-channel slice staging, and c_1-before-w_1 reuse intact, but store the seam rows after h_1 == 0 and materialize h_1 == 1 into a disjoint current buffer that compute_update consumes directly instead of rewriting the shared data_pad rows in place.",
+    "preserved_non_changes": [
+      "data_dilate remains materialized",
+      "the shared data_pad path remains intact for h_1 == 0",
+      "kernel_transform remains materialized",
+      "the bias-fused compute_init/compute_update path remains intact",
+      "the accepted P2 output-channel tiling remains c_1 x c_3 = 3 x 8",
+      "the accepted P4 pragma_auto_unroll_max_step remains 64",
+      "the winning v7 34 x 10 h_1 stripe remains intact",
+      "the winning v7 one dc_0 4-channel slice at a time remains intact",
+      "the winning c_1-before-w_1 consumer family remains intact for each staged slice",
+      "the dropped v8 single-input-channel slice branch remains closed",
+      "the failed v9 shared-data_pad writeback carry branch remains closed"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "leading_v7_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v7_working_copy_tir.py",
+    "leading_v7_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v7_working_copy_manifest.json",
+    "failed_v9_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v9_working_copy_tir.py",
+    "failed_v9_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v9_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v10_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v10_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the current winning v7 staged-reuse candidate rather than from the failed shared-writeback v9 branch.",
+    "The disjoint seam-buffer diagnostic showed that the second h_1 stripe matches v7 exactly before compute_update when the consumer-facing current stripe is materialized in a disjoint buffer.",
+    "This v10 candidate promotes that exact idea into checked-in scheduled TIR so the full local correctness and build path can be exercised.",
+    "The first full local proof on 2026-04-06 still failed against v7 with max_abs_diff = 18.509618759155273 and nonzero_diff_count = 12288, even though the post-db swap/build/export path succeeded."
+  ]
+}

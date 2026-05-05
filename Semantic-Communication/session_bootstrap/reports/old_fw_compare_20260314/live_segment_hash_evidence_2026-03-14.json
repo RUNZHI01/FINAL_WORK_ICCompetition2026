@@ -1,0 +1,62 @@
+{
+  "date": "2026-03-14",
+  "purpose": "Durable later-session live evidence for the OpenAMP firmware delta classification report.",
+  "official_elf": {
+    "path": "session_bootstrap/reports/old_fw_compare_20260314/openamp_core0_official.elf",
+    "size": 1650448
+  },
+  "candidate": {
+    "label": "release_v1.4.0",
+    "size": 1627224
+  },
+  "size_delta": 23224,
+  "pt_load_filesz": {
+    "load0": {
+      "official": 114688,
+      "candidate": 114688,
+      "match": true
+    },
+    "load1": {
+      "official": 4096,
+      "candidate": 4096,
+      "match": true
+    }
+  },
+  "resource_table": {
+    "size": 4096,
+    "official_sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794",
+    "candidate_sha256": "1b2083096dcd01a3a0855015c37b7e6d50dc71f4336d5c68d7c99236ff379794",
+    "match": true
+  },
+  "runtime_regions": {
+    "load0": {
+      "size": 114688,
+      "official_sha256": "fcca5482c78753e412cd9f849996e98e9092fbe451e9d7896fa16319ba428581",
+      "candidate_sha256": "80aecca80e44afac452809dbc8297b73601103a24e0bebd501023c8cadcdbc76",
+      "match": false
+    },
+    ".text": {
+      "size": 92800,
+      "official_sha256": "9c2773f50deb6705096443054b5deb44f0a0a361ddfaef4de1dd0e0fa102758e",
+      "candidate_sha256": "db5ffe9be8c8b673a3090e12e04f89501cd12f766bf28c54172253083b531db2",
+      "match": false
+    },
+    ".data": {
+      "size": 8192,
+      "official_sha256": "7e2c039d4a5f3e437ed6c1edcd76d21cf38901ef8c5068cb27011d678b3fcf92",
+      "candidate_sha256": "77863a0402a83183118fb7d03afa213dbdd58ca851961336aa750b453c72589a",
+      "match": false
+    },
+    ".rodata": {
+      "official_size": 11217,
+      "candidate_size": 10801,
+      "official_sha256": "2be5ecce03e2de8896f233f5156e471be93b304a689afd0ad0a8a0b2d3ca9fc1",
+      "candidate_sha256": "a1f065414f8d2f5e941ecd40f68dc9abc5cc95be801e855447924334a71eb6ad",
+      "match": false
+    }
+  },
+  "refined_conclusion": [
+    "The remaining 23224-byte file-size gap is still much more consistent with debug or other non-loadable metadata than with a large runtime/resource layout mismatch.",
+    "release_v1.4.0 is not byte-identical in runtime payload because load0, .text, .data, and .rodata still differ even though PT_LOAD sizes align and resource_table matches exactly."
+  ]
+}

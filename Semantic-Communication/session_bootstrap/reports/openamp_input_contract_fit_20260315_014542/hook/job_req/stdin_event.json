@@ -1,0 +1,12 @@
+{
+  "at": "2026-03-15T01:45:48+0800",
+  "phase": "JOB_REQ",
+  "payload": {
+    "job_id": 9302,
+    "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+    "deadline_ms": 60000,
+    "expected_outputs": 2,
+    "job_flags": "smoke",
+    "runner_cmd": "touch '/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_input_contract_fit_20260315_014542/wrapper/runner_should_not_run.txt'"
+  }
+}

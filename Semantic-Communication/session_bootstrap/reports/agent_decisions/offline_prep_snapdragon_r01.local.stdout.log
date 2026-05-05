@@ -1,0 +1,10 @@
+[2026-03-02T00:12:26+08:00] step=readiness start
+[2026-03-02T00:12:26+08:00] step=readiness success
+[2026-03-02T00:12:26+08:00] step=quick start
+[2026-03-02T00:12:29+08:00] step=quick success
+[2026-03-02T00:12:29+08:00] step=daily start
+[2026-03-02T00:12:29+08:00] step=daily success
+[2026-03-02T00:12:29+08:00] summary_file=/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/auto_round_summary_20260302_001226.md
+[2026-03-02T00:12:29+08:00] run_env=/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/config/agent_loops/offline_prep_snapdragon_working.run_20260302_001226.env
+[2026-03-02T00:12:29+08:00] daily_report=/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/daily_rpc_smoke_first_round_20260302_001226.md
+[2026-03-02T00:12:29+08:00] auto round completed successfully

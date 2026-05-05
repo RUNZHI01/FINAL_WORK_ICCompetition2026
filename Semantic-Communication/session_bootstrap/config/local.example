@@ -1,0 +1,43 @@
+# 本地配置示例（full 流程已接入可执行命令模板）
+# 使用方式：
+# 1) cp ./session_bootstrap/config/local.example ./session_bootstrap/config/local.env
+# 2) 按机器环境替换模型/target/命令
+
+PROJECT_NAME=tvm_metaschedule_session
+MODEL_NAME=example_model
+TARGET=llvm
+SHAPE_BUCKETS=64,128
+THREADS=4
+DEVICE_KEY=local
+RPC_TRACKER_HOST=
+RPC_TRACKER_PORT=9190
+TVM_PYTHON=
+TUNING_DB_DIR=./session_bootstrap/tmp/local_db
+LOG_DIR=./session_bootstrap/logs
+REPORT_DIR=./session_bootstrap/reports
+
+# quick 模式（可选）
+QUICK_REPEAT=2
+QUICK_TIMEOUT_SEC=20
+QUICK_BASELINE_CMD='echo "replace QUICK_BASELINE_CMD with real command" && sleep 0.02'
+QUICK_CURRENT_CMD='echo "replace QUICK_CURRENT_CMD with real command" && sleep 0.01'
+
+# full 模式低预算模板（可替换变量）
+FULL_TIMEOUT_SEC=120
+FULL_HOTSPOT_TASKS=conv2d_nchw_1,dense_1,layernorm_1
+FULL_TRIALS_PER_TASK=1
+FULL_BASELINE_WORK_UNITS=24
+FULL_CURRENT_WORK_UNITS=12
+FULL_RUNNER_SCRIPT=./session_bootstrap/scripts/run_hotspot_micro_benchmark.sh
+FULL_BASELINE_CMD='bash "$FULL_RUNNER_SCRIPT" --label baseline --hotspots "$FULL_HOTSPOT_TASKS" --trials-per-task "$FULL_TRIALS_PER_TASK" --work-units "$FULL_BASELINE_WORK_UNITS" --db-dir "$TUNING_DB_DIR/full_hotspot_runs"'
+FULL_CURRENT_CMD='bash "$FULL_RUNNER_SCRIPT" --label current --hotspots "$FULL_HOTSPOT_TASKS" --trials-per-task "$FULL_TRIALS_PER_TASK" --work-units "$FULL_CURRENT_WORK_UNITS" --db-dir "$TUNING_DB_DIR/full_hotspot_runs"'
+FULL_NOTES='low-budget hotspot validation template'
+
+# 可选：指定执行 ID，空则按时间生成
+EXECUTION_ID=
+FULL_EXECUTION_ID=full_low_budget_template
+
+# summarize_to_daily.sh 可选字段
+DAILY_OWNER=
+DAILY_SINGLE_CHANGE='wire full to executable hotspot payload command'
+DAILY_NEXT_CHANGE='replace dd payload with real TVM hotspot command'

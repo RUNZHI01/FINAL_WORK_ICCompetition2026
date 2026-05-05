@@ -1,0 +1,117 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+postreboot_state_before_setenv=offline
+fw_size=1650448 fw_mtime=2026-03-14 15:56:49.271513249 +0800
+a855b5681e2ac2e64f0c6ea17628ed502e302c6140bab479c3eb6f708e103835  /lib/firmware/openamp_core0.elf
+restore_set_env_rc=0
+[sudo] user 的密码： restore_devnodes_rc=2
+ls: 无法访问 '/dev/rpmsg0': 没有那个文件或目录
+crw------- 1 root root 238, 0 3月  14 16:11 /dev/rpmsg_ctrl0
+restore_demo_rc=0
+received message: Hello World! No:1
+received message: Hello World! No:2
+received message: Hello World! No:3
+received message: Hello World! No:4
+received message: Hello World! No:5
+received message: Hello World! No:6
+received message: Hello World! No:7
+received message: Hello World! No:8
+received message: Hello World! No:9
+received message: Hello World! No:10
+received message: Hello World! No:11
+received message: Hello World! No:12
+received message: Hello World! No:13
+received message: Hello World! No:14
+received message: Hello World! No:15
+received message: Hello World! No:16
+received message: Hello World! No:17
+received message: Hello World! No:18
+received message: Hello World! No:19
+received message: Hello World! No:20
+received message: Hello World! No:21
+received message: Hello World! No:22
+received message: Hello World! No:23
+received message: Hello World! No:24
+received message: Hello World! No:25
+received message: Hello World! No:26
+received message: Hello World! No:27
+received message: Hello World! No:28
+received message: Hello World! No:29
+received message: Hello World! No:30
+received message: Hello World! No:31
+received message: Hello World! No:32
+received message: Hello World! No:33
+received message: Hello World! No:34
+received message: Hello World! No:35
+received message: Hello World! No:36
+received message: Hello World! No:37
+received message: Hello World! No:38
+received message: Hello World! No:39
+received message: Hello World! No:40
+received message: Hello World! No:41
+received message: Hello World! No:42
+received message: Hello World! No:43
+received message: Hello World! No:44
+received message: Hello World! No:45
+received message: Hello World! No:46
+received message: Hello World! No:47
+received message: Hello World! No:48
+received message: Hello World! No:49
+received message: Hello World! No:50
+received message: Hello World! No:51
+received message: Hello World! No:52
+received message: Hello World! No:53
+received message: Hello World! No:54
+received message: Hello World! No:55
+received message: Hello World! No:56
+received message: Hello World! No:57
+received message: Hello World! No:58
+received message: Hello World! No:59
+received message: Hello World! No:60
+received message: Hello World! No:61
+received message: Hello World! No:62
+received message: Hello World! No:63
+received message: Hello World! No:64
+received message: Hello World! No:65
+received message: Hello World! No:66
+received message: Hello World! No:67
+received message: Hello World! No:68
+received message: Hello World! No:69
+received message: Hello World! No:70
+received message: Hello World! No:71
+received message: Hello World! No:72
+received message: Hello World! No:73
+received message: Hello World! No:74
+received message: Hello World! No:75
+received message: Hello World! No:76
+received message: Hello World! No:77
+received message: Hello World! No:78
+received message: Hello World! No:79
+received message: Hello World! No:80
+received message: Hello World! No:81
+received message: Hello World! No:82
+received message: Hello World! No:83
+received message: Hello World! No:84
+received message: Hello World! No:85
+received message: Hello World! No:86
+received message: Hello World! No:87
+received message: Hello World! No:88
+received message: Hello World! No:89
+received message: Hello World! No:90
+received message: Hello World! No:91
+received message: Hello World! No:92
+received message: Hello World! No:93
+received message: Hello World! No:94
+received message: Hello World! No:95
+received message: Hello World! No:96
+received message: Hello World! No:97
+received message: Hello World! No:98
+received message: Hello World! No:99
+received message: Hello World! No:100
+postreboot_final_state=running
+349:[    2.609069] remoteproc remoteproc0: homo_rproc is available
+492:[  146.466694] remoteproc remoteproc0: powering up homo_rproc
+493:[  146.473437] remoteproc remoteproc0: Booting fw image openamp_core0.elf, size 1650448
+496:[  146.659223] virtio_rpmsg_bus virtio0: rpmsg host is online
+497:[  146.671593]  remoteproc0#vdev0buffer: registered virtio0 (type 7)
+498:[  146.677884] remoteproc remoteproc0: remote processor homo_rproc is now up
+499:[  146.796335] virtio_rpmsg_bus virtio0: creating channel rpmsg-openamp-demo-channel addr 0x0

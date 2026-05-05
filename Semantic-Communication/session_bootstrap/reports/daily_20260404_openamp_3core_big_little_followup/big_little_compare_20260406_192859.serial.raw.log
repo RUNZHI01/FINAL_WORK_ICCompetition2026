@@ -1,0 +1,644 @@
+[current-real] variant=current artifact=/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so output_dir=/home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current snr=10 batch_size=1 python=env OMP_NUM_THREADS=3 TVM_NUM_THREADS=3 TVM_FFI_DISABLE_TORCH_C_DLPACK=1 LD_LIBRARY_PATH=/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages/tvm_ffi/lib:/home/user/tvm_samegen_safe_20260309/build TVM_LIBRARY_PATH=/home/user/tvm_samegen_safe_20260309/build PYTHONPATH=/home/user/tvm_samegen_20260307/python:/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages:/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages /home/user/anaconda3/envs/tvm310_safe/bin/python
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m2", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "pynq", "mattr": ["+neon"], "mtriple": "armv7a-linux-eabi"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "apple-m1", "mtriple": "arm64-apple-macos"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "armv8l-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2711", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "cortex-a78", "mtriple": "aarch64-linux-gnu", "num-cores": 12} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "ultra96", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 6} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "thunderx", "mattr": ["+neon", "+crc", "+lse"], "mcpu": "thunderxt88", "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "rk3399", "mattr": ["+neon"], "mtriple": "aarch64-linux-gnu"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mcpu": "carmel", "mtriple": "aarch64-linux-gnu", "num-cores": 8} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "bcm2837", "mattr": ["+neon"], "mtriple": "armv7l-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "stm32mp1", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a7", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "kirin970", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "mattr": ["+neon"], "mcpu": "cortex-a72", "mtriple": "aarch64-linux-gnu", "num-cores": 4} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "snapdragon835", "mattr": ["+neon"], "mtriple": "arm64-linux-android"} without LLVM support.
+[19:29:10] /home/user/tvm_samegen_20260307/src/target/canonicalizer/llvm/arm_aprofile.cc:123: Warning: Cannot parse Arm(R)-based target features for target {"kind": "llvm", "keys": ["arm_cpu", "cpu"], "device": "arm_cpu", "model": "beagleai", "mattr": ["+neon", "+vfp4", "+thumb2"], "mcpu": "cortex-a15", "mtriple": "armv7a-linux-gnueabihf"} without LLVM support.
+2026-04-06 19:29:11,973 - INFO - TVM 模型加载成功
+2026-04-06 19:29:12,395 - INFO - 批量推理时间（1 个样本）: 0.421711 秒
+2026-04-06 19:29:12,396 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000208_recon.png
+2026-04-06 19:29:12,751 - INFO - 批量推理时间（1 个样本）: 0.354594 秒
+2026-04-06 19:29:12,751 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000209_recon.png
+2026-04-06 19:29:13,091 - INFO - 批量推理时间（1 个样本）: 0.339289 秒
+2026-04-06 19:29:13,091 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000210_recon.png
+2026-04-06 19:29:13,426 - INFO - 批量推理时间（1 个样本）: 0.334779 秒
+2026-04-06 19:29:13,427 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000211_recon.png
+2026-04-06 19:29:13,777 - INFO - 批量推理时间（1 个样本）: 0.349511 秒
+2026-04-06 19:29:13,778 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000212_recon.png
+2026-04-06 19:29:14,131 - INFO - 批量推理时间（1 个样本）: 0.352601 秒
+2026-04-06 19:29:14,131 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000213_recon.png
+2026-04-06 19:29:14,471 - INFO - 批量推理时间（1 个样本）: 0.338949 秒
+2026-04-06 19:29:14,471 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000214_recon.png
+2026-04-06 19:29:14,788 - INFO - 批量推理时间（1 个样本）: 0.316346 秒
+2026-04-06 19:29:14,788 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000215_recon.png
+2026-04-06 19:29:15,140 - INFO - 批量推理时间（1 个样本）: 0.351341 秒
+2026-04-06 19:29:15,140 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000216_recon.png
+2026-04-06 19:29:15,488 - INFO - 批量推理时间（1 个样本）: 0.346855 秒
+2026-04-06 19:29:15,488 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000217_recon.png
+2026-04-06 19:29:15,834 - INFO - 批量推理时间（1 个样本）: 0.345787 秒
+2026-04-06 19:29:15,834 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000218_recon.png
+2026-04-06 19:29:16,200 - INFO - 批量推理时间（1 个样本）: 0.364621 秒
+2026-04-06 19:29:16,200 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000219_recon.png
+2026-04-06 19:29:16,558 - INFO - 批量推理时间（1 个样本）: 0.357281 秒
+2026-04-06 19:29:16,558 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000220_recon.png
+2026-04-06 19:29:16,901 - INFO - 批量推理时间（1 个样本）: 0.342425 秒
+2026-04-06 19:29:16,902 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000221_recon.png
+2026-04-06 19:29:17,245 - INFO - 批量推理时间（1 个样本）: 0.343123 秒
+2026-04-06 19:29:17,245 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000222_recon.png
+2026-04-06 19:29:17,595 - INFO - 批量推理时间（1 个样本）: 0.349272 秒
+2026-04-06 19:29:17,596 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000223_recon.png
+2026-04-06 19:29:17,943 - INFO - 批量推理时间（1 个样本）: 0.347548 秒
+2026-04-06 19:29:17,944 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000224_recon.png
+2026-04-06 19:29:18,301 - INFO - 批量推理时间（1 个样本）: 0.356621 秒
+2026-04-06 19:29:18,302 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000225_recon.png
+2026-04-06 19:29:18,636 - INFO - 批量推理时间（1 个样本）: 0.334003 秒
+2026-04-06 19:29:18,636 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000226_recon.png
+2026-04-06 19:29:19,010 - INFO - 批量推理时间（1 个样本）: 0.372759 秒
+2026-04-06 19:29:19,010 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000227_recon.png
+2026-04-06 19:29:19,343 - INFO - 批量推理时间（1 个样本）: 0.332711 秒
+2026-04-06 19:29:19,343 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000228_recon.png
+2026-04-06 19:29:19,699 - INFO - 批量推理时间（1 个样本）: 0.354988 秒
+2026-04-06 19:29:19,700 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000229_recon.png
+2026-04-06 19:29:20,061 - INFO - 批量推理时间（1 个样本）: 0.361375 秒
+2026-04-06 19:29:20,062 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000230_recon.png
+2026-04-06 19:29:20,418 - INFO - 批量推理时间（1 个样本）: 0.355844 秒
+2026-04-06 19:29:20,419 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000231_recon.png
+2026-04-06 19:29:20,764 - INFO - 批量推理时间（1 个样本）: 0.345203 秒
+2026-04-06 19:29:20,764 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000232_recon.png
+2026-04-06 19:29:21,098 - INFO - 批量推理时间（1 个样本）: 0.332512 秒
+2026-04-06 19:29:21,098 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000233_recon.png
+2026-04-06 19:29:21,457 - INFO - 批量推理时间（1 个样本）: 0.358788 秒
+2026-04-06 19:29:21,457 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000234_recon.png
+2026-04-06 19:29:21,778 - INFO - 批量推理时间（1 个样本）: 0.320199 秒
+2026-04-06 19:29:21,779 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000235_recon.png
+2026-04-06 19:29:22,109 - INFO - 批量推理时间（1 个样本）: 0.330050 秒
+2026-04-06 19:29:22,109 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000236_recon.png
+2026-04-06 19:29:22,458 - INFO - 批量推理时间（1 个样本）: 0.348172 秒
+2026-04-06 19:29:22,459 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000237_recon.png
+2026-04-06 19:29:22,823 - INFO - 批量推理时间（1 个样本）: 0.364250 秒
+2026-04-06 19:29:22,824 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000238_recon.png
+2026-04-06 19:29:23,170 - INFO - 批量推理时间（1 个样本）: 0.345460 秒
+2026-04-06 19:29:23,170 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000239_recon.png
+2026-04-06 19:29:23,515 - INFO - 批量推理时间（1 个样本）: 0.344759 秒
+2026-04-06 19:29:23,516 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000240_recon.png
+2026-04-06 19:29:23,854 - INFO - 批量推理时间（1 个样本）: 0.337377 秒
+2026-04-06 19:29:23,854 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000241_recon.png
+2026-04-06 19:29:24,202 - INFO - 批量推理时间（1 个样本）: 0.347667 秒
+2026-04-06 19:29:24,203 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000242_recon.png
+2026-04-06 19:29:24,563 - INFO - 批量推理时间（1 个样本）: 0.359344 秒
+2026-04-06 19:29:24,563 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000243_recon.png
+2026-04-06 19:29:24,930 - INFO - 批量推理时间（1 个样本）: 0.366350 秒
+2026-04-06 19:29:24,930 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000244_recon.png
+2026-04-06 19:29:25,289 - INFO - 批量推理时间（1 个样本）: 0.357962 秒
+2026-04-06 19:29:25,289 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000245_recon.png
+2026-04-06 19:29:25,637 - INFO - 批量推理时间（1 个样本）: 0.347532 秒
+2026-04-06 19:29:25,637 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000246_recon.png
+2026-04-06 19:29:25,997 - INFO - 批量推理时间（1 个样本）: 0.358989 秒
+2026-04-06 19:29:25,998 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000247_recon.png
+2026-04-06 19:29:26,351 - INFO - 批量推理时间（1 个样本）: 0.352874 秒
+2026-04-06 19:29:26,351 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000248_recon.png
+2026-04-06 19:29:26,717 - INFO - 批量推理时间（1 个样本）: 0.365407 秒
+2026-04-06 19:29:26,718 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000249_recon.png
+2026-04-06 19:29:27,075 - INFO - 批量推理时间（1 个样本）: 0.356707 秒
+2026-04-06 19:29:27,075 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000250_recon.png
+2026-04-06 19:29:27,429 - INFO - 批量推理时间（1 个样本）: 0.353661 秒
+2026-04-06 19:29:27,429 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000251_recon.png
+2026-04-06 19:29:27,772 - INFO - 批量推理时间（1 个样本）: 0.341711 秒
+2026-04-06 19:29:27,772 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000252_recon.png
+2026-04-06 19:29:28,123 - INFO - 批量推理时间（1 个样本）: 0.350294 秒
+2026-04-06 19:29:28,124 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000253_recon.png
+2026-04-06 19:29:28,472 - INFO - 批量推理时间（1 个样本）: 0.347922 秒
+2026-04-06 19:29:28,472 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000254_recon.png
+2026-04-06 19:29:28,845 - INFO - 批量推理时间（1 个样本）: 0.371856 秒
+2026-04-06 19:29:28,845 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000255_recon.png
+2026-04-06 19:29:29,195 - INFO - 批量推理时间（1 个样本）: 0.349142 秒
+2026-04-06 19:29:29,195 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000256_recon.png
+2026-04-06 19:29:29,549 - INFO - 批量推理时间（1 个样本）: 0.353002 秒
+2026-04-06 19:29:29,549 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000257_recon.png
+2026-04-06 19:29:29,884 - INFO - 批量推理时间（1 个样本）: 0.334712 秒
+2026-04-06 19:29:29,885 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000258_recon.png
+2026-04-06 19:29:30,244 - INFO - 批量推理时间（1 个样本）: 0.358611 秒
+2026-04-06 19:29:30,244 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000259_recon.png
+2026-04-06 19:29:30,607 - INFO - 批量推理时间（1 个样本）: 0.362152 秒
+2026-04-06 19:29:30,607 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000260_recon.png
+2026-04-06 19:29:30,935 - INFO - 批量推理时间（1 个样本）: 0.326766 秒
+2026-04-06 19:29:30,935 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000261_recon.png
+2026-04-06 19:29:31,246 - INFO - 批量推理时间（1 个样本）: 0.310994 秒
+2026-04-06 19:29:31,247 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000262_recon.png
+2026-04-06 19:29:31,582 - INFO - 批量推理时间（1 个样本）: 0.334199 秒
+2026-04-06 19:29:31,582 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000263_recon.png
+2026-04-06 19:29:31,931 - INFO - 批量推理时间（1 个样本）: 0.348385 秒
+2026-04-06 19:29:31,931 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000264_recon.png
+2026-04-06 19:29:32,258 - INFO - 批量推理时间（1 个样本）: 0.326576 秒
+2026-04-06 19:29:32,259 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000265_recon.png
+2026-04-06 19:29:32,617 - INFO - 批量推理时间（1 个样本）: 0.357467 秒
+2026-04-06 19:29:32,617 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000266_recon.png
+2026-04-06 19:29:32,952 - INFO - 批量推理时间（1 个样本）: 0.334599 秒
+2026-04-06 19:29:32,953 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000267_recon.png
+2026-04-06 19:29:33,300 - INFO - 批量推理时间（1 个样本）: 0.347280 秒
+2026-04-06 19:29:33,301 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000268_recon.png
+2026-04-06 19:29:33,641 - INFO - 批量推理时间（1 个样本）: 0.340031 秒
+2026-04-06 19:29:33,642 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000269_recon.png
+2026-04-06 19:29:33,989 - INFO - 批量推理时间（1 个样本）: 0.347076 秒
+2026-04-06 19:29:33,989 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000270_recon.png
+2026-04-06 19:29:34,337 - INFO - 批量推理时间（1 个样本）: 0.346702 秒
+2026-04-06 19:29:34,337 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000271_recon.png
+2026-04-06 19:29:34,687 - INFO - 批量推理时间（1 个样本）: 0.349344 秒
+2026-04-06 19:29:34,687 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000272_recon.png
+2026-04-06 19:29:35,039 - INFO - 批量推理时间（1 个样本）: 0.350863 秒
+2026-04-06 19:29:35,039 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000273_recon.png
+2026-04-06 19:29:35,375 - INFO - 批量推理时间（1 个样本）: 0.335809 秒
+2026-04-06 19:29:35,376 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000274_recon.png
+2026-04-06 19:29:35,725 - INFO - 批量推理时间（1 个样本）: 0.348349 秒
+2026-04-06 19:29:35,725 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000275_recon.png
+2026-04-06 19:29:36,078 - INFO - 批量推理时间（1 个样本）: 0.352455 秒
+2026-04-06 19:29:36,078 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000276_recon.png
+2026-04-06 19:29:36,447 - INFO - 批量推理时间（1 个样本）: 0.368196 秒
+2026-04-06 19:29:36,448 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000277_recon.png
+2026-04-06 19:29:36,809 - INFO - 批量推理时间（1 个样本）: 0.360553 秒
+2026-04-06 19:29:36,809 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000278_recon.png
+2026-04-06 19:29:37,149 - INFO - 批量推理时间（1 个样本）: 0.338875 秒
+2026-04-06 19:29:37,149 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000279_recon.png
+2026-04-06 19:29:37,504 - INFO - 批量推理时间（1 个样本）: 0.354985 秒
+2026-04-06 19:29:37,505 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000280_recon.png
+2026-04-06 19:29:37,842 - INFO - 批量推理时间（1 个样本）: 0.337015 秒
+2026-04-06 19:29:37,843 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000281_recon.png
+2026-04-06 19:29:38,196 - INFO - 批量推理时间（1 个样本）: 0.353418 秒
+2026-04-06 19:29:38,197 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000282_recon.png
+2026-04-06 19:29:38,571 - INFO - 批量推理时间（1 个样本）: 0.373007 秒
+2026-04-06 19:29:38,571 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000283_recon.png
+2026-04-06 19:29:38,936 - INFO - 批量推理时间（1 个样本）: 0.364385 秒
+2026-04-06 19:29:38,936 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000284_recon.png
+2026-04-06 19:29:39,276 - INFO - 批量推理时间（1 个样本）: 0.339531 秒
+2026-04-06 19:29:39,277 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000285_recon.png
+2026-04-06 19:29:39,633 - INFO - 批量推理时间（1 个样本）: 0.356577 秒
+2026-04-06 19:29:39,634 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000286_recon.png
+2026-04-06 19:29:40,006 - INFO - 批量推理时间（1 个样本）: 0.371805 秒
+2026-04-06 19:29:40,007 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000287_recon.png
+2026-04-06 19:29:40,383 - INFO - 批量推理时间（1 个样本）: 0.376393 秒
+2026-04-06 19:29:40,384 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000288_recon.png
+2026-04-06 19:29:40,740 - INFO - 批量推理时间（1 个样本）: 0.355197 秒
+2026-04-06 19:29:40,740 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000289_recon.png
+2026-04-06 19:29:41,083 - INFO - 批量推理时间（1 个样本）: 0.342720 秒
+2026-04-06 19:29:41,083 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000290_recon.png
+2026-04-06 19:29:41,435 - INFO - 批量推理时间（1 个样本）: 0.350269 秒
+2026-04-06 19:29:41,435 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000291_recon.png
+2026-04-06 19:29:41,761 - INFO - 批量推理时间（1 个样本）: 0.325856 秒
+2026-04-06 19:29:41,761 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000292_recon.png
+2026-04-06 19:29:42,105 - INFO - 批量推理时间（1 个样本）: 0.342911 秒
+2026-04-06 19:29:42,105 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000293_recon.png
+2026-04-06 19:29:42,440 - INFO - 批量推理时间（1 个样本）: 0.334731 秒
+2026-04-06 19:29:42,441 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000294_recon.png
+2026-04-06 19:29:42,790 - INFO - 批量推理时间（1 个样本）: 0.349180 秒
+2026-04-06 19:29:42,790 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000295_recon.png
+2026-04-06 19:29:43,117 - INFO - 批量推理时间（1 个样本）: 0.325569 秒
+2026-04-06 19:29:43,117 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000296_recon.png
+2026-04-06 19:29:43,449 - INFO - 批量推理时间（1 个样本）: 0.331428 秒
+2026-04-06 19:29:43,449 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000297_recon.png
+2026-04-06 19:29:43,798 - INFO - 批量推理时间（1 个样本）: 0.347783 秒
+2026-04-06 19:29:43,798 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000298_recon.png
+2026-04-06 19:29:44,131 - INFO - 批量推理时间（1 个样本）: 0.332692 秒
+2026-04-06 19:29:44,132 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000299_recon.png
+2026-04-06 19:29:44,492 - INFO - 批量推理时间（1 个样本）: 0.359856 秒
+2026-04-06 19:29:44,493 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000300_recon.png
+2026-04-06 19:29:44,843 - INFO - 批量推理时间（1 个样本）: 0.350429 秒
+2026-04-06 19:29:44,844 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000301_recon.png
+2026-04-06 19:29:45,177 - INFO - 批量推理时间（1 个样本）: 0.332650 秒
+2026-04-06 19:29:45,177 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000302_recon.png
+2026-04-06 19:29:45,511 - INFO - 批量推理时间（1 个样本）: 0.333316 秒
+2026-04-06 19:29:45,511 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000303_recon.png
+2026-04-06 19:29:45,862 - INFO - 批量推理时间（1 个样本）: 0.349212 秒
+2026-04-06 19:29:45,862 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000304_recon.png
+2026-04-06 19:29:46,199 - INFO - 批量推理时间（1 个样本）: 0.336250 秒
+2026-04-06 19:29:46,199 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000305_recon.png
+2026-04-06 19:29:46,542 - INFO - 批量推理时间（1 个样本）: 0.342699 秒
+2026-04-06 19:29:46,543 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000306_recon.png
+2026-04-06 19:29:46,883 - INFO - 批量推理时间（1 个样本）: 0.340181 秒
+2026-04-06 19:29:46,883 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000307_recon.png
+2026-04-06 19:29:47,207 - INFO - 批量推理时间（1 个样本）: 0.322419 秒
+2026-04-06 19:29:47,207 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000308_recon.png
+2026-04-06 19:29:47,579 - INFO - 批量推理时间（1 个样本）: 0.371262 秒
+2026-04-06 19:29:47,579 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000309_recon.png
+2026-04-06 19:29:47,949 - INFO - 批量推理时间（1 个样本）: 0.369482 秒
+2026-04-06 19:29:47,949 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000310_recon.png
+2026-04-06 19:29:48,288 - INFO - 批量推理时间（1 个样本）: 0.338543 秒
+2026-04-06 19:29:48,289 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000311_recon.png
+2026-04-06 19:29:48,630 - INFO - 批量推理时间（1 个样本）: 0.341392 秒
+2026-04-06 19:29:48,631 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000312_recon.png
+2026-04-06 19:29:48,986 - INFO - 批量推理时间（1 个样本）: 0.354142 秒
+2026-04-06 19:29:48,986 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000313_recon.png
+2026-04-06 19:29:49,357 - INFO - 批量推理时间（1 个样本）: 0.370995 秒
+2026-04-06 19:29:49,358 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000314_recon.png
+2026-04-06 19:29:49,726 - INFO - 批量推理时间（1 个样本）: 0.367968 秒
+2026-04-06 19:29:49,727 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000315_recon.png
+2026-04-06 19:29:50,081 - INFO - 批量推理时间（1 个样本）: 0.354271 秒
+2026-04-06 19:29:50,082 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000316_recon.png
+2026-04-06 19:29:50,424 - INFO - 批量推理时间（1 个样本）: 0.341211 秒
+2026-04-06 19:29:50,424 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000317_recon.png
+2026-04-06 19:29:50,783 - INFO - 批量推理时间（1 个样本）: 0.358428 秒
+2026-04-06 19:29:50,783 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000318_recon.png
+2026-04-06 19:29:51,140 - INFO - 批量推理时间（1 个样本）: 0.356521 秒
+2026-04-06 19:29:51,141 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000319_recon.png
+2026-04-06 19:29:51,507 - INFO - 批量推理时间（1 个样本）: 0.365924 秒
+2026-04-06 19:29:51,507 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000320_recon.png
+2026-04-06 19:29:51,847 - INFO - 批量推理时间（1 个样本）: 0.339336 秒
+2026-04-06 19:29:51,848 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000321_recon.png
+2026-04-06 19:29:52,177 - INFO - 批量推理时间（1 个样本）: 0.328677 秒
+2026-04-06 19:29:52,177 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000322_recon.png
+2026-04-06 19:29:52,503 - INFO - 批量推理时间（1 个样本）: 0.325178 秒
+2026-04-06 19:29:52,503 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000323_recon.png
+2026-04-06 19:29:52,837 - INFO - 批量推理时间（1 个样本）: 0.333576 秒
+2026-04-06 19:29:52,838 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000324_recon.png
+2026-04-06 19:29:53,200 - INFO - 批量推理时间（1 个样本）: 0.362313 秒
+2026-04-06 19:29:53,200 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000325_recon.png
+2026-04-06 19:29:53,567 - INFO - 批量推理时间（1 个样本）: 0.365720 秒
+2026-04-06 19:29:53,568 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000326_recon.png
+2026-04-06 19:29:53,907 - INFO - 批量推理时间（1 个样本）: 0.338781 秒
+2026-04-06 19:29:53,907 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000327_recon.png
+2026-04-06 19:29:54,267 - INFO - 批量推理时间（1 个样本）: 0.359061 秒
+2026-04-06 19:29:54,267 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000328_recon.png
+2026-04-06 19:29:54,615 - INFO - 批量推理时间（1 个样本）: 0.347358 秒
+2026-04-06 19:29:54,615 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000329_recon.png
+2026-04-06 19:29:54,947 - INFO - 批量推理时间（1 个样本）: 0.331001 秒
+2026-04-06 19:29:54,947 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000330_recon.png
+2026-04-06 19:29:55,302 - INFO - 批量推理时间（1 个样本）: 0.354589 秒
+2026-04-06 19:29:55,303 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000331_recon.png
+2026-04-06 19:29:55,661 - INFO - 批量推理时间（1 个样本）: 0.357388 秒
+2026-04-06 19:29:55,661 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000332_recon.png
+2026-04-06 19:29:56,020 - INFO - 批量推理时间（1 个样本）: 0.358249 秒
+2026-04-06 19:29:56,020 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000333_recon.png
+2026-04-06 19:29:56,364 - INFO - 批量推理时间（1 个样本）: 0.343264 秒
+2026-04-06 19:29:56,364 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000334_recon.png
+2026-04-06 19:29:56,711 - INFO - 批量推理时间（1 个样本）: 0.346382 秒
+2026-04-06 19:29:56,711 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000335_recon.png
+2026-04-06 19:29:57,062 - INFO - 批量推理时间（1 个样本）: 0.350176 秒
+2026-04-06 19:29:57,063 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000336_recon.png
+2026-04-06 19:29:57,381 - INFO - 批量推理时间（1 个样本）: 0.318396 秒
+2026-04-06 19:29:57,382 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000337_recon.png
+2026-04-06 19:29:57,702 - INFO - 批量推理时间（1 个样本）: 0.319157 秒
+2026-04-06 19:29:57,702 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000338_recon.png
+2026-04-06 19:29:58,068 - INFO - 批量推理时间（1 个样本）: 0.366065 秒
+2026-04-06 19:29:58,069 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000339_recon.png
+2026-04-06 19:29:58,398 - INFO - 批量推理时间（1 个样本）: 0.329365 秒
+2026-04-06 19:29:58,399 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000340_recon.png
+2026-04-06 19:29:58,756 - INFO - 批量推理时间（1 个样本）: 0.356606 秒
+2026-04-06 19:29:58,756 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000341_recon.png
+2026-04-06 19:29:59,116 - INFO - 批量推理时间（1 个样本）: 0.359554 秒
+2026-04-06 19:29:59,117 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000342_recon.png
+2026-04-06 19:29:59,450 - INFO - 批量推理时间（1 个样本）: 0.332040 秒
+2026-04-06 19:29:59,450 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000343_recon.png
+2026-04-06 19:29:59,797 - INFO - 批量推理时间（1 个样本）: 0.347136 秒
+2026-04-06 19:29:59,798 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000344_recon.png
+2026-04-06 19:30:00,139 - INFO - 批量推理时间（1 个样本）: 0.340749 秒
+2026-04-06 19:30:00,140 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000345_recon.png
+2026-04-06 19:30:00,482 - INFO - 批量推理时间（1 个样本）: 0.342016 秒
+2026-04-06 19:30:00,482 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000346_recon.png
+2026-04-06 19:30:00,842 - INFO - 批量推理时间（1 个样本）: 0.358539 秒
+2026-04-06 19:30:00,842 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000347_recon.png
+2026-04-06 19:30:01,192 - INFO - 批量推理时间（1 个样本）: 0.350004 秒
+2026-04-06 19:30:01,192 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000348_recon.png
+2026-04-06 19:30:01,547 - INFO - 批量推理时间（1 个样本）: 0.353382 秒
+2026-04-06 19:30:01,547 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000349_recon.png
+2026-04-06 19:30:01,885 - INFO - 批量推理时间（1 个样本）: 0.337693 秒
+2026-04-06 19:30:01,885 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000350_recon.png
+2026-04-06 19:30:02,216 - INFO - 批量推理时间（1 个样本）: 0.329872 秒
+2026-04-06 19:30:02,216 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000351_recon.png
+2026-04-06 19:30:02,591 - INFO - 批量推理时间（1 个样本）: 0.374387 秒
+2026-04-06 19:30:02,591 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000352_recon.png
+2026-04-06 19:30:02,930 - INFO - 批量推理时间（1 个样本）: 0.337444 秒
+2026-04-06 19:30:02,930 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000353_recon.png
+2026-04-06 19:30:03,283 - INFO - 批量推理时间（1 个样本）: 0.353244 秒
+2026-04-06 19:30:03,284 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000354_recon.png
+2026-04-06 19:30:03,594 - INFO - 批量推理时间（1 个样本）: 0.309178 秒
+2026-04-06 19:30:03,594 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000355_recon.png
+2026-04-06 19:30:03,947 - INFO - 批量推理时间（1 个样本）: 0.352720 秒
+2026-04-06 19:30:03,947 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000356_recon.png
+2026-04-06 19:30:04,300 - INFO - 批量推理时间（1 个样本）: 0.351560 秒
+2026-04-06 19:30:04,300 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000357_recon.png
+2026-04-06 19:30:04,625 - INFO - 批量推理时间（1 个样本）: 0.324469 秒
+2026-04-06 19:30:04,626 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000358_recon.png
+2026-04-06 19:30:04,975 - INFO - 批量推理时间（1 个样本）: 0.348926 秒
+2026-04-06 19:30:04,975 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000359_recon.png
+2026-04-06 19:30:05,335 - INFO - 批量推理时间（1 个样本）: 0.359263 秒
+2026-04-06 19:30:05,336 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000360_recon.png
+2026-04-06 19:30:05,692 - INFO - 批量推理时间（1 个样本）: 0.356390 秒
+2026-04-06 19:30:05,693 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000361_recon.png
+2026-04-06 19:30:06,034 - INFO - 批量推理时间（1 个样本）: 0.341288 秒
+2026-04-06 19:30:06,035 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000362_recon.png
+2026-04-06 19:30:06,400 - INFO - 批量推理时间（1 个样本）: 0.364162 秒
+2026-04-06 19:30:06,400 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000363_recon.png
+2026-04-06 19:30:06,735 - INFO - 批量推理时间（1 个样本）: 0.335216 秒
+2026-04-06 19:30:06,736 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000364_recon.png
+2026-04-06 19:30:07,076 - INFO - 批量推理时间（1 个样本）: 0.339769 秒
+2026-04-06 19:30:07,077 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000365_recon.png
+2026-04-06 19:30:07,404 - INFO - 批量推理时间（1 个样本）: 0.326655 秒
+2026-04-06 19:30:07,404 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000366_recon.png
+2026-04-06 19:30:07,747 - INFO - 批量推理时间（1 个样本）: 0.341834 秒
+2026-04-06 19:30:07,747 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000367_recon.png
+2026-04-06 19:30:08,106 - INFO - 批量推理时间（1 个样本）: 0.359221 秒
+2026-04-06 19:30:08,107 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000368_recon.png
+2026-04-06 19:30:08,420 - INFO - 批量推理时间（1 个样本）: 0.312804 秒
+2026-04-06 19:30:08,421 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000369_recon.png
+2026-04-06 19:30:08,779 - INFO - 批量推理时间（1 个样本）: 0.357668 秒
+2026-04-06 19:30:08,779 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000370_recon.png
+2026-04-06 19:30:09,122 - INFO - 批量推理时间（1 个样本）: 0.342174 秒
+2026-04-06 19:30:09,122 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000371_recon.png
+2026-04-06 19:30:09,471 - INFO - 批量推理时间（1 个样本）: 0.348700 秒
+2026-04-06 19:30:09,471 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000372_recon.png
+2026-04-06 19:30:09,817 - INFO - 批量推理时间（1 个样本）: 0.344672 秒
+2026-04-06 19:30:09,817 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000373_recon.png
+2026-04-06 19:30:10,155 - INFO - 批量推理时间（1 个样本）: 0.337983 秒
+2026-04-06 19:30:10,156 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000374_recon.png
+2026-04-06 19:30:10,500 - INFO - 批量推理时间（1 个样本）: 0.343937 秒
+2026-04-06 19:30:10,501 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000375_recon.png
+2026-04-06 19:30:10,842 - INFO - 批量推理时间（1 个样本）: 0.340674 秒
+2026-04-06 19:30:10,842 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000376_recon.png
+2026-04-06 19:30:11,172 - INFO - 批量推理时间（1 个样本）: 0.329227 秒
+2026-04-06 19:30:11,172 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000377_recon.png
+2026-04-06 19:30:11,503 - INFO - 批量推理时间（1 个样本）: 0.330614 秒
+2026-04-06 19:30:11,504 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000378_recon.png
+2026-04-06 19:30:11,845 - INFO - 批量推理时间（1 个样本）: 0.340825 秒
+2026-04-06 19:30:11,846 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000379_recon.png
+2026-04-06 19:30:12,173 - INFO - 批量推理时间（1 个样本）: 0.327167 秒
+2026-04-06 19:30:12,173 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000380_recon.png
+2026-04-06 19:30:12,519 - INFO - 批量推理时间（1 个样本）: 0.344535 秒
+2026-04-06 19:30:12,519 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000381_recon.png
+2026-04-06 19:30:12,879 - INFO - 批量推理时间（1 个样本）: 0.359775 秒
+2026-04-06 19:30:12,879 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000382_recon.png
+2026-04-06 19:30:13,207 - INFO - 批量推理时间（1 个样本）: 0.327094 秒
+2026-04-06 19:30:13,208 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000383_recon.png
+2026-04-06 19:30:13,560 - INFO - 批量推理时间（1 个样本）: 0.351588 秒
+2026-04-06 19:30:13,560 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000384_recon.png
+2026-04-06 19:30:13,896 - INFO - 批量推理时间（1 个样本）: 0.335796 秒
+2026-04-06 19:30:13,897 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000385_recon.png
+2026-04-06 19:30:14,248 - INFO - 批量推理时间（1 个样本）: 0.350348 秒
+2026-04-06 19:30:14,248 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000386_recon.png
+2026-04-06 19:30:14,605 - INFO - 批量推理时间（1 个样本）: 0.356638 秒
+2026-04-06 19:30:14,605 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000387_recon.png
+2026-04-06 19:30:14,966 - INFO - 批量推理时间（1 个样本）: 0.359821 秒
+2026-04-06 19:30:14,966 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000388_recon.png
+2026-04-06 19:30:15,292 - INFO - 批量推理时间（1 个样本）: 0.324985 秒
+2026-04-06 19:30:15,292 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000389_recon.png
+2026-04-06 19:30:15,654 - INFO - 批量推理时间（1 个样本）: 0.361147 秒
+2026-04-06 19:30:15,654 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000390_recon.png
+2026-04-06 19:30:16,020 - INFO - 批量推理时间（1 个样本）: 0.365510 秒
+2026-04-06 19:30:16,020 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000391_recon.png
+2026-04-06 19:30:16,379 - INFO - 批量推理时间（1 个样本）: 0.358476 秒
+2026-04-06 19:30:16,380 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000392_recon.png
+2026-04-06 19:30:16,730 - INFO - 批量推理时间（1 个样本）: 0.350162 秒
+2026-04-06 19:30:16,731 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000393_recon.png
+2026-04-06 19:30:17,066 - INFO - 批量推理时间（1 个样本）: 0.334178 秒
+2026-04-06 19:30:17,066 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000394_recon.png
+2026-04-06 19:30:17,385 - INFO - 批量推理时间（1 个样本）: 0.318899 秒
+2026-04-06 19:30:17,386 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000395_recon.png
+2026-04-06 19:30:17,745 - INFO - 批量推理时间（1 个样本）: 0.359522 秒
+2026-04-06 19:30:17,746 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000396_recon.png
+2026-04-06 19:30:18,086 - INFO - 批量推理时间（1 个样本）: 0.339018 秒
+2026-04-06 19:30:18,086 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000397_recon.png
+2026-04-06 19:30:18,439 - INFO - 批量推理时间（1 个样本）: 0.353124 秒
+2026-04-06 19:30:18,440 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000398_recon.png
+2026-04-06 19:30:18,780 - INFO - 批量推理时间（1 个样本）: 0.339513 秒
+2026-04-06 19:30:18,780 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000399_recon.png
+2026-04-06 19:30:19,147 - INFO - 批量推理时间（1 个样本）: 0.366265 秒
+2026-04-06 19:30:19,147 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000400_recon.png
+2026-04-06 19:30:19,504 - INFO - 批量推理时间（1 个样本）: 0.356499 秒
+2026-04-06 19:30:19,505 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000401_recon.png
+2026-04-06 19:30:19,862 - INFO - 批量推理时间（1 个样本）: 0.356637 秒
+2026-04-06 19:30:19,862 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000402_recon.png
+2026-04-06 19:30:20,222 - INFO - 批量推理时间（1 个样本）: 0.359174 秒
+2026-04-06 19:30:20,222 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000403_recon.png
+2026-04-06 19:30:20,561 - INFO - 批量推理时间（1 个样本）: 0.338474 秒
+2026-04-06 19:30:20,561 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000404_recon.png
+2026-04-06 19:30:20,932 - INFO - 批量推理时间（1 个样本）: 0.369419 秒
+2026-04-06 19:30:20,932 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000405_recon.png
+2026-04-06 19:30:21,282 - INFO - 批量推理时间（1 个样本）: 0.350260 秒
+2026-04-06 19:30:21,283 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000406_recon.png
+2026-04-06 19:30:21,610 - INFO - 批量推理时间（1 个样本）: 0.326543 秒
+2026-04-06 19:30:21,611 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000407_recon.png
+2026-04-06 19:30:21,958 - INFO - 批量推理时间（1 个样本）: 0.347115 秒
+2026-04-06 19:30:21,958 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000408_recon.png
+2026-04-06 19:30:22,292 - INFO - 批量推理时间（1 个样本）: 0.333019 秒
+2026-04-06 19:30:22,292 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000409_recon.png
+2026-04-06 19:30:22,628 - INFO - 批量推理时间（1 个样本）: 0.335557 秒
+2026-04-06 19:30:22,629 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000410_recon.png
+2026-04-06 19:30:22,967 - INFO - 批量推理时间（1 个样本）: 0.337484 秒
+2026-04-06 19:30:22,967 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000411_recon.png
+2026-04-06 19:30:23,312 - INFO - 批量推理时间（1 个样本）: 0.344424 秒
+2026-04-06 19:30:23,312 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000412_recon.png
+2026-04-06 19:30:23,674 - INFO - 批量推理时间（1 个样本）: 0.361404 秒
+2026-04-06 19:30:23,675 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000413_recon.png
+2026-04-06 19:30:24,024 - INFO - 批量推理时间（1 个样本）: 0.348452 秒
+2026-04-06 19:30:24,024 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000414_recon.png
+2026-04-06 19:30:24,380 - INFO - 批量推理时间（1 个样本）: 0.355098 秒
+2026-04-06 19:30:24,380 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000415_recon.png
+2026-04-06 19:30:24,715 - INFO - 批量推理时间（1 个样本）: 0.335081 秒
+2026-04-06 19:30:24,716 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000416_recon.png
+2026-04-06 19:30:25,077 - INFO - 批量推理时间（1 个样本）: 0.360681 秒
+2026-04-06 19:30:25,078 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000417_recon.png
+2026-04-06 19:30:25,404 - INFO - 批量推理时间（1 个样本）: 0.326269 秒
+2026-04-06 19:30:25,404 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000418_recon.png
+2026-04-06 19:30:25,742 - INFO - 批量推理时间（1 个样本）: 0.336845 秒
+2026-04-06 19:30:25,742 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000419_recon.png
+2026-04-06 19:30:26,076 - INFO - 批量推理时间（1 个样本）: 0.333454 秒
+2026-04-06 19:30:26,077 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000420_recon.png
+2026-04-06 19:30:26,440 - INFO - 批量推理时间（1 个样本）: 0.362179 秒
+2026-04-06 19:30:26,440 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000421_recon.png
+2026-04-06 19:30:26,789 - INFO - 批量推理时间（1 个样本）: 0.348410 秒
+2026-04-06 19:30:26,789 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000422_recon.png
+2026-04-06 19:30:27,134 - INFO - 批量推理时间（1 个样本）: 0.344742 秒
+2026-04-06 19:30:27,135 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000423_recon.png
+2026-04-06 19:30:27,482 - INFO - 批量推理时间（1 个样本）: 0.347324 秒
+2026-04-06 19:30:27,483 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000424_recon.png
+2026-04-06 19:30:27,825 - INFO - 批量推理时间（1 个样本）: 0.341526 秒
+2026-04-06 19:30:27,825 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000425_recon.png
+2026-04-06 19:30:28,166 - INFO - 批量推理时间（1 个样本）: 0.340047 秒
+2026-04-06 19:30:28,166 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000426_recon.png
+2026-04-06 19:30:28,490 - INFO - 批量推理时间（1 个样本）: 0.323575 秒
+2026-04-06 19:30:28,491 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000427_recon.png
+2026-04-06 19:30:28,822 - INFO - 批量推理时间（1 个样本）: 0.331088 秒
+2026-04-06 19:30:28,822 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000428_recon.png
+2026-04-06 19:30:29,183 - INFO - 批量推理时间（1 个样本）: 0.360139 秒
+2026-04-06 19:30:29,184 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000429_recon.png
+2026-04-06 19:30:29,524 - INFO - 批量推理时间（1 个样本）: 0.339986 秒
+2026-04-06 19:30:29,524 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000430_recon.png
+2026-04-06 19:30:29,878 - INFO - 批量推理时间（1 个样本）: 0.352458 秒
+2026-04-06 19:30:29,878 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000431_recon.png
+2026-04-06 19:30:30,230 - INFO - 批量推理时间（1 个样本）: 0.352130 秒
+2026-04-06 19:30:30,231 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000432_recon.png
+2026-04-06 19:30:30,545 - INFO - 批量推理时间（1 个样本）: 0.313605 秒
+2026-04-06 19:30:30,546 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000433_recon.png
+2026-04-06 19:30:30,872 - INFO - 批量推理时间（1 个样本）: 0.326071 秒
+2026-04-06 19:30:30,872 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000434_recon.png
+2026-04-06 19:30:31,228 - INFO - 批量推理时间（1 个样本）: 0.355160 秒
+2026-04-06 19:30:31,229 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000435_recon.png
+2026-04-06 19:30:31,563 - INFO - 批量推理时间（1 个样本）: 0.334337 秒
+2026-04-06 19:30:31,564 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000436_recon.png
+2026-04-06 19:30:31,914 - INFO - 批量推理时间（1 个样本）: 0.349208 秒
+2026-04-06 19:30:31,914 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000437_recon.png
+2026-04-06 19:30:32,252 - INFO - 批量推理时间（1 个样本）: 0.338236 秒
+2026-04-06 19:30:32,253 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000438_recon.png
+2026-04-06 19:30:32,598 - INFO - 批量推理时间（1 个样本）: 0.344107 秒
+2026-04-06 19:30:32,598 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000439_recon.png
+2026-04-06 19:30:32,940 - INFO - 批量推理时间（1 个样本）: 0.342135 秒
+2026-04-06 19:30:32,941 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000440_recon.png
+2026-04-06 19:30:33,272 - INFO - 批量推理时间（1 个样本）: 0.330216 秒
+2026-04-06 19:30:33,272 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000441_recon.png
+2026-04-06 19:30:33,622 - INFO - 批量推理时间（1 个样本）: 0.349295 秒
+2026-04-06 19:30:33,622 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000442_recon.png
+2026-04-06 19:30:33,958 - INFO - 批量推理时间（1 个样本）: 0.335580 秒
+2026-04-06 19:30:33,959 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000443_recon.png
+2026-04-06 19:30:34,300 - INFO - 批量推理时间（1 个样本）: 0.340488 秒
+2026-04-06 19:30:34,300 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000444_recon.png
+2026-04-06 19:30:34,676 - INFO - 批量推理时间（1 个样本）: 0.375692 秒
+2026-04-06 19:30:34,677 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000445_recon.png
+2026-04-06 19:30:35,036 - INFO - 批量推理时间（1 个样本）: 0.359466 秒
+2026-04-06 19:30:35,037 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000446_recon.png
+2026-04-06 19:30:35,394 - INFO - 批量推理时间（1 个样本）: 0.356519 秒
+2026-04-06 19:30:35,394 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000447_recon.png
+2026-04-06 19:30:35,760 - INFO - 批量推理时间（1 个样本）: 0.365447 秒
+2026-04-06 19:30:35,761 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000448_recon.png
+2026-04-06 19:30:36,095 - INFO - 批量推理时间（1 个样本）: 0.333131 秒
+2026-04-06 19:30:36,095 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000449_recon.png
+2026-04-06 19:30:36,442 - INFO - 批量推理时间（1 个样本）: 0.347318 秒
+2026-04-06 19:30:36,443 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000450_recon.png
+2026-04-06 19:30:36,793 - INFO - 批量推理时间（1 个样本）: 0.349544 秒
+2026-04-06 19:30:36,793 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000451_recon.png
+2026-04-06 19:30:37,123 - INFO - 批量推理时间（1 个样本）: 0.329035 秒
+2026-04-06 19:30:37,123 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000452_recon.png
+2026-04-06 19:30:37,458 - INFO - 批量推理时间（1 个样本）: 0.334361 秒
+2026-04-06 19:30:37,459 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000453_recon.png
+2026-04-06 19:30:37,806 - INFO - 批量推理时间（1 个样本）: 0.346873 秒
+2026-04-06 19:30:37,806 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000454_recon.png
+2026-04-06 19:30:38,165 - INFO - 批量推理时间（1 个样本）: 0.358300 秒
+2026-04-06 19:30:38,166 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000455_recon.png
+2026-04-06 19:30:38,497 - INFO - 批量推理时间（1 个样本）: 0.331058 秒
+2026-04-06 19:30:38,497 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000456_recon.png
+2026-04-06 19:30:38,853 - INFO - 批量推理时间（1 个样本）: 0.354630 秒
+2026-04-06 19:30:38,853 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000457_recon.png
+2026-04-06 19:30:39,205 - INFO - 批量推理时间（1 个样本）: 0.351540 秒
+2026-04-06 19:30:39,205 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000458_recon.png
+2026-04-06 19:30:39,518 - INFO - 批量推理时间（1 个样本）: 0.311651 秒
+2026-04-06 19:30:39,518 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000459_recon.png
+2026-04-06 19:30:39,888 - INFO - 批量推理时间（1 个样本）: 0.369570 秒
+2026-04-06 19:30:39,888 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000460_recon.png
+2026-04-06 19:30:40,271 - INFO - 批量推理时间（1 个样本）: 0.382224 秒
+2026-04-06 19:30:40,272 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000461_recon.png
+2026-04-06 19:30:40,610 - INFO - 批量推理时间（1 个样本）: 0.338462 秒
+2026-04-06 19:30:40,611 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000462_recon.png
+2026-04-06 19:30:40,973 - INFO - 批量推理时间（1 个样本）: 0.361654 秒
+2026-04-06 19:30:40,974 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000463_recon.png
+2026-04-06 19:30:41,337 - INFO - 批量推理时间（1 个样本）: 0.363531 秒
+2026-04-06 19:30:41,338 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000464_recon.png
+2026-04-06 19:30:41,697 - INFO - 批量推理时间（1 个样本）: 0.358533 秒
+2026-04-06 19:30:41,697 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000465_recon.png
+2026-04-06 19:30:42,044 - INFO - 批量推理时间（1 个样本）: 0.346632 秒
+2026-04-06 19:30:42,045 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000466_recon.png
+2026-04-06 19:30:42,402 - INFO - 批量推理时间（1 个样本）: 0.356674 秒
+2026-04-06 19:30:42,402 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000467_recon.png
+2026-04-06 19:30:42,748 - INFO - 批量推理时间（1 个样本）: 0.344831 秒
+2026-04-06 19:30:42,748 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000468_recon.png
+2026-04-06 19:30:43,098 - INFO - 批量推理时间（1 个样本）: 0.349573 秒
+2026-04-06 19:30:43,099 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000469_recon.png
+2026-04-06 19:30:43,450 - INFO - 批量推理时间（1 个样本）: 0.351120 秒
+2026-04-06 19:30:43,450 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000470_recon.png
+2026-04-06 19:30:43,795 - INFO - 批量推理时间（1 个样本）: 0.344119 秒
+2026-04-06 19:30:43,796 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000471_recon.png
+2026-04-06 19:30:44,117 - INFO - 批量推理时间（1 个样本）: 0.321461 秒
+2026-04-06 19:30:44,118 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000472_recon.png
+2026-04-06 19:30:44,452 - INFO - 批量推理时间（1 个样本）: 0.333890 秒
+2026-04-06 19:30:44,453 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000473_recon.png
+2026-04-06 19:30:44,789 - INFO - 批量推理时间（1 个样本）: 0.336187 秒
+2026-04-06 19:30:44,790 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000474_recon.png
+2026-04-06 19:30:45,167 - INFO - 批量推理时间（1 个样本）: 0.377040 秒
+2026-04-06 19:30:45,167 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000475_recon.png
+2026-04-06 19:30:45,517 - INFO - 批量推理时间（1 个样本）: 0.348582 秒
+2026-04-06 19:30:45,517 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000476_recon.png
+2026-04-06 19:30:45,849 - INFO - 批量推理时间（1 个样本）: 0.331525 秒
+2026-04-06 19:30:45,849 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000477_recon.png
+2026-04-06 19:30:46,187 - INFO - 批量推理时间（1 个样本）: 0.337050 秒
+2026-04-06 19:30:46,187 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000478_recon.png
+2026-04-06 19:30:46,523 - INFO - 批量推理时间（1 个样本）: 0.335555 秒
+2026-04-06 19:30:46,524 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000479_recon.png
+2026-04-06 19:30:46,851 - INFO - 批量推理时间（1 个样本）: 0.326240 秒
+2026-04-06 19:30:46,851 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000480_recon.png
+2026-04-06 19:30:47,202 - INFO - 批量推理时间（1 个样本）: 0.350273 秒
+2026-04-06 19:30:47,202 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000481_recon.png
+2026-04-06 19:30:47,546 - INFO - 批量推理时间（1 个样本）: 0.343790 秒
+2026-04-06 19:30:47,547 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000482_recon.png
+2026-04-06 19:30:47,897 - INFO - 批量推理时间（1 个样本）: 0.350257 秒
+2026-04-06 19:30:47,898 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000483_recon.png
+2026-04-06 19:30:48,212 - INFO - 批量推理时间（1 个样本）: 0.313755 秒
+2026-04-06 19:30:48,213 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000484_recon.png
+2026-04-06 19:30:48,549 - INFO - 批量推理时间（1 个样本）: 0.336300 秒
+2026-04-06 19:30:48,550 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000485_recon.png
+2026-04-06 19:30:48,908 - INFO - 批量推理时间（1 个样本）: 0.357706 秒
+2026-04-06 19:30:48,908 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000486_recon.png
+2026-04-06 19:30:49,269 - INFO - 批量推理时间（1 个样本）: 0.360593 秒
+2026-04-06 19:30:49,270 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000487_recon.png
+2026-04-06 19:30:49,634 - INFO - 批量推理时间（1 个样本）: 0.364125 秒
+2026-04-06 19:30:49,634 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000488_recon.png
+2026-04-06 19:30:49,965 - INFO - 批量推理时间（1 个样本）: 0.330095 秒
+2026-04-06 19:30:49,966 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000489_recon.png
+2026-04-06 19:30:50,325 - INFO - 批量推理时间（1 个样本）: 0.358746 秒
+2026-04-06 19:30:50,325 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000490_recon.png
+2026-04-06 19:30:50,667 - INFO - 批量推理时间（1 个样本）: 0.341283 秒
+2026-04-06 19:30:50,668 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000491_recon.png
+2026-04-06 19:30:51,019 - INFO - 批量推理时间（1 个样本）: 0.351095 秒
+2026-04-06 19:30:51,019 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000492_recon.png
+2026-04-06 19:30:51,351 - INFO - 批量推理时间（1 个样本）: 0.330626 秒
+2026-04-06 19:30:51,351 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000493_recon.png
+2026-04-06 19:30:51,662 - INFO - 批量推理时间（1 个样本）: 0.310977 秒
+2026-04-06 19:30:51,663 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000494_recon.png
+2026-04-06 19:30:52,021 - INFO - 批量推理时间（1 个样本）: 0.357157 秒
+2026-04-06 19:30:52,021 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000495_recon.png
+2026-04-06 19:30:52,351 - INFO - 批量推理时间（1 个样本）: 0.329463 秒
+2026-04-06 19:30:52,351 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000496_recon.png
+2026-04-06 19:30:52,683 - INFO - 批量推理时间（1 个样本）: 0.330650 秒
+2026-04-06 19:30:52,683 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000497_recon.png
+2026-04-06 19:30:53,012 - INFO - 批量推理时间（1 个样本）: 0.328542 秒
+2026-04-06 19:30:53,012 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000498_recon.png
+2026-04-06 19:30:53,366 - INFO - 批量推理时间（1 个样本）: 0.352479 秒
+2026-04-06 19:30:53,366 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000499_recon.png
+2026-04-06 19:30:53,727 - INFO - 批量推理时间（1 个样本）: 0.360884 秒
+2026-04-06 19:30:53,728 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000500_recon.png
+2026-04-06 19:30:54,085 - INFO - 批量推理时间（1 个样本）: 0.356271 秒
+2026-04-06 19:30:54,085 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000501_recon.png
+2026-04-06 19:30:54,416 - INFO - 批量推理时间（1 个样本）: 0.330799 秒
+2026-04-06 19:30:54,417 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000502_recon.png
+2026-04-06 19:30:54,754 - INFO - 批量推理时间（1 个样本）: 0.337441 秒
+2026-04-06 19:30:54,755 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000503_recon.png
+2026-04-06 19:30:55,125 - INFO - 批量推理时间（1 个样本）: 0.369777 秒
+2026-04-06 19:30:55,126 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000504_recon.png
+2026-04-06 19:30:55,471 - INFO - 批量推理时间（1 个样本）: 0.344747 秒
+2026-04-06 19:30:55,471 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000505_recon.png
+2026-04-06 19:30:55,822 - INFO - 批量推理时间（1 个样本）: 0.350790 秒
+2026-04-06 19:30:55,823 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000506_recon.png
+2026-04-06 19:30:56,143 - INFO - 批量推理时间（1 个样本）: 0.320304 秒
+2026-04-06 19:30:56,144 - INFO - 重构图像保存至: /home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions/Places365_val_00000507_recon.png
+2026-04-06 19:30:56,144 - INFO - 处理完成: 300/300 文件成功
+{"variant": "current", "artifact_path": "/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so", "artifact_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1", "artifact_sha256_match": true, "input_dir": "/home/user/Downloads/jscc-test/简化版latent", "output_dir": "/home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_trusted_current_direct_current/reconstructions", "output_count": 300, "processed_count": 300, "input_count": 300, "available_input_count": 300, "load_ms": 2.413, "vm_init_ms": 0.504, "run_count": 300, "run_samples_ms": [421.711, 354.594, 339.289, 334.779, 349.511, 352.601, 338.949, 316.346, 351.341, 346.855, 345.787, 364.621, 357.281, 342.425, 343.123, 349.272, 347.548, 356.621, 334.003, 372.759, 332.711, 354.988, 361.375, 355.844, 345.203, 332.512, 358.788, 320.199, 330.05, 348.172, 364.25, 345.46, 344.759, 337.377, 347.667, 359.344, 366.35, 357.962, 347.532, 358.989, 352.874, 365.407, 356.707, 353.661, 341.711, 350.294, 347.922, 371.856, 349.142, 353.002, 334.712, 358.611, 362.152, 326.766, 310.994, 334.199, 348.385, 326.576, 357.467, 334.599, 347.28, 340.031, 347.076, 346.702, 349.344, 350.863, 335.809, 348.349, 352.455, 368.196, 360.553, 338.875, 354.985, 337.015, 353.418, 373.007, 364.385, 339.531, 356.577, 371.805, 376.393, 355.197, 342.72, 350.269, 325.856, 342.911, 334.731, 349.18, 325.569, 331.428, 347.783, 332.692, 359.856, 350.429, 332.65, 333.316, 349.212, 336.25, 342.699, 340.181, 322.419, 371.262, 369.482, 338.543, 341.392, 354.142, 370.995, 367.968, 354.271, 341.211, 358.428, 356.521, 365.924, 339.336, 328.677, 325.178, 333.576, 362.313, 365.72, 338.781, 359.061, 347.358, 331.001, 354.589, 357.388, 358.249, 343.264, 346.382, 350.176, 318.396, 319.157, 366.065, 329.365, 356.606, 359.554, 332.04, 347.136, 340.749, 342.016, 358.539, 350.004, 353.382, 337.693, 329.872, 374.387, 337.444, 353.244, 309.178, 352.72, 351.56, 324.469, 348.926, 359.263, 356.39, 341.288, 364.162, 335.216, 339.769, 326.655, 341.834, 359.221, 312.804, 357.668, 342.174, 348.7, 344.672, 337.983, 343.937, 340.674, 329.227, 330.614, 340.825, 327.167, 344.535, 359.775, 327.094, 351.588, 335.796, 350.348, 356.638, 359.821, 324.985, 361.147, 365.51, 358.476, 350.162, 334.178, 318.899, 359.522, 339.018, 353.124, 339.513, 366.265, 356.499, 356.637, 359.174, 338.474, 369.419, 350.26, 326.543, 347.115, 333.019, 335.557, 337.484, 344.424, 361.404, 348.452, 355.098, 335.081, 360.681, 326.269, 336.845, 333.454, 362.179, 348.41, 344.742, 347.324, 341.526, 340.047, 323.575, 331.088, 360.139, 339.986, 352.458, 352.13, 313.605, 326.071, 355.16, 334.337, 349.208, 338.236, 344.107, 342.135, 330.216, 349.295, 335.58, 340.488, 375.692, 359.466, 356.519, 365.447, 333.131, 347.318, 349.544, 329.035, 334.361, 346.873, 358.3, 331.058, 354.63, 351.54, 311.651, 369.57, 382.224, 338.462, 361.654, 363.531, 358.533, 346.632, 356.674, 344.831, 349.573, 351.12, 344.119, 321.461, 333.89, 336.187, 377.04, 348.582, 331.525, 337.05, 335.555, 326.24, 350.273, 343.79, 350.257, 313.755, 336.3, 357.706, 360.593, 364.125, 330.095, 358.746, 341.283, 351.095, 330.626, 310.977, 357.157, 329.463, 330.65, 328.542, 352.479, 360.884, 356.271, 330.799, 337.441, 369.777, 344.747, 350.79, 320.304], "run_median_ms": 347.341, "run_mean_ms": 346.354, "run_min_ms": 309.178, "run_max_ms": 421.711, "run_variance_ms2": 214.073885, "output_shape": [1, 3, 256, 256], "output_dtype": "float32", "snr": 10.0, "batch_size": 1, "save_format": "png", "seed": null, "max_inputs": 300, "runtime_profiling": {"requested": false, "profile_samples_requested": 0, "attempted_samples": 0, "successful_samples": 0, "supported": null, "status": "not_requested", "top_ops": [], "sample_results": []}}

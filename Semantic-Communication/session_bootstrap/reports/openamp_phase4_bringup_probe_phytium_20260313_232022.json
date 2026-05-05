@@ -1,0 +1,203 @@
+{
+  "host": {
+    "hostname": "Phytium-Pi",
+    "release": "5.10.209-phytium-embedded-v2.2",
+    "machine": "aarch64",
+    "platform": "Linux-5.10.209-phytium-embedded-v2.2-aarch64-with-glibc2.29"
+  },
+  "tooling": {
+    "python3": "/usr/bin/python3",
+    "dtc": "/usr/bin/dtc",
+    "fdtdump": "/usr/bin/fdtdump",
+    "strings": "/usr/bin/strings",
+    "grep": "/usr/bin/grep",
+    "find": "/usr/bin/find"
+  },
+  "cmdline": "console=ttyAMA1,115200 earlycon=pl011,0x2800d000 root=/dev/mmcblk0p1 rootfstype=ext4 rootwait  rw cma=256m ;",
+  "boot_file_candidates": [
+    "/boot/overlay/cmd.txt",
+    "/boot/phytium-pi-baiwen.dtb",
+    "/boot/phytium-pi-board-emmc.dtb",
+    "/boot/phytium-pi-board-v2.dtb",
+    "/boot/phytium-pi-board-v3-openamp.dtb",
+    "/boot/phytium-pi-board-v3.dtb",
+    "/boot/phytium-pi-board.dtb",
+    "/boot/phytium-pi-songke.dtb"
+  ],
+  "boot_previews": {
+    "/proc/cmdline": "console=ttyAMA1,115200 earlycon=pl011,0x2800d000 root=/dev/mmcblk0p1 rootfstype=ext4 rootwait  rw cma=256m ;"
+  },
+  "dt_keyword_paths": {
+    "/proc/device-tree": [
+      "/proc/device-tree/__symbols__/mbox",
+      "/proc/device-tree/firmware/scmi/mbox-names",
+      "/proc/device-tree/firmware/scmi/mboxes",
+      "/proc/device-tree/soc/mailbox@32a00000",
+      "/proc/device-tree/soc/mailbox@32a00000/#mbox-cells",
+      "/proc/device-tree/soc/mailbox@32a00000/compatible",
+      "/proc/device-tree/soc/mailbox@32a00000/interrupts",
+      "/proc/device-tree/soc/mailbox@32a00000/name",
+      "/proc/device-tree/soc/mailbox@32a00000/phandle",
+      "/proc/device-tree/soc/mailbox@32a00000/reg"
+    ],
+    "/sys/firmware/devicetree/base": [
+      "/sys/firmware/devicetree/base/__symbols__/mbox",
+      "/sys/firmware/devicetree/base/firmware/scmi/mbox-names",
+      "/sys/firmware/devicetree/base/firmware/scmi/mboxes",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/#mbox-cells",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/compatible",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/interrupts",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/name",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/phandle",
+      "/sys/firmware/devicetree/base/soc/mailbox@32a00000/reg"
+    ]
+  },
+  "dt_keyword_props": [
+    {
+      "node": "/proc/device-tree/soc/mailbox@32a00000",
+      "props": {
+        "compatible": "phytium,mbox",
+        "name": "mailbox",
+        "phandle": "\u0002",
+        "reg": "2�        \u0010"
+      }
+    },
+    {
+      "node": "/sys/firmware/devicetree/base/soc/mailbox@32a00000",
+      "props": {
+        "compatible": "phytium,mbox",
+        "name": "mailbox",
+        "phandle": "\u0002",
+        "reg": "2�        \u0010"
+      }
+    }
+  ],
+  "dtb_string_hits": {
+    "/boot/phytium-pi-baiwen.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ],
+    "/boot/phytium-pi-board-emmc.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ],
+    "/boot/phytium-pi-board-v2.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ],
+    "/boot/phytium-pi-board-v3-openamp.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "reserved-memory",
+      "rproc@b0100000",
+      "homo_rproc@0",
+      "homo,rproc",
+      "-openamp_core0.elf",
+      "/soc/mailbox@32a00000",
+      "/reserved-memory/rproc@b0100000",
+      "/homo_rproc@0",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox",
+      "rproc",
+      "homo_rproc"
+    ],
+    "/boot/phytium-pi-board-v3.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ],
+    "/boot/phytium-pi-board.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ],
+    "/boot/phytium-pi-songke.dtb": [
+      "mailbox@32a00000",
+      "phytium,mbox",
+      "/soc/mailbox@32a00000",
+      "mboxes",
+      "mbox-names",
+      "#mbox-cells",
+      "mbox"
+    ]
+  },
+  "platform_devices": [
+    {
+      "name": "32a00000.mailbox",
+      "path": "/sys/bus/platform/devices/32a00000.mailbox",
+      "target": "/sys/devices/platform/soc/32a00000.mailbox"
+    }
+  ],
+  "platform_drivers": [
+    {
+      "name": "homo-rproc",
+      "path": "/sys/bus/platform/drivers/homo-rproc"
+    },
+    {
+      "name": "phytium-mbox",
+      "path": "/sys/bus/platform/drivers/phytium-mbox"
+    }
+  ],
+  "sysfs": {
+    "remoteproc_children": [],
+    "rpmsg_devices_children": [],
+    "rpmsg_bus_children": [
+      "devices",
+      "drivers",
+      "drivers_autoprobe",
+      "drivers_probe",
+      "uevent"
+    ]
+  },
+  "device_nodes": {
+    "ok": true,
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "module_hits": [
+    "/lib/modules/5.10.209-phytium-embedded-v2.2/kernel/drivers/rpmsg/rpmsg_char.ko"
+  ],
+  "modules_builtin_hits": {
+    "ok": true,
+    "returncode": 0,
+    "stdout": "/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:520:kernel/drivers/mailbox/arm_mhu.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:521:kernel/drivers/mailbox/arm_mhu_db.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:522:kernel/drivers/mailbox/platform_mhu.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:523:kernel/drivers/mailbox/phytium-mailbox.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:526:kernel/drivers/remoteproc/remoteproc.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:527:kernel/drivers/remoteproc/homo_remoteproc.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:528:kernel/drivers/rpmsg/rpmsg_core.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:529:kernel/drivers/rpmsg/qcom_glink.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:530:kernel/drivers/rpmsg/qcom_glink_rpm.ko\n/lib/modules/5.10.209-phytium-embedded-v2.2/modules.builtin:531:kernel/drivers/rpmsg/virtio_rpmsg_bus.ko\n",
+    "stderr": ""
+  },
+  "firmware_hits": [
+    "/lib/firmware/openamp_core0.elf",
+    "/usr/lib/firmware/openamp_core0.elf"
+  ],
+  "dmesg_hits": {
+    "ok": true,
+    "returncode": 0,
+    "stdout": "[    0.000000]   DMA zone: 0 pages reserved\n[    0.000000] cma: Reserved 256 MiB at 0x00000000e9c00000\n[    0.000000] Memory: 3697864K/4128768K available (13184K kernel code, 1212K rwdata, 5060K rodata, 2368K init, 486K bss, 168760K reserved, 262144K cma-reserved)\n[    2.588260] phytium-mbox 32a00000.mailbox: Phytium SoC Mailbox registered\n",
+    "stderr": ""
+  }
+}

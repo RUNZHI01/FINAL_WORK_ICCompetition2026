@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="420" viewBox="0 0 880 420" role="img" aria-label="Historical Latency vs SNR">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="440.0" y="28" text-anchor="middle" font-size="20" font-family="sans-serif" fill="#1f2937">Historical Latency vs SNR</text>
+<line x1="72" y1="356.00" x2="856" y2="356.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="62" y="360.00" text-anchor="end" font-size="12" font-family="sans-serif" fill="#4b5563">72800.968</text>
+<line x1="72" y1="281.00" x2="856" y2="281.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="62" y="285.00" text-anchor="end" font-size="12" font-family="sans-serif" fill="#4b5563">83193.920</text>
+<line x1="72" y1="206.00" x2="856" y2="206.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="62" y="210.00" text-anchor="end" font-size="12" font-family="sans-serif" fill="#4b5563">93586.872</text>
+<line x1="72" y1="131.00" x2="856" y2="131.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="62" y="135.00" text-anchor="end" font-size="12" font-family="sans-serif" fill="#4b5563">103979.825</text>
+<line x1="72" y1="56.00" x2="856" y2="56.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="62" y="60.00" text-anchor="end" font-size="12" font-family="sans-serif" fill="#4b5563">114372.777</text>
+<line x1="72.00" y1="56" x2="72.00" y2="356" stroke="#f3f4f6" stroke-width="1"/>
+<text x="72.00" y="380" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#4b5563">8</text>
+<line x1="333.33" y1="56" x2="333.33" y2="356" stroke="#f3f4f6" stroke-width="1"/>
+<text x="333.33" y="380" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#4b5563">10</text>
+<line x1="594.67" y1="56" x2="594.67" y2="356" stroke="#f3f4f6" stroke-width="1"/>
+<text x="594.67" y="380" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#4b5563">12</text>
+<line x1="856.00" y1="56" x2="856.00" y2="356" stroke="#f3f4f6" stroke-width="1"/>
+<text x="856.00" y="380" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#4b5563">14</text>
+<line x1="72" y1="356" x2="856" y2="356" stroke="#111827" stroke-width="1.5"/>
+<line x1="72" y1="56" x2="72" y2="356" stroke="#111827" stroke-width="1.5"/>
+<text x="440.0" y="402" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#111827">SNR (dB)</text>
+<text x="20" y="210.0" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#111827" transform="rotate(-90 20 210.0)">Latency (ms)</text>
+<line x1="676" y1="44" x2="694" y2="44" stroke="#94a3b8" stroke-width="3"/>
+<text x="700" y="48" font-size="12" font-family="sans-serif" fill="#111827">baseline</text>
+<line x1="676" y1="62" x2="694" y2="62" stroke="#2563eb" stroke-width="3"/>
+<text x="700" y="66" font-size="12" font-family="sans-serif" fill="#111827">current</text>
+<polyline fill="none" stroke="#94a3b8" stroke-width="3" points="72.00,326.06 333.33,317.32 594.67,323.91 856.00,288.96" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="72.00" cy="326.06" r="4" fill="#94a3b8"/>
+<text x="72.00" y="316.06" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#94a3b8">76949.93</text>
+<circle cx="333.33" cy="317.32" r="4" fill="#94a3b8"/>
+<text x="333.33" y="307.32" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#94a3b8">78160.69</text>
+<circle cx="594.67" cy="323.91" r="4" fill="#94a3b8"/>
+<text x="594.67" y="313.91" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#94a3b8">77247.98</text>
+<circle cx="856.00" cy="288.96" r="4" fill="#94a3b8"/>
+<text x="856.00" y="278.96" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#94a3b8">82090.85</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="3" points="72.00,335.31 333.33,321.08 594.67,76.69 856.00,308.60" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="72.00" cy="335.31" r="4" fill="#2563eb"/>
+<text x="72.00" y="325.31" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#2563eb">75667.99</text>
+<circle cx="333.33" cy="321.08" r="4" fill="#2563eb"/>
+<text x="333.33" y="311.08" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#2563eb">77640.02</text>
+<circle cx="594.67" cy="76.69" r="4" fill="#2563eb"/>
+<text x="594.67" y="66.69" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#2563eb">111505.76</text>
+<circle cx="856.00" cy="308.60" r="4" fill="#2563eb"/>
+<text x="856.00" y="298.60" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#2563eb">79369.81</text>
+</svg>

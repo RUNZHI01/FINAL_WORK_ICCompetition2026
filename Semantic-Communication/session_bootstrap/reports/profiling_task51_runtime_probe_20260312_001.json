@@ -1,0 +1,137 @@
+{
+  "generated_at": "2026-03-12T15:42:09+0800",
+  "run_id": "profiling_task51_runtime_probe_20260312_001",
+  "summary_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001.json",
+  "summary_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001.md",
+  "log_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/logs/profiling_task51_runtime_probe_20260312_001.log",
+  "raw_dir": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001",
+  "hotspot_phase": {
+    "requested_mode": "reuse",
+    "status": "reused",
+    "env_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_current_safe.baseline_seeded_warm_start.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env",
+    "report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001/hotspot_tasks_reused.json",
+    "report_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001/hotspot_tasks_reused.md",
+    "recommended_full_hotspot_tasks": [
+      "reshape2",
+      "fused_variance1_add3_tir_sqrt1",
+      "reshape1",
+      "fused_mean1_subtract1_divide1_multiply1_add4",
+      "fused_conv2d1_add2",
+      "fused_conv2d2_add2",
+      "mirror_pad1",
+      "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+    ],
+    "top_tasks": [
+      {
+        "rank": 1,
+        "task_name": "reshape2",
+        "weight": 42,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 2,
+        "task_name": "fused_variance1_add3_tir_sqrt1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 3,
+        "task_name": "reshape1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 4,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4",
+        "weight": 11,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 5,
+        "task_name": "fused_conv2d1_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 6,
+        "task_name": "fused_conv2d2_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 7,
+        "task_name": "mirror_pad1",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 8,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4_relu",
+        "weight": 5,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      }
+    ],
+    "error": null,
+    "source_report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.json",
+    "source_report_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.md"
+  },
+  "runtime_phase": {
+    "requested_mode": "attempt",
+    "status": "failed",
+    "trusted_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env",
+    "trusted_variant": "current",
+    "command": "bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current --max-inputs 1 --seed 0 --profile-ops --profile-samples 1",
+    "command_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001/runtime_command.log",
+    "summary": null,
+    "fallback_reason": "trusted runtime command failed with rc=255; see /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_task51_runtime_probe_20260312_001/runtime_command.log",
+    "remote_host": "100.121.87.73",
+    "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+    "expected_artifact_sha256": "1946b08e6cf20a1259fa43f9e849a06f50ae1230c08d4df7081fba1edae4c644",
+    "returncode": 255
+  },
+  "overall_status": "stage_level_hotspot_only",
+  "recommended_full_hotspot_tasks": [
+    "reshape2",
+    "fused_variance1_add3_tir_sqrt1",
+    "reshape1",
+    "fused_mean1_subtract1_divide1_multiply1_add4",
+    "fused_conv2d1_add2",
+    "fused_conv2d2_add2",
+    "mirror_pad1",
+    "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+  ],
+  "runtime_hotspot_candidates": [],
+  "next_step_guidance": "If runtime_operator_profile is available, feed runtime_hotspot_candidates into 4.2/7.1. If only stage_level_hotspot_only is available, keep using recommended_full_hotspot_tasks for 4.2 and rebuild or replace the remote TVM runtime with profiler support before treating 7.1 as settled."
+}

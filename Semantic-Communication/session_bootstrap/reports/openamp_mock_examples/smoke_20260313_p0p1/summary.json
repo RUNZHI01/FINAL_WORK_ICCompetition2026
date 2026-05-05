@@ -1,0 +1,607 @@
+{
+  "run_id": "openamp_mock_smoke_20260313_p0p1",
+  "generated_at": "2026-03-13T22:52:54",
+  "scenario_results": [
+    {
+      "scenario": "allow",
+      "description": "合法作业获批并正常完成",
+      "tc_id": "TC-001",
+      "fit_id": null,
+      "injected_fault": null,
+      "expected_result": "JOB_ACK(ALLOW) 后完成 JOB_DONE(success)，guard 返回 READY。",
+      "actual_result": "decision=ALLOW, orchestrator=DONE, guard=READY, last_fault=F000",
+      "risk_item": null,
+      "passed": true,
+      "job_id": 1001,
+      "flags": "payload",
+      "artifact_sha_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "artifact_sha_actual": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "deadline_ms": 500,
+      "expected_outputs": 1,
+      "decision": "ALLOW",
+      "orchestrator_state": "DONE",
+      "guard_state": "READY",
+      "last_fault_code": "F000",
+      "fault_log": [],
+      "guard_state_log": [
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "BOOT",
+          "to_state": "READY",
+          "reason": "boot completed",
+          "active_job_id": 0,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "READY",
+          "to_state": "JOB_ACTIVE",
+          "reason": "job request accepted",
+          "active_job_id": 1001,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 200,
+          "component": "safety_guard",
+          "from_state": "JOB_ACTIVE",
+          "to_state": "READY",
+          "reason": "job completed and finalized",
+          "active_job_id": 0,
+          "last_fault_code": "F000"
+        }
+      ],
+      "status_snapshot": {
+        "guard_state": "READY",
+        "active_job_id": 0,
+        "last_fault_code": 0,
+        "heartbeat_ok": 0,
+        "sticky_fault": 0,
+        "total_fault_count": 0
+      },
+      "ctrl_log": [
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "JOB_REQ",
+          "seq": 1,
+          "job_id": 1001,
+          "payload": {
+            "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+            "input_shape_n": 1,
+            "input_shape_c": 32,
+            "input_shape_h": 32,
+            "input_shape_w": 32,
+            "input_dtype": 1,
+            "snr_db_x100": 1000,
+            "payload_crc32": 0,
+            "deadline_ms": 500,
+            "expected_outputs": 1,
+            "flags": "payload"
+          }
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "JOB_ACK",
+          "seq": 1,
+          "job_id": 1001,
+          "payload": {
+            "decision": 1,
+            "fault_code": 0,
+            "guard_state": "JOB_ACTIVE"
+          },
+          "fault_tag": "F000",
+          "fault_name": "NONE"
+        },
+        {
+          "at_ms": 100,
+          "direction": "linux->guard",
+          "msg_type": "HEARTBEAT",
+          "seq": 2,
+          "job_id": 1001,
+          "payload": {
+            "runtime_state": "RUNNING",
+            "elapsed_ms": 100,
+            "completed_outputs": 0,
+            "progress_x100": 5000
+          }
+        },
+        {
+          "at_ms": 200,
+          "direction": "linux->guard",
+          "msg_type": "HEARTBEAT",
+          "seq": 3,
+          "job_id": 1001,
+          "payload": {
+            "runtime_state": "RUNNING",
+            "elapsed_ms": 200,
+            "completed_outputs": 1,
+            "progress_x100": 10000
+          }
+        },
+        {
+          "at_ms": 200,
+          "direction": "linux->guard",
+          "msg_type": "JOB_DONE",
+          "seq": 4,
+          "job_id": 1001,
+          "payload": {
+            "result_code": 0,
+            "output_count": 1,
+            "result_crc32": 0,
+            "reserved": 0
+          }
+        },
+        {
+          "at_ms": 200,
+          "direction": "linux->guard",
+          "msg_type": "STATUS_REQ",
+          "seq": 5,
+          "job_id": 1001,
+          "payload": {}
+        },
+        {
+          "at_ms": 200,
+          "direction": "guard->linux",
+          "msg_type": "STATUS_RESP",
+          "seq": 2,
+          "job_id": 1001,
+          "payload": {
+            "guard_state": "READY",
+            "active_job_id": 0,
+            "last_fault_code": 0,
+            "heartbeat_ok": 0,
+            "sticky_fault": 0,
+            "total_fault_count": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "deny_sha",
+      "description": "错误 trusted current SHA 被前置拒绝",
+      "tc_id": "TC-003",
+      "fit_id": "FIT-01",
+      "injected_fault": "提交与 trusted current 不一致的 expected_sha256。",
+      "expected_result": "收到 JOB_ACK(DENY, F001)，不进入 TVM 执行。",
+      "actual_result": "decision=DENY, orchestrator=DENIED, guard=READY, last_fault=F001",
+      "risk_item": "未知 artifact 执行风险",
+      "passed": true,
+      "job_id": 1002,
+      "flags": "payload",
+      "artifact_sha_expected": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "artifact_sha_actual": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "deadline_ms": 500,
+      "expected_outputs": 1,
+      "decision": "DENY",
+      "orchestrator_state": "DENIED",
+      "guard_state": "READY",
+      "last_fault_code": "F001",
+      "fault_log": [
+        {
+          "at_ms": 0,
+          "job_id": 1002,
+          "fault_tag": "F001",
+          "fault_name": "ARTIFACT_SHA_MISMATCH",
+          "reason": "artifact sha mismatch",
+          "action": "DENY",
+          "guard_state": "READY"
+        },
+        {
+          "at_ms": 0,
+          "fault_tag": "F001",
+          "fault_name": "ARTIFACT_SHA_MISMATCH",
+          "reason": "received JOB_ACK DENY",
+          "orchestrator_state": "REQUESTING"
+        }
+      ],
+      "guard_state_log": [
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "BOOT",
+          "to_state": "READY",
+          "reason": "boot completed",
+          "active_job_id": 0,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "READY",
+          "to_state": "DENY_PENDING",
+          "reason": "artifact sha mismatch",
+          "active_job_id": 0,
+          "last_fault_code": "F001"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "DENY_PENDING",
+          "to_state": "READY",
+          "reason": "deny status consumed",
+          "active_job_id": 0,
+          "last_fault_code": "F001"
+        }
+      ],
+      "status_snapshot": {
+        "guard_state": "DENY_PENDING",
+        "active_job_id": 0,
+        "last_fault_code": 1,
+        "heartbeat_ok": 0,
+        "sticky_fault": 0,
+        "total_fault_count": 1
+      },
+      "ctrl_log": [
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "JOB_REQ",
+          "seq": 1,
+          "job_id": 1002,
+          "payload": {
+            "expected_sha256": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+            "input_shape_n": 1,
+            "input_shape_c": 32,
+            "input_shape_h": 32,
+            "input_shape_w": 32,
+            "input_dtype": 1,
+            "snr_db_x100": 1000,
+            "payload_crc32": 0,
+            "deadline_ms": 500,
+            "expected_outputs": 1,
+            "flags": "payload"
+          }
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "JOB_ACK",
+          "seq": 1,
+          "job_id": 1002,
+          "payload": {
+            "decision": 0,
+            "fault_code": 1,
+            "guard_state": "DENY_PENDING"
+          },
+          "fault_tag": "F001",
+          "fault_name": "ARTIFACT_SHA_MISMATCH"
+        },
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "STATUS_REQ",
+          "seq": 2,
+          "job_id": 1002,
+          "payload": {}
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "STATUS_RESP",
+          "seq": 2,
+          "job_id": 1002,
+          "payload": {
+            "guard_state": "DENY_PENDING",
+            "active_job_id": 0,
+            "last_fault_code": 1,
+            "heartbeat_ok": 0,
+            "sticky_fault": 0,
+            "total_fault_count": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "deny_input",
+      "description": "输入契约违规被前置拒绝",
+      "tc_id": "TC-004",
+      "fit_id": "FIT-02",
+      "injected_fault": "构造 batch=4，触发固定 batch=1 契约拒绝。",
+      "expected_result": "收到 JOB_ACK(DENY, F002)，guard 记录输入契约故障。",
+      "actual_result": "decision=DENY, orchestrator=DENIED, guard=READY, last_fault=F002",
+      "risk_item": "输入契约违规风险",
+      "passed": true,
+      "job_id": 1003,
+      "flags": "payload",
+      "artifact_sha_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "artifact_sha_actual": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "deadline_ms": 500,
+      "expected_outputs": 1,
+      "decision": "DENY",
+      "orchestrator_state": "DENIED",
+      "guard_state": "READY",
+      "last_fault_code": "F002",
+      "fault_log": [
+        {
+          "at_ms": 0,
+          "job_id": 1003,
+          "fault_tag": "F002",
+          "fault_name": "INPUT_CONTRACT_INVALID",
+          "reason": "input contract invalid",
+          "action": "DENY",
+          "guard_state": "READY"
+        },
+        {
+          "at_ms": 0,
+          "fault_tag": "F002",
+          "fault_name": "INPUT_CONTRACT_INVALID",
+          "reason": "received JOB_ACK DENY",
+          "orchestrator_state": "REQUESTING"
+        }
+      ],
+      "guard_state_log": [
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "BOOT",
+          "to_state": "READY",
+          "reason": "boot completed",
+          "active_job_id": 0,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "READY",
+          "to_state": "DENY_PENDING",
+          "reason": "input contract invalid",
+          "active_job_id": 0,
+          "last_fault_code": "F002"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "DENY_PENDING",
+          "to_state": "READY",
+          "reason": "deny status consumed",
+          "active_job_id": 0,
+          "last_fault_code": "F002"
+        }
+      ],
+      "status_snapshot": {
+        "guard_state": "DENY_PENDING",
+        "active_job_id": 0,
+        "last_fault_code": 2,
+        "heartbeat_ok": 0,
+        "sticky_fault": 0,
+        "total_fault_count": 1
+      },
+      "ctrl_log": [
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "JOB_REQ",
+          "seq": 1,
+          "job_id": 1003,
+          "payload": {
+            "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+            "input_shape_n": 4,
+            "input_shape_c": 32,
+            "input_shape_h": 32,
+            "input_shape_w": 32,
+            "input_dtype": 1,
+            "snr_db_x100": 1000,
+            "payload_crc32": 0,
+            "deadline_ms": 500,
+            "expected_outputs": 1,
+            "flags": "payload"
+          }
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "JOB_ACK",
+          "seq": 1,
+          "job_id": 1003,
+          "payload": {
+            "decision": 0,
+            "fault_code": 2,
+            "guard_state": "DENY_PENDING"
+          },
+          "fault_tag": "F002",
+          "fault_name": "INPUT_CONTRACT_INVALID"
+        },
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "STATUS_REQ",
+          "seq": 2,
+          "job_id": 1003,
+          "payload": {}
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "STATUS_RESP",
+          "seq": 2,
+          "job_id": 1003,
+          "payload": {
+            "guard_state": "DENY_PENDING",
+            "active_job_id": 0,
+            "last_fault_code": 2,
+            "heartbeat_ok": 0,
+            "sticky_fault": 0,
+            "total_fault_count": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "timeout",
+      "description": "heartbeat 超时触发 SAFE_STOP",
+      "tc_id": "TC-006",
+      "fit_id": "FIT-03",
+      "injected_fault": "合法作业启动后故意停止 heartbeat。",
+      "expected_result": "guard 触发 SAFE_STOP(F003) 并进入 FAULT_LATCHED。",
+      "actual_result": "decision=ALLOW, orchestrator=SAFE_STOPPED, guard=FAULT_LATCHED, last_fault=F003",
+      "risk_item": "主控失活风险",
+      "passed": true,
+      "job_id": 1004,
+      "flags": "payload",
+      "artifact_sha_expected": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "artifact_sha_actual": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "deadline_ms": 500,
+      "expected_outputs": 1,
+      "decision": "ALLOW",
+      "orchestrator_state": "SAFE_STOPPED",
+      "guard_state": "FAULT_LATCHED",
+      "last_fault_code": "F003",
+      "fault_log": [
+        {
+          "at_ms": 400,
+          "job_id": 1004,
+          "fault_tag": "F003",
+          "fault_name": "HEARTBEAT_TIMEOUT",
+          "reason": "heartbeat watchdog expired",
+          "action": "SAFE_STOP",
+          "guard_state": "JOB_ACTIVE"
+        },
+        {
+          "at_ms": 400,
+          "fault_tag": "F003",
+          "fault_name": "HEARTBEAT_TIMEOUT",
+          "reason": "received SAFE_STOP",
+          "orchestrator_state": "RUNNING"
+        }
+      ],
+      "guard_state_log": [
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "BOOT",
+          "to_state": "READY",
+          "reason": "boot completed",
+          "active_job_id": 0,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 0,
+          "component": "safety_guard",
+          "from_state": "READY",
+          "to_state": "JOB_ACTIVE",
+          "reason": "job request accepted",
+          "active_job_id": 1004,
+          "last_fault_code": "F000"
+        },
+        {
+          "at_ms": 400,
+          "component": "safety_guard",
+          "from_state": "JOB_ACTIVE",
+          "to_state": "FAULT_LATCHED",
+          "reason": "heartbeat watchdog expired",
+          "active_job_id": 1004,
+          "last_fault_code": "F003"
+        }
+      ],
+      "status_snapshot": {
+        "guard_state": "FAULT_LATCHED",
+        "active_job_id": 1004,
+        "last_fault_code": 3,
+        "heartbeat_ok": 0,
+        "sticky_fault": 1,
+        "total_fault_count": 1
+      },
+      "ctrl_log": [
+        {
+          "at_ms": 0,
+          "direction": "linux->guard",
+          "msg_type": "JOB_REQ",
+          "seq": 1,
+          "job_id": 1004,
+          "payload": {
+            "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+            "input_shape_n": 1,
+            "input_shape_c": 32,
+            "input_shape_h": 32,
+            "input_shape_w": 32,
+            "input_dtype": 1,
+            "snr_db_x100": 1000,
+            "payload_crc32": 0,
+            "deadline_ms": 500,
+            "expected_outputs": 1,
+            "flags": "payload"
+          }
+        },
+        {
+          "at_ms": 0,
+          "direction": "guard->linux",
+          "msg_type": "JOB_ACK",
+          "seq": 1,
+          "job_id": 1004,
+          "payload": {
+            "decision": 1,
+            "fault_code": 0,
+            "guard_state": "JOB_ACTIVE"
+          },
+          "fault_tag": "F000",
+          "fault_name": "NONE"
+        },
+        {
+          "at_ms": 100,
+          "direction": "linux->guard",
+          "msg_type": "HEARTBEAT",
+          "seq": 2,
+          "job_id": 1004,
+          "payload": {
+            "runtime_state": "RUNNING",
+            "elapsed_ms": 100,
+            "completed_outputs": 0,
+            "progress_x100": 2500
+          }
+        },
+        {
+          "at_ms": 400,
+          "direction": "guard->linux",
+          "msg_type": "SAFE_STOP",
+          "seq": 2,
+          "job_id": 1004,
+          "payload": {
+            "fault_code": 3,
+            "guard_state": "FAULT_LATCHED"
+          },
+          "fault_tag": "F003",
+          "fault_name": "HEARTBEAT_TIMEOUT"
+        },
+        {
+          "at_ms": 400,
+          "direction": "linux->guard",
+          "msg_type": "JOB_DONE",
+          "seq": 3,
+          "job_id": 1004,
+          "payload": {
+            "result_code": 1,
+            "output_count": 0,
+            "result_crc32": 0,
+            "reserved": 0
+          }
+        },
+        {
+          "at_ms": 400,
+          "direction": "linux->guard",
+          "msg_type": "STATUS_REQ",
+          "seq": 4,
+          "job_id": 1004,
+          "payload": {}
+        },
+        {
+          "at_ms": 400,
+          "direction": "guard->linux",
+          "msg_type": "STATUS_RESP",
+          "seq": 3,
+          "job_id": 1004,
+          "payload": {
+            "guard_state": "FAULT_LATCHED",
+            "active_job_id": 1004,
+            "last_fault_code": 3,
+            "heartbeat_ok": 0,
+            "sticky_fault": 1,
+            "total_fault_count": 1
+          }
+        }
+      ]
+    }
+  ]
+}

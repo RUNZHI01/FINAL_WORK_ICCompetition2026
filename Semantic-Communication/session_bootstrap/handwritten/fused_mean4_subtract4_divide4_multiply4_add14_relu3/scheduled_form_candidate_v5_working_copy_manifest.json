@@ -1,0 +1,54 @@
+{
+  "generated_at_utc": "2026-04-06T07:35:00Z",
+  "operator": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+  "phase": "scheduled_form_candidate_v5_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v5_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v5_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v4.py",
+    "candidate_version": "v4_working_copy",
+    "status": "board_proven_positive_branch_baked_into_handwritten_final",
+    "remote_report": "./session_bootstrap/reports/mean4_v4_remote_benchmark_20260406_1425.md",
+    "remote_median_ms": 241.948
+  },
+  "current_edit_state": {
+    "status": "v5_channel_affine_precompute_applied",
+    "working_copy_tir_sha256": "c81f8b7c6605dc8933a8abf6ad112a6f60e505ce8033a0d942e07732a93f5115",
+    "concrete_change": "Keep the mean reduction and one-pass spatial epilogue from v4, but collapse the channel-wise epilogue parameters into an affine pair `scale = weight / std` and `shift = bias - mean * scale`, so the hot loop only executes `x * scale + shift + relu`.",
+    "preserved_non_changes": [
+      "the checked-in v1 seed-clone baseline remains frozen in its own files",
+      "the checked-in v2 scalar-epilogue candidate remains intact as the board-regressed branch",
+      "the checked-in v3 local-mean-handoff-only ablation remains intact for isolation",
+      "the checked-in v4 fused-epilogue branch remains intact as the current handwritten final baseline",
+      "the reduction domain remains 256 x 256 per channel",
+      "the output signature and ReLU semantics remain unchanged"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "previous_v4_candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v4.py",
+    "previous_v4_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v4_working_copy_tir.py",
+    "previous_v4_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v4_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v5_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v5_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy keeps the v4 memory-traffic win, but now also removes two scalar ops from the hot loop by precomputing the channel-wise affine pair.",
+    "The branch stays local-only and diagnostic-only until local build and handwritten-line board validation are completed.",
+    "The intent is to keep the handwritten line focused on mean4-specific affine collapse rather than reopening cross-operator pattern transfer."
+  ]
+}

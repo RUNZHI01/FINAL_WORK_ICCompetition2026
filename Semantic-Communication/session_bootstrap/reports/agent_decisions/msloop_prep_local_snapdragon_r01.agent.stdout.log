@@ -1,0 +1,135 @@
+[submit] session=main
+[openclaw] Building TypeScript (dist is stale).
+[submit] runId=live-1772387342-11159 status=started
+[openclaw] Building TypeScript (dist is stale).
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-dgjhkhbg.js             [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-BLl0yZg4.js                    [2m   1.27 kB[22m [2m│ gzip:   0.55 kB[22m
+[log] [34mℹ[39m [2mdist/plugin-sdk/[22mtarget-errors-RXs1OCTQ.js             [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/plugin-sdk/[22merrors-D0xt6lgD.js                    [2m   1.27 kB[22m [2m│ gzip:   0.54 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-ZJ2oHKSY.js                 [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-ep9Fblgx.js                        [2m   1.27 kB[22m [2m│ gzip:   0.54 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-1mgYIvgl.js                    [2m   6.67 kB[22m [2m│ gzip:   2.02 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-8IxbaLwV.js                           [2m   1.43 kB[22m [2m│ gzip:   0.60 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-D4aLwsCU.js                    [2m   6.67 kB[22m [2m│ gzip:   2.02 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-Cu3BYw29.js                           [2m   1.43 kB[22m [2m│ gzip:   0.60 kB[22m
+[status] 5s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 12s running...
+[log] 2026-03-01T17:49:18.882Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quick_rpc_armv8_snapdragon_local_round1_20260302_014854.md'
+[log] 2026-03-01T17:49:18.883Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/quick_rpc_armv8_snapdragon_local_round1_20260302_014854.md'
+[log] 2026-03-01T17:49:18.888Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/full_rpc_armv8_snapdragon_local_round1_20260302_014854.md'
+[log] 2026-03-01T17:49:18.889Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/full_rpc_armv8_snapdragon_local_round1_20260302_014854.md'
+[openclaw] Building TypeScript (dist is stale).
+[status] 18s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 24s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 31s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 37s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 44s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 50s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 56s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 63s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 69s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 75s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 82s running...
+[openclaw] Building TypeScript (dist is stale).
+[done] runId=live-1772387342-11159 status=ok elapsed=87s
+[log] 2026-03-02T03:36:25.250Z error [tools] exec failed: /bin/bash: line 1: python: command not found
+[log] 2026-03-02T03:36:25.250Z error [tools] exec failed: /bin/bash: line 1: python: command not found
+[log] 2026-03-02T04:28:27.016Z info exec {"subsystem":"exec"} elevated command cd /home/tianxing/paper-first-draft/manuscript && latexmk -xelatex -interaction=nonstopmode -file-line-error main.tex
+[log] 2026-03-02T04:28:53.358Z info exec {"subsystem":"exec"} elevated command export PATH="$HOME/.TinyTeX/bin/$(uname -m)-linux:$PATH"; ...xelatex -interaction=nonstopmode -file-line-error main.tex
+[log] 2026-03-02T04:29:16.203Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:16.203Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:16.209Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:16.209Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:30.036Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:30.036Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:30.039Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:30.039Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:45.538Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:45.539Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:45.541Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:45.541Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:58.624Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:29:58.625Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:10.356Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:10.357Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:30.618Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:30.618Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:46.503Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:46.504Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:59.384Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:30:59.384Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:20.738Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:20.739Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:38.514Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:38.515Z error [tools] edit failed: Missing required parameters: path (path or file_path), oldText (oldText or old_string), newText (newText or new_string). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:57.702Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:31:57.703Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:32:12.705Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:32:12.705Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:31.140Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:31.141Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:44.314Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:44.314Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:54.349Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:48:54.350Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:49:06.254Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T04:49:06.254Z error [tools] edit failed: Missing required parameter: path (path or file_path). Supply correct parameters before retrying.
+[log] 2026-03-02T06:30:59.304Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=da2bb16d-f8a1-4b29-833d-ba679624fe36 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:04.921Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=da2bb16d-f8a1-4b29-833d-ba679624fe36 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:12.657Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=da2bb16d-f8a1-4b29-833d-ba679624fe36 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:24.256Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=da2bb16d-f8a1-4b29-833d-ba679624fe36 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:43.963Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=40ecc769-0b30-4c97-9f4d-816e07a0fd4e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:49.611Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=40ecc769-0b30-4c97-9f4d-816e07a0fd4e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:31:57.333Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=40ecc769-0b30-4c97-9f4d-816e07a0fd4e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:32:12.662Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=9a382e32-e086-4d24-b851-0c702ecd46b8 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:32:18.375Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=9a382e32-e086-4d24-b851-0c702ecd46b8 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:32:26.135Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=9a382e32-e086-4d24-b851-0c702ecd46b8 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:32:41.606Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=1e0f20d7-2dc9-4d65-9291-2116b20d0167 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T06:53:59.730Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/paper-first-draft/library/notes/lithobench.txt'
+[log] 2026-03-02T06:53:59.731Z error [tools] read failed: ENOENT: no such file or directory, access '/home/tianxing/paper-first-draft/library/notes/lithobench.txt'
+[log] 2026-03-02T07:12:26.162Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=4f043175-fdf7-49c1-9593-b652425dc0ef isError=true error=An error occurred while processing your request. You can retry your request, or contact us through our help center at help.openai.com if the error persists. Please include the request ID 2ea8c810-ca56-4510-80f5-6afe66718e20 in your message.
+[log] 2026-03-02T07:46:21.904Z error [tools] read failed: Offset 200 is beyond end of file (199 lines total)
+[log] 2026-03-02T07:46:21.905Z error [tools] read failed: Offset 200 is beyond end of file (199 lines total)
+[log] 2026-03-02T07:54:59.587Z error [tools] image failed: Local media path is not under an allowed directory: /home/tianxing/paper-first-draft/library/figures/lithosim_openreview/p003_img03.png
+[log] 2026-03-02T07:54:59.588Z error [tools] image failed: Local media path is not under an allowed directory: /home/tianxing/paper-first-draft/library/figures/lithosim_openreview/p003_img03.png
+[log] 2026-03-02T08:17:05.447Z error [tools] image failed: Local media path is not under an allowed directory: /home/tianxing/paper-first-draft/manuscript/figures-inline/adaopc.png
+[log] 2026-03-02T08:17:05.448Z error [tools] image failed: Local media path is not under an allowed directory: /home/tianxing/paper-first-draft/manuscript/figures-inline/adaopc.png
+[log] 2026-03-02T08:23:44.016Z error [tools] image failed: Image model failed (openai/gpt-5-mini): 401 Incorrect API key provided: sk-rlnCa***************************************YdN9. You can find your API key at https://platform.openai.com/account/api-keys.
+[log] 2026-03-02T08:23:44.017Z error [tools] image failed: Image model failed (openai/gpt-5-mini): 401 Incorrect API key provided: sk-rlnCa***************************************YdN9. You can find your API key at https://platform.openai.com/account/api-keys.
+[log] 2026-03-02T09:44:27.622Z warn compaction {"subsystem":"compaction"} Full summarization failed, trying partial: Summarization failed: 502 "TypeError: fetch failed"
+[log] 2026-03-02T09:44:40.317Z warn compaction {"subsystem":"compaction"} Partial summarization also failed: Summarization failed: 502 "TypeError: fetch failed"
+[log] 2026-03-02T09:44:52.977Z warn compaction {"subsystem":"compaction"} Full summarization failed, trying partial: Summarization failed: 502 "TypeError: fetch failed"
+[log] 2026-03-02T09:45:09.123Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3b38a82e-9b13-44ba-b288-7782b1a7aafa isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:45:14.900Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3b38a82e-9b13-44ba-b288-7782b1a7aafa isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:45:22.584Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3b38a82e-9b13-44ba-b288-7782b1a7aafa isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:45:38.022Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=94ff4ae4-10db-4289-8212-5d21e29aa7c0 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:45:43.671Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=94ff4ae4-10db-4289-8212-5d21e29aa7c0 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:45:51.352Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=94ff4ae4-10db-4289-8212-5d21e29aa7c0 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T09:47:55.111Z info exec {"subsystem":"exec"} elevated command export PATH="$HOME/.TinyTeX/bin/$(uname -m)-linux:$PATH" &...xelatex -interaction=nonstopmode -file-line-error main.tex
+[log] 2026-03-02T10:31:05.124Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=d127a7ea-73d6-4f38-9220-f0475548e802 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:31:10.740Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=d127a7ea-73d6-4f38-9220-f0475548e802 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:31:18.332Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=d127a7ea-73d6-4f38-9220-f0475548e802 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:31:33.979Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3d46c7ac-de02-42d8-9e21-2a1aad9a579a isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:31:39.589Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3d46c7ac-de02-42d8-9e21-2a1aad9a579a isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:31:47.257Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=3d46c7ac-de02-42d8-9e21-2a1aad9a579a isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:02.708Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=fad93f12-9f66-4ac4-a28f-c7ff72032823 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:08.215Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=fad93f12-9f66-4ac4-a28f-c7ff72032823 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:15.875Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=fad93f12-9f66-4ac4-a28f-c7ff72032823 isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:31.307Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=7e347be2-7239-424a-ab25-4cb4b441686b isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:36.951Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=7e347be2-7239-424a-ab25-4cb4b441686b isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:32:44.773Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=7e347be2-7239-424a-ab25-4cb4b441686b isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:33:00.011Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=e5c027a7-b5e1-4efb-84a8-78ba7606158e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:33:05.700Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=e5c027a7-b5e1-4efb-84a8-78ba7606158e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:33:13.241Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=e5c027a7-b5e1-4efb-84a8-78ba7606158e isError=true error=HTTP 502: "TypeError: fetch failed"
+[log] 2026-03-02T10:33:24.914Z warn agent/embedded {"subsystem":"agent/embedded"} embedded run agent end: runId=e5c027a7-b5e1-4efb-84a8-78ba7606158e isError=true error=HTTP 502: "TypeError: fetch failed"

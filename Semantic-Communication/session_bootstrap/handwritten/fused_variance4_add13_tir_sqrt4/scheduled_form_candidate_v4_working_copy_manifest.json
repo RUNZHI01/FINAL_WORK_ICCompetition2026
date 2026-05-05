@@ -1,0 +1,91 @@
+{
+  "generated_at_utc": "2026-04-02T05:28:28Z",
+  "operator": "fused_variance4_add13_tir_sqrt4",
+  "phase": "scheduled_form_candidate_v4_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v4_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v4_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_post_db_scheduled_reference_seed_tir.py",
+    "reference_tir_sha256": "ebe53f7f503cd5c0db9e8f7df77f30fae6295e0c448153bc482837e6a73c2ebf",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply",
+    "reference_source": {
+      "task_summary_json": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/task_summary.json",
+      "database_dir": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/tuning_logs",
+      "operator_global_var": "fused_variance4_add13_tir_sqrt4",
+      "post_db_operator_tir_is_scheduled": false,
+      "structural_equal_to_database_query_ir_module_main": null,
+      "source_seam_id": "post_database_scheduled_primfunc_swap"
+    },
+    "reference_task_rows": {
+      "task_summary_row": {
+        "rank": 26,
+        "task_name": "fused_variance4_add13_tir_sqrt4",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      },
+      "reconstructed_task_row": {
+        "rank": 26,
+        "task_name": "fused_variance4_add13_tir_sqrt4",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      }
+    }
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v1.py",
+    "candidate_version": "v1_working_copy",
+    "status": "seed_synced_unedited",
+    "local_status_report": "./session_bootstrap/reports/variance4_handwritten_lane_status_20260402.md"
+  },
+  "current_edit_state": {
+    "status": "v4_mean_divide_stage_fused_into_subtract_on_top_of_v3_applied",
+    "working_copy_tir_sha256": "25ffed20f9a770144f1f1dd5d73f9d767e334c718c17113e6f82bb87246370a5",
+    "concrete_change": "On top of the checked-in v3 scheduled-form working copy, remove the standalone T_divide mean buffer/stage and fold the mean /65536.0 directly into T_subtract while keeping the v3 variance-normalization divide folded into sqrt, the v2 epsilon add fused into sqrt, both reductions, the T_subtract/T_multiply materialization, and the output signature unchanged.",
+    "preserved_non_changes": [
+      "the frozen v1 scheduled-form candidate remains intact as the seed-aligned baseline",
+      "the checked-in v2 candidate remains intact as the first isolated iteration",
+      "the checked-in v3 candidate remains intact as the prior isolated iteration",
+      "the lv335_red and T_multiply_red reductions remain materialized",
+      "the T_subtract and T_multiply full-size staging buffers remain materialized",
+      "the file stays local-only, diagnostic-only, and not hook-facing"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "previous_v2_candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v2.py",
+    "previous_v2_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v2_working_copy_tir.py",
+    "previous_v2_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v2_working_copy_manifest.json",
+    "previous_v3_candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v3.py",
+    "previous_v3_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v3_working_copy_tir.py",
+    "previous_v3_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v3_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v4_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v4_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the checked-in scheduled-form v3 working copy rather than from a raw pre-compile hook lane.",
+    "The v4 purpose is to isolate one narrow follow-up mean-stage simplification without disturbing the local proof seam already established for v1, v2, and v3.",
+    "This candidate remains local-only and diagnostic-only; it does not make performance claims."
+  ]
+}

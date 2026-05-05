@@ -1,0 +1,16 @@
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.metricItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}

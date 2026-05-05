@@ -1,0 +1,30 @@
+{
+  "python_executable": "/home/user/anaconda3/envs/tvm310_safe/bin/python",
+  "python_version": "3.10.20 | packaged by conda-forge | (main, Mar  5 2026, 16:36:56) [GCC 14.3.0]",
+  "tvm_version": "0.24.dev0",
+  "tvm_import_ok": true,
+  "relax_import_ok": true,
+  "virtual_machine_class_found": true,
+  "virtual_machine_has_profile": true,
+  "virtual_machine_profile_like_members": [
+    "profile"
+  ],
+  "virtual_machine_selected_members": [
+    "invoke_closure",
+    "profile",
+    "save_function",
+    "set_input",
+    "time_evaluator"
+  ],
+  "runtime_profiling_import_ok": true,
+  "runtime_profiling_report_members": [
+    "calls",
+    "configuration",
+    "csv",
+    "device_metrics",
+    "from_json",
+    "json",
+    "same_as",
+    "table"
+  ]
+}

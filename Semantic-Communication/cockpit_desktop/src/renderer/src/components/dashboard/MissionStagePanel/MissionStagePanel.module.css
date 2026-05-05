@@ -1,0 +1,23 @@
+/* Mission Stage Panel - Right sidebar */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);  /* Visual hierarchy between sections */
+}
+
+.primarySection {
+  display: flex;
+  flex-direction: column;
+}
+
+.secondarySection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;  /* Tighter grouping for secondary content */
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

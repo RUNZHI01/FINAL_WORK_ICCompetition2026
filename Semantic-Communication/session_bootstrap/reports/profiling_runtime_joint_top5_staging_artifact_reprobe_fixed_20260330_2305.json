@@ -1,0 +1,3587 @@
+{
+  "generated_at": "2026-03-30T23:02:18+0800",
+  "run_id": "profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305",
+  "summary_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305.json",
+  "summary_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305.md",
+  "log_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/logs/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305.log",
+  "raw_dir": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305",
+  "hotspot_phase": {
+    "requested_mode": "reuse",
+    "status": "reused",
+    "env_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_current_safe.baseline_seeded_warm_start.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env",
+    "report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305/hotspot_tasks_reused.json",
+    "report_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305/hotspot_tasks_reused.md",
+    "recommended_full_hotspot_tasks": [
+      "reshape2",
+      "fused_variance1_add3_tir_sqrt1",
+      "reshape1",
+      "fused_mean1_subtract1_divide1_multiply1_add4",
+      "fused_conv2d1_add2",
+      "fused_conv2d2_add2",
+      "mirror_pad1",
+      "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+    ],
+    "top_tasks": [
+      {
+        "rank": 1,
+        "task_name": "reshape2",
+        "weight": 42,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 2,
+        "task_name": "fused_variance1_add3_tir_sqrt1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 3,
+        "task_name": "reshape1",
+        "weight": 21,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 4,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4",
+        "weight": 11,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 5,
+        "task_name": "fused_conv2d1_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 6,
+        "task_name": "fused_conv2d2_add2",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 7,
+        "task_name": "mirror_pad1",
+        "weight": 10,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      },
+      {
+        "rank": 8,
+        "task_name": "fused_mean1_subtract1_divide1_multiply1_add4_relu",
+        "weight": 5,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}"
+      }
+    ],
+    "error": null,
+    "source_report_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.json",
+    "source_report_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/hotspot_tasks_trusted_current_20260312_153906.md"
+  },
+  "runtime_phase": {
+    "requested_mode": "attempt",
+    "status": "profiled_raw",
+    "trusted_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/profile_joint_top5_staging_artifact_fixed_20260330.env",
+    "trusted_variant": "current",
+    "command": "bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current --max-inputs 1 --seed 0 --profile-ops --profile-samples 1",
+    "command_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305/runtime_command.log",
+    "summary": {
+      "variant": "current",
+      "artifact_path": "/home/user/Downloads/jscc-test/jscc_staging/tvm_tune_logs/optimized_model.so",
+      "artifact_sha256": "9979d906a7eb52772eab3c124aea58246e7e0f0e4391b76d57af6d095ddbc805",
+      "artifact_sha256_expected": "9979d906a7eb52772eab3c124aea58246e7e0f0e4391b76d57af6d095ddbc805",
+      "artifact_sha256_match": true,
+      "input_dir": "/home/user/Downloads/jscc-test/简化版latent",
+      "output_dir": "/home/user/Downloads/jscc-test/jscc/infer_outputs/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305_current/reconstructions",
+      "output_count": 1,
+      "processed_count": 1,
+      "input_count": 1,
+      "available_input_count": 300,
+      "load_ms": 2.404,
+      "vm_init_ms": 0.493,
+      "run_count": 1,
+      "run_samples_ms": [
+        389.017
+      ],
+      "run_median_ms": 389.017,
+      "run_mean_ms": 389.017,
+      "run_min_ms": 389.017,
+      "run_max_ms": 389.017,
+      "run_variance_ms2": 0.0,
+      "output_shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "output_dtype": "float32",
+      "snr": 10.0,
+      "batch_size": 1,
+      "save_format": "png",
+      "seed": 0,
+      "max_inputs": 1,
+      "runtime_profiling": {
+        "requested": true,
+        "profile_samples_requested": 1,
+        "attempted_samples": 1,
+        "successful_samples": 1,
+        "supported": true,
+        "status": "profiled_raw",
+        "top_ops": [
+          {
+            "name": "fused_conv2d_add2",
+            "mean_duration_us": 61546.916,
+            "mean_percent": 26.484050469072386,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_conv2d_transpose2_add12",
+            "mean_duration_us": 23694.824,
+            "mean_percent": 10.196041580244048,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_conv2d_transpose1_add9",
+            "mean_duration_us": 19294.962,
+            "mean_percent": 8.30275147185009,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_conv2d_transpose_add6",
+            "mean_duration_us": 18622.367,
+            "mean_percent": 8.013329335325073,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_conv2d3_add15",
+            "mean_duration_us": 16063.64,
+            "mean_percent": 6.912291957520828,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+            "mean_duration_us": 12115.582,
+            "mean_percent": 5.213416138514316,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_variance4_add13_tir_sqrt4",
+            "mean_duration_us": 7628.085,
+            "mean_percent": 3.28241610225237,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          },
+          {
+            "name": "fused_mean3_subtract3_divide3_multiply3_add11_relu2",
+            "mean_duration_us": 5872.388,
+            "mean_percent": 2.5269279157053957,
+            "samples": 1,
+            "devices": [
+              "cpu0"
+            ]
+          }
+        ],
+        "sample_results": [
+          {
+            "input_file": "Places365_val_00000208_latent.pt",
+            "requested": true,
+            "supported": true,
+            "status": "profiled_raw",
+            "api_call": "vm.profile('main', input)",
+            "attempts": [
+              {
+                "call": "vm.profile('main', input)",
+                "status": "ok",
+                "elapsed_ms": 601.351
+              }
+            ],
+            "elapsed_ms": 601.351,
+            "rows": [],
+            "report_text": "Name                                                    Duration (us)  Percent  Device  Count                                                                                                                                             Argument Shapes  \nfused_conv2d_add2                                           61,546.92    26.48    cpu0      1                                                                 float32[1, 32, 34, 34], float32[96, 32, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]  \nfused_conv2d_transpose2_add12                               23,694.82    10.20    cpu0      1                                                             float32[1, 24, 128, 128], float32[24, 12, 3, 3], float32[1, 12, 1, 1], float32[1, 12, 256, 256]  \nfused_conv2d_transpose1_add9                                19,294.96     8.30    cpu0      1                                                               float32[1, 48, 64, 64], float32[48, 24, 3, 3], float32[1, 24, 1, 1], float32[1, 24, 128, 128]  \nfused_conv2d_transpose_add6                                 18,622.37     8.01    cpu0      1                                                                 float32[1, 96, 32, 32], float32[96, 48, 3, 3], float32[1, 48, 1, 1], float32[1, 48, 64, 64]  \nfused_conv2d3_add15                                         16,063.64     6.91    cpu0      1                                                                float32[1, 12, 262, 262], float32[3, 12, 7, 7], float32[1, 3, 1, 1], float32[1, 3, 256, 256]  \nfused_variance1_add3_tir_sqrt1                              14,311.08     6.16    cpu0     21                                                                                                                float32[1, 96, 32, 32], float32[1, 96, 1, 1]  \nfused_mean4_subtract4_divide4_multiply4_add14_relu3         12,115.58     5.21    cpu0      1                                              float32[1, 12, 256, 256], float32[1, 12, 1, 1], float32[12, 1, 1], float32[12, 1, 1], float32[1, 12, 256, 256]  \nfused_conv2d2_add2                                          11,533.00     4.96    cpu0     10                                                                 float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]  \nfused_mean1_subtract1_divide1_multiply1_add4                 8,748.98     3.76    cpu0     11                                                  float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]  \nfused_variance4_add13_tir_sqrt4                              7,628.09     3.28    cpu0      1                                                                                                              float32[1, 12, 256, 256], float32[1, 12, 1, 1]  \nfused_conv2d1_add2                                           5,879.59     2.53    cpu0     10                                                                  float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]  \nfused_mean3_subtract3_divide3_multiply3_add11_relu2          5,872.39     2.53    cpu0      1                                              float32[1, 24, 128, 128], float32[1, 24, 1, 1], float32[24, 1, 1], float32[24, 1, 1], float32[1, 24, 128, 128]  \nfused_mean1_subtract1_divide1_multiply1_add4_relu            5,399.19     2.32    cpu0      5                                                  float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]  \nfused_mean1_subtract1_divide1_multiply1_add4_add5            3,886.84     1.67    cpu0      4                          float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]  \nfused_variance3_add10_tir_sqrt3                              3,590.17     1.54    cpu0      1                                                                                                              float32[1, 24, 128, 128], float32[1, 24, 1, 1]  \nfused_mean2_subtract2_divide2_multiply2_add8_relu1           2,226.46     0.96    cpu0      1                                                  float32[1, 48, 64, 64], float32[1, 48, 1, 1], float32[48, 1, 1], float32[48, 1, 1], float32[1, 48, 64, 64]  \nmirror_pad1                                                  1,995.87     0.86    cpu0     10                                                                                                              float32[1, 96, 32, 32], float32[1, 96, 34, 34]  \nfused_variance2_add7_tir_sqrt2                               1,785.06     0.77    cpu0      1                                                                                                                float32[1, 48, 64, 64], float32[1, 48, 1, 1]  \nmirror_pad2                                                  1,694.26     0.73    cpu0      1                                                                                                          float32[1, 12, 256, 256], float32[1, 12, 262, 262]  \nfused_mean1_subtract1_divide1_multiply1_add4_add5_add5       1,202.42     0.52    cpu0      1  float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32], float32[1, 96, 32, 32]  \nfused_mean_subtract_divide_multiply_add1                       227.13     0.10    cpu0      1                                                  float32[1, 32, 32, 32], float32[1, 32, 1, 1], float32[32, 1, 1], float32[32, 1, 1], float32[1, 32, 32, 32]  \nfused_variance_add_tir_sqrt                                    214.93     0.09    cpu0      1                                                                                                                float32[1, 32, 32, 32], float32[1, 32, 1, 1]  \nvm.builtin.reshape                                             207.03     0.09    cpu0     63                                                                                                                                                 float32[96]  \nmirror_pad                                                      56.24     0.02    cpu0      1                                                                                                              float32[1, 32, 32, 32], float32[1, 32, 34, 34]  \nvm.builtin.reshape                                              15.44     0.01    cpu0      3                                                                                                                                                 float32[48]  \nvm.builtin.reshape                                              13.56     0.01    cpu0      3                                                                                                                                                 float32[24]  \nvm.builtin.reshape                                              12.74     0.01    cpu0      3                                                                                                                                                 float32[12]  \nvm.builtin.check_tensor_info                                     9.24     0.00    cpu0      1                                                                                                                                      float32[1, 32, 32, 32]  \nvm.builtin.reshape                                               7.38     0.00    cpu0      1                                                                                                                                                  float32[3]  \nvm.builtin.reshape                                               6.62     0.00    cpu0      2                                                                                                                                                 float32[32]  \nvm.builtin.match_shape                                           4.26     0.00    cpu0      1                                                                                                                                      float32[1, 32, 32, 32]  \n----------                                                                                                                                                                                                                                                 \nSum                                                        227,866.24    98.05            164                                                                                                                                                              \nTotal                                                      232,392.38             cpu0      1                                                                                                                                                              \n\nConfiguration\n-------------\nNumber of threads: 2\nExecutor: VM\n",
+            "report_json": {
+              "calls": [
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.check_tensor_info"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00397603393050968
+                  },
+                  "Duration (us)": {
+                    "microseconds": 9.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.match_shape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.0018326762456754
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.259
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 32, 32], float32[1, 32, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance_add_tir_sqrt"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.09248711047470087
+                  },
+                  "Duration (us)": {
+                    "microseconds": 214.933
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00192777402691378
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.48
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00092085634321328
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.14
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 32, 32], float32[1, 32, 1, 1], float32[32, 1, 1], float32[32, 1, 1], float32[1, 32, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean_subtract_divide_multiply_add1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.09773642193771902
+                  },
+                  "Duration (us)": {
+                    "microseconds": 227.132
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 32, 32], float32[1, 32, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.02419958833160207
+                  },
+                  "Duration (us)": {
+                    "microseconds": 56.238
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00110115485153401
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.559
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 32, 34, 34], float32[96, 32, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 26.484050469072386
+                  },
+                  "Duration (us)": {
+                    "microseconds": 61546.916
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3110144965465585
+                  },
+                  "Duration (us)": {
+                    "microseconds": 722.774
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00225480712076523
+                  },
+                  "Duration (us)": {
+                    "microseconds": 5.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00092085634321328
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.14
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.34523119460417084
+                  },
+                  "Duration (us)": {
+                    "microseconds": 802.291
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08861391984607343
+                  },
+                  "Duration (us)": {
+                    "microseconds": 205.932
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00187570691591901
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.359
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2536997953155805
+                  },
+                  "Duration (us)": {
+                    "microseconds": 589.579
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2978905724289595
+                  },
+                  "Duration (us)": {
+                    "microseconds": 692.275
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00197898052450368
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.599
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00086061340487222
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.0
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3573482010380693
+                  },
+                  "Duration (us)": {
+                    "microseconds": 830.45
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00149746732447767
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.48
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.5061947318643399
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1176.358
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2871505474428566
+                  },
+                  "Duration (us)": {
+                    "microseconds": 667.316
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00186753108857273
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.34
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00076594593033628
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.78
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.9149112258124226
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2126.184
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08498213127751265
+                  },
+                  "Duration (us)": {
+                    "microseconds": 197.492
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00197037439045496
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.579
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.24573912132051243
+                  },
+                  "Duration (us)": {
+                    "microseconds": 571.079
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3016338104334513
+                  },
+                  "Duration (us)": {
+                    "microseconds": 700.974
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00197898052450368
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.599
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.000929462477262
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.16
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.33165975151603827
+                  },
+                  "Duration (us)": {
+                    "microseconds": 770.752
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00133395077755195
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.1
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.5032596098470232
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1169.537
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2848268912497016
+                  },
+                  "Duration (us)": {
+                    "microseconds": 661.916
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00169497810089585
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.939
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00130813237540578
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.04
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_add5"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.417365228360346
+                  },
+                  "Duration (us)": {
+                    "microseconds": 969.925
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08278799740179092
+                  },
+                  "Duration (us)": {
+                    "microseconds": 192.393
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00169540840759828
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.94
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2403951423829584
+                  },
+                  "Duration (us)": {
+                    "microseconds": 558.66
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2974688718605721
+                  },
+                  "Duration (us)": {
+                    "microseconds": 691.295
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00210850284193695
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.9
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00084340113677478
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.96
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3570641986144615
+                  },
+                  "Duration (us)": {
+                    "microseconds": 829.79
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.001394193715893
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.4999897092152113
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1161.938
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2868149082149564
+                  },
+                  "Duration (us)": {
+                    "microseconds": 666.536
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00159213479901362
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.7
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00086921953892095
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.02
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.34699545208415883
+                  },
+                  "Duration (us)": {
+                    "microseconds": 806.391
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08881186092919405
+                  },
+                  "Duration (us)": {
+                    "microseconds": 206.392
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00142861825208789
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.32
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.26961167655826307
+                  },
+                  "Duration (us)": {
+                    "microseconds": 626.557
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2979938460375442
+                  },
+                  "Duration (us)": {
+                    "microseconds": 692.515
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00186710078187029
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.339
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00098970541560306
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.3
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3361521534894713
+                  },
+                  "Duration (us)": {
+                    "microseconds": 781.192
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00119625263277239
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.78
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.48963652995459833
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1137.878
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.28165165809242554
+                  },
+                  "Duration (us)": {
+                    "microseconds": 654.537
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.0013167385094545
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.06
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.000774552064385
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.8
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_add5"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.42767494664401284
+                  },
+                  "Duration (us)": {
+                    "microseconds": 993.884
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08162659961191585
+                  },
+                  "Duration (us)": {
+                    "microseconds": 189.694
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00158352866496489
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.68
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.23854482356248313
+                  },
+                  "Duration (us)": {
+                    "microseconds": 554.36
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2957304327827302
+                  },
+                  "Duration (us)": {
+                    "microseconds": 687.255
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00275396289559112
+                  },
+                  "Duration (us)": {
+                    "microseconds": 6.4
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00099788124294934
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.319
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.33610008637847655
+                  },
+                  "Duration (us)": {
+                    "microseconds": 781.071
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00125649557111345
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.92
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.501857240303784
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1166.278
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2903003925046889
+                  },
+                  "Duration (us)": {
+                    "microseconds": 674.636
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00160074093306234
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.72
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00073152139414139
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.7
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3453344682127555
+                  },
+                  "Duration (us)": {
+                    "microseconds": 802.531
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08763325087122154
+                  },
+                  "Duration (us)": {
+                    "microseconds": 203.653
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00223759485266778
+                  },
+                  "Duration (us)": {
+                    "microseconds": 5.2
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2651627355617761
+                  },
+                  "Duration (us)": {
+                    "microseconds": 616.218
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.29976627934487854
+                  },
+                  "Duration (us)": {
+                    "microseconds": 696.634
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00158352866496489
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.68
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00105855448799284
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.46
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.35608352963960954
+                  },
+                  "Duration (us)": {
+                    "microseconds": 827.511
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00172122680974445
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.0
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.48618590050776317
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1129.859
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.28221923263293874
+                  },
+                  "Duration (us)": {
+                    "microseconds": 655.856
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00130813237540578
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.04
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00144583052018534
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.36
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_add5"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.4132601024191055
+                  },
+                  "Duration (us)": {
+                    "microseconds": 960.385
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08261587472081647
+                  },
+                  "Duration (us)": {
+                    "microseconds": 191.993
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00166959000545211
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.88
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2480283529774726
+                  },
+                  "Duration (us)": {
+                    "microseconds": 576.399
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.30150514872942286
+                  },
+                  "Duration (us)": {
+                    "microseconds": 700.675
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00199662309930356
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.64
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00082618886867734
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.92
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.33033440687253507
+                  },
+                  "Duration (us)": {
+                    "microseconds": 767.672
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00123067716896728
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.86
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.4917282508351404
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1142.739
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.28552398810764806
+                  },
+                  "Duration (us)": {
+                    "microseconds": 663.536
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00135976917969811
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.16
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00076594593033628
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.78
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3608508975958993
+                  },
+                  "Duration (us)": {
+                    "microseconds": 838.59
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.0886311321141709
+                  },
+                  "Duration (us)": {
+                    "microseconds": 205.972
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00138515727514184
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.219
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2558595046551074
+                  },
+                  "Duration (us)": {
+                    "microseconds": 594.598
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.30216782105117446
+                  },
+                  "Duration (us)": {
+                    "microseconds": 702.215
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00169540840759828
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.94
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00166098387140339
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.86
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3332088556448083
+                  },
+                  "Duration (us)": {
+                    "microseconds": 774.352
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00126510170516217
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.94
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.498569697097172
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1158.638
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.28283887428444676
+                  },
+                  "Duration (us)": {
+                    "microseconds": 657.296
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00180685784352923
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.199
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.000929462477262
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.16
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_add5"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.4142330258733135
+                  },
+                  "Duration (us)": {
+                    "microseconds": 962.646
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.08373467214715036
+                  },
+                  "Duration (us)": {
+                    "microseconds": 194.593
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00160891676040862
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.739
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.23937961856520915
+                  },
+                  "Duration (us)": {
+                    "microseconds": 556.3
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2997408912494348
+                  },
+                  "Duration (us)": {
+                    "microseconds": 696.575
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00197080469715739
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.58
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00088643180701839
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.06
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3444308241376397
+                  },
+                  "Duration (us)": {
+                    "microseconds": 800.431
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00138558758184428
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.22
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.4973390199282048
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1155.778
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.284474039753704
+                  },
+                  "Duration (us)": {
+                    "microseconds": 661.096
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.001394193715893
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00068806041719534
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1.599
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3552138797939862
+                  },
+                  "Duration (us)": {
+                    "microseconds": 825.49
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 34, 34]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.0893975083512096
+                  },
+                  "Duration (us)": {
+                    "microseconds": 207.753
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.001394193715893
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d1_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.2736049227568702
+                  },
+                  "Duration (us)": {
+                    "microseconds": 635.837
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.30382837461587536
+                  },
+                  "Duration (us)": {
+                    "microseconds": 706.074
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00191916789286506
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.46
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00092085634321328
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.14
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.3371332527710256
+                  },
+                  "Duration (us)": {
+                    "microseconds": 783.472
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00142861825208789
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.32
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d2_add2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.48796737025584874
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1133.999
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance1_add3_tir_sqrt1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.28361342634883174
+                  },
+                  "Duration (us)": {
+                    "microseconds": 659.096
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00130813237540578
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.04
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[96]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00089503794106711
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.08
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32], float32[1, 96, 32, 32]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean1_subtract1_divide1_multiply1_add4_add5_add5"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.5174080942231225
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1202.417
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[48]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00298632851490662
+                  },
+                  "Duration (us)": {
+                    "microseconds": 6.94
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 96, 32, 32], float32[96, 48, 3, 3], float32[1, 48, 1, 1], float32[1, 48, 64, 64]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d_transpose_add6"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 8.013329335325073
+                  },
+                  "Duration (us)": {
+                    "microseconds": 18622.367
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 48, 64, 64], float32[1, 48, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance2_add7_tir_sqrt2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.7681215610237966
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1785.056
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[48]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00270232609129878
+                  },
+                  "Duration (us)": {
+                    "microseconds": 6.28
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[48]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00095528087940817
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.22
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 48, 64, 64], float32[1, 48, 1, 1], float32[48, 1, 1], float32[48, 1, 1], float32[1, 48, 64, 64]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean2_subtract2_divide2_multiply2_add8_relu1"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.9580602303992037
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2226.459
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[24]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00160074093306234
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3.72
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 48, 64, 64], float32[48, 24, 3, 3], float32[1, 24, 1, 1], float32[1, 24, 128, 128]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d_transpose1_add9"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 8.30275147185009
+                  },
+                  "Duration (us)": {
+                    "microseconds": 19294.962
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 24, 128, 128], float32[1, 24, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance3_add10_tir_sqrt3"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 1.5448742138850566
+                  },
+                  "Duration (us)": {
+                    "microseconds": 3590.17
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[24]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00242692980173967
+                  },
+                  "Duration (us)": {
+                    "microseconds": 5.64
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[24]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00180728815023167
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.2
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 24, 128, 128], float32[1, 24, 1, 1], float32[24, 1, 1], float32[24, 1, 1], float32[1, 24, 128, 128]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean3_subtract3_divide3_multiply3_add11_relu2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 2.5269279157053957
+                  },
+                  "Duration (us)": {
+                    "microseconds": 5872.388
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[12]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00181589428428039
+                  },
+                  "Duration (us)": {
+                    "microseconds": 4.22
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 24, 128, 128], float32[24, 12, 3, 3], float32[1, 12, 1, 1], float32[1, 12, 256, 256]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d_transpose2_add12"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 10.196041580244048
+                  },
+                  "Duration (us)": {
+                    "microseconds": 23694.824
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 12, 256, 256], float32[1, 12, 1, 1]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_variance4_add13_tir_sqrt4"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 3.28241610225237
+                  },
+                  "Duration (us)": {
+                    "microseconds": 7628.085
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[12]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00270232609129878
+                  },
+                  "Duration (us)": {
+                    "microseconds": 6.28
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[12]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00096388701345689
+                  },
+                  "Duration (us)": {
+                    "microseconds": 2.24
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 12, 256, 256], float32[1, 12, 1, 1], float32[12, 1, 1], float32[12, 1, 1], float32[1, 12, 256, 256]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_mean4_subtract4_divide4_multiply4_add14_relu3"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 5.213416138514316
+                  },
+                  "Duration (us)": {
+                    "microseconds": 12115.582
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 12, 256, 256], float32[1, 12, 262, 262]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "mirror_pad2"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.7290510033627049
+                  },
+                  "Duration (us)": {
+                    "microseconds": 1694.259
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[3]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "vm.builtin.reshape"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 0.00317566346397851
+                  },
+                  "Duration (us)": {
+                    "microseconds": 7.38
+                  }
+                },
+                {
+                  "Argument Shapes": {
+                    "string": "float32[1, 12, 262, 262], float32[3, 12, 7, 7], float32[1, 3, 1, 1], float32[1, 3, 256, 256]"
+                  },
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "fused_conv2d3_add15"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Percent": {
+                    "percent": 6.912291957520828
+                  },
+                  "Duration (us)": {
+                    "microseconds": 16063.64
+                  }
+                }
+              ],
+              "device_metrics": {
+                "cpu0": {
+                  "Device": {
+                    "string": "cpu0"
+                  },
+                  "Name": {
+                    "string": "Total"
+                  },
+                  "Count": {
+                    "count": 1
+                  },
+                  "Duration (us)": {
+                    "microseconds": 232392.383
+                  }
+                }
+              },
+              "configuration": {
+                "Number of threads": {
+                  "count": 2
+                },
+                "Executor": {
+                  "string": "VM"
+                }
+              }
+            },
+            "report_json_text": "{\"calls\":[{\"Argument Shapes\":{\"string\":\"float32[1, 32, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.check_tensor_info\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00397603393050968},\"Duration (us)\":{\"microseconds\":9.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[1, 32, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.match_shape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00183267624567540},\"Duration (us)\":{\"microseconds\":4.25900000000000034}},{\"Argument Shapes\":{\"string\":\"float32[1, 32, 32, 32], float32[1, 32, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance_add_tir_sqrt\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.09248711047470087},\"Duration (us)\":{\"microseconds\":214.93299999999999272}},{\"Argument Shapes\":{\"string\":\"float32[32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00192777402691378},\"Duration (us)\":{\"microseconds\":4.48000000000000043}},{\"Argument Shapes\":{\"string\":\"float32[32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00092085634321328},\"Duration (us)\":{\"microseconds\":2.14000000000000012}},{\"Argument Shapes\":{\"string\":\"float32[1, 32, 32, 32], float32[1, 32, 1, 1], float32[32, 1, 1], float32[32, 1, 1], float32[1, 32, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean_subtract_divide_multiply_add1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.09773642193771902},\"Duration (us)\":{\"microseconds\":227.13200000000000500}},{\"Argument Shapes\":{\"string\":\"float32[1, 32, 32, 32], float32[1, 32, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.02419958833160207},\"Duration (us)\":{\"microseconds\":56.23799999999999955}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00110115485153401},\"Duration (us)\":{\"microseconds\":2.55900000000000016}},{\"Argument Shapes\":{\"string\":\"float32[1, 32, 34, 34], float32[96, 32, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":26.48405046907238614},\"Duration (us)\":{\"microseconds\":61546.91599999999743886}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.31101449654655849},\"Duration (us)\":{\"microseconds\":722.77400000000000091}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00225480712076523},\"Duration (us)\":{\"microseconds\":5.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00092085634321328},\"Duration (us)\":{\"microseconds\":2.14000000000000012}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.34523119460417084},\"Duration (us)\":{\"microseconds\":802.29100000000005366}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08861391984607343},\"Duration (us)\":{\"microseconds\":205.93199999999998795}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00187570691591901},\"Duration (us)\":{\"microseconds\":4.35899999999999999}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.25369979531558051},\"Duration (us)\":{\"microseconds\":589.57899999999995089}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29789057242895950},\"Duration (us)\":{\"microseconds\":692.27499999999997726}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00197898052450368},\"Duration (us)\":{\"microseconds\":4.59900000000000020}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00086061340487222},\"Duration (us)\":{\"microseconds\":2.00000000000000000}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.35734820103806930},\"Duration (us)\":{\"microseconds\":830.45000000000004547}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00149746732447767},\"Duration (us)\":{\"microseconds\":3.47999999999999998}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.50619473186433994},\"Duration (us)\":{\"microseconds\":1176.35799999999994725}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28715054744285662},\"Duration (us)\":{\"microseconds\":667.31600000000003092}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00186753108857273},\"Duration (us)\":{\"microseconds\":4.33999999999999986}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00076594593033628},\"Duration (us)\":{\"microseconds\":1.78000000000000003}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_relu\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.91491122581242257},\"Duration (us)\":{\"microseconds\":2126.18400000000019645}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08498213127751265},\"Duration (us)\":{\"microseconds\":197.49199999999999022}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00197037439045496},\"Duration (us)\":{\"microseconds\":4.57899999999999974}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.24573912132051243},\"Duration (us)\":{\"microseconds\":571.07899999999995089}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.30163381043345128},\"Duration (us)\":{\"microseconds\":700.97400000000004638}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00197898052450368},\"Duration (us)\":{\"microseconds\":4.59900000000000020}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00092946247726200},\"Duration (us)\":{\"microseconds\":2.16000000000000014}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33165975151603827},\"Duration (us)\":{\"microseconds\":770.75199999999995271}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00133395077755195},\"Duration (us)\":{\"microseconds\":3.10000000000000009}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.50325960984702323},\"Duration (us)\":{\"microseconds\":1169.53700000000003456}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28482689124970162},\"Duration (us)\":{\"microseconds\":661.91600000000005366}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00169497810089585},\"Duration (us)\":{\"microseconds\":3.93900000000000006}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00130813237540578},\"Duration (us)\":{\"microseconds\":3.04000000000000004}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_add5\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.41736522836034601},\"Duration (us)\":{\"microseconds\":969.92499999999995453}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08278799740179092},\"Duration (us)\":{\"microseconds\":192.39300000000000068}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00169540840759828},\"Duration (us)\":{\"microseconds\":3.93999999999999995}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.24039514238295839},\"Duration (us)\":{\"microseconds\":558.65999999999996817}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29746887186057208},\"Duration (us)\":{\"microseconds\":691.29499999999995907}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00210850284193695},\"Duration (us)\":{\"microseconds\":4.90000000000000036}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00084340113677478},\"Duration (us)\":{\"microseconds\":1.95999999999999996}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.35706419861446148},\"Duration (us)\":{\"microseconds\":829.78999999999996362}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00139419371589300},\"Duration (us)\":{\"microseconds\":3.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.49998970921521130},\"Duration (us)\":{\"microseconds\":1161.93800000000010186}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28681490821495642},\"Duration (us)\":{\"microseconds\":666.53599999999994452}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00159213479901362},\"Duration (us)\":{\"microseconds\":3.70000000000000018}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00086921953892095},\"Duration (us)\":{\"microseconds\":2.02000000000000002}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_relu\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.34699545208415883},\"Duration (us)\":{\"microseconds\":806.39099999999996271}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08881186092919405},\"Duration (us)\":{\"microseconds\":206.39199999999999591}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00142861825208789},\"Duration (us)\":{\"microseconds\":3.31999999999999984}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.26961167655826307},\"Duration (us)\":{\"microseconds\":626.55700000000001637}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29799384603754420},\"Duration (us)\":{\"microseconds\":692.51499999999998636}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00186710078187029},\"Duration (us)\":{\"microseconds\":4.33900000000000041}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00098970541560306},\"Duration (us)\":{\"microseconds\":2.29999999999999982}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33615215348947131},\"Duration (us)\":{\"microseconds\":781.19200000000000728}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00119625263277239},\"Duration (us)\":{\"microseconds\":2.77999999999999980}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.48963652995459833},\"Duration (us)\":{\"microseconds\":1137.87799999999992906}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28165165809242554},\"Duration (us)\":{\"microseconds\":654.53700000000003456}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00131673850945450},\"Duration (us)\":{\"microseconds\":3.06000000000000005}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00077455206438500},\"Duration (us)\":{\"microseconds\":1.80000000000000004}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_add5\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.42767494664401284},\"Duration (us)\":{\"microseconds\":993.88400000000001455}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08162659961191585},\"Duration (us)\":{\"microseconds\":189.69399999999998840}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00158352866496489},\"Duration (us)\":{\"microseconds\":3.68000000000000016}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.23854482356248313},\"Duration (us)\":{\"microseconds\":554.36000000000001364}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29573043278273020},\"Duration (us)\":{\"microseconds\":687.25499999999999545}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00275396289559112},\"Duration (us)\":{\"microseconds\":6.40000000000000036}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00099788124294934},\"Duration (us)\":{\"microseconds\":2.31899999999999995}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33610008637847655},\"Duration (us)\":{\"microseconds\":781.07100000000002638}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00125649557111345},\"Duration (us)\":{\"microseconds\":2.91999999999999993}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.50185724030378398},\"Duration (us)\":{\"microseconds\":1166.27800000000002001}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29030039250468892},\"Duration (us)\":{\"microseconds\":674.63599999999996726}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00160074093306234},\"Duration (us)\":{\"microseconds\":3.72000000000000020}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00073152139414139},\"Duration (us)\":{\"microseconds\":1.69999999999999996}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_relu\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.34533446821275549},\"Duration (us)\":{\"microseconds\":802.53099999999994907}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08763325087122154},\"Duration (us)\":{\"microseconds\":203.65299999999999159}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00223759485266778},\"Duration (us)\":{\"microseconds\":5.20000000000000018}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.26516273556177611},\"Duration (us)\":{\"microseconds\":616.21799999999996089}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29976627934487854},\"Duration (us)\":{\"microseconds\":696.63400000000001455}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00158352866496489},\"Duration (us)\":{\"microseconds\":3.68000000000000016}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00105855448799284},\"Duration (us)\":{\"microseconds\":2.45999999999999996}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.35608352963960954},\"Duration (us)\":{\"microseconds\":827.51099999999996726}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00172122680974445},\"Duration (us)\":{\"microseconds\":4.00000000000000000}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.48618590050776317},\"Duration (us)\":{\"microseconds\":1129.85899999999992360}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28221923263293874},\"Duration (us)\":{\"microseconds\":655.85599999999999454}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00130813237540578},\"Duration (us)\":{\"microseconds\":3.04000000000000004}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00144583052018534},\"Duration (us)\":{\"microseconds\":3.35999999999999988}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_add5\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.41326010241910549},\"Duration (us)\":{\"microseconds\":960.38499999999999091}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08261587472081647},\"Duration (us)\":{\"microseconds\":191.99299999999999500}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00166959000545211},\"Duration (us)\":{\"microseconds\":3.87999999999999989}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.24802835297747261},\"Duration (us)\":{\"microseconds\":576.39900000000000091}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.30150514872942286},\"Duration (us)\":{\"microseconds\":700.67499999999995453}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00199662309930356},\"Duration (us)\":{\"microseconds\":4.63999999999999968}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00082618886867734},\"Duration (us)\":{\"microseconds\":1.91999999999999993}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33033440687253507},\"Duration (us)\":{\"microseconds\":767.67200000000002547}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00123067716896728},\"Duration (us)\":{\"microseconds\":2.85999999999999988}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.49172825083514038},\"Duration (us)\":{\"microseconds\":1142.73900000000003274}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28552398810764806},\"Duration (us)\":{\"microseconds\":663.53599999999994452}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00135976917969811},\"Duration (us)\":{\"microseconds\":3.16000000000000014}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00076594593033628},\"Duration (us)\":{\"microseconds\":1.78000000000000003}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_relu\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.36085089759589928},\"Duration (us)\":{\"microseconds\":838.59000000000003183}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08863113211417090},\"Duration (us)\":{\"microseconds\":205.97200000000000841}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00138515727514184},\"Duration (us)\":{\"microseconds\":3.21899999999999986}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.25585950465510737},\"Duration (us)\":{\"microseconds\":594.59799999999995634}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.30216782105117446},\"Duration (us)\":{\"microseconds\":702.21500000000003183}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00169540840759828},\"Duration (us)\":{\"microseconds\":3.93999999999999995}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00166098387140339},\"Duration (us)\":{\"microseconds\":3.85999999999999988}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33320885564480829},\"Duration (us)\":{\"microseconds\":774.35199999999997544}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00126510170516217},\"Duration (us)\":{\"microseconds\":2.93999999999999995}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.49856969709717203},\"Duration (us)\":{\"microseconds\":1158.63799999999991996}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28283887428444676},\"Duration (us)\":{\"microseconds\":657.29600000000004911}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00180685784352923},\"Duration (us)\":{\"microseconds\":4.19899999999999984}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00092946247726200},\"Duration (us)\":{\"microseconds\":2.16000000000000014}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_add5\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.41423302587331351},\"Duration (us)\":{\"microseconds\":962.64599999999995816}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08373467214715036},\"Duration (us)\":{\"microseconds\":194.59299999999998931}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00160891676040862},\"Duration (us)\":{\"microseconds\":3.73899999999999988}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.23937961856520915},\"Duration (us)\":{\"microseconds\":556.29999999999995453}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.29974089124943482},\"Duration (us)\":{\"microseconds\":696.57500000000004547}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00197080469715739},\"Duration (us)\":{\"microseconds\":4.58000000000000007}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00088643180701839},\"Duration (us)\":{\"microseconds\":2.06000000000000005}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.34443082413763970},\"Duration (us)\":{\"microseconds\":800.43100000000004002}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00138558758184428},\"Duration (us)\":{\"microseconds\":3.22000000000000020}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.49733901992820478},\"Duration (us)\":{\"microseconds\":1155.77800000000002001}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28447403975370400},\"Duration (us)\":{\"microseconds\":661.09600000000000364}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00139419371589300},\"Duration (us)\":{\"microseconds\":3.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00068806041719534},\"Duration (us)\":{\"microseconds\":1.59899999999999998}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_relu\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.35521387979398622},\"Duration (us)\":{\"microseconds\":825.49000000000000909}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 34, 34]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.08939750835120960},\"Duration (us)\":{\"microseconds\":207.75299999999998590}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00139419371589300},\"Duration (us)\":{\"microseconds\":3.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 34, 34], float32[96, 1, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d1_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.27360492275687021},\"Duration (us)\":{\"microseconds\":635.83699999999998909}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.30382837461587536},\"Duration (us)\":{\"microseconds\":706.07399999999995543}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00191916789286506},\"Duration (us)\":{\"microseconds\":4.45999999999999996}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00092085634321328},\"Duration (us)\":{\"microseconds\":2.14000000000000012}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.33713325277102563},\"Duration (us)\":{\"microseconds\":783.47199999999997999}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00142861825208789},\"Duration (us)\":{\"microseconds\":3.31999999999999984}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d2_add2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.48796737025584874},\"Duration (us)\":{\"microseconds\":1133.99900000000002365}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance1_add3_tir_sqrt1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.28361342634883174},\"Duration (us)\":{\"microseconds\":659.09600000000000364}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00130813237540578},\"Duration (us)\":{\"microseconds\":3.04000000000000004}},{\"Argument Shapes\":{\"string\":\"float32[96]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00089503794106711},\"Duration (us)\":{\"microseconds\":2.08000000000000007}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32], float32[1, 96, 32, 32], float32[1, 96, 32, 32]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean1_subtract1_divide1_multiply1_add4_add5_add5\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.51740809422312251},\"Duration (us)\":{\"microseconds\":1202.41699999999991633}},{\"Argument Shapes\":{\"string\":\"float32[48]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00298632851490662},\"Duration (us)\":{\"microseconds\":6.94000000000000039}},{\"Argument Shapes\":{\"string\":\"float32[1, 96, 32, 32], float32[96, 48, 3, 3], float32[1, 48, 1, 1], float32[1, 48, 64, 64]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d_transpose_add6\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":8.01332933532507319},\"Duration (us)\":{\"microseconds\":18622.36699999999837019}},{\"Argument Shapes\":{\"string\":\"float32[1, 48, 64, 64], float32[1, 48, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance2_add7_tir_sqrt2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.76812156102379658},\"Duration (us)\":{\"microseconds\":1785.05600000000004002}},{\"Argument Shapes\":{\"string\":\"float32[48]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00270232609129878},\"Duration (us)\":{\"microseconds\":6.28000000000000025}},{\"Argument Shapes\":{\"string\":\"float32[48]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00095528087940817},\"Duration (us)\":{\"microseconds\":2.22000000000000020}},{\"Argument Shapes\":{\"string\":\"float32[1, 48, 64, 64], float32[1, 48, 1, 1], float32[48, 1, 1], float32[48, 1, 1], float32[1, 48, 64, 64]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean2_subtract2_divide2_multiply2_add8_relu1\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.95806023039920374},\"Duration (us)\":{\"microseconds\":2226.45899999999983265}},{\"Argument Shapes\":{\"string\":\"float32[24]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00160074093306234},\"Duration (us)\":{\"microseconds\":3.72000000000000020}},{\"Argument Shapes\":{\"string\":\"float32[1, 48, 64, 64], float32[48, 24, 3, 3], float32[1, 24, 1, 1], float32[1, 24, 128, 128]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d_transpose1_add9\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":8.30275147185009033},\"Duration (us)\":{\"microseconds\":19294.96199999999953434}},{\"Argument Shapes\":{\"string\":\"float32[1, 24, 128, 128], float32[1, 24, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance3_add10_tir_sqrt3\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":1.54487421388505664},\"Duration (us)\":{\"microseconds\":3590.17000000000007276}},{\"Argument Shapes\":{\"string\":\"float32[24]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00242692980173967},\"Duration (us)\":{\"microseconds\":5.63999999999999968}},{\"Argument Shapes\":{\"string\":\"float32[24]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00180728815023167},\"Duration (us)\":{\"microseconds\":4.20000000000000018}},{\"Argument Shapes\":{\"string\":\"float32[1, 24, 128, 128], float32[1, 24, 1, 1], float32[24, 1, 1], float32[24, 1, 1], float32[1, 24, 128, 128]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean3_subtract3_divide3_multiply3_add11_relu2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":2.52692791570539566},\"Duration (us)\":{\"microseconds\":5872.38799999999991996}},{\"Argument Shapes\":{\"string\":\"float32[12]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00181589428428039},\"Duration (us)\":{\"microseconds\":4.21999999999999975}},{\"Argument Shapes\":{\"string\":\"float32[1, 24, 128, 128], float32[24, 12, 3, 3], float32[1, 12, 1, 1], float32[1, 12, 256, 256]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d_transpose2_add12\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":10.19604158024404761},\"Duration (us)\":{\"microseconds\":23694.82400000000052387}},{\"Argument Shapes\":{\"string\":\"float32[1, 12, 256, 256], float32[1, 12, 1, 1]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_variance4_add13_tir_sqrt4\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":3.28241610225237013},\"Duration (us)\":{\"microseconds\":7628.08500000000003638}},{\"Argument Shapes\":{\"string\":\"float32[12]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00270232609129878},\"Duration (us)\":{\"microseconds\":6.28000000000000025}},{\"Argument Shapes\":{\"string\":\"float32[12]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00096388701345689},\"Duration (us)\":{\"microseconds\":2.24000000000000021}},{\"Argument Shapes\":{\"string\":\"float32[1, 12, 256, 256], float32[1, 12, 1, 1], float32[12, 1, 1], float32[12, 1, 1], float32[1, 12, 256, 256]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_mean4_subtract4_divide4_multiply4_add14_relu3\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":5.21341613851431607},\"Duration (us)\":{\"microseconds\":12115.58200000000033469}},{\"Argument Shapes\":{\"string\":\"float32[1, 12, 256, 256], float32[1, 12, 262, 262]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"mirror_pad2\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.72905100336270490},\"Duration (us)\":{\"microseconds\":1694.25900000000001455}},{\"Argument Shapes\":{\"string\":\"float32[3]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"vm.builtin.reshape\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":0.00317566346397851},\"Duration (us)\":{\"microseconds\":7.37999999999999989}},{\"Argument Shapes\":{\"string\":\"float32[1, 12, 262, 262], float32[3, 12, 7, 7], float32[1, 3, 1, 1], float32[1, 3, 256, 256]\"},\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"fused_conv2d3_add15\"},\"Count\":{\"count\":1},\"Percent\":{\"percent\":6.91229195752082770},\"Duration (us)\":{\"microseconds\":16063.63999999999941792}}],\"device_metrics\":{\"cpu0\":{\"Device\":{\"string\":\"cpu0\"},\"Name\":{\"string\":\"Total\"},\"Count\":{\"count\":1},\"Duration (us)\":{\"microseconds\":232392.38300000000162981}}},\"configuration\":{\"Number of threads\":{\"count\":2},\"Executor\":{\"string\":\"VM\"}}}",
+            "report_json_error": null,
+            "report_table_error": null
+          }
+        ]
+      }
+    },
+    "fallback_reason": null,
+    "remote_host": "100.121.87.73",
+    "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+    "expected_artifact_sha256": "9979d906a7eb52772eab3c124aea58246e7e0f0e4391b76d57af6d095ddbc805",
+    "returncode": 0
+  },
+  "overall_status": "runtime_operator_profile",
+  "recommended_full_hotspot_tasks": [
+    "reshape2",
+    "fused_variance1_add3_tir_sqrt1",
+    "reshape1",
+    "fused_mean1_subtract1_divide1_multiply1_add4",
+    "fused_conv2d1_add2",
+    "fused_conv2d2_add2",
+    "mirror_pad1",
+    "fused_mean1_subtract1_divide1_multiply1_add4_relu"
+  ],
+  "runtime_hotspot_candidates": [
+    "fused_conv2d_add2",
+    "fused_conv2d_transpose2_add12"
+  ],
+  "next_step_guidance": "If runtime_operator_profile is available, feed runtime_hotspot_candidates into 4.2/7.1. If only stage_level_hotspot_only is available, keep using recommended_full_hotspot_tasks for 4.2 and rebuild or replace the remote TVM runtime with profiler support before treating 7.1 as settled."
+}

@@ -1,0 +1,26 @@
+{
+  "artifact_exists": true,
+  "latent_exists": true,
+  "tvm_version": "0.24.dev0",
+  "loaded_module_type": "Module",
+  "loaded_module_type_full": "<class 'tvm.runtime.module.Module'>",
+  "loaded_module_has_profile": false,
+  "loaded_module_dir_profile_like": [],
+  "vm_instance_type": "VirtualMachine",
+  "vm_has_profile": true,
+  "vm_dir_profile_like": [
+    "profile"
+  ],
+  "vm_module_found": true,
+  "vm_module_type": "Module",
+  "vm_module_type_full": "<class 'tvm.runtime.module.Module'>",
+  "vm_module_has_profile": false,
+  "vm_module_dir_profile_like": [],
+  "vm_module_has_get_function": true,
+  "get_function_profile": "ERROR: AttributeError: Module has no function 'profile'",
+  "get_function_main": true,
+  "get_function_set_input": true,
+  "get_function_invoke_stateful": true,
+  "fatal_error": "ValueError: unknown dtype `object`",
+  "fatal_traceback": "Traceback (most recent call last):\n  File \"/tmp/profiling_runtime_instance_probe_20260330.py\", line 41, in <module>\n    sample = tvm.runtime.tensor(sample)\n  File \"/home/user/tvm_samegen_20260307/python/tvm/runtime/_tensor.py\", line 353, in tensor\n    return empty(arr.shape, arr.dtype, device, mem_scope).copyfrom(arr)\n  File \"/home/user/tvm_samegen_20260307/python/tvm/runtime/_tensor.py\", line 325, in empty\n    dtype = tvm_ffi.dtype(dtype)\n  File \"/home/user/anaconda3/envs/tvm310_safe/lib/python3.10/site-packages/tvm_ffi/_dtype.py\", line 96, in __new__\n    val._tvm_ffi_dtype = core.DataType(content)\n  File \"python/tvm_ffi/cython/dtype.pxi\", line 86, in tvm_ffi.core.DataType.__init__\n  File \"python/tvm_ffi/cython/error.pxi\", line 163, in tvm_ffi.core.CHECK_CALL\n  File \"<unknown>\", line 0, in type_call\n  File \"<unknown>\", line 0, in __pyx_pw_7tvm_ffi_4core_8DataType_1__init__(_object*, _object*, _object*)\n  File \"<unknown>\", line 0, in TVMFFIDataTypeFromString\n  File \"src/ffi/dtype.cc\", line 338, in DLDataType tvm::ffi::StringViewToDLDataType_(std::string_view)\nValueError: unknown dtype `object`\n"
+}

@@ -1,0 +1,53 @@
+{
+  "generated_at_utc": "2026-04-03T00:00:00Z",
+  "operator": "fused_conv2d_transpose2_add12",
+  "phase": "scheduled_form_candidate_v4_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v4_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v4_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v1.py",
+    "candidate_version": "v1_working_copy",
+    "status": "v1_bias_fusion_applied",
+    "remote_report": "./session_bootstrap/reports/transpose2_v1_remote_benchmark_20260331_201239.md",
+    "remote_median_ms": 161.416
+  },
+  "current_edit_state": {
+    "status": "v4_w0_window_data_stage_applied",
+    "working_copy_tir_sha256": "6ad73691bb8f14633afc98dd9ac64634bdb6b99df210f1b745298cee639fabd3",
+    "concrete_change": "Keep the accepted transpose2 v1 bias-fused compute path intact, but move data_dilate/data_pad staging inside w_0 so only the current 10 x 34 width window is prepared at a time instead of the full 10 x 258 strip.",
+    "preserved_non_changes": [
+      "the accepted transpose2 v1 baseline remains frozen in its own files",
+      "data_dilate remains materialized",
+      "data_pad remains materialized",
+      "kernel_transform remains materialized in the accepted v1 layout",
+      "the bias-fused compute_init/compute_update path remains intact",
+      "the scheduled h/w tiling, reduction split, and pragma_auto_unroll_max_step=32 remain unchanged"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v4_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/scheduled_form_candidate_v4_working_copy_manifest.json"
+  },
+  "notes": [
+    "This v4 candidate keeps the accepted transpose2 v1 baseline frozen and reusable.",
+    "This first real v4 edit attacks the still-unspent width-window data-locality seam instead of revisiting the dropped P1/P2/P4/v3 branches.",
+    "This handoff is local-only and diagnostic-only; it does not make performance claims."
+  ]
+}

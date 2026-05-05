@@ -1,0 +1,54 @@
+{
+  "generated_at_utc": "2026-04-02T03:36:04Z",
+  "operator": "fused_conv2d_transpose1_add9",
+  "phase": "scheduled_form_candidate_v3_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v3_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v3_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v1.py",
+    "candidate_version": "v1_working_copy",
+    "status": "p4_cortex_a72_auto_unroll64_on_p2_applied",
+    "remote_report": "./session_bootstrap/reports/transpose1_p4_remote_benchmark_20260331_193220.md",
+    "remote_median_ms": 159.356
+  },
+  "current_edit_state": {
+    "status": "p3_direct_stride_read_on_top_of_p2_p4_applied",
+    "working_copy_tir_sha256": "233558e25a6232539de189feb22fad1db71d2fb234c74533e5e1110a84aa42cd",
+    "concrete_change": "On top of the accepted P2+P4 scheduled-form state, remove the materialized data_dilate/data_pad staging path and make compute_update read lv318 directly through the transposed-convolution stride/parity guards while keeping kernel_transform materialized, the bias-fused epilogue, the accepted c_1 x c_3 = 3 x 8 tiling, and the accepted pragma_auto_unroll_max_step = 64.",
+    "preserved_non_changes": [
+      "kernel_transform remains materialized",
+      "the bias-fused compute_init/compute_update path remains intact",
+      "the accepted P2 output-channel tiling remains c_1 x c_3 = 3 x 8",
+      "the accepted P4 pragma_auto_unroll_max_step remains 64",
+      "the surrounding scheduled h/w tiling, reduction split, and 4-lane vectorized inner loops stay in the checked-in scheduled form"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "previous_v2_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v2_working_copy_tir.py",
+    "previous_v2_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v2_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v3_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v3_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the accepted scheduled-form P2+P4 state rather than from the raw pre-compile path.",
+    "The latest transpose1 and transpose2 P1-style dilate+pad fusion candidates both regressed on real hardware, so v3 pivots to the documented P3 path instead of repeating that move.",
+    "The new candidate remains local-only and diagnostic-only until the remote payload benchmark is run on the board."
+  ]
+}

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="16" y1="10" x2="110" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#123a5a"/>
+      <stop offset="0.55" stop-color="#0b2032"/>
+      <stop offset="1" stop-color="#07111c"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="64" y1="18" x2="64" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7be7ff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#2b7bb0" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="url(#bg)"/>
+  <rect x="13" y="13" width="102" height="102" rx="21" stroke="#3f93c9" stroke-opacity="0.55" stroke-width="2"/>
+  <path d="M26 36H102" stroke="#7be7ff" stroke-opacity="0.22" stroke-width="2"/>
+  <path d="M64 24V104" stroke="#7be7ff" stroke-opacity="0.16" stroke-width="2"/>
+  <path d="M24 64H104" stroke="#7be7ff" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M34 84C43 67 56 55 78 43" stroke="#ffb761" stroke-opacity="0.82" stroke-width="3" stroke-linecap="round"/>
+  <path d="M37 48L58 48L58 56L46 56L46 81L37 81L37 48Z" fill="url(#glow)"/>
+  <path d="M68 46H92V54H77V62H90V69H77V80H68V46Z" fill="url(#glow)"/>
+  <circle cx="84" cy="82" r="10" stroke="#7be7ff" stroke-width="3" stroke-opacity="0.9"/>
+  <circle cx="84" cy="82" r="3" fill="#7be7ff"/>
+</svg>

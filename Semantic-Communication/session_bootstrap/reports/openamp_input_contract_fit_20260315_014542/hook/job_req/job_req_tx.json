@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-03-15T01:45:48+0800",
+  "byte_len": 68,
+  "hex": "4d4f43530100010001000000562400002c0000001f86f0216f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000200000003000000",
+  "parsed_frame": {
+    "raw_len": 68,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 1,
+    "msg_name": "JOB_REQ",
+    "seq": 1,
+    "job_id": 9302,
+    "payload_len": 44,
+    "header_crc32": 569411103,
+    "expected_header_crc32": 569411103,
+    "payload_hex": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000200000003000000",
+    "job_req": {
+      "payload_len": 44,
+      "parsed": true,
+      "expected_sha256_hex": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+      "deadline_ms": 60000,
+      "expected_outputs": 2,
+      "flags": 3,
+      "flag_name": "smoke"
+    }
+  }
+}

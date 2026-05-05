@@ -1,0 +1,2 @@
+{"at_ms": 400, "job_id": 1004, "fault_tag": "F003", "fault_name": "HEARTBEAT_TIMEOUT", "reason": "heartbeat watchdog expired", "action": "SAFE_STOP", "guard_state": "JOB_ACTIVE"}
+{"at_ms": 400, "fault_tag": "F003", "fault_name": "HEARTBEAT_TIMEOUT", "reason": "received SAFE_STOP", "orchestrator_state": "RUNNING"}

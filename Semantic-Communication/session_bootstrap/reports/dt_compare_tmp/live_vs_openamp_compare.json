@@ -1,0 +1,46 @@
+{
+  "cmdline": {},
+  "boot_overlay_cmd": {},
+  "live_dts": {
+    "mailbox@32a00000": [
+      "mailbox@32a00000 {",
+      "mbox = \"/soc/mailbox@32a00000\";"
+    ]
+  },
+  "openamp_dts": {
+    "openamp": [
+      "firmware-name = \"openamp_core0.elf\";"
+    ],
+    "homo_rproc": [
+      "homo_rproc@0 {",
+      "homo_rproc = \"/homo_rproc@0\";"
+    ],
+    "rproc@": [
+      "rproc@b0100000 {",
+      "homo_rproc@0 {",
+      "rproc = \"/reserved-memory/rproc@b0100000\";",
+      "homo_rproc = \"/homo_rproc@0\";"
+    ],
+    "reserved-memory": [
+      "reserved-memory {",
+      "rproc = \"/reserved-memory/rproc@b0100000\";"
+    ],
+    "openamp_core0.elf": [
+      "firmware-name = \"openamp_core0.elf\";"
+    ],
+    "mailbox@32a00000": [
+      "mailbox@32a00000 {",
+      "mbox = \"/soc/mailbox@32a00000\";"
+    ]
+  },
+  "normal_dts": {
+    "mailbox@32a00000": [
+      "mailbox@32a00000 {",
+      "mbox = \"/soc/mailbox@32a00000\";"
+    ]
+  },
+  "raw": {
+    "cmdline": "console=ttyAMA1,115200 earlycon=pl011,0x2800d000 root=/dev/mmcblk0p1 rootfstype=ext4 rootwait  rw cma=256m ;\n",
+    "boot_overlay_cmd": " dtc -@ -Hepapr -I dts -O dtb -o overlay.dtbo overlay.dts\n"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "cockpit-desktop",
+  "version": "0.1.0",
+  "description": "Electron + React cockpit demo for OpenAMP control plane (上位机)",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.1.1",
+    "@ant-design/pro-components": "^2.8.10",
+    "@tanstack/react-query": "^5.62.2",
+    "antd": "^5.22.2",
+    "clsx": "^2.1.1",
+    "echarts": "^5.5.1",
+    "echarts-for-react": "^3.0.2",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

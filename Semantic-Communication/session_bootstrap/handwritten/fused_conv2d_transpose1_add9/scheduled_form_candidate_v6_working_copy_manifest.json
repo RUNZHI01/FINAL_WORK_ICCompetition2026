@@ -1,0 +1,61 @@
+{
+  "generated_at_utc": "2026-04-02T12:15:00Z",
+  "operator": "fused_conv2d_transpose1_add9",
+  "phase": "scheduled_form_candidate_v6_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v6_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v6_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v4.py",
+    "candidate_version": "v4_working_copy",
+    "status": "v4_data_staging_hoisted_outside_c1_applied",
+    "remote_report": "./session_bootstrap/reports/transpose1_v4_remote_benchmark_20260402_172812.md",
+    "remote_median_ms": 158.621
+  },
+  "current_edit_state": {
+    "status": "v6_h1_stripe_staging_on_top_of_v4_applied",
+    "working_copy_tir_sha256": "8cbf77096a1d2808d947b1120ec77ab695f7eeda5798144a038eb84b1e67e47f",
+    "concrete_change": "Keep the winning v4 staged-reuse structure and materialized buffers intact, but move data_dilate/data_pad staging inside h_1 so only one 34 x 10 stripe is prepared at a time and then reused across all three c_1 groups and both w_1 positions.",
+    "preserved_non_changes": [
+      "data_dilate remains materialized",
+      "data_pad remains materialized",
+      "kernel_transform remains materialized",
+      "the bias-fused compute_init/compute_update path remains intact",
+      "the accepted P2 output-channel tiling remains c_1 x c_3 = 3 x 8",
+      "the accepted P4 pragma_auto_unroll_max_step remains 64",
+      "the winning v4 consumer family remains c_1 before w_1 for each staged stripe",
+      "the surrounding reduction split/order and 4-lane vectorized inner loops stay in the checked-in scheduled form",
+      "the dropped raw v0, P1 dilate+pad fusion, P3 direct guarded read, and v5 consumer-order branch remain unopened"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "leading_v4_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v4_working_copy_tir.py",
+    "leading_v4_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v4_working_copy_manifest.json",
+    "dropped_v5_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v5_working_copy_tir.py",
+    "dropped_v5_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v5_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/fused_conv2d_transpose1_add9_scheduled_form_candidate_v6_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose1_add9/scheduled_form_candidate_v6_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the winning v4 staged-reuse candidate rather than from the raw pre-compile path.",
+    "The strongest remaining follow-up is to narrow producer staging while staying in the same locality/reuse family that already produced the best real board result.",
+    "This v6 candidate stages one h_1 stripe at a time instead of the full 66 x 10 tile, while still reusing that stripe across all three c_1 groups and both w_1 positions.",
+    "This lane remains local-only and diagnostic-only until the resulting swapped artifact is benchmarked on the board."
+  ]
+}

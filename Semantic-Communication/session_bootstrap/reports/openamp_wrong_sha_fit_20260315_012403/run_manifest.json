@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-03-15T01:28:29+0800",
+  "fit_id": "FIT-01",
+  "tc_id": "TC-003",
+  "run_id": "openamp_wrong_sha_fit_20260315_012403",
+  "scenario": "wrong expected_sha256 JOB_REQ on real board path",
+  "risk_item": "unknown artifact execution risk",
+  "job_id": 9301,
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "wrong_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+  "expected_result": {
+    "decision": "DENY",
+    "fault_code": 1,
+    "fault_name": "ARTIFACT_SHA_MISMATCH",
+    "guard_state": "READY",
+    "runner_should_not_start": true
+  },
+  "board_access": {
+    "mode": "ssh",
+    "host": "100.121.87.73",
+    "user": "user",
+    "port": "22",
+    "reachable": true,
+    "executed_from": "main assistant exec on lenovo host",
+    "remote_project_root": "/home/user/tvm_metaschedule_execution_project",
+    "remote_output_dir": "/home/user/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403",
+    "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+    "rpmsg_dev": "/dev/rpmsg0",
+    "remote_runner_marker_absent": true
+  },
+  "observed_result": {
+    "decision": "DENY",
+    "fault_code": 1,
+    "fault_name": "ARTIFACT_SHA_MISMATCH",
+    "guard_state": "READY",
+    "wrapper_result": "denied_by_control_hook",
+    "runner_exit_code": null,
+    "pre_status": {
+      "payload_len": 24,
+      "parsed": true,
+      "guard_state": 1,
+      "guard_state_name": "READY",
+      "active_job_id": 0,
+      "last_fault_code": 0,
+      "last_fault_name": "NONE",
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    },
+    "post_status": {
+      "payload_len": 24,
+      "parsed": true,
+      "guard_state": 1,
+      "guard_state_name": "READY",
+      "active_job_id": 0,
+      "last_fault_code": 1,
+      "last_fault_name": "ARTIFACT_SHA_MISMATCH",
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  },
+  "evidence_bundle": {
+    "pre_status_bridge_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/pre_status/bridge_summary.json",
+    "wrapper_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/wrapper/job_manifest.json",
+    "wrapper_trace": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/wrapper/control_trace.jsonl",
+    "wrapper_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/wrapper/wrapper_summary.json",
+    "job_req_bridge_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/bridge_summary.json",
+    "post_status_bridge_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/post_status/bridge_summary.json"
+  }
+}

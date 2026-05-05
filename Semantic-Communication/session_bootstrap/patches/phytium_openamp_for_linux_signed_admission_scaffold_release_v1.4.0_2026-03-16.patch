@@ -1,0 +1,822 @@
+--- a/example/system/amp/openamp_for_linux/src/slaver_00_example.c
++++ b/example/system/amp/openamp_for_linux/src/slaver_00_example.c
+@@ -58,12 +58,34 @@
+ #define SC_MSG_JOB_DONE             0x0005U
+ #define SC_MSG_SAFE_STOP            0x0007U
+ #define SC_MSG_STATUS_REQ           0x0008U
+ #define SC_MSG_STATUS_RESP          0x0009U
++#define SC_MSG_SIGNED_ADMISSION_BEGIN      0x000CU
++#define SC_MSG_SIGNED_ADMISSION_CHUNK      0x000DU
++#define SC_MSG_SIGNED_ADMISSION_SIGNATURE  0x000EU
++#define SC_MSG_SIGNED_ADMISSION_COMMIT     0x000FU
++#define SC_MSG_SIGNED_ADMISSION_ACK        0x0010U
+ #define SC_GUARD_STATE_BOOT         0U
+ #define SC_GUARD_STATE_READY        1U
+ #define SC_GUARD_STATE_JOB_ACTIVE   2U
+ #define SC_GUARD_STATE_WAIT_DONE    3U
+ #define SC_GUARD_STATE_DENY_PENDING 4U
+ #define SC_GUARD_STATE_FAULT_LATCHED 5U
+ #define SC_DECISION_DENY            0U
+ #define SC_DECISION_ALLOW           1U
+ #define SC_FAULT_NONE               0U
+ #define SC_FAULT_ARTIFACT_SHA       1U
+ #define SC_FAULT_HEARTBEAT_TIMEOUT  3U
+ #define SC_FAULT_OUTPUT_INCOMPLETE  5U
+ #define SC_FAULT_DUPLICATE_JOB      8U
+ #define SC_FAULT_PARAM_RANGE        9U
+ #define SC_FAULT_MANUAL_SAFE_STOP   10U
++#define SC_FAULT_MANIFEST_NOT_STAGED 11U
++#define SC_FAULT_MANIFEST_DIGEST_MISMATCH 12U
++#define SC_FAULT_MANIFEST_PARSE_ERROR 13U
++#define SC_FAULT_SIGNATURE_INVALID  14U
++#define SC_FAULT_KEY_SLOT_UNKNOWN   15U
++#define SC_FAULT_MANIFEST_CONTRACT_MISMATCH 16U
++#define SC_ADMISSION_TYPE_SIGNED_MANIFEST_V1 1U
++#define SC_SIGALG_ECDSA_P256_SHA256_DER      1U
++#define SC_SIGNED_MANIFEST_MAX_LEN          1536U
++#define SC_SIGNED_SIGNATURE_MAX_LEN         96U
++#define SC_SIGNED_MANIFEST_CHUNK_MAX        160U
++#define SC_SIGNED_MANIFEST_MAX_CHUNK_COUNT  10U
++#define SC_SIGNED_STAGE_BEGIN               1U
++#define SC_SIGNED_STAGE_CHUNK               2U
++#define SC_SIGNED_STAGE_SIGNATURE           3U
++#define SC_SIGNED_STAGE_COMMIT              4U
++#define SC_SIGNED_ACK_ACCEPTED              0U
++#define SC_SIGNED_ACK_DUPLICATE             1U
++#define SC_SIGNED_ACK_OUT_OF_RANGE          2U
++#define SC_SIGNED_ACK_CRC_ERROR             3U
++#define SC_SIGNED_ACK_TOO_LARGE             4U
++#define SC_SIGNED_ACK_READY                 5U
+ #define SC_HEARTBEAT_TIMEOUT_MS     5000U
+@@ -220,6 +242,69 @@ typedef struct
+     ScCtrlHdr header;
+     ScStatusResp payload;
+ } ScStatusRespFrame;
++
++typedef struct
++{
++    uint8_t admission_type;
++    uint8_t key_slot;
++    uint16_t signature_algorithm;
++    uint8_t manifest_sha256[32];
++    uint32_t manifest_len;
++    uint32_t signature_len;
++    uint32_t chunk_size;
++} ScSignedAdmissionBeginV1;
++
++typedef struct
++{
++    uint8_t manifest_sha256[32];
++    uint32_t offset;
++    uint32_t chunk_len;
++    uint32_t chunk_crc32;
++} ScSignedAdmissionChunkHdrV1;
++
++typedef struct
++{
++    uint8_t manifest_sha256[32];
++    uint32_t signature_len;
++    uint32_t signature_crc32;
++} ScSignedAdmissionSignatureHdrV1;
++
++typedef struct
++{
++    uint8_t manifest_sha256[32];
++    uint32_t manifest_crc32;
++    uint32_t signature_crc32;
++    uint32_t manifest_len;
++    uint32_t signature_len;
++} ScSignedAdmissionCommitV1;
++
++typedef struct
++{
++    uint8_t manifest_sha256[32];
++    uint32_t stage;
++    uint32_t status;
++    uint32_t offset;
++    uint32_t accepted_len;
++} ScSignedAdmissionAckV1;
++
++typedef struct
++{
++    ScCtrlHdr header;
++    ScSignedAdmissionAckV1 payload;
++} ScSignedAdmissionAckFrame;
++
++typedef struct
++{
++    uint32_t job_id;
++    uint8_t key_slot;
++    uint16_t signature_algorithm;
++    uint8_t manifest_sha256[32];
++    uint32_t manifest_len;
++    uint32_t received_manifest_len;
++    uint32_t signature_len;
++    uint32_t received_signature_len;
++    uint32_t chunk_size;
++    uint32_t manifest_crc32;
++    uint32_t signature_crc32;
++    uint32_t ready_for_job_req;
++    uint8_t manifest_buf[SC_SIGNED_MANIFEST_MAX_LEN];
++    uint8_t signature_buf[SC_SIGNED_SIGNATURE_MAX_LEN];
++} ScSignedAdmissionStage;
++
+ typedef struct
+ {
+     const char *label;
+@@ -229,6 +314,20 @@ typedef struct
+     uint32_t enabled;
+     const char *source;
+ } ScTrustedArtifactEntry;
++
++typedef struct
++{
++    uint8_t slot_id;
++    const char *key_id;
++    uint8_t public_key_uncompressed[65];
++} ScPublicKeySlot;
++
++typedef struct
++{
++    uint8_t artifact_sha256[32];
++    uint32_t deadline_ms;
++    uint32_t expected_outputs;
++    uint32_t flags;
++} ScManifestContract;
+@@ -264,6 +363,18 @@ static uint32_t sc_last_fault_code = SC_FAULT_NONE;
+ static uint32_t sc_total_fault_count = 0U;
+ static uint32_t sc_heartbeat_seen = 0U;
+ static uint32_t sc_expected_outputs = 0U;
++static ScSignedAdmissionStage sc_signed_stage;
++static const ScPublicKeySlot sc_public_key_slots[] = {
++    {
++        1U,
++        "fixture-dev-20260316",
++        {
++            /* TODO(next): replace placeholder bytes with the real uncompressed P-256 public key. */
++            0x04U,
++        },
++    },
++};
+ static uint64_t sc_last_heartbeat_ticks = 0ULL;
+ static uint64_t sc_heartbeat_timeout_ticks = 0ULL;
+ /************************** Function Prototypes ******************************/
+@@ -277,10 +388,22 @@ static void sc_ctrl_clear_active_job(void)
+     sc_last_heartbeat_ticks = 0ULL;
+ }
+ 
++static void sc_ctrl_clear_signed_stage(void)
++{
++    memset(&sc_signed_stage, 0, sizeof(sc_signed_stage));
++}
++
++static int sc_ctrl_is_signed_stage_for_job(uint32_t job_id)
++{
++    return ((sc_signed_stage.job_id == job_id) &&
++            (sc_signed_stage.manifest_len != 0U));
++}
++
+ static void sc_ctrl_reset_runtime_state(void)
+ {
+     sc_ctrl_clear_active_job();
++    sc_ctrl_clear_signed_stage();
+     sc_last_fault_code = SC_FAULT_NONE;
+     sc_total_fault_count = 0U;
+     sc_heartbeat_timeout_ticks = 0ULL;
+ }
+@@ -362,6 +485,7 @@ static void sc_ctrl_apply_watchdog_timeout(void)
+     timed_out_job_id = sc_active_job_id;
+     sc_ctrl_note_fault(SC_FAULT_HEARTBEAT_TIMEOUT);
+     sc_ctrl_clear_active_job();
++    sc_ctrl_clear_signed_stage();
+     SLAVE_DEBUG_W("HEARTBEAT timeout seq-state job_id:%u fault:%u total_faults:%u",
+                   (unsigned int)timed_out_job_id,
+                   (unsigned int)sc_last_fault_code,
+@@ -401,6 +525,260 @@ static int sc_ctrl_is_known_flag(uint32_t flags)
+     return (flags == 1U) || (flags == 2U) || (flags == 3U);
+ }
+ 
++static int sc_ctrl_lookup_public_key_slot(uint8_t key_slot,
++                                          const ScPublicKeySlot **out_slot)
++{
++    size_t entry_index;
++
++    for (entry_index = 0; entry_index < (sizeof(sc_public_key_slots) /
++                                         sizeof(sc_public_key_slots[0]));
++         ++entry_index)
++    {
++        const ScPublicKeySlot *entry = &sc_public_key_slots[entry_index];
++
++        if ((entry->slot_id == key_slot) && (entry->key_id != NULL))
++        {
++            if (out_slot != NULL)
++            {
++                *out_slot = entry;
++            }
++            return 1;
++        }
++    }
++
++    if (out_slot != NULL)
++    {
++        *out_slot = NULL;
++    }
++    return 0;
++}
++
++static int sc_ctrl_send_signed_admission_ack(struct rpmsg_endpoint *ept, uint32_t src,
++                                             const ScCtrlHdr *request_header,
++                                             const uint8_t manifest_sha256[32],
++                                             uint32_t stage, uint32_t status,
++                                             uint32_t offset, uint32_t accepted_len)
++{
++    ScSignedAdmissionAckFrame response;
++
++    memset(&response, 0, sizeof(response));
++    ept->dest_addr = src;
++    response.header.magic = SC_CTRL_MAGIC;
++    response.header.version = SC_CTRL_VERSION;
++    response.header.msg_type = SC_MSG_SIGNED_ADMISSION_ACK;
++    response.header.seq = request_header->seq;
++    response.header.job_id = request_header->job_id;
++    response.header.payload_len = sizeof(response.payload);
++    response.header.header_crc32 = sc_ctrl_compute_header_crc(&response.header);
++    if (manifest_sha256 != NULL)
++    {
++        memcpy(response.payload.manifest_sha256, manifest_sha256,
++               sizeof(response.payload.manifest_sha256));
++    }
++    response.payload.stage = stage;
++    response.payload.status = status;
++    response.payload.offset = offset;
++    response.payload.accepted_len = accepted_len;
++
++    return rpmsg_send(ept, &response, sizeof(response));
++}
++
++static int sc_ctrl_handle_signed_admission_begin(struct rpmsg_endpoint *ept, uint32_t src,
++                                                 const ScCtrlHdr *request_header,
++                                                 const void *payload_data)
++{
++    ScSignedAdmissionBeginV1 request;
++    uint8_t zero_sha256[32] = {0};
++    uint32_t chunk_count = 0U;
++
++    if (request_header->payload_len != sizeof(request))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 zero_sha256,
++                                                 SC_SIGNED_STAGE_BEGIN,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    memcpy(&request, payload_data, sizeof(request));
++    if ((request.admission_type != SC_ADMISSION_TYPE_SIGNED_MANIFEST_V1) ||
++        (request.signature_algorithm != SC_SIGALG_ECDSA_P256_SHA256_DER))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_BEGIN,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if ((request.manifest_len == 0U) ||
++        (request.manifest_len > SC_SIGNED_MANIFEST_MAX_LEN) ||
++        (request.signature_len == 0U) ||
++        (request.signature_len > SC_SIGNED_SIGNATURE_MAX_LEN) ||
++        (request.chunk_size == 0U) ||
++        (request.chunk_size > SC_SIGNED_MANIFEST_CHUNK_MAX))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_BEGIN,
++                                                 SC_SIGNED_ACK_TOO_LARGE,
++                                                 0U, 0U);
++    }
++
++    chunk_count = (request.manifest_len + request.chunk_size - 1U) / request.chunk_size;
++    if (chunk_count > SC_SIGNED_MANIFEST_MAX_CHUNK_COUNT)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_BEGIN,
++                                                 SC_SIGNED_ACK_TOO_LARGE,
++                                                 0U, 0U);
++    }
++
++    if (sc_ctrl_is_signed_stage_for_job(request_header->job_id) &&
++        (memcmp(sc_signed_stage.manifest_sha256, request.manifest_sha256,
++                sizeof(request.manifest_sha256)) == 0) &&
++        (sc_signed_stage.manifest_len == request.manifest_len) &&
++        (sc_signed_stage.signature_len == request.signature_len) &&
++        (sc_signed_stage.chunk_size == request.chunk_size))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_BEGIN,
++                                                 SC_SIGNED_ACK_DUPLICATE,
++                                                 0U,
++                                                 request.manifest_len);
++    }
++
++    sc_ctrl_clear_signed_stage();
++    sc_signed_stage.job_id = request_header->job_id;
++    sc_signed_stage.key_slot = request.key_slot;
++    sc_signed_stage.signature_algorithm = request.signature_algorithm;
++    memcpy(sc_signed_stage.manifest_sha256, request.manifest_sha256,
++           sizeof(sc_signed_stage.manifest_sha256));
++    sc_signed_stage.manifest_len = request.manifest_len;
++    sc_signed_stage.signature_len = request.signature_len;
++    sc_signed_stage.chunk_size = request.chunk_size;
++
++    return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                             request.manifest_sha256,
++                                             SC_SIGNED_STAGE_BEGIN,
++                                             SC_SIGNED_ACK_ACCEPTED,
++                                             0U,
++                                             request.manifest_len);
++}
++
++static int sc_ctrl_handle_signed_admission_chunk(struct rpmsg_endpoint *ept, uint32_t src,
++                                                 const ScCtrlHdr *request_header,
++                                                 const void *payload_data)
++{
++    ScSignedAdmissionChunkHdrV1 request;
++    const uint8_t *chunk_data;
++    uint8_t zero_sha256[32] = {0};
++
++    if (!sc_ctrl_is_signed_stage_for_job(request_header->job_id))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 zero_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if (request_header->payload_len < sizeof(request))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 sc_signed_stage.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    memcpy(&request, payload_data, sizeof(request));
++    if (memcmp(request.manifest_sha256, sc_signed_stage.manifest_sha256,
++               sizeof(request.manifest_sha256)) != 0)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 request.offset, 0U);
++    }
++
++    if ((request.chunk_len == 0U) ||
++        (request.chunk_len > sc_signed_stage.chunk_size) ||
++        (request_header->payload_len != (sizeof(request) + request.chunk_len)) ||
++        ((request.offset + request.chunk_len) > sc_signed_stage.manifest_len))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 request.offset, 0U);
++    }
++
++    chunk_data = ((const uint8_t *)payload_data) + sizeof(request);
++    if ((request.offset + request.chunk_len) <= sc_signed_stage.received_manifest_len)
++    {
++        if (memcmp(sc_signed_stage.manifest_buf + request.offset,
++                   chunk_data, request.chunk_len) == 0)
++        {
++            return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                     request.manifest_sha256,
++                                                     SC_SIGNED_STAGE_CHUNK,
++                                                     SC_SIGNED_ACK_DUPLICATE,
++                                                     request.offset,
++                                                     request.chunk_len);
++        }
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 request.offset, 0U);
++    }
++
++    if (request.offset != sc_signed_stage.received_manifest_len)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 request.offset, 0U);
++    }
++
++    if (sc_ctrl_crc32(chunk_data, request.chunk_len) != request.chunk_crc32)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_CHUNK,
++                                                 SC_SIGNED_ACK_CRC_ERROR,
++                                                 request.offset, 0U);
++    }
++
++    memcpy(sc_signed_stage.manifest_buf + request.offset, chunk_data, request.chunk_len);
++    sc_signed_stage.received_manifest_len += request.chunk_len;
++    return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                             request.manifest_sha256,
++                                             SC_SIGNED_STAGE_CHUNK,
++                                             SC_SIGNED_ACK_ACCEPTED,
++                                             request.offset,
++                                             request.chunk_len);
++}
++
++static int sc_ctrl_handle_signed_admission_signature(struct rpmsg_endpoint *ept, uint32_t src,
++                                                     const ScCtrlHdr *request_header,
++                                                     const void *payload_data)
++{
++    ScSignedAdmissionSignatureHdrV1 request;
++    const uint8_t *signature_data;
++    uint8_t zero_sha256[32] = {0};
++
++    if (!sc_ctrl_is_signed_stage_for_job(request_header->job_id))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 zero_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if (request_header->payload_len < sizeof(request))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 sc_signed_stage.manifest_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    memcpy(&request, payload_data, sizeof(request));
++    if (memcmp(request.manifest_sha256, sc_signed_stage.manifest_sha256,
++               sizeof(request.manifest_sha256)) != 0)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if ((request.signature_len == 0U) ||
++        (request.signature_len > SC_SIGNED_SIGNATURE_MAX_LEN) ||
++        (request.signature_len != sc_signed_stage.signature_len) ||
++        (request_header->payload_len != (sizeof(request) + request.signature_len)))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    signature_data = ((const uint8_t *)payload_data) + sizeof(request);
++    if ((sc_signed_stage.received_signature_len == request.signature_len) &&
++        (memcmp(sc_signed_stage.signature_buf, signature_data, request.signature_len) == 0))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_DUPLICATE,
++                                                 0U, request.signature_len);
++    }
++
++    if (sc_ctrl_crc32(signature_data, request.signature_len) != request.signature_crc32)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_SIGNATURE,
++                                                 SC_SIGNED_ACK_CRC_ERROR,
++                                                 0U, 0U);
++    }
++
++    memcpy(sc_signed_stage.signature_buf, signature_data, request.signature_len);
++    sc_signed_stage.received_signature_len = request.signature_len;
++    return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                             request.manifest_sha256,
++                                             SC_SIGNED_STAGE_SIGNATURE,
++                                             SC_SIGNED_ACK_ACCEPTED,
++                                             0U, request.signature_len);
++}
++
++static int sc_ctrl_handle_signed_admission_commit(struct rpmsg_endpoint *ept, uint32_t src,
++                                                  const ScCtrlHdr *request_header,
++                                                  const void *payload_data)
++{
++    ScSignedAdmissionCommitV1 request;
++    uint8_t zero_sha256[32] = {0};
++
++    if (!sc_ctrl_is_signed_stage_for_job(request_header->job_id))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 zero_sha256,
++                                                 SC_SIGNED_STAGE_COMMIT,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if (request_header->payload_len != sizeof(request))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 sc_signed_stage.manifest_sha256,
++                                                 SC_SIGNED_STAGE_COMMIT,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    memcpy(&request, payload_data, sizeof(request));
++    if (memcmp(request.manifest_sha256, sc_signed_stage.manifest_sha256,
++               sizeof(request.manifest_sha256)) != 0)
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_COMMIT,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if ((request.manifest_len != sc_signed_stage.manifest_len) ||
++        (request.signature_len != sc_signed_stage.signature_len) ||
++        (sc_signed_stage.received_manifest_len != sc_signed_stage.manifest_len) ||
++        (sc_signed_stage.received_signature_len != sc_signed_stage.signature_len))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_COMMIT,
++                                                 SC_SIGNED_ACK_OUT_OF_RANGE,
++                                                 0U, 0U);
++    }
++
++    if ((sc_ctrl_crc32(sc_signed_stage.manifest_buf, sc_signed_stage.manifest_len) !=
++         request.manifest_crc32) ||
++        (sc_ctrl_crc32(sc_signed_stage.signature_buf, sc_signed_stage.signature_len) !=
++         request.signature_crc32))
++    {
++        return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                                 request.manifest_sha256,
++                                                 SC_SIGNED_STAGE_COMMIT,
++                                                 SC_SIGNED_ACK_CRC_ERROR,
++                                                 0U, 0U);
++    }
++
++    sc_signed_stage.manifest_crc32 = request.manifest_crc32;
++    sc_signed_stage.signature_crc32 = request.signature_crc32;
++    sc_signed_stage.ready_for_job_req = 1U;
++    return sc_ctrl_send_signed_admission_ack(ept, src, request_header,
++                                             request.manifest_sha256,
++                                             SC_SIGNED_STAGE_COMMIT,
++                                             SC_SIGNED_ACK_READY,
++                                             0U,
++                                             request.manifest_len);
++}
++
++static int sc_ctrl_verify_manifest_signature(const ScPublicKeySlot *slot,
++                                             const uint8_t *manifest_bytes,
++                                             uint32_t manifest_len,
++                                             const uint8_t *signature_bytes,
++                                             uint32_t signature_len)
++{
++    (void)slot;
++    (void)manifest_bytes;
++    (void)manifest_len;
++    (void)signature_bytes;
++    (void)signature_len;
++    /*
++     * TODO(next): replace this deny-by-default stub with the chosen SHA-256 +
++     * ECDSA-P256 verifier from the standalone SDK build. Until that lands, the
++     * signed path remains explicitly non-admitting.
++     */
++    return 0;
++}
++
++static int sc_ctrl_parse_manifest_contract(const uint8_t *manifest_bytes,
++                                           uint32_t manifest_len,
++                                           ScManifestContract *out_contract)
++{
++    (void)manifest_bytes;
++    (void)manifest_len;
++    if (out_contract != NULL)
++    {
++        memset(out_contract, 0, sizeof(*out_contract));
++    }
++    /* TODO(next): implement strict field extraction for artifact.sha256 and job.* only. */
++    return 0;
++}
++
++static uint32_t sc_ctrl_verify_signed_manifest_for_job_req(const ScCtrlHdr *request_header,
++                                                           const ScJobReq *request)
++{
++    const ScPublicKeySlot *slot = NULL;
++    ScManifestContract contract;
++
++    if (!sc_ctrl_is_signed_stage_for_job(request_header->job_id) ||
++        (sc_signed_stage.ready_for_job_req == 0U))
++    {
++        return SC_FAULT_MANIFEST_NOT_STAGED;
++    }
++    if (sc_signed_stage.job_id != request_header->job_id)
++    {
++        return SC_FAULT_MANIFEST_NOT_STAGED;
++    }
++    if (sc_ctrl_crc32(sc_signed_stage.manifest_buf, sc_signed_stage.manifest_len) !=
++        sc_signed_stage.manifest_crc32)
++    {
++        return SC_FAULT_MANIFEST_DIGEST_MISMATCH;
++    }
++    if (!sc_ctrl_lookup_public_key_slot(sc_signed_stage.key_slot, &slot))
++    {
++        return SC_FAULT_KEY_SLOT_UNKNOWN;
++    }
++    if (!sc_ctrl_verify_manifest_signature(slot,
++                                           sc_signed_stage.manifest_buf,
++                                           sc_signed_stage.manifest_len,
++                                           sc_signed_stage.signature_buf,
++                                           sc_signed_stage.signature_len))
++    {
++        return SC_FAULT_SIGNATURE_INVALID;
++    }
++    if (!sc_ctrl_parse_manifest_contract(sc_signed_stage.manifest_buf,
++                                         sc_signed_stage.manifest_len,
++                                         &contract))
++    {
++        return SC_FAULT_MANIFEST_PARSE_ERROR;
++    }
++    if ((memcmp(request->expected_sha256, contract.artifact_sha256,
++                sizeof(contract.artifact_sha256)) != 0) ||
++        (request->deadline_ms != contract.deadline_ms) ||
++        (request->expected_outputs != contract.expected_outputs) ||
++        (request->flags != contract.flags))
++    {
++        return SC_FAULT_MANIFEST_CONTRACT_MISMATCH;
++    }
++    return SC_FAULT_NONE;
++}
++
+ static int sc_ctrl_send_job_ack(struct rpmsg_endpoint *ept, uint32_t src,
+                                 const ScCtrlHdr *request_header,
+                                 uint32_t decision, uint32_t fault_code)
+@@ -461,6 +839,7 @@ static int sc_ctrl_handle_job_req(struct rpmsg_endpoint *ept, uint32_t src,
+     ScJobReq request;
+     const ScTrustedArtifactEntry *matched_artifact = NULL;
+     uint32_t fault_code = SC_FAULT_NONE;
++    int signed_path_requested = 0;
++    uint8_t signed_key_slot = 0U;
++    uint32_t signed_manifest_len = 0U;
+     int ret;
+ 
+     sc_ctrl_apply_watchdog_timeout();
+@@ -479,10 +858,24 @@ static int sc_ctrl_handle_job_req(struct rpmsg_endpoint *ept, uint32_t src,
+         goto deny_request;
+     }
+ 
+-    if (!sc_ctrl_is_trusted_artifact_sha(request.expected_sha256, &matched_artifact))
++    signed_path_requested = sc_ctrl_is_signed_stage_for_job(request_header->job_id);
++    if (signed_path_requested)
+     {
+-        fault_code = SC_FAULT_ARTIFACT_SHA;
+-        goto deny_request;
++        fault_code = sc_ctrl_verify_signed_manifest_for_job_req(request_header, &request);
++        if (fault_code != SC_FAULT_NONE)
++        {
++            goto deny_request;
++        }
++        signed_key_slot = sc_signed_stage.key_slot;
++        signed_manifest_len = sc_signed_stage.manifest_len;
++        sc_ctrl_clear_signed_stage();
++    }
++    else
++    {
++        if (!sc_ctrl_is_trusted_artifact_sha(request.expected_sha256, &matched_artifact))
++        {
++            fault_code = SC_FAULT_ARTIFACT_SHA;
++            goto deny_request;
++        }
+     }
+ 
+     if (request.deadline_ms == 0U)
+@@ -510,11 +903,23 @@ static int sc_ctrl_handle_job_req(struct rpmsg_endpoint *ept, uint32_t src,
+         return ret;
+     }
+ 
+-    SLAVE_DEBUG_I("JOB_REQ allow seq:%u job_id:%u artifact:%s outputs:%u flags:%u",
+-                  (unsigned int)request_header->seq,
+-                  (unsigned int)request_header->job_id,
+-                  (matched_artifact != NULL) ? matched_artifact->label : "unknown",
+-                  (unsigned int)request.expected_outputs,
+-                  (unsigned int)request.flags);
++    if (signed_path_requested)
++    {
++        SLAVE_DEBUG_I("JOB_REQ signed scaffold seq:%u job_id:%u slot:%u manifest_len:%u outputs:%u flags:%u",
++                      (unsigned int)request_header->seq,
++                      (unsigned int)request_header->job_id,
++                      (unsigned int)signed_key_slot,
++                      (unsigned int)signed_manifest_len,
++                      (unsigned int)request.expected_outputs,
++                      (unsigned int)request.flags);
++    }
++    else
++    {
++        SLAVE_DEBUG_I("JOB_REQ allow seq:%u job_id:%u artifact:%s outputs:%u flags:%u",
++                      (unsigned int)request_header->seq,
++                      (unsigned int)request_header->job_id,
++                      (matched_artifact != NULL) ? matched_artifact->label : "unknown",
++                      (unsigned int)request.expected_outputs,
++                      (unsigned int)request.flags);
++    }
+     return RPMSG_SUCCESS;
+ 
+ deny_request:
++    if (signed_path_requested && (fault_code >= SC_FAULT_MANIFEST_NOT_STAGED))
++    {
++        sc_ctrl_clear_signed_stage();
++    }
+     sc_ctrl_note_fault(fault_code);
+     sc_ctrl_normalize_runtime_state();
+ 
+@@ -630,10 +1035,12 @@ static int sc_ctrl_handle_job_done(struct rpmsg_endpoint *ept, uint32_t src,
+         if (request.result_code == 0U)
+         {
+             sc_last_fault_code = SC_FAULT_NONE;
+             sc_ctrl_clear_active_job();
++            sc_ctrl_clear_signed_stage();
+         }
+         else
+         {
+             sc_ctrl_note_fault(SC_FAULT_OUTPUT_INCOMPLETE);
+             sc_ctrl_clear_active_job();
++            sc_ctrl_clear_signed_stage();
+         }
+         done_applied = 1;
+     }
+@@ -688,6 +1095,7 @@ static int sc_ctrl_handle_safe_stop(struct rpmsg_endpoint *ept, uint32_t src,
+     {
+         sc_ctrl_note_fault(SC_FAULT_MANUAL_SAFE_STOP);
+         sc_ctrl_clear_active_job();
++        sc_ctrl_clear_signed_stage();
+         stop_applied = 1;
+     }
+ 
+@@ -777,6 +1185,34 @@ static int rpmsg_endpoint_cb(struct rpmsg_endpoint *ept, void *data, size_t len, uint32_t src, void *priv)
+             SLAVE_DEBUG_I("STATUS_REQ seq:%u job_id:%u -> STATUS_RESP guard:%u active:%u",
+                           (unsigned int)header.seq,
+                           (unsigned int)header.job_id,
+                           (unsigned int)sc_guard_state,
+                           (unsigned int)sc_active_job_id);
+             return RPMSG_SUCCESS;
+ 
++        case SC_MSG_SIGNED_ADMISSION_BEGIN:
++            ret = sc_ctrl_handle_signed_admission_begin(ept, src, &header, payload_data);
++            if (ret < 0)
++            {
++                SLAVE_DEBUG_E("rpmsg_send signed begin ack failed.\r\n");
++                return ret;
++            }
++            return RPMSG_SUCCESS;
++
++        case SC_MSG_SIGNED_ADMISSION_CHUNK:
++            ret = sc_ctrl_handle_signed_admission_chunk(ept, src, &header, payload_data);
++            if (ret < 0)
++            {
++                SLAVE_DEBUG_E("rpmsg_send signed chunk ack failed.\r\n");
++                return ret;
++            }
++            return RPMSG_SUCCESS;
++
++        case SC_MSG_SIGNED_ADMISSION_SIGNATURE:
++            ret = sc_ctrl_handle_signed_admission_signature(ept, src, &header, payload_data);
++            if (ret < 0)
++            {
++                SLAVE_DEBUG_E("rpmsg_send signed signature ack failed.\r\n");
++                return ret;
++            }
++            return RPMSG_SUCCESS;
++
++        case SC_MSG_SIGNED_ADMISSION_COMMIT:
++            ret = sc_ctrl_handle_signed_admission_commit(ept, src, &header, payload_data);
++            if (ret < 0)
++            {
++                SLAVE_DEBUG_E("rpmsg_send signed commit ack failed.\r\n");
++                return ret;
++            }
++            return RPMSG_SUCCESS;
++
+         case SC_MSG_JOB_REQ:
+             ret = sc_ctrl_handle_job_req(ept, src, &header, payload_data);
+             if (ret < 0)
+             {
+                 SLAVE_DEBUG_E("rpmsg_send job ack failed.\r\n");

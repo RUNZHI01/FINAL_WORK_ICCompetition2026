@@ -1,0 +1,14 @@
+[Unit]
+Description=Board Position API Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openamp-demo/board_position_api_service
+ExecStart=/usr/bin/env bash -lc "set -a; . ~/.openamp-demo/board_position_api_service/board_position_api_service.env; set +a; exec ~/.openamp-demo/board_position_api_service/run_board_position_api_service.sh >> ~/.openamp-demo/board_position_api_service/board_position_api_service.log 2>&1"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

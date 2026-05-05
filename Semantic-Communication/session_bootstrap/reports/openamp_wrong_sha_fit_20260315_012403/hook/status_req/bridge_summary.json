@@ -1,0 +1,88 @@
+{
+  "phase": "STATUS_REQ",
+  "transport_status": "status_resp_received",
+  "protocol_semantics": "implemented",
+  "note": "Received a decodable STATUS_RESP frame.",
+  "tx_frame": {
+    "raw_len": 24,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 8,
+    "msg_name": "STATUS_REQ",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 0,
+    "header_crc32": 3956108858,
+    "expected_header_crc32": 3956108858,
+    "payload_hex": ""
+  },
+  "rx_frame": {
+    "raw_len": 48,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 9,
+    "msg_name": "STATUS_RESP",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 24,
+    "header_crc32": 3815764028,
+    "expected_header_crc32": 3815764028,
+    "payload_hex": "010000000000000000000000000000000000000000000000",
+    "status_resp": {
+      "payload_len": 24,
+      "parsed": true,
+      "guard_state": 1,
+      "guard_state_name": "READY",
+      "active_job_id": 0,
+      "last_fault_code": 0,
+      "last_fault_name": "NONE",
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    }
+  },
+  "generated_at": "2026-03-15T01:24:34+0800",
+  "job_id": 9301,
+  "seq": 1,
+  "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+  "rpmsg_dev": "/dev/rpmsg0",
+  "device_status": {
+    "rpmsg_ctrl": {
+      "path": "/dev/rpmsg_ctrl0",
+      "exists": true,
+      "used_for": "presence_check_only_in_phase5_prep"
+    },
+    "rpmsg_dev": {
+      "path": "/dev/rpmsg0",
+      "exists": true,
+      "used_for": "read_write_transport"
+    },
+    "require_devices": true
+  },
+  "bridge_mode": "hook",
+  "hook_event_phase": "STATUS_REQ",
+  "hook_event_payload": {
+    "job_id": 9301,
+    "variant": "wrong_sha_fit",
+    "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+    "job_flags": "smoke"
+  },
+  "written_bytes": 24,
+  "drained_bytes_hex": "",
+  "rx_bytes_hex": "4d4f4353010009000100000055240000180000003cf06fe3010000000000000000000000000000000000000000000000",
+  "output_dir": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req",
+  "artifact_paths": {
+    "stdin_event": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/stdin_event.json",
+    "tx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_req_tx.bin",
+    "tx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_req_tx.hex",
+    "tx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_req_tx.json",
+    "rx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_resp_or_echo_rx.bin",
+    "rx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_resp_or_echo_rx.hex",
+    "rx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/status_resp_or_echo_rx.json",
+    "summary": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/status_req/bridge_summary.json"
+  }
+}

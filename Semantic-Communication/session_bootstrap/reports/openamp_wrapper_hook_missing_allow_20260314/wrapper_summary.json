@@ -1,0 +1,21 @@
+{
+  "finished_at": "2026-03-14T18:42:30+0800",
+  "job_id": 9102,
+  "result": "denied_by_control_hook",
+  "status_response": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "  File \"<string>\", line 1\n    import json, os; phase=os.environ.get(\"OPENAMP_PHASE\", \"\");\\nif phase == \"STATUS_REQ\":\\n    print(json.dumps({\"phase\": phase, \"source\": \"replayed_live_status_resp\", \"transport_status\": \"status_resp_received\", \"protocol_semantics\": \"implemented\", \"note\": \"status-only replay\"}, ensure_ascii=False))\n                                                                ^\nSyntaxError: unexpected character after line continuation character\n",
+    "response": null
+  },
+  "job_req_response": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "  File \"<string>\", line 1\n    import json, os; phase=os.environ.get(\"OPENAMP_PHASE\", \"\");\\nif phase == \"STATUS_REQ\":\\n    print(json.dumps({\"phase\": phase, \"source\": \"replayed_live_status_resp\", \"transport_status\": \"status_resp_received\", \"protocol_semantics\": \"implemented\", \"note\": \"status-only replay\"}, ensure_ascii=False))\n                                                                ^\nSyntaxError: unexpected character after line continuation character\n",
+    "response": null
+  },
+  "runner_exit_code": null,
+  "runner_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_missing_allow_20260314/runner.log",
+  "manifest_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_missing_allow_20260314/job_manifest.json",
+  "control_trace_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_hook_missing_allow_20260314/control_trace.jsonl"
+}

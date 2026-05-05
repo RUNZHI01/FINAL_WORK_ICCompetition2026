@@ -1,0 +1,24 @@
+/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/old_fw_compare_20260314/openamp_core0_official.elf  :
+section                size         addr
+.text                 92800   2953838592
+.rodata               11217   2953932800
+.le_shell              1024   2953944064
+.gcc_except_table         0   2953945088
+.data                  8192   2953945088
+.bss                5606080   2953969664
+.heap               1048576   2959575744
+.stack                 4096   2960624320
+.resource_table        4096   3221225472
+.debug_info          365907            0
+.debug_abbrev         64286            0
+.debug_aranges        12544            0
+.debug_ranges         41472            0
+.debug_macro          55857            0
+.debug_line          250634            0
+.debug_str           167645            0
+.comment                 93            0
+.debug_frame          25640            0
+.debug_loc           429407            0
+Total               8189566
+
+

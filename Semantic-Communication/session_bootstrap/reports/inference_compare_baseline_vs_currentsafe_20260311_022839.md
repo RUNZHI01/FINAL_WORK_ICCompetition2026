@@ -1,0 +1,50 @@
+# Inference Benchmark Report
+
+- execution_id: inference_compare_baseline_vs_currentsafe_20260311_022839
+- mode: inference_benchmark
+- status: failed_baseline
+- timestamp: 2026-03-11T02:28:46+08:00
+- env_file: ./session_bootstrap/tmp/inference_compare_baseline_vs_currentsafe_20260311_022839.env
+- model_name: jscc
+- target: {kind:llvm,mtriple:aarch64-linux-gnu,mcpu:cortex-a72,mattr:[+neon],num-cores:4}
+- shape_buckets: 1x3x224x224,1x3x256x256
+- threads: 4
+- input_shape: 1,32,32,32
+- input_dtype: float32
+- inference_repeat: 10
+- inference_warmup_runs: 2
+- inference_timeout_sec: 3600
+- baseline_load_ms: NA
+- baseline_vm_init_ms: NA
+- baseline_run_median_ms: NA
+- baseline_run_mean_ms: NA
+- baseline_run_min_ms: NA
+- baseline_run_max_ms: NA
+- baseline_run_variance_ms2: NA
+- baseline_run_count: 0
+- baseline_exit_code: 1
+- baseline_output_shape: NA
+- baseline_output_dtype: NA
+- current_load_ms: NA
+- current_vm_init_ms: NA
+- current_run_median_ms: NA
+- current_run_mean_ms: NA
+- current_run_min_ms: NA
+- current_run_max_ms: NA
+- current_run_variance_ms2: NA
+- current_run_count: 0
+- current_exit_code: NA
+- current_output_shape: NA
+- current_output_dtype: NA
+- delta_ms_current_minus_baseline: NA
+- improvement_pct: NA
+
+## Commands
+
+- baseline_cmd: bash ./session_bootstrap/scripts/run_remote_legacy_tvm_compat.sh --variant baseline
+- current_cmd: bash ./session_bootstrap/scripts/run_remote_tvm_inference_payload.sh --variant current
+
+## Artifacts
+
+- log_file: /home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/inference_compare_baseline_vs_currentsafe_20260311_022839.log
+- raw_csv_file: /home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/inference_compare_baseline_vs_currentsafe_20260311_022839_raw.csv

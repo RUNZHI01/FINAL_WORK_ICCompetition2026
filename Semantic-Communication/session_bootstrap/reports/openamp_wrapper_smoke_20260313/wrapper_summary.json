@@ -1,0 +1,12 @@
+{
+  "finished_at": "2026-03-13T23:01:55+0800",
+  "job_id": 24001,
+  "result": "success",
+  "status_response": {},
+  "job_req_response": {},
+  "runner_exit_code": 0,
+  "runner_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_20260313/runner.log",
+  "manifest_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_20260313/job_manifest.json",
+  "control_trace_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_20260313/control_trace.jsonl",
+  "summary_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_20260313/wrapper_summary.json"
+}

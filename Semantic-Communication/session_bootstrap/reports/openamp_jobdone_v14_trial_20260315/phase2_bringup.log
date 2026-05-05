@@ -1,0 +1,17 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+state=running
+fw_size=1649896 fw_mtime=2026-03-15 00:16:18.721954691 +0800
+afa9679f24f0d9d4ccd4c35e0c779e72573bfe839799d7f95586706977b23803  /lib/firmware/openamp_core0.elf
+=== SET_ENV ===
+[sudo] user 的密码： === RPMSG_DEMO ===
+=== DEVNODES ===
+crw------- 1 root root 238, 1 3月  15 00:17 /dev/rpmsg0
+crw------- 1 root root 238, 0 3月  15 00:17 /dev/rpmsg_ctrl0
+=== DMESG ===
+349:[    2.614380] remoteproc remoteproc0: homo_rproc is available
+509:[   66.561037] remoteproc remoteproc0: powering up homo_rproc
+510:[   66.721293] remoteproc remoteproc0: Booting fw image openamp_core0.elf, size 1649896
+513:[   66.948154] virtio_rpmsg_bus virtio0: rpmsg host is online
+514:[   66.956415]  remoteproc0#vdev0buffer: registered virtio0 (type 7)
+515:[   66.978918] remoteproc remoteproc0: remote processor homo_rproc is now up
+516:[   67.077711] virtio_rpmsg_bus virtio0: creating channel rpmsg-openamp-demo-channel addr 0x0

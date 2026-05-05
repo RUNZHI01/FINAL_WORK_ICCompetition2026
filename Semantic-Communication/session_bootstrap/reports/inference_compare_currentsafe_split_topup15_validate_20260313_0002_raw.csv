@@ -1,0 +1,3 @@
+mode,load_ms,vm_init_ms,run_median_ms,run_mean_ms,run_min_ms,run_max_ms,run_variance_ms2,run_count,exit_code,start_at,end_at
+baseline,NA,NA,1853.7,1854.857,1849.4,1932.4,45.200589,300,0,2026-03-13T00:03:20+08:00,2026-03-13T00:13:38+08:00
+current,3.867,2.106,131.343,131.576,130.683,133.783,0.773951,10,0,2026-03-13T00:13:38+08:00,2026-03-13T00:13:44+08:00

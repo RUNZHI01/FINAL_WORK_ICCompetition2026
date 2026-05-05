@@ -1,0 +1,31 @@
+.verdictGroup {
+  margin-bottom: 8px;  /* Increased from 6px */
+}
+
+.verdictItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;  /* Increased from 4px */
+}
+
+.messageText {
+  color: var(--color-text-secondary);
+  margin-bottom: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.reasonsList {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.reasonItem {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}

@@ -1,0 +1,10 @@
+{
+  "at": "2026-03-15T01:45:47+0800",
+  "phase": "STATUS_REQ",
+  "payload": {
+    "job_id": 9302,
+    "variant": "invalid_expected_outputs_fit",
+    "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+    "job_flags": "smoke"
+  }
+}

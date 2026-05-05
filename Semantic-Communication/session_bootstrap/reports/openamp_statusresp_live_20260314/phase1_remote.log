@@ -1,0 +1,11 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+[sudo] user 的密码： === PREP ===
+patching file example/system/amp/openamp_for_linux/src/slaver_00_example.c
+Hunk #1 succeeded at 29 (offset -4 lines).
+Hunk #2 FAILED at 59.
+Hunk #3 FAILED at 71.
+Hunk #4 FAILED at 150.
+Hunk #5 FAILED at 209.
+Hunk #6 FAILED at 294.
+Hunk #7 FAILED at 351.
+6 out of 7 hunks FAILED -- saving rejects to file example/system/amp/openamp_for_linux/src/slaver_00_example.c.rej

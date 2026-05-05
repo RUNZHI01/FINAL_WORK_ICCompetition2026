@@ -1,0 +1,12 @@
+{
+  "captured_at": "2026-03-15T01:09:03+0800",
+  "host": "100.121.87.73",
+  "user": "user",
+  "port": "22",
+  "probe_command_redacted": "bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/ssh_with_password.sh --host 100.121.87.73 --user user --pass '***' --port 22 -- 'hostname && whoami && uname -a'",
+  "returncode": 255,
+  "stdout_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/ssh_probe/stdout.log",
+  "stderr_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/ssh_probe/stderr.log",
+  "reachable": false,
+  "stderr_excerpt": "socket: Operation not permitted\nssh: connect to host 100.121.87.73 port 22: failure"
+}

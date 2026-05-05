@@ -1,0 +1,14 @@
+[Unit]
+Description=Aircraft Position Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openamp-demo/aircraft_position_bridge
+ExecStart=/usr/bin/env bash -lc "set -a; . ~/.openamp-demo/aircraft_position_bridge/aircraft_position_bridge.env; set +a; exec ~/.openamp-demo/aircraft_position_bridge/run_aircraft_position_bridge.sh >> ~/.openamp-demo/aircraft_position_bridge/aircraft_position_bridge.log 2>&1"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

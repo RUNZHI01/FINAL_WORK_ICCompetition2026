@@ -1,0 +1,75 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+BASH=/usr/bin/bash
+BASHOPTS=checkwinsize:cmdhist:complete_fullquote:extquote:force_fignore:globasciiranges:hostcomplete:interactive_comments:login_shell:progcomp:promptvars:sourcepath
+BASH_ALIASES=()
+BASH_ARGC=([0]="1")
+BASH_ARGV=([0]="pipefail")
+BASH_CMDS=()
+BASH_EXECUTION_STRING=set
+BASH_LINENO=()
+BASH_SOURCE=()
+BASH_VERSINFO=([0]="5" [1]="0" [2]="17" [3]="1" [4]="release" [5]="aarch64-unknown-linux-gnu")
+BASH_VERSION='5.0.17(1)-release'
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+DEFAULT_XDG_CONFIG_DIRS=/etc/xdg
+DEFAULT_XDG_DATA_DIRS=/usr/local/share/:/usr/share/
+DIRSTACK=()
+EUID=1000
+GROUPS=()
+HOME=/home/user
+HOSTNAME=Phytium-Pi
+HOSTTYPE=aarch64
+IFS=$' \t\n'
+LANG=zh_CN.UTF-8
+LC_ADDRESS=zh_CN.UTF-8
+LC_IDENTIFICATION=zh_CN.UTF-8
+LC_MEASUREMENT=zh_CN.UTF-8
+LC_MONETARY=zh_CN.UTF-8
+LC_NAME=zh_CN.UTF-8
+LC_NUMERIC=zh_CN.UTF-8
+LC_PAPER=zh_CN.UTF-8
+LC_TELEPHONE=zh_CN.UTF-8
+LC_TIME=zh_CN.UTF-8
+LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu
+LOGNAME=user
+MACHTYPE=aarch64-unknown-linux-gnu
+MOTD_SHOWN=pam
+OPTERR=1
+OPTIND=1
+OSTYPE=linux-gnu
+PAPERSIZE=a4
+PATH=/home/user/.cargo/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+PIPESTATUS=([0]="0")
+PPID=195335
+PS4='+ '
+PWD=/home/user
+QT_LOGGING_RULES=qt5ct.debug=false
+SHELL=/bin/bash
+SHELLOPTS=braceexpand:hashall:interactive-comments
+SHLVL=2
+SSH_CLIENT='100.116.93.120 43478 22'
+SSH_CONNECTION='100.116.93.120 43478 100.66.13.36 22'
+TERM=dumb
+UID=1000
+USER=user
+XDG_DATA_DIRS=/usr/local/share:/usr/share:/var/lib/snapd/desktop
+XDG_RUNTIME_DIR=/run/user/1000
+XDG_SESSION_CLASS=user
+XDG_SESSION_ID=94
+XDG_SESSION_TYPE=tty
+_=/home/user/.cargo/env
+snap_bin_path=/snap/bin
+snap_xdg_path=/var/lib/snapd/desktop
+host=Phytium-Pi
+captured_at=2026-03-12T15:21:17+08:00
+bash=/usr/bin/bash
+vmstat=/usr/bin/vmstat
+free=/usr/bin/free
+top=/usr/bin/top
+date=/usr/bin/date
+hostname=/usr/bin/hostname
+pidstat=missing
+mpstat=missing
+perf=missing
+sar=missing
+/usr/bin/time=missing

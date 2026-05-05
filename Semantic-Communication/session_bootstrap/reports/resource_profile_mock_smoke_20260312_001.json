@@ -1,0 +1,86 @@
+{
+  "run_id": "resource_profile_mock_smoke_20260312_001",
+  "command_mode": "smoke",
+  "trusted_variant": "current",
+  "run_label": "smoke",
+  "env_file": "session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env",
+  "remote_host": "100.121.87.73",
+  "remote_port": 22,
+  "vmstat_interval_seconds": 1,
+  "command_started_at": "2026-03-12T15:21:43+08:00",
+  "command_ended_at": "2026-03-12T15:21:47+08:00",
+  "wall_time_seconds": 4,
+  "target_exit_code": 0,
+  "target_description": "remote:bash -lc 'echo resource-profile-smoke host=$(hostname); echo started=$(date -Iseconds); sleep 3; echo finished=$(date -Iseconds)'",
+  "raw_dir": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001",
+  "wrapper_log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/logs/resource_profile_mock_smoke_20260312_001.log",
+  "wrapper_log_bytes": 756,
+  "target_log_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/target.command.log",
+  "target_log_bytes": 104,
+  "tool_probe": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/tool_probe.txt",
+    "host": "lenovo",
+    "captured_at": "2026-03-12T15:21:42+08:00",
+    "bash": "/usr/bin/bash",
+    "vmstat": "/usr/bin/vmstat",
+    "free": "/usr/bin/free",
+    "top": "/usr/bin/top",
+    "date": "/usr/bin/date",
+    "hostname": "/usr/bin/hostname",
+    "pidstat": "missing",
+    "mpstat": "missing",
+    "perf": "missing",
+    "sar": "missing",
+    "/usr/bin/time": "/usr/bin/time"
+  },
+  "vmstat_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/vmstat.log",
+  "free_pre_h_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/free_pre_h.txt",
+  "free_post_h_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/free_post_h.txt",
+  "top_pre_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/top_pre.txt",
+  "top_post_file": "/home/tianxing/tvm_metaschedule_execution_project/./session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/top_post.txt",
+  "memory_pre_mib": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/free_pre_m.txt",
+    "unit": "MiB",
+    "total": 15738,
+    "used": 2416,
+    "free": 12884,
+    "shared": 3,
+    "buff_cache": 683,
+    "available": 13321
+  },
+  "memory_post_mib": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/free_post_m.txt",
+    "unit": "MiB",
+    "total": 15738,
+    "used": 2417,
+    "free": 12883,
+    "shared": 3,
+    "buff_cache": 683,
+    "available": 13320
+  },
+  "memory_available_delta_mib": -1,
+  "top_pre_summary": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/top_pre.txt",
+    "top_line": "top - 15:21:42 up  1:03,  1 user,  load average: 0.07, 0.10, 0.06",
+    "load_average_line": "top - 15:21:42 up  1:03,  1 user,  load average: 0.07, 0.10, 0.06",
+    "cpu_line": "%Cpu(s):  0.8 us,  0.0 sy,  0.0 ni, 97.6 id,  0.8 wa,  0.0 hi,  0.8 si,  0.0 st"
+  },
+  "top_post_summary": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/top_post.txt",
+    "top_line": "top - 15:21:47 up  1:03,  1 user,  load average: 0.07, 0.10, 0.06",
+    "load_average_line": "top - 15:21:47 up  1:03,  1 user,  load average: 0.07, 0.10, 0.06",
+    "cpu_line": "%Cpu(s):  0.8 us,  0.8 sy,  0.0 ni, 98.4 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st"
+  },
+  "vmstat_summary": {
+    "path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/resource_profile_mock_smoke_20260312_001/vmstat.log",
+    "raw_row_count": 0,
+    "sample_count": 0,
+    "error": "no numeric vmstat rows parsed"
+  },
+  "target_last_json": null,
+  "limitations": [
+    "Resource evidence is based on free, top, vmstat, and shell wall time only.",
+    "vmstat is system-wide sampling, not per-process attribution.",
+    "Board-level power still requires an external meter."
+  ]
+}

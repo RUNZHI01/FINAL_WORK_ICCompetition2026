@@ -1,0 +1,14 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+=== APPLY_AND_BUILD ===
+[sudo] user 的密码： built_size=1646088 built_mtime=2026-03-14 20:53:30.719780646 +0800
+c1172b7cedd44bb7a9241db76f9b29a45935cae6157485077d1f8735f6b84711  /home/user/phytium-dev/release_v1.4.0-heartbeatfix-v14/example/system/amp/openamp_for_linux/phytiumpi_aarch64_firefly_openamp_core0.elf
+
+String dump of section '.comment':
+  [     0]  GCC: (GNU Toolchain for the A-profile Architecture 10.3-2021.07 (arm-10.29)) 10.3.1 20210621
+
+=== INSTALL_AND_REBOOT ===
+backup_lib=/tmp/openamp_core0.elf.heartbeatfix.lib.backup.20260314_205238
+backup_usrlib=/tmp/openamp_core0.elf.heartbeatfix.usrlib.backup.20260314_205238
+live_size=1646088 live_mtime=2026-03-14 20:53:31.151772623 +0800
+c1172b7cedd44bb7a9241db76f9b29a45935cae6157485077d1f8735f6b84711  /lib/firmware/openamp_core0.elf
+Connection to 100.121.87.73 closed by remote host.

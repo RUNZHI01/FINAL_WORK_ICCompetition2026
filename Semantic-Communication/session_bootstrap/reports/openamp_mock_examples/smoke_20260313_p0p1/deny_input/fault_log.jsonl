@@ -1,0 +1,2 @@
+{"at_ms": 0, "job_id": 1003, "fault_tag": "F002", "fault_name": "INPUT_CONTRACT_INVALID", "reason": "input contract invalid", "action": "DENY", "guard_state": "READY"}
+{"at_ms": 0, "fault_tag": "F002", "fault_name": "INPUT_CONTRACT_INVALID", "reason": "received JOB_ACK DENY", "orchestrator_state": "REQUESTING"}

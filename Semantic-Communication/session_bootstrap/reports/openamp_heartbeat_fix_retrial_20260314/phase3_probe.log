@@ -1,0 +1,57 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+[sudo] user 的密码： {
+  "rpmsg_exists": true,
+  "job_req_tx_hex": "4d4f43530100010001000000b92400002c000000d2b1007b6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000100000003000000",
+  "job_ack_rx_hex": "4d4f43530100020001000000b92400000c000000373b53a7000000000800000002000000",
+  "job_ack_len": 36,
+  "job_ack_hdr": {
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 2,
+    "seq": 1,
+    "job_id": 9401,
+    "payload_len": 12,
+    "header_crc32": 2807249719
+  },
+  "job_ack": {
+    "decision": 0,
+    "fault_code": 8,
+    "guard_state": 2
+  },
+  "heartbeat_tx_hex": "4d4f43530100030002000000b92400001000000096e00d5702000000d20400000000000064000000",
+  "heartbeat_ack_rx_hex": "4d4f43530100040002000000b92400000800000026356da70200000000000000",
+  "heartbeat_ack_len": 32,
+  "heartbeat_ack_hdr": {
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 4,
+    "seq": 2,
+    "job_id": 9401,
+    "payload_len": 8,
+    "header_crc32": 2808952102
+  },
+  "heartbeat_ack": {
+    "guard_state": 2,
+    "heartbeat_ok": 0
+  },
+  "status_req_tx_hex": "4d4f43530100080003000000b9240000000000008bc089d3",
+  "status_resp_rx_hex": "4d4f43530100090003000000b9240000180000008d5e2bdb020000005524000008000000010000000000000002000000",
+  "status_resp_len": 48,
+  "status_resp_hdr": {
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 9,
+    "seq": 3,
+    "job_id": 9401,
+    "payload_len": 24,
+    "header_crc32": 3677052557
+  },
+  "status_resp": {
+    "guard_state": 2,
+    "active_job_id": 9301,
+    "last_fault_code": 8,
+    "heartbeat_ok": 1,
+    "sticky_fault": 0,
+    "total_fault_count": 2
+  }
+}

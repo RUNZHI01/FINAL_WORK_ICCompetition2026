@@ -1,0 +1,10 @@
+{
+  "captured_at": "2026-03-15T01:09:03+0800",
+  "phase": "pre_status",
+  "status": "blocked_not_run",
+  "expected_transport_status": "status_resp_received",
+  "expected_guard_state": "READY",
+  "expected_active_job_id": 0,
+  "planned_remote_command": "python3 ./session_bootstrap/scripts/openamp_rpmsg_bridge.py --phase STATUS_REQ --job-id 9301 --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/pre_status --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096",
+  "blocked_reason": "socket: Operation not permitted\nssh: connect to host 100.121.87.73 port 22: failure"
+}

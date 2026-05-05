@@ -1,0 +1,14 @@
+cropped_pairs=300
+/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=AlexNet_Weights.IMAGENET1K_V1`. You can also use `weights=AlexNet_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+Setting up [LPIPS] perceptual loss: trunk [alex], v[0.1], spatial [off]
+Loading model from: /home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/lpips/weights/v0.1/alex.pth
+Compared 300 image pairs for pytorch_vs_tvm_baseline_lpips_remote_snr10_crop249
+PSNR mean/median/min: 34.4244 / 34.5601 / 25.8307 dB
+SSIM mean/median/min: 0.970454 / 0.970567 / 0.945818
+LPIPS mean/median/max: 0.025883 / 0.025599 / 0.051841
+Shape mismatch: none (No shape mismatch detected.)
+Markdown report: /tmp/lpips_remote_snr10_retry_20260330_163229_baseline_quality_crop249.md
+JSON report: /tmp/lpips_remote_snr10_retry_20260330_163229_baseline_quality_crop249.json

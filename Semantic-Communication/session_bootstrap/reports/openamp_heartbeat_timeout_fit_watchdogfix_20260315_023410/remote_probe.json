@@ -1,0 +1,129 @@
+{
+  "rpmsg_exists": true,
+  "wait_without_heartbeat_sec": 5.0,
+  "pre_status": {
+    "rx_hex": "4d4f435301000900010000005824000018000000ede56a78010000000000000000000000000000000000000000000000",
+    "len": 48,
+    "hdr": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "seq": 1,
+      "job_id": 9304,
+      "payload_len": 24,
+      "header_crc32": 2020271597
+    },
+    "status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 0,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    }
+  },
+  "job_req": {
+    "tx_hex": "4d4f43530100010002000000582400002c000000dd46e4436f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc160ea00000100000003000000",
+    "rx": {
+      "rx_hex": "4d4f43530100020002000000582400000c00000038ccb79f010000000000000002000000",
+      "len": 36,
+      "hdr": {
+        "magic": 1396920141,
+        "version": 1,
+        "msg_type": 2,
+        "seq": 2,
+        "job_id": 9304,
+        "payload_len": 12,
+        "header_crc32": 2679622712
+      },
+      "job_ack": {
+        "decision": 1,
+        "fault_code": 0,
+        "guard_state": 2
+      }
+    }
+  },
+  "heartbeat": {
+    "tx_hex": "4d4f4353010003000300000058240000100000000689d28302000000d20400000000000064000000",
+    "rx": {
+      "rx_hex": "4d4f435301000400030000005824000008000000b65cb2730200000001000000",
+      "len": 32,
+      "hdr": {
+        "magic": 1396920141,
+        "version": 1,
+        "msg_type": 4,
+        "seq": 3,
+        "job_id": 9304,
+        "payload_len": 8,
+        "header_crc32": 1941068982
+      },
+      "heartbeat_ack": {
+        "guard_state": 2,
+        "heartbeat_ok": 1
+      }
+    }
+  },
+  "timeout_status": {
+    "rx_hex": "4d4f435301000900040000005824000018000000fd92c9e0010000000000000003000000000000000000000001000000",
+    "len": 48,
+    "hdr": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "seq": 4,
+      "job_id": 9304,
+      "payload_len": 24,
+      "header_crc32": 3771306749
+    },
+    "status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 3,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  },
+  "cleanup_safe_stop": {
+    "rx_hex": "4d4f43530100090005000000582400001800000092de6c7b010000000000000003000000000000000000000001000000",
+    "len": 48,
+    "hdr": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "seq": 5,
+      "job_id": 9304,
+      "payload_len": 24,
+      "header_crc32": 2070732434
+    },
+    "status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 3,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  },
+  "final_status": {
+    "rx_hex": "4d4f435301000900060000005824000018000000620cf20c010000000000000003000000000000000000000001000000",
+    "len": 48,
+    "hdr": {
+      "magic": 1396920141,
+      "version": 1,
+      "msg_type": 9,
+      "seq": 6,
+      "job_id": 9304,
+      "payload_len": 24,
+      "header_crc32": 217189474
+    },
+    "status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 3,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "finished_at": "2026-03-15T01:09:03+0800",
+  "job_id": 9301,
+  "result": "blocked_remote_access",
+  "status_response": {
+    "source": "local_execution_guard",
+    "transport_status": "not_attempted",
+    "protocol_semantics": "not_attempted",
+    "note": "pre STATUS_REQ was not sent because SSH could not reach the board."
+  },
+  "job_req_response": {
+    "source": "local_execution_guard",
+    "transport_status": "not_attempted",
+    "protocol_semantics": "not_attempted",
+    "note": "socket: Operation not permitted\nssh: connect to host 100.121.87.73 port 22: failure"
+  },
+  "runner_exit_code": null,
+  "runner_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/runner.log",
+  "manifest_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/job_manifest.json",
+  "control_trace_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/wrapper/control_trace.jsonl",
+  "blocker": {
+    "kind": "ssh_connect_failed",
+    "host": "100.121.87.73",
+    "port": "22",
+    "returncode": 255,
+    "stderr_excerpt": "socket: Operation not permitted\nssh: connect to host 100.121.87.73 port 22: failure",
+    "ssh_probe": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/ssh_probe/connect_probe.json"
+  }
+}

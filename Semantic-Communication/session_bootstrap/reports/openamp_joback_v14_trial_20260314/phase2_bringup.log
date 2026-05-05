@@ -1,0 +1,18 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+state=running
+fw_size=1635728 fw_mtime=2026-03-14 16:55:02.084086913 +0800
+daf889e376a2da8165ddcf0444fcf29182110066eeb82b9aebe3b6f6acd3fcb6  /lib/firmware/openamp_core0.elf
+=== SET_ENV ===
+[sudo] user 的密码： /home/user/open-amp/set_env.sh: 第 3 行： echo: 写错误: 设备或资源忙
+insmod: ERROR: could not insert module /lib/modules/5.10.209-phytium-embedded-v2.2/kernel/drivers/rpmsg/rpmsg_char.ko: File exists
+=== DEVNODES ===
+crw------- 1 root root 238, 1 3月  14 16:56 /dev/rpmsg0
+crw------- 1 root root 238, 0 3月  14 16:56 /dev/rpmsg_ctrl0
+=== DMESG ===
+349:[    2.614420] remoteproc remoteproc0: homo_rproc is available
+491:[   83.498509] remoteproc remoteproc0: powering up homo_rproc
+492:[   83.505715] remoteproc remoteproc0: Booting fw image openamp_core0.elf, size 1635728
+495:[   83.926538] virtio_rpmsg_bus virtio0: rpmsg host is online
+496:[   83.939517]  remoteproc0#vdev0buffer: registered virtio0 (type 7)
+497:[   83.945620] remoteproc remoteproc0: remote processor homo_rproc is now up
+498:[   84.168565] virtio_rpmsg_bus virtio0: creating channel rpmsg-openamp-demo-channel addr 0x0

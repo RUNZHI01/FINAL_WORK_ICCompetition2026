@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-03-15T02:00:46+0800",
+  "fit_id": "FIT-03",
+  "tc_id": "TC-006",
+  "run_id": "openamp_heartbeat_timeout_fit_20260315_015841",
+  "scenario": "heartbeat timeout / watchdog semantics on real board path",
+  "risk_item": "runaway active job due to missing heartbeat timeout watchdog",
+  "status": "FAIL",
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "board_access": {
+    "mode": "ssh",
+    "host": "100.121.87.73",
+    "port": "22",
+    "reachable": true
+  },
+  "expected_result": {
+    "during_timeout_window": {
+      "guard_state_should_leave_job_active": true,
+      "last_fault_code_should_be": 3,
+      "last_fault_name_should_be": "HEARTBEAT_TIMEOUT",
+      "heartbeat_ok_should_clear": true
+    },
+    "cleanup_needed_only_if_watchdog_missing": true
+  },
+  "observed_result": {
+    "job_req_decision": 1,
+    "heartbeat_ok_after_ack": 1,
+    "status_after_5s_without_heartbeat": {
+      "guard_state": 2,
+      "active_job_id": 9303,
+      "last_fault_code": 0,
+      "heartbeat_ok": 1,
+      "sticky_fault": 0,
+      "total_fault_count": 0
+    },
+    "cleanup_safe_stop_status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 10,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    },
+    "final_status": {
+      "guard_state": 1,
+      "active_job_id": 0,
+      "last_fault_code": 10,
+      "heartbeat_ok": 0,
+      "sticky_fault": 0,
+      "total_fault_count": 1
+    }
+  },
+  "conclusion": "Current live firmware does not auto-trigger HEARTBEAT_TIMEOUT / SAFE_STOP after the tested 5s no-heartbeat window; manual SAFE_STOP was required to return the board to READY.",
+  "evidence_bundle": {
+    "run_manifest": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/run_manifest.json",
+    "remote_probe": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/remote_probe.json",
+    "pre_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/pre_status/status_snapshot.json",
+    "timeout_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/timeout_status/status_snapshot.json",
+    "cleanup_safe_stop_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/cleanup_safe_stop/status_snapshot.json",
+    "final_status_snapshot": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/final_status/status_snapshot.json",
+    "fit_report": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/fit_report_FIT-03.md",
+    "coverage_matrix": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_heartbeat_timeout_fit_20260315_015841/coverage_matrix.md"
+  }
+}

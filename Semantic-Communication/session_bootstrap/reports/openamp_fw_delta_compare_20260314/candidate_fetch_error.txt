@@ -1,0 +1,2 @@
+Command '['/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/ssh_with_password.sh', '--host', '100.121.87.73', '--user', 'user', '--pass', 'user', '--', "stat -c 'size=%s mtime=%y' /home/user/phytium-dev/release_v1.4.0/example/system/amp/openamp_for_linux/phytiumpi_aarch64_firefly_openamp_core0.elf"]' returned non-zero exit status 255.; details: socket: Operation not permitted
+ssh: connect to host 100.121.87.73 port 22: failure

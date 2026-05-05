@@ -1,0 +1,21 @@
+task_stage_used_for_recommendation=legalized_fused_tir
+tuned_stage_pipeline=LegalizeOps -> AnnotateTIROpPattern -> FuseOps -> FuseTIR
+total_tasks=33
+raw_import_total_tasks=3
+top_k=8
+recommended_full_hotspot_tasks=reshape2,fused_variance1_add3_tir_sqrt1,reshape1,fused_mean1_subtract1_divide1_multiply1_add4,fused_conv2d1_add2,fused_conv2d2_add2,mirror_pad1,fused_mean1_subtract1_divide1_multiply1_add4_relu
+markdown_report=/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_tasks.md
+json_report=/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_trusted_current_20260312_154323/hotspot_tasks.json
+task rank=1 name=reshape2 weight=42 dispatched=1 prim_funcs=main
+task rank=2 name=fused_variance1_add3_tir_sqrt1 weight=21 dispatched=1 prim_funcs=main
+task rank=3 name=reshape1 weight=21 dispatched=1 prim_funcs=main
+task rank=4 name=fused_mean1_subtract1_divide1_multiply1_add4 weight=11 dispatched=1 prim_funcs=main
+task rank=5 name=fused_conv2d1_add2 weight=10 dispatched=1 prim_funcs=main
+task rank=6 name=fused_conv2d2_add2 weight=10 dispatched=1 prim_funcs=main
+task rank=7 name=mirror_pad1 weight=10 dispatched=1 prim_funcs=main
+task rank=8 name=fused_mean1_subtract1_divide1_multiply1_add4_relu weight=5 dispatched=1 prim_funcs=main
+raw_import_stage_preview_begin
+raw_task rank=1 name=mirror_pad1 weight=10 dispatched=1 prim_funcs=main
+raw_task rank=2 name=mirror_pad weight=1 dispatched=1 prim_funcs=main
+raw_task rank=3 name=mirror_pad2 weight=1 dispatched=1 prim_funcs=main
+raw_import_stage_preview_end

@@ -1,0 +1,99 @@
+{
+  "generated_at_utc": "2026-04-06T10:10:00Z",
+  "operator": "fused_variance4_add13_tir_sqrt4",
+  "phase": "scheduled_form_candidate_v22_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v22_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v22_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_post_db_scheduled_reference_seed_tir.py",
+    "reference_tir_sha256": "ebe53f7f503cd5c0db9e8f7df77f30fae6295e0c448153bc482837e6a73c2ebf",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply",
+    "reference_source": {
+      "task_summary_json": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/task_summary.json",
+      "database_dir": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/tuning_logs",
+      "operator_global_var": "fused_variance4_add13_tir_sqrt4",
+      "post_db_operator_tir_is_scheduled": false,
+      "structural_equal_to_database_query_ir_module_main": null,
+      "source_seam_id": "post_database_scheduled_primfunc_swap"
+    },
+    "reference_task_rows": {
+      "task_summary_row": {
+        "rank": 26,
+        "task_name": "fused_variance4_add13_tir_sqrt4",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      },
+      "reconstructed_task_row": {
+        "rank": 26,
+        "task_name": "fused_variance4_add13_tir_sqrt4",
+        "weight": 1,
+        "dispatched_count": 1,
+        "prim_funcs": [
+          "main"
+        ],
+        "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+        "stage_name": "legalized_fused_tir"
+      }
+    }
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v1.py",
+    "candidate_version": "v1_working_copy",
+    "status": "seed_synced_unedited",
+    "local_status_report": "./session_bootstrap/reports/variance4_handwritten_lane_status_20260402.md"
+  },
+  "current_edit_state": {
+    "status": "v22_per_channel_mean_retimed_consume",
+    "working_copy_tir_sha256": "e604407820d376b2837394b4a260cc9eb16756a321553a8b73fab74faa6ceafa",
+    "concrete_change": "On top of the exact checked-in v18 scheduled-form working copy, keep the original (1,12,1,1) normalized-mean handoff and centered-value T_subtract_local reuse intact, but retime the second phase so each per-channel mean is produced and then immediately consumed through the full k2/k3 reduction before moving to the next channel.",
+    "kept_invariants": [
+      "the checked-in v18 candidate remains intact as the current board-proven best reuse/handoff result for this lane",
+      "the checked-in v19 candidate remains intact as negative evidence against scalarizing the mean handoff without isolating the structural effect",
+      "the checked-in v21 candidate remains intact as isolated evidence for the scalar mean handoff plus restored local reduction storage branch",
+      "lv335_red stays explicitly local",
+      "lv335_mean_local keeps the original (1,12,1,1) local handoff shape from v18",
+      "the explicit one-element centered-value T_subtract_local handoff remains intact",
+      "T_multiply_red stays explicit scope=\"local\" on this branch",
+      "the explicit one-element local float32 store/load boundary remains intact",
+      "the explicit volatile_scope marker remains attached to T_multiply_local.data",
+      "the same two reductions and final sqrt output signature remain intact",
+      "the file stays local-only, diagnostic-only, and not hook-facing"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "previous_v18_candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v18.py",
+    "previous_v18_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v18_working_copy_tir.py",
+    "previous_v18_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v18_working_copy_manifest.json",
+    "previous_v19_candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v19.py",
+    "previous_v19_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v19_working_copy_tir.py",
+    "previous_v19_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v19_working_copy_manifest.json",
+    "previous_v21_candidate_entrypoint": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v21.py",
+    "previous_v21_working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v21_working_copy_tir.py",
+    "previous_v21_working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v21_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/fused_variance4_add13_tir_sqrt4_scheduled_form_candidate_v22_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_variance4_add13_tir_sqrt4/scheduled_form_candidate_v22_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy starts from the exact checked-in v18 state instead of mutating the already explored v19 or v21 branches in place.",
+    "The v22 purpose is to isolate loop retiming around the original v18 mean handoff shape without introducing another storage-family change.",
+    "This candidate remains local-only and diagnostic-only; it does not make performance claims."
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "date": "2026-03-15",
+  "context": "release_v1.4.0 baseline + STATUS_REQ/RESP + JOB_REQ/JOB_ACK + HEARTBEAT + SAFE_STOP + JOB_DONE minimal patch",
+  "live_firmware": {
+    "path": "/lib/firmware/openamp_core0.elf",
+    "size": 1649896,
+    "sha256": "afa9679f24f0d9d4ccd4c35e0c779e72573bfe839799d7f95586706977b23803"
+  },
+  "transport": {
+    "remoteproc_state": "running",
+    "channel": "rpmsg-openamp-demo-channel",
+    "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+    "rpmsg_dev": "/dev/rpmsg0"
+  },
+  "status0": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 0,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 0
+  },
+  "job_req": {
+    "job_id": 9801,
+    "decision": 1,
+    "fault_code": 0,
+    "guard_state": 2
+  },
+  "heartbeat_ack": {
+    "guard_state": 2,
+    "heartbeat_ok": 1
+  },
+  "job_done_status": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 0,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 0
+  },
+  "status_after_job_done": {
+    "guard_state": 1,
+    "active_job_id": 0,
+    "last_fault_code": 0,
+    "heartbeat_ok": 0,
+    "sticky_fault": 0,
+    "total_fault_count": 0
+  },
+  "result": {
+    "job_done_applied": true,
+    "protocol_semantics": "implemented_minimal_job_done"
+  }
+}

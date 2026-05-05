@@ -1,0 +1,18 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);  /* Generous separation between major sections */
+  min-width: 0;
+}
+
+.topSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;  /* Tighter grouping for top cards */
+}
+
+.bottomSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;  /* Even tighter for operational cards */
+}

@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-03-15T01:09:03+0800",
+  "fit_id": "FIT-01",
+  "tc_id": "TC-003",
+  "run_id": "openamp_wrong_sha_fit_20260315_010828",
+  "scenario": "wrong expected_sha256 JOB_REQ on real board path",
+  "risk_item": "unknown artifact execution risk",
+  "job_id": 9301,
+  "trusted_current_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+  "wrong_sha": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+  "expected_firmware_outcome": {
+    "decision": "DENY",
+    "fault_code": 1,
+    "fault_name": "ARTIFACT_SHA_MISMATCH",
+    "guard_state": "READY"
+  },
+  "expected_wrapper_outcome": {
+    "result": "denied_by_control_hook",
+    "runner_exit_code": null,
+    "runner_should_not_run_path": "/tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/wrapper/runner_should_not_run.txt"
+  },
+  "board_access": {
+    "mode": "ssh",
+    "host": "100.121.87.73",
+    "user": "user",
+    "port": "22",
+    "env_file": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/inference_tvm310_safe.2026-03-10.phytium_pi.env",
+    "remote_project_root": "/home/user/tvm_metaschedule_execution_project",
+    "remote_output_dir": "/tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828"
+  },
+  "local_output_dir": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828",
+  "planned_remote_commands": {
+    "pre_status": "python3 ./session_bootstrap/scripts/openamp_rpmsg_bridge.py --phase STATUS_REQ --job-id 9301 --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/pre_status --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096",
+    "wrapper": "python3 ./session_bootstrap/scripts/openamp_control_wrapper.py --job-id 9301 --variant wrong_sha_fit --runner-cmd 'touch /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/wrapper/runner_should_not_run.txt' --expected-sha256 6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0 --deadline-ms 60000 --expected-outputs 1 --job-flags smoke --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/wrapper --transport hook --control-hook-cmd 'python3 ./session_bootstrap/scripts/openamp_wrong_sha_fit_hook.py --output-root /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/hook --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096'",
+    "post_status": "python3 ./session_bootstrap/scripts/openamp_rpmsg_bridge.py --phase STATUS_REQ --job-id 9301 --seq 2 --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/post_status --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096",
+    "ssh_combined_redacted": "bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/ssh_with_password.sh --host 100.121.87.73 --user user --pass '***' --port 22 -- 'set -euo pipefail\ncd /home/user/tvm_metaschedule_execution_project\nOUT=/tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828\nmkdir -p \"$OUT\"\npython3 ./session_bootstrap/scripts/openamp_rpmsg_bridge.py --phase STATUS_REQ --job-id 9301 --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/pre_status --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096\nWRAPPER_RC=0\npython3 ./session_bootstrap/scripts/openamp_control_wrapper.py --job-id 9301 --variant wrong_sha_fit --runner-cmd '\"'\"'touch /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/wrapper/runner_should_not_run.txt'\"'\"' --expected-sha256 6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0 --deadline-ms 60000 --expected-outputs 1 --job-flags smoke --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/wrapper --transport hook --control-hook-cmd '\"'\"'python3 ./session_bootstrap/scripts/openamp_wrong_sha_fit_hook.py --output-root /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/hook --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096'\"'\"' || WRAPPER_RC=$?\nmkdir -p \"$OUT/wrapper\"\nprintf '\"'\"'%s\\n'\"'\"' \"$WRAPPER_RC\" > \"$OUT/wrapper/wrapper_exit_code.txt\"\npython3 ./session_bootstrap/scripts/openamp_rpmsg_bridge.py --phase STATUS_REQ --job-id 9301 --seq 2 --rpmsg-ctrl /dev/rpmsg_ctrl0 --rpmsg-dev /dev/rpmsg0 --output-dir /tmp/openamp_wrong_sha_fit/openamp_wrong_sha_fit_20260315_010828/post_status --response-timeout-sec 2.0 --settle-timeout-sec 0.05 --max-rx-bytes 4096'"
+  },
+  "boundary_note": "FIT-01 only mutates JOB_REQ.expected_sha256; it does not alter the firmware baseline. If SSH is unavailable, the bundle must remain explicitly blocked rather than simulating board success.",
+  "planned_board_commands": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/planned_board_commands.sh"
+}

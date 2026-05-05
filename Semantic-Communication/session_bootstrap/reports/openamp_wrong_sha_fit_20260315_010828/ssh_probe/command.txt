@@ -1,0 +1,1 @@
+bash /home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/scripts/ssh_with_password.sh --host 100.121.87.73 --user user --pass '***' --port 22 -- 'hostname && whoami && uname -a'

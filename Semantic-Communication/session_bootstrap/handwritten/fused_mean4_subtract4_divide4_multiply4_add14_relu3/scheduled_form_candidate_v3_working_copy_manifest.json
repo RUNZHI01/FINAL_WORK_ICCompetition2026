@@ -1,0 +1,54 @@
+{
+  "generated_at_utc": "2026-04-03T00:00:00Z",
+  "operator": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+  "phase": "scheduled_form_candidate_v3_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v3_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v3_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v2.py",
+    "candidate_version": "v2_working_copy",
+    "status": "board_regressed_vs_frozen_staging",
+    "remote_report": "./session_bootstrap/reports/mean4_v2_remote_benchmark_20260403_1627.md",
+    "remote_median_ms": 340.201
+  },
+  "current_edit_state": {
+    "status": "v3_local_mean_handoff_only_ablation_applied",
+    "working_copy_tir_sha256": "4781a8d0fa679b568b8955f32a37b8986eb7bda88ff1d4a7bd4c02e3d76f927b",
+    "concrete_change": "Rebase to v1 structure and apply only one edit: make the tiny per-channel mean handoff buffer local scoped (T_divide_intermediate scope=local). Keep the full-frame subtract/divide/multiply/add intermediates and loop partition exactly as v1.",
+    "preserved_non_changes": [
+      "the checked-in v1 seed-clone baseline remains frozen in its own files",
+      "the checked-in v2 scalar-epilogue candidate remains unchanged for comparison",
+      "reduction domain and arithmetic order remain the same as v1",
+      "full-frame epilogue materialization remains in separate loops as v1",
+      "output signature and ReLU semantics remain unchanged"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "accepted_v2_working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v2_working_copy_tir.py",
+    "accepted_v2_working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v2_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/fused_mean4_subtract4_divide4_multiply4_add14_relu3_scheduled_form_candidate_v3_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_mean4_subtract4_divide4_multiply4_add14_relu3/scheduled_form_candidate_v3_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is an operator-specific ablation intended to isolate which portion of v2 caused the regression.",
+    "The candidate stays local-only and diagnostic-only until a dedicated board payload benchmark is run.",
+    "This branch avoids cross-operator pattern transfer by changing only mean4-local buffer placement."
+  ]
+}

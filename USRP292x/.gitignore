@@ -1,0 +1,14 @@
+*.dat
+*.log
+*.bin
+*.sc16
+*.x86_64
+OtaRxCaptureGain
+OtaRxPersistentServer
+OtaTxPersistentServer
+QpskFileDecode
+payloads/
+qpsk_runs/
+qpsk_arq_runs/
+qpsk_batch_arq_runs/
+qpsk_batch_spool_arq_runs/

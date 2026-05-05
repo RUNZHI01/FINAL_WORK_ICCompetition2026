@@ -1,0 +1,98 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.emptyText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.loadingText {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.spaceWrapper {
+  width: 100%;
+}
+
+.jobTag {
+  font-family: var(--font-family-mono);
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stageIcon {
+  color: var(--color-text-tertiary);
+}
+
+.stageText {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.messageText {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.timelineWrapper {
+  margin-top: 8px;
+}
+
+/* ── Completed state ── */
+
+.completedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.completedBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.completedIcon {
+  color: var(--color-success);
+}
+
+.completedLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-success);
+  letter-spacing: 0.01em;
+}
+
+.completedSummary {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.dismissBtn {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dismissBtn:hover {
+  border-color: var(--color-border-base);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-section);
+}

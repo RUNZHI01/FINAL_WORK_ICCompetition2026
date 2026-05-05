@@ -1,0 +1,31 @@
+__pycache__/
+*.pyc
+*.pyo
+tongsuo-dist/
+*.egg-info/
+airfield/
+finalWork/
+airfield.zip
+finalWork.zip
+dist/
+build/
+.venv/
+Archive/tongsuo-mini/
+liboqs-dist/
+host_pic_to_latent/airfield300/
+host_pic_to_latent/checkpoint/
+host_pic_to_latent/encoder_outputs*/
+host_pic_to_latent/reconstructions/
+
+# Local USRP firmware/image dumps
+usrp2920_images
+
+# Local transient outputs
+out.dat
+downloads/
+artifacts/*
+!artifacts/evidence/
+!artifacts/evidence/**
+artifacts/evidence/logs/**/server_*.jsonl
+test_latent_2kb.npz
+tongsuo-dist-board-aarch64.tar.gz

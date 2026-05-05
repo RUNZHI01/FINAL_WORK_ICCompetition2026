@@ -1,0 +1,110 @@
+{
+  "run_id": "judge_snr_robustness_20260330_current_chunk4",
+  "generated_at": "2026-03-30T15:55:50+08:00",
+  "title": "Multi-SNR Robustness Report",
+  "report_markdown": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.md",
+  "report_json": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4.json",
+  "latency_chart_svg": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4_latency.svg",
+  "quality_chart_svg": "session_bootstrap/reports/judge_snr_robustness_20260330_current_chunk4_quality.svg",
+  "coverage_status": "latency_and_quality",
+  "latency_points": [
+    {
+      "snr": 1.0,
+      "status": "success",
+      "baseline_ms": null,
+      "current_ms": 228.223,
+      "improvement_pct": null,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+    },
+    {
+      "snr": 4.0,
+      "status": "success",
+      "baseline_ms": null,
+      "current_ms": 228.595,
+      "improvement_pct": null,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+    },
+    {
+      "snr": 7.0,
+      "status": "success",
+      "baseline_ms": null,
+      "current_ms": 233.509,
+      "improvement_pct": null,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+    },
+    {
+      "snr": 10.0,
+      "status": "success",
+      "baseline_ms": null,
+      "current_ms": 231.893,
+      "improvement_pct": null,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+    },
+    {
+      "snr": 13.0,
+      "status": "success",
+      "baseline_ms": null,
+      "current_ms": 234.018,
+      "improvement_pct": null,
+      "source_summary": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_sweep_current_chunk4_20260330_152054.md"
+    }
+  ],
+  "quality_points": [
+    {
+      "snr": 1.0,
+      "comparison_label": "trusted_current_snr1_vs_pytorch_reference",
+      "run_id": "snr_current_chunk4_snr1_20260330_152054_quality",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr1_20260330_152054_quality.json",
+      "psnr_mean_db": 29.145174303746582,
+      "ssim_mean": 0.9000386382158856,
+      "lpips_mean": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+    },
+    {
+      "snr": 4.0,
+      "comparison_label": "trusted_current_snr4_vs_pytorch_reference",
+      "run_id": "snr_current_chunk4_snr4_20260330_152054_quality",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr4_20260330_152054_quality.json",
+      "psnr_mean_db": 31.80465321539713,
+      "ssim_mean": 0.9395592505067378,
+      "lpips_mean": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+    },
+    {
+      "snr": 7.0,
+      "comparison_label": "trusted_current_snr7_vs_pytorch_reference",
+      "run_id": "snr_current_chunk4_snr7_20260330_152054_quality",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr7_20260330_152054_quality.json",
+      "psnr_mean_db": 34.018474333177274,
+      "ssim_mean": 0.96124265860332,
+      "lpips_mean": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+    },
+    {
+      "snr": 10.0,
+      "comparison_label": "trusted_current_snr10_vs_pytorch_reference",
+      "run_id": "snr_current_chunk4_snr10_20260330_152054_quality",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr10_20260330_152054_quality.json",
+      "psnr_mean_db": 35.66440449174833,
+      "ssim_mean": 0.9727349759392971,
+      "lpips_mean": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+    },
+    {
+      "snr": 13.0,
+      "comparison_label": "trusted_current_snr13_vs_pytorch_reference",
+      "run_id": "snr_current_chunk4_snr13_20260330_152054_quality",
+      "source_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/snr_current_chunk4_snr13_20260330_152054_quality.json",
+      "psnr_mean_db": 36.86951018284996,
+      "ssim_mean": 0.9787571706320946,
+      "lpips_mean": null,
+      "lpips_status": "torch/lpips unavailable; LPIPS skipped"
+    }
+  ],
+  "source_reports": [],
+  "findings": [
+    "Historical current latency is best at SNR=1 with 228.223 ms and worst at SNR=13 with 234.018 ms.",
+    "Quality coverage exists for 5 SNR points; best mean PSNR currently recorded is 36.8695 dB at SNR=13."
+  ],
+  "manual_command": "for snr in 1 4 7 10 13; do\n  RUN_TAG=\"judge_snr_${snr}_$(date +%Y%m%d_%H%M%S)\"\n  ENV_COPY=\"session_bootstrap/tmp/${RUN_TAG}.env\"\n  cp session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env \"$ENV_COPY\"\n  sed -i \\\n    -e \"s#^INFERENCE_OUTPUT_PREFIX=.*#INFERENCE_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^INFERENCE_REAL_OUTPUT_PREFIX=.*#INFERENCE_REAL_OUTPUT_PREFIX=${RUN_TAG}#\" \\\n    -e \"s#^REMOTE_SNR_CURRENT=.*#REMOTE_SNR_CURRENT=${snr}#\" \\\n    \"$ENV_COPY\"\n\n  bash ./session_bootstrap/scripts/run_remote_pytorch_reference_reconstruction.sh \\\n    --env-file \"$ENV_COPY\" \\\n    --output-prefix \"${RUN_TAG}_pytorch_ref\" \\\n    --snr \"$snr\"\n\n  set -a\n  source \"$ENV_COPY\"\n  set +a\n  bash ./session_bootstrap/scripts/run_remote_current_real_reconstruction.sh --variant current\n\n  REF_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_pytorch_ref\"\n  CUR_DIR=\"${REMOTE_OUTPUT_BASE}/${RUN_TAG}_current\"\n  python3 ./session_bootstrap/scripts/compute_image_quality_metrics.py \\\n    --ref-dir \"${REF_DIR}/reconstructions\" \\\n    --test-dir \"${CUR_DIR}/reconstructions\" \\\n    --comparison-label \"pytorch_vs_tvm_current_snr${snr}\" \\\n    --report-prefix \"session_bootstrap/reports/${RUN_TAG}_quality\"\ndone"
+}

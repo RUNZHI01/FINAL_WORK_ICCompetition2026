@@ -1,0 +1,73 @@
+{
+  "runs": [
+    {
+      "run": 1,
+      "median_ms": 2486.869,
+      "mean_ms": 2488.762,
+      "variance_ms2": 23.023665,
+      "max_ms": 2501.831,
+      "min_ms": 2484.284,
+      "governors": [
+        "performance",
+        "performance",
+        "performance"
+      ],
+      "scaling_cur_freqs": [
+        "1500000",
+        "1800000",
+        "1800000"
+      ],
+      "thermal_raw": [
+        "33000",
+        "32000"
+      ]
+    },
+    {
+      "run": 2,
+      "median_ms": 2497.435,
+      "mean_ms": 2498.068,
+      "variance_ms2": 4.4078,
+      "max_ms": 2503.332,
+      "min_ms": 2496.028,
+      "governors": [
+        "performance",
+        "performance",
+        "performance"
+      ],
+      "scaling_cur_freqs": [
+        "1500000",
+        "1800000",
+        "1800000"
+      ],
+      "thermal_raw": [
+        "34000",
+        "32000"
+      ]
+    },
+    {
+      "run": 3,
+      "median_ms": 2489.833,
+      "mean_ms": 2490.283,
+      "variance_ms2": 7.140033,
+      "max_ms": 2495.565,
+      "min_ms": 2487.159,
+      "governors": [
+        "performance",
+        "performance",
+        "performance"
+      ],
+      "scaling_cur_freqs": [
+        "1500000",
+        "1800000",
+        "1800000"
+      ],
+      "thermal_raw": [
+        "34000",
+        "33000"
+      ]
+    }
+  ],
+  "median_of_medians": 2489.833,
+  "mean_of_medians": 2491.379,
+  "max_median_gap": 10.566
+}

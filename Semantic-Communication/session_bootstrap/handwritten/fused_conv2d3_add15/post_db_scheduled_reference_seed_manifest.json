@@ -1,0 +1,53 @@
+{
+  "generated_at_utc": "2026-03-31T13:53:15Z",
+  "operator": "fused_conv2d3_add15",
+  "phase": "post_db_meta_schedule_apply",
+  "seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+  "seed_contract": {
+    "path_kind": "diagnostic_post_db_scheduled_reference_seed",
+    "local_only": true,
+    "diagnostic_only": true,
+    "performance_claims": false,
+    "comparison_semantics": "reference_edit_seed_only"
+  },
+  "source": {
+    "task_summary_json": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/task_summary.json",
+    "database_dir": "./session_bootstrap/tmp/phytium_runtime_joint_top6_targeted_staging_search_20260330_2315/tuning_logs",
+    "operator_global_var": "fused_conv2d3_add15",
+    "post_db_operator_tir_is_scheduled": true,
+    "structural_equal_to_database_query_ir_module_main": false,
+    "source_seam_id": "post_database_scheduled_primfunc_swap"
+  },
+  "task_rows": {
+    "task_summary_row": {
+      "rank": 14,
+      "task_name": "fused_conv2d3_add15",
+      "weight": 1,
+      "dispatched_count": 1,
+      "prim_funcs": [
+        "main"
+      ],
+      "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+      "stage_name": "legalized_fused_tir"
+    },
+    "reconstructed_task_row": {
+      "rank": 14,
+      "task_name": "fused_conv2d3_add15",
+      "weight": 1,
+      "dispatched_count": 1,
+      "prim_funcs": [
+        "main"
+      ],
+      "target": "{\"kind\":\"llvm\",\"tag\":\"\",\"keys\":[\"arm_cpu\",\"cpu\"],\"feature.has_sme\":false,\"feature.has_matmul_i8\":false,\"feature.has_dotprod\":false,\"feature.has_fp16_simd\":false,\"feature.has_sve\":false,\"feature.is_aarch64\":true,\"num-cores\":4,\"feature.has_asimd\":true,\"mcpu\":\"cortex-a72\",\"mtriple\":\"aarch64-linux-gnu\",\"mattr\":[\"+neon\"]}",
+      "stage_name": "legalized_fused_tir"
+    }
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d3_add15/fused_conv2d3_add15_post_db_scheduled_reference_seed_tir.py"
+  },
+  "notes": [
+    "This manifest tracks the schedule-preserving reference/edit seed recovered from the post-db full-module path.",
+    "Keep this distinct from the older raw pre-compile seed when preparing the next handwritten candidate.",
+    "This handoff is local-only and diagnostic-only; it does not make performance claims."
+  ]
+}

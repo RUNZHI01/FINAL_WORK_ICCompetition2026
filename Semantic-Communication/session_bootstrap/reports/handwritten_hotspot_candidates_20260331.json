@@ -1,0 +1,343 @@
+{
+  "generated_at": "2026-03-31T01:46:56+0800",
+  "current_profile_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top6_staging_artifact_reprobe_20260331_0010.json",
+  "reference_profile_json": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305.json",
+  "best_candidate_freeze_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/current_best_staging_candidate_20260331.md",
+  "current_best_staging": {
+    "run_id": "profiling_runtime_joint_top6_staging_artifact_reprobe_20260331_0010",
+    "summary_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top6_staging_artifact_reprobe_20260331_0010.md",
+    "artifact_sha256": "5bd14b9f97d1d06f04a484cd8b1b3f57a955d65711ed65a22f9925dcec44698d",
+    "artifact_path": "/home/user/Downloads/jscc-test/jscc_staging/tvm_tune_logs/optimized_model.so",
+    "reprobe_run_median_ms": 329.928,
+    "reprobe_run_mean_ms": 329.928,
+    "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+    "trusted_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/profile_joint_top6_staging_artifact_20260331_003213.env",
+    "command_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top6_staging_artifact_reprobe_20260331_0010/runtime_command.log"
+  },
+  "reference_staging": {
+    "run_id": "profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305",
+    "summary_md": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305.md",
+    "artifact_sha256": "9979d906a7eb52772eab3c124aea58246e7e0f0e4391b76d57af6d095ddbc805",
+    "artifact_path": "/home/user/Downloads/jscc-test/jscc_staging/tvm_tune_logs/optimized_model.so",
+    "reprobe_run_median_ms": 389.017,
+    "reprobe_run_mean_ms": 389.017,
+    "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+    "trusted_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/tmp/profile_joint_top5_staging_artifact_fixed_20260330.env",
+    "command_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/profiling_runtime_joint_top5_staging_artifact_reprobe_fixed_20260330_2305/runtime_command.log"
+  },
+  "current_curated_top_ops": [
+    {
+      "rank": 1,
+      "name": "fused_conv2d_transpose1_add9",
+      "family": "deconv",
+      "mean_duration_us": 24275.261,
+      "mean_percent": 14.600473480896312,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 2,
+      "name": "fused_conv2d_transpose2_add12",
+      "family": "deconv",
+      "mean_duration_us": 20234.681,
+      "mean_percent": 12.170247040182037,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 3,
+      "name": "fused_conv2d_transpose_add6",
+      "family": "deconv",
+      "mean_duration_us": 17385.325,
+      "mean_percent": 10.456488052559504,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 4,
+      "name": "fused_conv2d3_add15",
+      "family": "conv",
+      "mean_duration_us": 11800.99,
+      "mean_percent": 7.097762678775012,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 5,
+      "name": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+      "family": "norm_stats",
+      "mean_duration_us": 11065.872,
+      "mean_percent": 6.655622391824871,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 6,
+      "name": "fused_variance4_add13_tir_sqrt4",
+      "family": "norm_stats",
+      "mean_duration_us": 7099.569,
+      "mean_percent": 4.270070213057382,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 7,
+      "name": "fused_mean3_subtract3_divide3_multiply3_add11_relu2",
+      "family": "norm_stats",
+      "mean_duration_us": 5825.708,
+      "mean_percent": 3.503900335466856,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    },
+    {
+      "rank": 8,
+      "name": "fused_variance3_add10_tir_sqrt3",
+      "family": "norm_stats",
+      "mean_duration_us": 3575.034,
+      "mean_percent": 2.150221540781896,
+      "samples": 1,
+      "devices": [
+        "cpu0"
+      ]
+    }
+  ],
+  "wave1_candidates": [
+    {
+      "priority": 1,
+      "name": "fused_conv2d_transpose1_add9",
+      "family": "deconv",
+      "manual_direction": "Wave 1: handwritten TIR plus NEON for spatial tile and vector store.",
+      "reason": "Still a top compute kernel in the best staging candidate (24275.26 us, 14.60%). Joint-top5 reference was 8.30%, so this kernel survived multiple targeted rounds. Manual NEON/TIR is the next conservative lever.",
+      "current_raw_rank": 1,
+      "current_mean_duration_us": 24275.26,
+      "current_mean_percent": 14.6,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 48, 64, 64], float32[48, 24, 3, 3], float32[1, 24, 1, 1], float32[1, 24, 128, 128]",
+      "current_curated_rank": 1,
+      "reference_raw_rank": 3,
+      "reference_mean_duration_us": 19294.96,
+      "reference_mean_percent": 8.3,
+      "reference_curated_rank": 3,
+      "delta_percent_vs_reference": 6.299999999999999
+    },
+    {
+      "priority": 2,
+      "name": "fused_conv2d_transpose2_add12",
+      "family": "deconv",
+      "manual_direction": "Wave 1: handwritten TIR plus NEON for spatial tile and vector store.",
+      "reason": "Still a top compute kernel in the best staging candidate (20234.68 us, 12.17%). Joint-top5 reference was 10.20%, so this kernel survived multiple targeted rounds. Manual NEON/TIR is the next conservative lever.",
+      "current_raw_rank": 2,
+      "current_mean_duration_us": 20234.68,
+      "current_mean_percent": 12.17,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 24, 128, 128], float32[24, 12, 3, 3], float32[1, 12, 1, 1], float32[1, 12, 256, 256]",
+      "current_curated_rank": 2,
+      "reference_raw_rank": 2,
+      "reference_mean_duration_us": 23694.82,
+      "reference_mean_percent": 10.2,
+      "reference_curated_rank": 2,
+      "delta_percent_vs_reference": 1.9700000000000006
+    },
+    {
+      "priority": 3,
+      "name": "fused_conv2d_transpose_add6",
+      "family": "deconv",
+      "manual_direction": "Wave 1: handwritten TIR plus NEON for spatial tile and vector store.",
+      "reason": "Still a top compute kernel in the best staging candidate (17385.33 us, 10.46%). Joint-top5 reference was 8.01%, so this kernel survived multiple targeted rounds. Manual NEON/TIR is the next conservative lever.",
+      "current_raw_rank": 3,
+      "current_mean_duration_us": 17385.33,
+      "current_mean_percent": 10.46,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 96, 32, 32], float32[96, 48, 3, 3], float32[1, 48, 1, 1], float32[1, 48, 64, 64]",
+      "current_curated_rank": 3,
+      "reference_raw_rank": 4,
+      "reference_mean_duration_us": 18622.37,
+      "reference_mean_percent": 8.01,
+      "reference_curated_rank": 4,
+      "delta_percent_vs_reference": 2.450000000000001
+    },
+    {
+      "priority": 4,
+      "name": "fused_conv2d3_add15",
+      "family": "conv",
+      "manual_direction": "Wave 1: handwritten TIR plus NEON for kernel tile and epilogue.",
+      "reason": "Still a top compute kernel in the best staging candidate (11800.99 us, 7.10%). Joint-top5 reference was 6.91%, so this kernel survived multiple targeted rounds. Manual NEON/TIR is the next conservative lever.",
+      "current_raw_rank": 5,
+      "current_mean_duration_us": 11800.99,
+      "current_mean_percent": 7.1,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 12, 262, 262], float32[3, 12, 7, 7], float32[1, 3, 1, 1], float32[1, 3, 256, 256]",
+      "current_curated_rank": 4,
+      "reference_raw_rank": 5,
+      "reference_mean_duration_us": 16063.64,
+      "reference_mean_percent": 6.91,
+      "reference_curated_rank": 5,
+      "delta_percent_vs_reference": 0.1899999999999995
+    }
+  ],
+  "wave2_candidates": [
+    {
+      "priority": 1,
+      "name": "fused_mean4_subtract4_divide4_multiply4_add14_relu3",
+      "family": "norm_stats",
+      "manual_direction": "Wave 2: handwritten TIR for reduction, vector math, and fused epilogue.",
+      "reason": "Now visible after the joint-top6 conv/deconv protection set (11065.87 us, 6.66%). Joint-top5 reference was 5.21%, so this is a real residual rather than a one-off spike. This is a reduction/vector epilogue candidate for handwritten TIR.",
+      "current_raw_rank": 7,
+      "current_mean_duration_us": 11065.87,
+      "current_mean_percent": 6.66,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 12, 256, 256], float32[1, 12, 1, 1], float32[12, 1, 1], float32[12, 1, 1], float32[1, 12, 256, 256]",
+      "current_curated_rank": 5,
+      "reference_raw_rank": 7,
+      "reference_mean_duration_us": 12115.58,
+      "reference_mean_percent": 5.21,
+      "reference_curated_rank": 6,
+      "delta_percent_vs_reference": 1.4500000000000002
+    },
+    {
+      "priority": 2,
+      "name": "fused_variance4_add13_tir_sqrt4",
+      "family": "norm_stats",
+      "manual_direction": "Wave 2: handwritten TIR for reduction, vector math, and fused epilogue.",
+      "reason": "Now visible after the joint-top6 conv/deconv protection set (7099.57 us, 4.27%). Joint-top5 reference was 3.28%, so this is a real residual rather than a one-off spike. This is a reduction/vector epilogue candidate for handwritten TIR.",
+      "current_raw_rank": 9,
+      "current_mean_duration_us": 7099.57,
+      "current_mean_percent": 4.27,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 12, 256, 256], float32[1, 12, 1, 1]",
+      "current_curated_rank": 6,
+      "reference_raw_rank": 10,
+      "reference_mean_duration_us": 7628.09,
+      "reference_mean_percent": 3.28,
+      "reference_curated_rank": 7,
+      "delta_percent_vs_reference": 0.9899999999999998
+    },
+    {
+      "priority": 3,
+      "name": "fused_mean3_subtract3_divide3_multiply3_add11_relu2",
+      "family": "norm_stats",
+      "manual_direction": "Wave 2: handwritten TIR for reduction, vector math, and fused epilogue.",
+      "reason": "Now visible after the joint-top6 conv/deconv protection set (5825.71 us, 3.50%). Joint-top5 reference was 2.53%, so this is a real residual rather than a one-off spike. This is a reduction/vector epilogue candidate for handwritten TIR.",
+      "current_raw_rank": 11,
+      "current_mean_duration_us": 5825.71,
+      "current_mean_percent": 3.5,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 24, 128, 128], float32[1, 24, 1, 1], float32[24, 1, 1], float32[24, 1, 1], float32[1, 24, 128, 128]",
+      "current_curated_rank": 7,
+      "reference_raw_rank": 12,
+      "reference_mean_duration_us": 5872.39,
+      "reference_mean_percent": 2.53,
+      "reference_curated_rank": 8,
+      "delta_percent_vs_reference": 0.9700000000000002
+    },
+    {
+      "priority": 4,
+      "name": "fused_variance3_add10_tir_sqrt3",
+      "family": "norm_stats",
+      "manual_direction": "Wave 2: handwritten TIR for reduction, vector math, and fused epilogue.",
+      "reason": "Now visible after the joint-top6 conv/deconv protection set (3575.03 us, 2.15%). Joint-top5 reference was 1.54%, so this is a real residual rather than a one-off spike. This is a reduction/vector epilogue candidate for handwritten TIR.",
+      "current_raw_rank": 14,
+      "current_mean_duration_us": 3575.03,
+      "current_mean_percent": 2.15,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 24, 128, 128], float32[1, 24, 1, 1]",
+      "current_curated_rank": 8,
+      "reference_raw_rank": 15,
+      "reference_mean_duration_us": 3590.17,
+      "reference_mean_percent": 1.54,
+      "reference_curated_rank": null,
+      "delta_percent_vs_reference": 0.6099999999999999
+    }
+  ],
+  "monitor_only_candidates": [
+    {
+      "name": "fused_variance1_add3_tir_sqrt1",
+      "family": "norm_stats",
+      "manual_direction": "Monitor only.",
+      "reason": "Visible in raw aggregated calls but not promoted into the diagnosis shortlist. Use a focused reprobe or micro-benchmark before spending handwritten effort here.",
+      "current_raw_rank": 4,
+      "current_mean_duration_us": 14715.16,
+      "current_mean_percent": 8.85,
+      "current_count": 21,
+      "current_argument_shapes": "float32[1, 96, 32, 32], float32[1, 96, 1, 1]",
+      "current_curated_rank": null,
+      "reference_raw_rank": 6,
+      "reference_mean_duration_us": 14311.08,
+      "reference_mean_percent": 6.16,
+      "reference_curated_rank": null,
+      "delta_percent_vs_reference": 2.6899999999999995
+    },
+    {
+      "name": "fused_conv2d2_add2",
+      "family": "conv",
+      "manual_direction": "Monitor only.",
+      "reason": "Still visible in raw aggregated calls, but the diagnosis no longer promotes it as a curated top hotspot. Reconfirm with a focused reprobe before manual TIR.",
+      "current_raw_rank": 6,
+      "current_mean_duration_us": 11634.82,
+      "current_mean_percent": 7.0,
+      "current_count": 10,
+      "current_argument_shapes": "float32[1, 96, 32, 32], float32[96, 96, 1, 1], float32[1, 96, 1, 1], float32[1, 96, 32, 32]",
+      "current_curated_rank": null,
+      "reference_raw_rank": 8,
+      "reference_mean_duration_us": 11533.0,
+      "reference_mean_percent": 4.96,
+      "reference_curated_rank": null,
+      "delta_percent_vs_reference": 2.04
+    },
+    {
+      "name": "fused_mean1_subtract1_divide1_multiply1_add4",
+      "family": "norm_stats",
+      "manual_direction": "Monitor only.",
+      "reason": "Visible in raw aggregated calls but not promoted into the diagnosis shortlist. Use a focused reprobe or micro-benchmark before spending handwritten effort here.",
+      "current_raw_rank": 8,
+      "current_mean_duration_us": 8482.05,
+      "current_mean_percent": 5.1,
+      "current_count": 11,
+      "current_argument_shapes": "float32[1, 96, 32, 32], float32[1, 96, 1, 1], float32[96, 1, 1], float32[96, 1, 1], float32[1, 96, 32, 32]",
+      "current_curated_rank": null,
+      "reference_raw_rank": 9,
+      "reference_mean_duration_us": 8748.98,
+      "reference_mean_percent": 3.76,
+      "reference_curated_rank": null,
+      "delta_percent_vs_reference": 1.3399999999999999
+    },
+    {
+      "name": "fused_conv2d_add2",
+      "family": "conv",
+      "manual_direction": "Monitor only.",
+      "reason": "Triggered the jump from joint-top5 to joint-top6 (26.48% -> 1.62%). Keep it as a control, not the first handwritten kernel.",
+      "current_raw_rank": 15,
+      "current_mean_duration_us": 2693.3,
+      "current_mean_percent": 1.62,
+      "current_count": 1,
+      "current_argument_shapes": "float32[1, 32, 34, 34], float32[96, 32, 3, 3], float32[1, 96, 1, 1], float32[1, 96, 32, 32]",
+      "current_curated_rank": null,
+      "reference_raw_rank": 1,
+      "reference_mean_duration_us": 61546.92,
+      "reference_mean_percent": 26.48,
+      "reference_curated_rank": 1,
+      "delta_percent_vs_reference": -24.86
+    }
+  ],
+  "suggested_staging_archive": "/home/user/Downloads/jscc-test/jscc_staging_handwritten",
+  "guardrails": [
+    "Do not overwrite the trusted current archive.",
+    "Use the current best staging candidate as the fixed comparison point.",
+    "Work one handwritten kernel at a time and re-profile after each candidate.",
+    "If a candidate creates a new dominant hotspot or regresses payload, keep it in staging only."
+  ]
+}

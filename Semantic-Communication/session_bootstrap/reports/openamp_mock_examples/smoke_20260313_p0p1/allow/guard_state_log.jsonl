@@ -1,0 +1,3 @@
+{"at_ms": 0, "component": "safety_guard", "from_state": "BOOT", "to_state": "READY", "reason": "boot completed", "active_job_id": 0, "last_fault_code": "F000"}
+{"at_ms": 0, "component": "safety_guard", "from_state": "READY", "to_state": "JOB_ACTIVE", "reason": "job request accepted", "active_job_id": 1001, "last_fault_code": "F000"}
+{"at_ms": 200, "component": "safety_guard", "from_state": "JOB_ACTIVE", "to_state": "READY", "reason": "job completed and finalized", "active_job_id": 0, "last_fault_code": "F000"}

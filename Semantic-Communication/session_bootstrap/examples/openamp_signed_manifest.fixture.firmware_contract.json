@@ -1,0 +1,390 @@
+{
+  "schema": "openamp_signed_admission_firmware_contract/v1",
+  "contract_version": 1,
+  "bundle_schema": "openamp_signed_manifest_bundle/v1",
+  "manifest_schema": "openamp_artifact_manifest/v1",
+  "manifest_sha256": "dcde2829dcf76b7c974dc193ac93dd8641d2dfb948b15b4d46c9bbbef7f45d54",
+  "manifest_len": 808,
+  "manifest_crc32": 4253828123,
+  "signature_len": 71,
+  "signature_crc32": 3659953669,
+  "signature_algorithm": "ecdsa-p256-sha256",
+  "signature_algorithm_wire": 1,
+  "admission_type_wire": 1,
+  "message_types": {
+    "SIGNED_ADMISSION_BEGIN": 12,
+    "SIGNED_ADMISSION_CHUNK": 13,
+    "SIGNED_ADMISSION_SIGNATURE": 14,
+    "SIGNED_ADMISSION_COMMIT": 15,
+    "SIGNED_ADMISSION_ACK": 16
+  },
+  "stage_codes": {
+    "BEGIN": 1,
+    "CHUNK": 2,
+    "SIGNATURE": 3,
+    "COMMIT": 4
+  },
+  "ack_status_codes": {
+    "ACCEPTED": 0,
+    "DUPLICATE": 1,
+    "OUT_OF_RANGE": 2,
+    "CRC_ERROR": 3,
+    "TOO_LARGE": 4,
+    "READY": 5
+  },
+  "public_key_slot": {
+    "slot_id": 1,
+    "key_id": "fixture-dev-20260316",
+    "channel": "openamp-fixture",
+    "curve": "prime256v1",
+    "format": "uncompressed-sec1",
+    "byte_len": 65,
+    "bytes_hex": "04aaef2bc7f2dd9af211bd3bc4f3bad1bcaeb7e25baacc0100e13ec51c12bdae62da2b87f3a1659721602600025d08f77d3a6a23b295316b917d2ebb081d15d305",
+    "c_type": "ScPublicKeySlot",
+    "c_initializer_lines": [
+      "0x04U, 0xAAU, 0xEFU, 0x2BU, 0xC7U, 0xF2U, 0xDDU, 0x9AU,",
+      "0xF2U, 0x11U, 0xBDU, 0x3BU, 0xC4U, 0xF3U, 0xBAU, 0xD1U,",
+      "0xBCU, 0xAEU, 0xB7U, 0xE2U, 0x5BU, 0xAAU, 0xCCU, 0x01U,",
+      "0x00U, 0xE1U, 0x3EU, 0xC5U, 0x1CU, 0x12U, 0xBDU, 0xAEU,",
+      "0x62U, 0xDAU, 0x2BU, 0x87U, 0xF3U, 0xA1U, 0x65U, 0x97U,",
+      "0x21U, 0x60U, 0x26U, 0x00U, 0x02U, 0x5DU, 0x08U, 0xF7U,",
+      "0x7DU, 0x3AU, 0x6AU, 0x23U, 0xB2U, 0x95U, 0x31U, 0x6BU,",
+      "0x91U, 0x7DU, 0x2EU, 0xBBU, 0x08U, 0x1DU, 0x15U, 0xD3U,",
+      "0x05U"
+    ],
+    "c_initializer": "{\n    1U,\n    \"fixture-dev-20260316\",\n    \"openamp-fixture\",\n    {\n        0x04U, 0xAAU, 0xEFU, 0x2BU, 0xC7U, 0xF2U, 0xDDU, 0x9AU,\n        0xF2U, 0x11U, 0xBDU, 0x3BU, 0xC4U, 0xF3U, 0xBAU, 0xD1U,\n        0xBCU, 0xAEU, 0xB7U, 0xE2U, 0x5BU, 0xAAU, 0xCCU, 0x01U,\n        0x00U, 0xE1U, 0x3EU, 0xC5U, 0x1CU, 0x12U, 0xBDU, 0xAEU,\n        0x62U, 0xDAU, 0x2BU, 0x87U, 0xF3U, 0xA1U, 0x65U, 0x97U,\n        0x21U, 0x60U, 0x26U, 0x00U, 0x02U, 0x5DU, 0x08U, 0xF7U,\n        0x7DU, 0x3AU, 0x6AU, 0x23U, 0xB2U, 0x95U, 0x31U, 0x6BU,\n        0x91U, 0x7DU, 0x2EU, 0xBBU, 0x08U, 0x1DU, 0x15U, 0xD3U,\n        0x05U\n    },\n}"
+  },
+  "manifest_contract": {
+    "struct_name": "ScManifestContract",
+    "schema": "openamp_artifact_manifest/v1",
+    "manifest_version": 1,
+    "artifact_sha256": "09af47ee1b0e2a7d3cad3add031f36811926e1fe34cfd58fa98d70eba9526b91",
+    "artifact_size_bytes": 119,
+    "artifact_path": "session_bootstrap/examples/openamp_signed_manifest.fixture.artifact.so",
+    "artifact_format": "tvm-module-shared-object",
+    "artifact_variant": "current",
+    "deadline_ms": 60000,
+    "expected_outputs": 300,
+    "job_flags_text": "reconstruction",
+    "job_flags_wire": 2,
+    "input_shape": [
+      1,
+      32,
+      32,
+      32
+    ],
+    "input_dtype": "float32",
+    "publisher_key_id": "fixture-dev-20260316",
+    "publisher_channel": "openamp-fixture",
+    "provenance_created_at": "2026-03-16T16:30:00+0800",
+    "provenance_builder": "session_bootstrap/scripts/openamp_signed_manifest.py",
+    "provenance_source_repo": "tvm_metaschedule_execution_project",
+    "provenance_source_git_commit": "execution-batch-fixture",
+    "provenance_note": "deterministic signed fixture for firmware-side admission bring-up",
+    "field_plan": [
+      {
+        "json_path": "schema",
+        "c_field": "schema_id",
+        "c_type": "char[32]",
+        "parser": "json_string_exact",
+        "required": true,
+        "max_len": 32,
+        "expected": "openamp_artifact_manifest/v1"
+      },
+      {
+        "json_path": "manifest_version",
+        "c_field": "manifest_version",
+        "c_type": "uint32_t",
+        "parser": "json_u32_exact",
+        "required": true,
+        "expected": 1
+      },
+      {
+        "json_path": "artifact.sha256",
+        "c_field": "artifact_sha256",
+        "c_type": "uint8_t[32]",
+        "parser": "json_sha256_hex",
+        "required": true
+      },
+      {
+        "json_path": "artifact.size_bytes",
+        "c_field": "artifact_size_bytes",
+        "c_type": "uint32_t",
+        "parser": "json_u32",
+        "required": true,
+        "allow_zero": true
+      },
+      {
+        "json_path": "artifact.path",
+        "c_field": "artifact_path",
+        "c_type": "char[160]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 160
+      },
+      {
+        "json_path": "artifact.format",
+        "c_field": "artifact_format",
+        "c_type": "char[48]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 48
+      },
+      {
+        "json_path": "artifact.variant",
+        "c_field": "artifact_variant",
+        "c_type": "char[32]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 32
+      },
+      {
+        "json_path": "job.deadline_ms",
+        "c_field": "deadline_ms",
+        "c_type": "uint32_t",
+        "parser": "json_u32",
+        "required": true
+      },
+      {
+        "json_path": "job.expected_outputs",
+        "c_field": "expected_outputs",
+        "c_type": "uint32_t",
+        "parser": "json_u32",
+        "required": true
+      },
+      {
+        "json_path": "job.job_flags",
+        "c_field": "flags",
+        "c_type": "uint32_t",
+        "parser": "json_string_enum",
+        "required": true,
+        "enum_map": {
+          "payload": 1,
+          "reconstruction": 2,
+          "smoke": 3
+        }
+      },
+      {
+        "json_path": "input_contract.shape",
+        "c_field": "input_shape",
+        "c_type": "uint32_t[4]",
+        "parser": "json_u32_array4",
+        "required": true
+      },
+      {
+        "json_path": "input_contract.dtype",
+        "c_field": "input_dtype",
+        "c_type": "char[16]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 16
+      },
+      {
+        "json_path": "publisher.key_id",
+        "c_field": "publisher_key_id",
+        "c_type": "char[32]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 32
+      },
+      {
+        "json_path": "publisher.channel",
+        "c_field": "publisher_channel",
+        "c_type": "char[32]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 32
+      },
+      {
+        "json_path": "provenance.created_at",
+        "c_field": "provenance_created_at",
+        "c_type": "char[40]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 40
+      },
+      {
+        "json_path": "provenance.builder",
+        "c_field": "provenance_builder",
+        "c_type": "char[64]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 64
+      },
+      {
+        "json_path": "provenance.source_repo",
+        "c_field": "provenance_source_repo",
+        "c_type": "char[64]",
+        "parser": "json_string_copy",
+        "required": true,
+        "max_len": 64
+      },
+      {
+        "json_path": "provenance.source_git_commit",
+        "c_field": "provenance_source_git_commit",
+        "c_type": "char[64]",
+        "parser": "json_string_optional",
+        "required": false,
+        "max_len": 64
+      },
+      {
+        "json_path": "provenance.note",
+        "c_field": "provenance_note",
+        "c_type": "char[128]",
+        "parser": "json_string_optional",
+        "required": false,
+        "max_len": 128
+      }
+    ]
+  },
+  "parser_strategy": {
+    "entrypoint": "sc_ctrl_parse_manifest_contract",
+    "required_helpers": [
+      "sc_ctrl_json_expect_string_field",
+      "sc_ctrl_json_expect_u32_field",
+      "sc_ctrl_json_find_object",
+      "sc_ctrl_json_find_string_field",
+      "sc_ctrl_json_find_optional_string_field",
+      "sc_ctrl_json_find_u32_field",
+      "sc_ctrl_json_find_u32_array4_field",
+      "sc_ctrl_parse_manifest_artifact_contract",
+      "sc_ctrl_parse_manifest_job_contract",
+      "sc_ctrl_parse_manifest_input_contract",
+      "sc_ctrl_parse_manifest_publisher_contract",
+      "sc_ctrl_parse_manifest_provenance_contract",
+      "sc_ctrl_parse_sha256_hex",
+      "sc_ctrl_manifest_flag_from_string"
+    ],
+    "parse_call_markers": [
+      "sc_ctrl_json_expect_string_field(manifest_bytes,",
+      "sc_ctrl_json_expect_u32_field(manifest_bytes,",
+      "sc_ctrl_parse_manifest_artifact_contract(manifest_bytes,",
+      "sc_ctrl_parse_manifest_job_contract(manifest_bytes,",
+      "sc_ctrl_parse_manifest_input_contract(manifest_bytes,",
+      "sc_ctrl_parse_manifest_publisher_contract(manifest_bytes,",
+      "sc_ctrl_parse_manifest_provenance_contract(manifest_bytes,"
+    ],
+    "strict_field_markers": [
+      "out_contract->artifact_size_bytes",
+      "out_contract->artifact_path",
+      "out_contract->artifact_format",
+      "out_contract->artifact_variant",
+      "out_contract->input_shape",
+      "out_contract->input_dtype",
+      "out_contract->provenance_created_at",
+      "out_contract->provenance_builder",
+      "out_contract->provenance_source_repo"
+    ],
+    "optional_field_markers": [
+      "sc_ctrl_json_find_optional_string_field(provenance_object.begin,",
+      "out_contract->provenance_source_git_commit",
+      "out_contract->provenance_note"
+    ],
+    "slot_binding_markers": [
+      "strcmp(contract.publisher_key_id, slot->key_id)",
+      "strcmp(contract.publisher_channel, slot->channel)"
+    ],
+    "assumptions": [
+      "manifest bytes are the exact canonical UTF-8 bytes staged over SIGNED_ADMISSION_CHUNK",
+      "parser is narrow and only accepts the committed openamp_artifact_manifest/v1 schema",
+      "string fields reject escape sequences to keep the firmware parser small and deterministic",
+      "artifact.path / artifact.format / artifact.variant / input_contract / provenance fields are still parsed even though JOB_REQ only mirrors a subset"
+    ]
+  },
+  "crypto_boundary": {
+    "backend": "standalone-sdk-mbedtls-boundary",
+    "hash_algorithm": "sha256",
+    "digest_len": 32,
+    "public_key_format": "uncompressed-sec1",
+    "signature_format": "asn1-der",
+    "request_struct_name": "ScEcdsaP256VerifyRequest",
+    "enable_macro": "SC_CTRL_USE_MBEDTLS",
+    "include_guard_markers": [
+      "#if defined(SC_CTRL_USE_MBEDTLS)",
+      "#include <mbedtls/ecdsa.h>",
+      "#include <mbedtls/ecp.h>",
+      "#include <mbedtls/sha256.h>",
+      "#endif"
+    ],
+    "required_symbols": [
+      "mbedtls_sha256_ret",
+      "mbedtls_ecdsa_init",
+      "mbedtls_ecp_group_load",
+      "mbedtls_ecp_point_read_binary",
+      "mbedtls_ecp_check_pubkey",
+      "mbedtls_ecdsa_read_signature",
+      "mbedtls_ecdsa_free"
+    ],
+    "sha256_wrapper": {
+      "name": "sc_ctrl_crypto_sha256",
+      "prototype": "static int sc_ctrl_crypto_sha256(const uint8_t *input, uint32_t input_len, uint8_t out_digest[32])",
+      "validation_markers": [
+        "input == NULL",
+        "input_len == 0U",
+        "out_digest == NULL"
+      ],
+      "call_sequence": [
+        "mbedtls_sha256_ret(input, input_len, out_digest, 0)"
+      ],
+      "implementation_markers": [
+        "#if defined(SC_CTRL_USE_MBEDTLS)",
+        "sdk_status = mbedtls_sha256_ret(input, input_len, out_digest, 0);",
+        "return (sdk_status == 0);",
+        "#else",
+        "return 0;",
+        "#endif"
+      ]
+    },
+    "verify_wrapper": {
+      "name": "sc_ctrl_crypto_verify_ecdsa_p256_sha256_der",
+      "prototype": "static int sc_ctrl_crypto_verify_ecdsa_p256_sha256_der(const ScEcdsaP256VerifyRequest *request)",
+      "validation_markers": [
+        "request->manifest_bytes == NULL",
+        "request->manifest_len == 0U",
+        "request->signature_der == NULL",
+        "request->signature_len == 0U",
+        "request->signature_len > SC_SIGNED_SIGNATURE_MAX_LEN",
+        "request->public_key_uncompressed == NULL",
+        "request->public_key_len != SC_PUBLIC_KEY_UNCOMPRESSED_LEN"
+      ],
+      "context_markers": [
+        "mbedtls_ecdsa_context ecdsa",
+        "int sdk_status = -1"
+      ],
+      "cleanup_sequence": [
+        "mbedtls_ecdsa_free(&ecdsa)"
+      ],
+      "implementation_markers": [
+        "#if defined(SC_CTRL_USE_MBEDTLS)",
+        "mbedtls_ecdsa_context ecdsa;",
+        "mbedtls_ecdsa_init(&ecdsa);",
+        "sdk_status = mbedtls_ecp_group_load(&ecdsa.grp, MBEDTLS_ECP_DP_SECP256R1);",
+        "sdk_status = mbedtls_ecp_point_read_binary(&ecdsa.grp,",
+        "sdk_status = mbedtls_ecp_check_pubkey(&ecdsa.grp, &ecdsa.Q);",
+        "sdk_status = mbedtls_ecdsa_read_signature(&ecdsa,",
+        "mbedtls_ecdsa_free(&ecdsa);",
+        "return (sdk_status == 0);",
+        "#else",
+        "return 0;",
+        "#endif"
+      ]
+    },
+    "sdk_headers": [
+      "mbedtls/ecdsa.h",
+      "mbedtls/ecp.h",
+      "mbedtls/sha256.h"
+    ],
+    "mbedtls_call_sequence": [
+      "mbedtls_ecdsa_init(&ecdsa)",
+      "mbedtls_ecp_group_load(&ecdsa.grp, MBEDTLS_ECP_DP_SECP256R1)",
+      "mbedtls_ecp_point_read_binary(&ecdsa.grp,",
+      "mbedtls_ecp_check_pubkey(&ecdsa.grp, &ecdsa.Q)",
+      "mbedtls_ecdsa_read_signature(&ecdsa,"
+    ],
+    "integration_checklist": [
+      "define SC_CTRL_USE_MBEDTLS only after the openamp_for_linux example resolves the mbedTLS headers",
+      "link the standalone-SDK archive set that resolves every symbol in required_symbols",
+      "keep SC_CTRL_USE_MBEDTLS undefined until that link step is complete so signed admission remains deny-by-default"
+    ]
+  }
+}

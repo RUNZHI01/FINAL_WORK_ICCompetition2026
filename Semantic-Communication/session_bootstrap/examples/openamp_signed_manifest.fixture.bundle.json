@@ -1,0 +1,47 @@
+{
+  "schema": "openamp_signed_manifest_bundle/v1",
+  "bundle_version": 1,
+  "manifest_sha256": "dcde2829dcf76b7c974dc193ac93dd8641d2dfb948b15b4d46c9bbbef7f45d54",
+  "manifest": {
+    "schema": "openamp_artifact_manifest/v1",
+    "manifest_version": 1,
+    "artifact": {
+      "path": "session_bootstrap/examples/openamp_signed_manifest.fixture.artifact.so",
+      "sha256": "09af47ee1b0e2a7d3cad3add031f36811926e1fe34cfd58fa98d70eba9526b91",
+      "size_bytes": 119,
+      "format": "tvm-module-shared-object",
+      "variant": "current"
+    },
+    "job": {
+      "deadline_ms": 60000,
+      "expected_outputs": 300,
+      "job_flags": "reconstruction"
+    },
+    "input_contract": {
+      "shape": [
+        1,
+        32,
+        32,
+        32
+      ],
+      "dtype": "float32"
+    },
+    "publisher": {
+      "key_id": "fixture-dev-20260316",
+      "channel": "openamp-fixture"
+    },
+    "provenance": {
+      "created_at": "2026-03-16T16:30:00+0800",
+      "builder": "session_bootstrap/scripts/openamp_signed_manifest.py",
+      "source_repo": "tvm_metaschedule_execution_project",
+      "source_git_commit": "execution-batch-fixture",
+      "note": "deterministic signed fixture for firmware-side admission bring-up"
+    }
+  },
+  "signature": {
+    "algorithm": "ecdsa-p256-sha256",
+    "key_id": "fixture-dev-20260316",
+    "encoding": "base64",
+    "value": "MEUCIQCJ7e1YaxLO1lvjD+RUGxFAvmBvimOWb5GTlSm1PAfAMQIgIbeUxR1k2PYlCb00TazsukVRGlduGqEtdg4EdnDq1t0="
+  }
+}

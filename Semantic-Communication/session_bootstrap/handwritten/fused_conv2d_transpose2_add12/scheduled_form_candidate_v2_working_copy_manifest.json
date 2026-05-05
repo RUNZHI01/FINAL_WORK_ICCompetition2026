@@ -1,0 +1,53 @@
+{
+  "generated_at_utc": "2026-04-02T00:00:00Z",
+  "operator": "fused_conv2d_transpose2_add12",
+  "phase": "scheduled_form_candidate_v2_prep",
+  "working_copy_role": "editable_scheduled_form_candidate_v2_working_copy",
+  "working_copy_contract": {
+    "path_kind": "diagnostic_scheduled_form_candidate_v2_working_copy",
+    "local_only": true,
+    "diagnostic_only": true,
+    "hook_target": false,
+    "performance_claims": false,
+    "comparison_semantics": "edit_surface_only"
+  },
+  "source_reference_seed": {
+    "reference_tir_path": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_post_db_scheduled_reference_seed_tir.py",
+    "reference_manifest_path": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/post_db_scheduled_reference_seed_manifest.json",
+    "reference_seed_capture_kind": "post_db_schedule_preserving_reference_seed",
+    "reference_phase": "post_db_meta_schedule_apply"
+  },
+  "accepted_baseline": {
+    "candidate_entrypoint": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v1.py",
+    "candidate_version": "v1_working_copy",
+    "status": "v1_bias_fusion_applied",
+    "remote_report": "./session_bootstrap/reports/transpose2_v1_remote_benchmark_20260331_201239.md",
+    "remote_median_ms": 161.416
+  },
+  "current_edit_state": {
+    "status": "p1_dilate_pad_fusion_on_top_of_v1_applied",
+    "working_copy_tir_sha256": "078c823cb5387da0d21ef26343ad0be091ca107c059a3375294ed5355af96661",
+    "concrete_change": "On top of the accepted transpose2 v1 bias-fused scheduled-form state, replace the separate materialized data_dilate (255x255) plus data_pad (258x258) path with one materialized data_dilate_pad (258x258) buffer that directly emits padded+dilated values from lv332 while keeping kernel_transform, the bias-fused compute path, the scheduled h/w tiling, the reduction split, the outer w_0 sweep, and pragma_auto_unroll_max_step=32 intact.",
+    "preserved_non_changes": [
+      "kernel_transform remains materialized",
+      "the accepted v1 bias-fused compute_init/compute_update path remains intact",
+      "the scheduled h/w tiling remains unchanged",
+      "the reduction split remains dc_0 x dc_1 = 4 x 6",
+      "the outer w_0 sweep remains 8",
+      "pragma_auto_unroll_max_step remains 32"
+    ]
+  },
+  "related_files": {
+    "scheduled_reference_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_post_db_scheduled_reference_seed_tir.py",
+    "scheduled_reference_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/post_db_scheduled_reference_seed_manifest.json",
+    "accepted_v1_working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v1_working_copy_tir.py",
+    "accepted_v1_working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/scheduled_form_candidate_v1_working_copy_manifest.json",
+    "working_copy_tir": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/fused_conv2d_transpose2_add12_scheduled_form_candidate_v2_working_copy_tir.py",
+    "working_copy_manifest": "./session_bootstrap/handwritten/fused_conv2d_transpose2_add12/scheduled_form_candidate_v2_working_copy_manifest.json"
+  },
+  "notes": [
+    "This working copy is derived from the accepted transpose2 v1 state rather than from the raw pre-compile path.",
+    "The new candidate remains local-only and diagnostic-only until the real board payload benchmark is run.",
+    "The purpose of v2 is to isolate the P1-style dilate+pad fusion without disturbing the accepted transpose2 v1 baseline."
+  ]
+}

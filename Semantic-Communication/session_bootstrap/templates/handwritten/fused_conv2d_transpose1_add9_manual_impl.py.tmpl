@@ -1,0 +1,287 @@
+"""Staging-only manual implementation seed for fused_conv2d_transpose1_add9.
+
+This module is the first real handoff after the manual-hook overlay exists:
+- it keeps the handwritten lane staging-only
+- it records the selected task row plus any discoverable TIR snapshot
+- it leaves the actual manual override unimplemented on purpose
+
+Edit this file when the engineer is ready to replace the seed capture with a
+real handwritten implementation. Treat the emitted seed artifacts as reference
+material, not as the place to make manual changes.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+OPERATOR_NAME = __OPERATOR_NAME__
+REFERENCE_STAGING_SHA256 = __REFERENCE_STAGING_SHA256__
+REFERENCE_PROFILE_JSON = __REFERENCE_PROFILE_JSON__
+ARGUMENT_SHAPES = __ARGUMENT_SHAPES__
+BOOKKEEPING_JSON = __BOOKKEEPING_JSON__
+REMOTE_ARCHIVE_DIR = __REMOTE_ARCHIVE_DIR__
+PLACEHOLDER_ONLY = True
+
+
+def _module_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _seed_json_path() -> Path:
+    return _module_dir() / f"{OPERATOR_NAME}_manual_seed.json"
+
+
+def _seed_tir_path() -> Path:
+    return _module_dir() / f"{OPERATOR_NAME}_manual_seed_tir.py"
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "__fspath__"):
+        return str(Path(value))
+    return repr(value)
+
+
+def _script_or_none(node: Any) -> str | None:
+    script_fn = getattr(node, "script", None)
+    if not callable(script_fn):
+        return None
+
+    for kwargs in ({}, {"show_meta": False}):
+        try:
+            script = script_fn(**kwargs)
+        except TypeError:
+            continue
+        except Exception:
+            return None
+        return str(script)
+    return None
+
+
+def _global_var_name(value: Any) -> str:
+    name_hint = getattr(value, "name_hint", None)
+    if name_hint:
+        return str(name_hint)
+    return str(value)
+
+
+def _lookup_prim_func(mod: Any, name: str) -> Any:
+    if mod is None or not name:
+        return None
+
+    get_global_var = getattr(mod, "get_global_var", None)
+    if callable(get_global_var):
+        try:
+            global_var = get_global_var(name)
+        except Exception:
+            global_var = None
+        else:
+            try:
+                return mod[global_var]
+            except Exception:
+                pass
+
+    try:
+        return mod[name]
+    except Exception:
+        pass
+
+    functions = getattr(mod, "functions", None)
+    if functions is not None:
+        try:
+            items = list(functions.items())
+        except Exception:
+            items = []
+        for key, value in items:
+            if _global_var_name(key) == name:
+                return value
+
+    get_global_vars = getattr(mod, "get_global_vars", None)
+    if callable(get_global_vars):
+        try:
+            global_vars = list(get_global_vars())
+        except Exception:
+            global_vars = []
+        for key in global_vars:
+            if _global_var_name(key) == name:
+                try:
+                    return mod[key]
+                except Exception:
+                    return None
+    return None
+
+
+def _select_task_row(task_stages: Any) -> dict[str, Any] | None:
+    if not isinstance(task_stages, dict):
+        return None
+
+    preferred = None
+    fallback = None
+    for stage_name, payload in task_stages.items():
+        tasks = payload.get("tasks") or []
+        for row in tasks:
+            if row.get("task_name") != OPERATOR_NAME:
+                continue
+            candidate = dict(row)
+            candidate["stage_name"] = stage_name
+            if stage_name == "legalized_fused_tir":
+                preferred = candidate
+                break
+            if fallback is None:
+                fallback = candidate
+        if preferred is not None:
+            break
+    return preferred or fallback
+
+
+def _build_tir_snapshot(context: dict[str, Any], task_row: dict[str, Any] | None) -> tuple[str, list[dict[str, Any]]]:
+    mod = context.get("mod")
+    prim_func_names = list((task_row or {}).get("prim_funcs") or [])
+    sections: list[str] = [
+        f"# Auto-generated manual seed snapshot for {OPERATOR_NAME}.",
+        "# Captured from rpc_tune.py via the handwritten hook before compile.",
+        "# Edit the *_manual_impl.py module for implementation work.",
+        f"# Seed JSON: {_seed_json_path()}",
+        "",
+    ]
+    manifest: list[dict[str, Any]] = []
+
+    if task_row is not None:
+        sections.extend(
+            [
+                "# Selected task row:",
+                "# " + json.dumps(task_row, ensure_ascii=False, sort_keys=True),
+                "",
+            ]
+        )
+
+    for name in prim_func_names:
+        prim_func = _lookup_prim_func(mod, str(name))
+        script = _script_or_none(prim_func)
+        manifest.append(
+            {
+                "name": str(name),
+                "found": prim_func is not None,
+                "script_captured": script is not None,
+            }
+        )
+        if script is None:
+            sections.extend(
+                [
+                    f"# PrimFunc unavailable: {name}",
+                    "",
+                ]
+            )
+            continue
+        sections.extend(
+            [
+                f"# PrimFunc: {name}",
+                script.rstrip(),
+                "",
+            ]
+        )
+
+    if not prim_func_names:
+        manifest.append(
+            {
+                "name": "<none>",
+                "found": False,
+                "script_captured": False,
+            }
+        )
+
+    if not any(row["script_captured"] for row in manifest):
+        mod_script = _script_or_none(mod)
+        manifest.append(
+            {
+                "name": "<full_module_fallback>",
+                "found": mod is not None,
+                "script_captured": mod_script is not None,
+            }
+        )
+        if mod_script is not None:
+            sections.extend(
+                [
+                    "# Fallback full IRModule script:",
+                    mod_script.rstrip(),
+                    "",
+                ]
+            )
+
+    return "\n".join(sections).rstrip() + "\n", manifest
+
+
+def capture_manual_seed(context: dict[str, Any]) -> dict[str, Any]:
+    task_row = _select_task_row(context.get("task_stages"))
+    seed_json_path = _seed_json_path()
+    seed_tir_path = _seed_tir_path()
+    tir_snapshot, manifest = _build_tir_snapshot(context, task_row)
+    seed_tir_path.write_text(tir_snapshot, encoding="utf-8")
+
+    payload = {
+        "operator": OPERATOR_NAME,
+        "phase": context.get("phase"),
+        "module_path": context.get("module_path"),
+        "output_dir": context.get("output_dir"),
+        "bookkeeping_json": context.get("bookkeeping_json") or BOOKKEEPING_JSON,
+        "reference_staging_sha256": REFERENCE_STAGING_SHA256,
+        "reference_profile_json": REFERENCE_PROFILE_JSON,
+        "argument_shapes": ARGUMENT_SHAPES,
+        "remote_archive_dir": REMOTE_ARCHIVE_DIR,
+        "target": _json_safe(context.get("target")),
+        "task_row": task_row,
+        "prim_func_capture": manifest,
+        "seed_tir_path": str(seed_tir_path),
+        "seed_capture_kind": "pre_compile_selected_operator_snapshot",
+        "next_edit_target": str(Path(__file__).resolve()),
+    }
+    seed_json_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def describe_placeholder(context: dict[str, Any] | None = None) -> dict[str, object]:
+    return {
+        "operator": OPERATOR_NAME,
+        "reference_staging_sha256": REFERENCE_STAGING_SHA256,
+        "reference_profile_json": REFERENCE_PROFILE_JSON,
+        "argument_shapes": ARGUMENT_SHAPES,
+        "bookkeeping_json": BOOKKEEPING_JSON,
+        "remote_archive_dir": REMOTE_ARCHIVE_DIR,
+        "seed_json": str(_seed_json_path()),
+        "seed_tir": str(_seed_tir_path()),
+        "placeholder_only": PLACEHOLDER_ONLY,
+        "next_step": (
+            "Run the local manual-seed helper once, inspect the emitted seed "
+            "artifacts, then replace build_manual_impl() with the first "
+            "engineer-owned manual implementation."
+        ),
+    }
+
+
+def build_manual_impl(context: dict[str, Any] | None = None) -> None:
+    seed_json_path = _seed_json_path()
+    if context is not None:
+        capture_manual_seed(context)
+        raise NotImplementedError(
+            "Manual seed captured. Inspect "
+            f"{seed_json_path.name} and {_seed_tir_path().name}, then replace "
+            "build_manual_impl() with the first staging-only manual implementation."
+        )
+    raise NotImplementedError(
+        "Manual seed capture requires the rpc_tune.py handwritten hook context."
+    )
+
+
+if __name__ == "__main__":
+    print(json.dumps(describe_placeholder(), indent=2, ensure_ascii=False))

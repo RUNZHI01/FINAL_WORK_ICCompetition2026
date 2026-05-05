@@ -1,0 +1,103 @@
+{
+  "phase": "JOB_REQ",
+  "decision": "DENY",
+  "fault_code": 1,
+  "fault_name": "ARTIFACT_SHA_MISMATCH",
+  "guard_state": 1,
+  "guard_state_name": "READY",
+  "source": "firmware_job_ack",
+  "transport_status": "job_ack_received",
+  "protocol_semantics": "implemented",
+  "note": "Received a decodable JOB_ACK frame from firmware.",
+  "tx_frame": {
+    "raw_len": 68,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 1,
+    "msg_name": "JOB_REQ",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 44,
+    "header_crc32": 2944369148,
+    "expected_header_crc32": 2944369148,
+    "payload_hex": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc060ea00000100000003000000",
+    "job_req": {
+      "payload_len": 44,
+      "parsed": true,
+      "expected_sha256_hex": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+      "deadline_ms": 60000,
+      "expected_outputs": 1,
+      "flags": 3,
+      "flag_name": "smoke"
+    }
+  },
+  "rx_frame": {
+    "raw_len": 36,
+    "is_protocol_frame": true,
+    "is_valid_header_crc": true,
+    "magic": 1396920141,
+    "version": 1,
+    "msg_type": 2,
+    "msg_name": "JOB_ACK",
+    "seq": 1,
+    "job_id": 9301,
+    "payload_len": 12,
+    "header_crc32": 1932266265,
+    "expected_header_crc32": 1932266265,
+    "payload_hex": "000000000100000001000000",
+    "job_ack": {
+      "payload_len": 12,
+      "parsed": true,
+      "decision": 0,
+      "decision_name": "DENY",
+      "fault_code": 1,
+      "fault_name": "ARTIFACT_SHA_MISMATCH",
+      "guard_state": 1,
+      "guard_state_name": "READY"
+    }
+  },
+  "generated_at": "2026-03-15T01:24:34+0800",
+  "job_id": 9301,
+  "seq": 1,
+  "rpmsg_ctrl": "/dev/rpmsg_ctrl0",
+  "rpmsg_dev": "/dev/rpmsg0",
+  "device_status": {
+    "rpmsg_ctrl": {
+      "path": "/dev/rpmsg_ctrl0",
+      "exists": true,
+      "used_for": "presence_check_only_in_phase5_prep"
+    },
+    "rpmsg_dev": {
+      "path": "/dev/rpmsg0",
+      "exists": true,
+      "used_for": "read_write_transport"
+    },
+    "require_devices": true
+  },
+  "bridge_mode": "hook",
+  "hook_event_phase": "JOB_REQ",
+  "hook_event_payload": {
+    "job_id": 9301,
+    "expected_sha256": "6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc0",
+    "deadline_ms": 60000,
+    "expected_outputs": 1,
+    "job_flags": "smoke",
+    "runner_cmd": "touch '/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/wrapper/runner_should_not_run.txt'"
+  },
+  "written_bytes": 68,
+  "drained_bytes_hex": "",
+  "rx_bytes_hex": "4d4f43530100020001000000552400000c000000190b2c73000000000100000001000000",
+  "output_dir": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req",
+  "artifact_paths": {
+    "stdin_event": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/stdin_event.json",
+    "tx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_req_tx.bin",
+    "tx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_req_tx.hex",
+    "tx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_req_tx.json",
+    "rx_raw": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_ack_rx.bin",
+    "rx_hex": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_ack_rx.hex",
+    "rx_json": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/job_ack_rx.json",
+    "summary": "/tmp/openamp_wrong_sha_fit/project/session_bootstrap/reports/openamp_wrong_sha_fit_20260315_012403/hook/job_req/bridge_summary.json"
+  }
+}

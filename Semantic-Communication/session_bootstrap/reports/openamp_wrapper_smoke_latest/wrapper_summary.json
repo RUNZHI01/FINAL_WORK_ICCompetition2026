@@ -1,0 +1,11 @@
+{
+  "finished_at": "2026-03-13T23:03:46+0800",
+  "job_id": 1773414226,
+  "result": "dry_run_only",
+  "status_response": {},
+  "job_req_response": {},
+  "runner_exit_code": null,
+  "runner_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_latest/runner.log",
+  "manifest_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_latest/job_manifest.json",
+  "control_trace_path": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/openamp_wrapper_smoke_latest/control_trace.jsonl"
+}

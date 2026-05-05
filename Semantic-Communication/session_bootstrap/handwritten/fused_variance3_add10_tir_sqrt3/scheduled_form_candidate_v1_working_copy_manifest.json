@@ -1,0 +1,44 @@
+{
+    "generated_at_utc": "2026-04-03T10:10:00Z",
+    "operator": "fused_variance3_add10_tir_sqrt3",
+    "phase": "scheduled_form_candidate_v1_prep",
+    "working_copy_role": "editable_scheduled_form_candidate_v1_working_copy",
+    "working_copy_contract": {
+        "path_kind": "diagnostic_scheduled_form_candidate_v1_working_copy",
+        "local_only": true,
+        "diagnostic_only": true,
+        "hook_target": false,
+        "performance_claims": false,
+        "comparison_semantics": "edit_surface_only"
+    },
+    "source_reference_seed": {
+        "reference_seed_capture_kind": "profiling_derived_shape_inference",
+        "reference_phase": "post_db_meta_schedule_apply",
+        "reference_source": {
+            "profiling_report": "./session_bootstrap/reports/profiling_judge_expanded_10samples_20260403.md",
+            "input_shape": [1, 24, 128, 128],
+            "output_shape": [1, 24, 1, 1],
+            "reduction_axes": [2, 3],
+            "reduction_size": 16384,
+            "division_constant": 16384.0,
+            "epsilon": 9.9999997473787516e-06
+        },
+        "optimization_principle": {
+            "provenance": "variance4 v18 (transpose1 v7 working set reduction)",
+            "principle": "working_set_reduction + normalized_mean_handoff",
+            "adapted_for": "variance3 [1,24,128,128] shape"
+        }
+    },
+    "accepted_baseline": {
+        "source": "runtime_profiling_10samples",
+        "mean_us": 3562,
+        "median_us": 3543,
+        "pct_of_total": 2.80
+    },
+    "current_edit_state": {
+        "status": "ready_for_remote_build_and_benchmark",
+        "working_copy_tir_sha256": "f8c1229a4b81339f9dbaf205c278af3a1dfe5ae7acb3083f7ea0ad9148bd4555",
+        "edit_summary": "v1: apply working set reduction + normalized-mean handoff from variance4 v18",
+        "expected_improvement_range": "conservative, 0-3%"
+    }
+}

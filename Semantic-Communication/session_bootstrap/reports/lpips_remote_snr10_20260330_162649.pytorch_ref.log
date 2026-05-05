@@ -1,0 +1,13 @@
+[pytorch-ref] mode=ssh python=/home/user/anaconda3/envs/myenv/bin/python jscc_root=/home/user/Downloads/jscc-test/jscc
+[pytorch-ref] input_dir=/home/user/Downloads/jscc-test/简化版latent output_dir=/home/user/Downloads/jscc-test/jscc/infer_outputs/lpips_remote_snr10_20260330_162649_pytorch_ref snr=10 seed=20260312 max_images=300
+[pytorch-ref] generator_ckpt=/home/user/Downloads/jscc-test/export/compressed_gan.pt origin_ckpt=/home/user/Downloads/jscc-test/origin/1snr_lpips_6_6_6_6_6_6_6_openimages_gan.pt
+[pytorch-ref] env_file=session_bootstrap/tmp/lpips_remote_snr10_20260330_162649.env
+mux_client_request_session: read from master failed: Broken pipe
+Terminated
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+ssh_askpass: exec(/tmp/ssh_askpass_52cRyY.sh): No such file or directory
+Permission denied, please try again.
+ssh_askpass: exec(/tmp/ssh_askpass_52cRyY.sh): No such file or directory
+Permission denied, please try again.
+ssh_askpass: exec(/tmp/ssh_askpass_52cRyY.sh): No such file or directory
+user@100.121.87.73: Permission denied (publickey,password).

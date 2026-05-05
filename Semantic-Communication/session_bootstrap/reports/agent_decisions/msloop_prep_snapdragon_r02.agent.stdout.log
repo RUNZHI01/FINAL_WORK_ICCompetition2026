@@ -1,0 +1,25 @@
+[submit] session=main
+[openclaw] Building TypeScript (dist is stale).
+[submit] runId=live-1772375131-5726 status=started
+[openclaw] Building TypeScript (dist is stale).
+[status] 6s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 12s running...
+[openclaw] Building TypeScript (dist is stale).
+[status] 19s running...
+[openclaw] Building TypeScript (dist is stale).
+[done] runId=live-1772375131-5726 status=ok elapsed=24s
+[log] [34mℹ[39m [2mdist/plugin-sdk/[22mtarget-errors-CMRBNuvg.js             [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/plugin-sdk/[22merrors-BWHFreGi.js                    [2m   1.27 kB[22m [2m│ gzip:   0.54 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-dgjhkhbg.js             [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-BLl0yZg4.js                    [2m   1.27 kB[22m [2m│ gzip:   0.55 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-ZJ2oHKSY.js                 [2m   6.65 kB[22m [2m│ gzip:   2.01 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-ep9Fblgx.js                        [2m   1.27 kB[22m [2m│ gzip:   0.54 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-1mgYIvgl.js                    [2m   6.67 kB[22m [2m│ gzip:   2.02 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-8IxbaLwV.js                           [2m   1.43 kB[22m [2m│ gzip:   0.60 kB[22m
+[log] [34mℹ[39m [2mdist/[22mtarget-errors-D4aLwsCU.js                    [2m   6.67 kB[22m [2m│ gzip:   2.02 kB[22m
+[log] [34mℹ[39m [2mdist/[22merrors-Cu3BYw29.js                           [2m   1.43 kB[22m [2m│ gzip:   0.60 kB[22m
+[log] 2026-03-01T15:57:29.312Z error Gateway failed to start: gateway already running (pid 447607); lock timeout after 5000ms
+[log] 2026-03-01T15:57:29.469Z error Port 18789 is already in use.
+[log] 2026-03-01T15:57:29.470Z error - pid 447607 tianxing: openclaw-gateway (127.0.0.1:18789)
+[log] 2026-03-01T15:57:29.471Z error - Gateway already running locally. Stop it (openclaw gateway stop) or use a different port.

@@ -1,0 +1,96 @@
+{
+  "mode": "baseline_export_bridge_current_safe_local",
+  "generated_at": "2026-03-20T20:46:55+0800",
+  "report_id": "baseline_export_bridge_local_smoke_20260320_1",
+  "rebuild_env": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/config/rpc_tune_rebuild_current_safe.recommended_cortex_a72_neon.2026-03-10.phytium_pi.env",
+  "source_lineage": {
+    "source_db": "session_bootstrap/tmp/rpc_tune_output_20260306_195752/tuning_logs",
+    "source_archive": null,
+    "database_workload_sha256": "d677de5fed68b37d02c6818c8c5b203bd4045ea3a78569ee37c3b6f20c053623",
+    "database_tuning_record_sha256": "5d50a197741204c1d11db0e03d449d29fa1bfc23e8937c928fd6307deea8e173"
+  },
+  "local_build": {
+    "builder_python": "/home/tianxing/.venvs/tvm-ms/bin/python",
+    "onnx_model": "/home/tianxing/TVM_LAST/finalWork/服务端/jscc-test/jscc/model.onnx",
+    "target": "{\"kind\":\"llvm\",\"mtriple\":\"aarch64-linux-gnu\",\"mcpu\":\"cortex-a72\",\"mattr\":[\"+neon\"],\"num-cores\":4}",
+    "output_dir": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/build_output",
+    "optimized_model_so": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/build_output/optimized_model.so",
+    "optimized_model_sha256": "75f480ab8d272fc7cb9174ed55afef8a86ed17d67bffe8168d5ca4afbae31080",
+    "optimized_model_size_bytes": 1675320,
+    "tune_report": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/build_output/tune_report.json",
+    "task_summary_json": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/build_output/task_summary.json",
+    "tune_report_runner": "local",
+    "tune_report_total_trials": 0,
+    "rebuild_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/logs/baseline_export_bridge_local_smoke_20260320_1.build.log"
+  },
+  "candidate_archive": {
+    "archive_root": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive",
+    "artifact_path": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive/tvm_tune_logs/optimized_model.so",
+    "artifact_sha256": "75f480ab8d272fc7cb9174ed55afef8a86ed17d67bffe8168d5ca4afbae31080",
+    "artifact_size_bytes": 1675320,
+    "database_workload_json": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive/tuning_logs/database_workload.json",
+    "database_tuning_record_json": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive/tuning_logs/database_tuning_record.json"
+  },
+  "local_current_safe_probe": {
+    "status": "current_safe_probe_succeeded",
+    "payload_log": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/logs/baseline_export_bridge_local_smoke_20260320_1.local_probe.log",
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_dtype": "float32",
+    "expected_output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_contract_match": true,
+    "payload": {
+      "variant": "baseline",
+      "archive": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive",
+      "entry": "main",
+      "shape": [
+        1,
+        32,
+        32,
+        32
+      ],
+      "dtype": "float32",
+      "warmup_runs": 0,
+      "repeat": 1,
+      "tvm_version": "0.24.dev0",
+      "device": "cpu:0",
+      "artifact_path": "session_bootstrap/tmp/baseline_export_bridge_local_smoke_20260320_1/baseline_candidate_archive/tvm_tune_logs/optimized_model.so",
+      "artifact_sha256": "75f480ab8d272fc7cb9174ed55afef8a86ed17d67bffe8168d5ca4afbae31080",
+      "artifact_size_bytes": 1675320,
+      "artifact_sha256_expected": "75f480ab8d272fc7cb9174ed55afef8a86ed17d67bffe8168d5ca4afbae31080",
+      "artifact_sha256_match": true,
+      "load_ms": 1.243,
+      "vm_init_ms": 0.727,
+      "run_count": 1,
+      "run_samples_ms": [
+        717.15
+      ],
+      "run_median_ms": 717.15,
+      "run_mean_ms": 717.15,
+      "run_min_ms": 717.15,
+      "run_max_ms": 717.15,
+      "run_variance_ms2": 0.0,
+      "output_shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "output_dtype": "float32"
+    }
+  },
+  "board_stage": {
+    "remote_archive_dir": "/home/user/Downloads/baseline_current_safe_bridge/baseline_export_bridge_local_smoke_20260320_1",
+    "board_stage_script": "/home/tianxing/tvm_metaschedule_execution_project/session_bootstrap/reports/baseline_export_bridge_local_smoke_20260320_1_board_stage.sh"
+  },
+  "next_step": "Run the generated board-stage script to upload this candidate archive to /home/user/Downloads/baseline_current_safe_bridge/baseline_export_bridge_local_smoke_20260320_1 and probe it under the current-safe runtime on the Pi. If that probe still returns [1, 3, 256, 256], rerun the fair compare with this archive as baseline."
+}

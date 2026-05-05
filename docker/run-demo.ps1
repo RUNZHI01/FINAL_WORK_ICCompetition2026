@@ -1,0 +1,73 @@
+$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$ImageName = if ($env:IMAGE_NAME) { $env:IMAGE_NAME } else { "iccomp-ubuntu-minimal" }
+$ContainerName = if ($env:CONTAINER_NAME) { $env:CONTAINER_NAME } else { "iccomp-electron-demo" }
+$Display = if ($env:DISPLAY) { $env:DISPLAY } else { "host.docker.internal:0.0" }
+$EnableTailscale = $env:ENABLE_TAILSCALE -in @("1", "true", "TRUE", "yes", "YES")
+$TailscaleStateVolume = if ($env:TAILSCALE_STATE_VOLUME) { $env:TAILSCALE_STATE_VOLUME } else { "iccomp-tailscale-state" }
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..")
+
+function Write-DemoLog {
+    param([string]$Message)
+    Write-Host "[demo] $Message"
+}
+
+function Assert-LastExitCode {
+    param([string]$Step)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Step failed with exit code $LASTEXITCODE"
+    }
+}
+
+docker image inspect "$ImageName" *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-DemoLog "image $ImageName not found; building it first"
+    docker build `
+        -f "$ProjectRoot/docker/ubuntu-minimal.Dockerfile" `
+        -t "$ImageName" `
+        "$ProjectRoot"
+    Assert-LastExitCode "docker build"
+}
+
+Write-DemoLog "starting the real Electron cockpit inside Docker"
+Write-DemoLog "DISPLAY=$Display; on Windows, start VcXsrv/Xming with access control disabled before running this script"
+if ($EnableTailscale) {
+    Write-DemoLog "tailscale enabled; state volume=$TailscaleStateVolume"
+}
+
+$DockerArgs = @(
+    "run", "--rm", "-it",
+    "--name", "$ContainerName",
+    "-e", "DISPLAY=$Display"
+)
+
+if ($EnableTailscale) {
+    $DockerArgs += @(
+        "--cap-add=NET_ADMIN",
+        "--cap-add=NET_RAW",
+        "--device=/dev/net/tun",
+        "-v", "${TailscaleStateVolume}:/var/lib/tailscale",
+        "-e", "ENABLE_TAILSCALE=1"
+    )
+    foreach ($Name in @(
+        "TS_AUTHKEY", "TAILSCALE_AUTHKEY",
+        "TS_HOSTNAME", "TAILSCALE_HOSTNAME",
+        "TS_ACCEPT_DNS", "TAILSCALE_ACCEPT_DNS",
+        "TS_ACCEPT_ROUTES", "TAILSCALE_ACCEPT_ROUTES",
+        "TS_EXTRA_ARGS", "TAILSCALE_EXTRA_ARGS",
+        "TAILSCALE_PING_TARGET"
+    )) {
+        $Value = [Environment]::GetEnvironmentVariable($Name)
+        if ($Value) {
+            $DockerArgs += @("-e", "${Name}=${Value}")
+        }
+    }
+}
+
+$DockerArgs += @("$ImageName", "bash", "docker/start-electron-prod-demo.sh")
+
+docker @DockerArgs
+Assert-LastExitCode "Electron demo"

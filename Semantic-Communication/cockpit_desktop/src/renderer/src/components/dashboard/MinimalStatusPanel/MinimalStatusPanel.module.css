@@ -1,0 +1,221 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 20px;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--elevation-1);
+  transition: box-shadow 250ms var(--easing-standard), border-color 250ms var(--easing-standard);
+}
+
+.container:hover {
+  box-shadow: var(--elevation-2);
+  border-color: var(--color-border-base);
+}
+
+/* ===== Section Title & Header ===== */
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ===== Gauges & Waveform ===== */
+.gaugesRow {
+  display: flex;
+  gap: var(--space-lg);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border-light);
+  justify-content: space-around;
+}
+
+.gaugeContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.gaugeSvg {
+  transform: rotate(0deg);
+}
+
+.gaugeValue {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-family-mono);
+}
+
+.gaugeLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Waveform */
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.waveBar {
+  width: 3px;
+  height: 3px;
+  background: var(--color-border-base);
+  border-radius: 1px;
+  transition: height 200ms ease;
+}
+
+.waveformActive .waveBar {
+  background: var(--color-primary);
+  animation: wave 1s ease-in-out infinite alternate;
+}
+
+.waveformActive .waveBar:nth-child(1) { animation-delay: 0.0s; }
+.waveformActive .waveBar:nth-child(2) { animation-delay: 0.2s; }
+.waveformActive .waveBar:nth-child(3) { animation-delay: 0.4s; }
+.waveformActive .waveBar:nth-child(4) { animation-delay: 0.6s; }
+
+@keyframes wave {
+  0% { height: 3px; }
+  100% { height: 12px; }
+}
+
+/* ===== LED Matrix ===== */
+.ledMatrix {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border-base);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.ledGreen {
+  background: var(--color-success);
+  box-shadow: 0 0 6px rgba(5, 150, 105, 0.6), inset 0 1px 2px rgba(255,255,255,0.4);
+}
+
+.ledBlueBlink {
+  background: var(--color-primary);
+  animation: ledBlink 1s infinite;
+}
+
+@keyframes ledBlink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(26, 86, 219, 0.6), inset 0 1px 2px rgba(255,255,255,0.4); }
+  50% { opacity: 0.4; box-shadow: none; }
+}
+
+/* ===== Detail List ===== */
+.detailList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.detailRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.detailRow:first-of-type {
+  padding-top: 0;
+}
+
+.detailLabel {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+}
+
+.detailValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detailValueAccent {
+  composes: detailValue;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.detailValueWarning {
+  composes: detailValue;
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.online {
+  composes: statusDot;
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.offline {
+  composes: statusDot;
+  background: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1200px) {
+  .detailList {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+  .detailRow {
+    flex: 0 0 calc(50% - 8px);
+    border-bottom: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .container { padding: var(--space-md); }
+}

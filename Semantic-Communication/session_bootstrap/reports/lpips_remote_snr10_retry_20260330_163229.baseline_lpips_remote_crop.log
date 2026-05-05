@@ -1,0 +1,17 @@
+Warning: Permanently added '100.121.87.73' (ED25519) to the list of known hosts.
+/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=AlexNet_Weights.IMAGENET1K_V1`. You can also use `weights=AlexNet_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+Setting up [LPIPS] perceptual loss: trunk [alex], v[0.1], spatial [off]
+Loading model from: /home/user/anaconda3/envs/myenv/lib/python3.10/site-packages/lpips/weights/v0.1/alex.pth
+Traceback (most recent call last):
+  File "/tmp/lpips_remote_snr10_retry_20260330_163229_tools/compute_image_quality_metrics.py", line 918, in <module>
+    sys.exit(main())
+  File "/tmp/lpips_remote_snr10_retry_20260330_163229_tools/compute_image_quality_metrics.py", line 912, in main
+    report = compare_directories(args)
+  File "/tmp/lpips_remote_snr10_retry_20260330_163229_tools/compute_image_quality_metrics.py", line 795, in compare_directories
+    ref_image, test_image, cropped, ref_shape, test_shape, crop_metadata = maybe_crop_to_common_shape(
+  File "/tmp/lpips_remote_snr10_retry_20260330_163229_tools/compute_image_quality_metrics.py", line 331, in maybe_crop_to_common_shape
+    raise ValueError(
+ValueError: cannot crop images with incompatible shapes: ref=[256, 256, 3] test=[249, 249, 3] relation=non_spatial_mismatch

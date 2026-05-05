@@ -1,0 +1,6 @@
+mode,iteration,elapsed_ms,exit_code
+baseline,1,321776.315,0
+baseline,2,322134.557,0
+baseline,3,322659.752,0
+current,1,483713.501,0
+current,2,2620413.706,124
