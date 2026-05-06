@@ -1,45 +1,45 @@
 # 飞腾多核弱网安全语义视觉回传
 
-本仓库是第十届全国大学生集成电路创新创业大赛的参赛交付包。项目面向低空/弱网场景下的视觉回传任务，把语义压缩与重建、飞腾派板端推理、OpenAMP 控制面、后量子安全信道和 NI USRP-2922 无线数据面放在同一个可复现演示系统中。
+这是我们参加第十届全国大学生集成电路创新创业大赛使用的源码和复现仓库。
 
-仓库已经包含源码、模型、板端运行时、固件和复现实验脚本；`Semantic-Communication/`、`liboqs/`、`board_deps/` 等目录不是需要现场初始化的 submodule。评委可以先用 Docker 验证基础可复现性；如果具备飞腾派板卡和同一 Tailscale 网络，再运行真机链路与三路性能复现。
+项目做的是低空弱网场景下的视觉回传：上位机发起任务，链路侧可以走预录 latent 或 NI USRP-2922，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
 
-## 评委先看这里
+源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 复现脚本都已经放在仓库里。`Semantic-Communication/`、`liboqs/`、`board_deps/` 随交付包一起展开，不需要现场再初始化 submodule。
 
-| 场景 | 推荐入口 | 会验证什么 |
+## 先按这个选
+
+| 现场条件 | 入口 | 结果 |
 |---|---|---|
-| 没有板卡，只检查仓库是否能跑 | `docker/repro.*` | Docker 镜像、Python/Node/Electron/liboqs 依赖、预录 API、Electron 主进程 smoke |
-| 想直接看上位机界面 | `docker/run-demo.*` | 原生 Electron cockpit，默认使用预录数据 |
-| 有飞腾派板卡和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | Electron + Tailscale + 板端真实链路 |
-| 要复现实测 KPI | `docker/run-board-cli-smoke.*` | TVM、MNN、PyTorch 三条板端推理路径，输出 `logs/demo-kpi-summary.json` |
+| 只有 Docker，没有飞腾派 | `docker/repro.*` | 构建复现镜像，检查依赖、预录 API 和 Electron 主进程 |
+| 想先看桌面端界面 | `docker/run-demo.*` | 打开原生 Electron cockpit，默认使用预录数据 |
+| 能连接飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | 运行 Electron 真机链路，要求板端固定路径依赖已经安装 |
+| 要复测板端性能数字 | `docker/run-board-cli-smoke.*` | 跑 TVM / MNN / PyTorch 三条路径，生成 `logs/demo-kpi-summary.json` |
 
-`internal/legacy-launchers/` 是历史主机直连入口，保留用于追溯，不是评审复现的主路径。
+`internal/legacy-launchers/` 是早期主机直连脚本，评审复现一般不用看。
 
-## 项目做了什么
-
-系统的主链路可以概括为：
+## 演示链路
 
 ```text
-Electron 上位机
+图像 / latent 输入
+  -> Electron cockpit
   -> ML-KEM / Tongsuo 安全信道
-  -> OpenAMP 控制面与任务准入
-  -> USRP 或预录 latent 数据输入
+  -> OpenAMP 控制面
   -> 飞腾派板端 TVM / MNN / PyTorch 推理
-  -> 重建图像、性能 KPI、FIT/日志证据
+  -> 重建图像、性能 KPI 和日志证据
 ```
 
-交付内容包括：
+几个主要目录对应关系如下：
 
-- 一套原生 Electron cockpit，用于展示弱网链路状态、板卡状态、推理进度、图像重建结果和安全信道状态。
-- 三条板端推理路径：TVM current/baseline、MNN 动态尺寸重建、PyTorch 参考重建。
-- OpenAMP 控制面与 FIT 证据，覆盖任务准入、签名 sideband、心跳超时 watchdog 等板端行为。
-- ML-KEM-768 安全信道实现，支持 liboqs 与 Tongsuo 相关运行产物。
-- NI USRP-2922 数据面代码，以及预录 latent/encoder output 数据，方便无无线硬件时做基础演示。
-- Docker 复现入口，把评审环境中的依赖安装、API smoke 和 Electron smoke 收敛到一条命令。
+- `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
+- `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
+- `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
+- `USRP292x/`：NI USRP-2922 数据面代码。
+- `board_deps/`：板端固件、模型、runtime、输入样本和校验清单。
+- `docker/`：复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
-## 基础复现：不需要板卡
+## 1. Docker 基础复现
 
-下面的命令默认在仓库根目录执行。如果评委拿到的是压缩包，先解压并进入 `FINAL_WORK_ICCompetition2026`；如果从 GitHub 拉取，请先完成 clone 并进入仓库根目录。
+这一步不需要飞腾派。它用来确认交付包能在容器里完成依赖检查、预录 API smoke 和 Electron 主进程 smoke。
 
 Linux / WSL:
 
@@ -53,7 +53,7 @@ Windows PowerShell:
 .\docker\repro.ps1
 ```
 
-关键成功输出如下：
+关键成功标记：
 
 ```text
 deps-ok
@@ -62,11 +62,11 @@ electron-smoke-ok
 [repro] reproducibility validation completed
 ```
 
-`repro.*` 会构建最小复现镜像，检查 Python/Node/Electron/liboqs 依赖，运行最小 pytest 集合，调用预录 demo API，并在 Xvfb 下启动真实 Electron 主进程完成 smoke 检查。该路径不连接飞腾派，也不复现板端性能数字；它的作用是先证明交付包不是“只能在队伍机器上跑”的材料。
+`repro.*` 会构建 Docker 镜像，检查 Python、Node、Electron、liboqs 相关依赖，运行最小 pytest 集合，然后在 Xvfb 下启动真实 Electron 主进程。这里不会连接飞腾派，也不会复现 TVM / MNN / PyTorch 的板端性能数字。
 
-## 查看 Electron Demo
+## 2. 查看 Electron 桌面端
 
-如果只想看桌面端效果，使用下面入口。该模式默认走预录数据，不需要板卡密码。
+只看上位机界面时运行：
 
 Linux / WSL:
 
@@ -80,11 +80,28 @@ Windows PowerShell:
 .\docker\run-demo.ps1
 ```
 
-Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。需要接入飞腾派真机时，请使用下一节的 Tailscale 入口。
+这个入口默认使用预录数据。Linux / WSL 需要可用的 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。
 
-## 真机演示：飞腾派 + Tailscale
+## 3. 飞腾派真机演示
 
-真机演示要求评委机器能够登录到与飞腾派板卡相同的 Tailscale 网络。脚本里保留的历史地址只对应本队验证环境，不是公网地址，也不是通用默认地址；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。
+真机演示需要评审机器和飞腾派在同一个 Tailscale 网络内。脚本里保留的历史地址只对应我们自己的验证环境；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定现场板卡地址。
+
+这一入口会复用 demo 原始启动链路，因此依赖飞腾派上若干固定路径。`docker/run-demo-wslg-tailscale.ps1` 不会自动安装这些文件，因为安装过程会写入 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 和 `/home/user/Downloads` 等板端路径。
+
+如果评委使用的是干净飞腾派，先把本仓库放到板端，然后在板端执行：
+
+```bash
+bash board_deps/install-board-deps.sh
+bash board_deps/verify-board-deps.sh
+```
+
+如果评委使用的是已经配置好的飞腾派，只需要先做非破坏性校验：
+
+```bash
+bash board_deps/verify-board-deps.sh
+```
+
+校验通过后再启动 Electron 真机入口。
 
 Windows + WSLg 推荐入口：
 
@@ -92,18 +109,20 @@ Windows + WSLg 推荐入口：
 .\docker\run-demo-wslg-tailscale.ps1
 ```
 
-如需先登录 Tailscale：
+如果需要先登录 Tailscale：
 
 ```powershell
 .\docker\tailscale-login.ps1
 .\docker\run-demo-tailscale.ps1
 ```
 
-板卡 SSH 密码在 Electron 界面的板卡连接/授权区域填写。仓库不保存板卡 SSH 密码、Tailscale 登录凭据或私钥。
+Electron 界面里的板卡连接/授权区域会要求填写板卡 SSH 密码。
 
-## 板端三路性能复现
+## 4. 板端三路性能复现
 
-三路 CLI smoke 用于复现可交付 KPI。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后只使用仓库内的 runtime、模型、输入和脚本运行 TVM、MNN、PyTorch 三条路径。
+这条路径用于复测板端 KPI。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，再在这个目录里运行 TVM、MNN、PyTorch 三条推理路径。
+
+这条路径和第 3 节不同：它优先使用仓库内的 `board_deps/runtime`、`board_deps/tvm`、`board_deps/mnn`、`board_deps/inputs`，在隔离目录中解包运行，不要求板端已经存在 demo 的固定 `/home/user/Downloads/...` 目录结构。它用于复测性能数字，但不替代 Electron 真机 demo 的固定路径环境。
 
 Windows PowerShell:
 
@@ -117,7 +136,7 @@ Linux / WSL:
 bash docker/run-board-cli-smoke.sh
 ```
 
-脚本会交互式询问板卡 SSH 密码，输入只保存在当前进程中。调试时可以缩短输入数量：
+脚本会交互式询问板卡 SSH 密码。调试时可以先把输入数量调小：
 
 ```powershell
 $env:BOARD_CLI_MAX_INPUTS="3"
@@ -130,7 +149,7 @@ $env:BOARD_CLI_MAX_INPUTS="3"
 cli-smoke-ok
 ```
 
-性能汇总写入板端隔离目录的 `logs/demo-kpi-summary.json`，字段口径与 Electron 前端一致：
+KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`，字段和 Electron 前端展示口径一致：
 
 | 路径 | KPI 字段 |
 |---|---|
@@ -138,45 +157,71 @@ cli-smoke-ok
 | MNN | `total_ms.median_ms` |
 | PyTorch | `run_median_ms` |
 
-MNN 使用 `total_ms`，因为前端展示的是端到端 wall time，包含预处理、`runSession`、后处理和输出保存；`run_ms` 只表示 MNN session 执行时间，不能直接和 demo 展示值对齐。
+MNN 这里看 `total_ms`，因为前端展示的是端到端 wall time，包含预处理、`runSession`、后处理和保存。`run_ms` 只覆盖 MNN session 执行时间，不能直接拿来和 demo 卡片里的数字对齐。
 
-最近一次 300 输入隔离验证的参考值为：TVM 约 `257 ms`，MNN 约 `363 ms`，PyTorch 约 `913 ms`。这些数字用于评审复测时对齐量级，不应理解为固定常数；板端温度、DDR 状态和后台进程都会影响实际结果。
+最近一次 300 输入隔离验证的参考值：TVM 约 `257 ms`，MNN 约 `363 ms`，PyTorch 约 `913 ms`。复测时数值会受板端温度、DDR 状态和后台进程影响。
 
-## 板端依赖和证据材料
+## 5. 板端材料
 
-`board_deps/` 是板端复现材料目录，包含：
+`board_deps/` 放的是板端复现需要的材料：
 
 - OpenAMP 当前固件、DTB、源码、构建产物和运行服务。
-- TVM current/baseline artifact 与 TVM 运行时。
-- MNN 模型与 MNN/PyTorch 便携运行时。
+- TVM current / baseline artifact 与 TVM runtime。
+- MNN 模型，以及 MNN / PyTorch 便携 runtime。
 - PyTorch JSCC generator checkpoint。
-- 预录 latent / encoder output 输入。
+- 预录 latent 和 encoder output 输入。
 - ML-KEM、Tongsuo、公钥和远端 helper 快照。
 
-校验板端依赖完整性：
+完整性检查：
 
 ```bash
 bash board_deps/verify-board-deps.sh
 ```
 
-`board_deps/install-board-deps.sh` 会安装或覆盖板端 firmware、DTB、runtime 和模型，只适合干净板卡初始化。已经能够运行 demo 的板卡，优先使用上一节的 isolated CLI smoke，不需要重新安装。
+`board_deps/install-board-deps.sh` 会写入或覆盖板端 firmware、DTB、runtime 和模型，只适合初始化干净板卡。已经能跑 demo 的板卡，建议直接走第 4 节的 isolated CLI smoke。
 
-关键证据文件：
+真机 Electron demo 依赖的主要板端路径包括：
+
+```text
+/home/user/Downloads/5.1TVM优化结果/tvm_tune_logs/optimized_model.so
+/home/user/Downloads/jscc-test/jscc_opus_final_mean4_v7_20260406/tvm_tune_logs/optimized_model.so
+/home/user/Downloads/jscc-test/jscc/tvm_tune_logs/optimized_model.so
+/home/user/Downloads/jscc-test/简化版latent
+/home/user/Downloads/jscc-test/encoder_outputs
+/home/user/Downloads/MNNversion/origin/model1.mnn
+/home/user/anaconda3/envs/tvm310_safe
+/home/user/tvm_samegen_safe_20260309/build
+/home/user/tvm_samegen_20260307/python
+/home/user/liboqs-dist
+/home/user/libtongsuo_sig_bridge.so
+/usr/local/tongsuo
+/lib/firmware/openamp_core0.elf
+/boot/phytium-pi-board-v3-openamp.dtb
+/home/user/.openamp-demo/
+```
+
+这些文件和目录由 `board_deps/install-board-deps.sh` 从仓库内材料恢复。评委如果只运行 `docker/run-demo-wslg-tailscale.ps1` 而没有先准备这些路径，Electron 可以启动，但 live 推理、OpenAMP 固件状态或安全信道相关功能可能会失败或回退。
+
+## 6. 报告和证据
+
+这些文件不是运行入口，主要用于追溯我们已经完成过的板端验证：
 
 | 文件 | 内容 |
 |---|---|
+| `Semantic-Communication/session_bootstrap/reports/inference_compare_currentsafe_chunk4_refresh_20260313_1758.md` | TVM payload 推理 current / baseline 对比 |
+| `Semantic-Communication/session_bootstrap/reports/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.md` | TVM 真实重建 current / baseline 对比 |
 | `Semantic-Communication/session_bootstrap/reports/openamp_demo_live_dualpath_status_20260317.md` | OpenAMP demo live 双路径真机状态 |
 | `Semantic-Communication/session_bootstrap/reports/openamp_phase5_fit03_watchdog_success_2026-03-15.md` | heartbeat timeout watchdog FIT 真机验证 |
 | `Semantic-Communication/session_bootstrap/reports/big_little_compare_20260318_123300.md` | big.LITTLE pipeline 吞吐对比 |
 
-## 仓库结构
+## 7. 仓库结构
 
 ```text
 FINAL_WORK_ICCompetition2026/
 ├── README.md
 ├── requirements.txt
 ├── docker/                    # Docker 复现、Electron、Tailscale、板端 smoke 入口
-├── board_deps/                # 板端固件、运行时、模型、输入和校验清单
+├── board_deps/                # 板端固件、runtime、模型、输入和校验清单
 ├── mlkem_link/                # ML-KEM / secure channel Python 包
 ├── scripts/                   # transport、run logger、TVM helper 和测试脚本
 ├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面、报告和板端脚本
@@ -185,11 +230,4 @@ FINAL_WORK_ICCompetition2026/
 └── USRP292x/                  # NI USRP-2922 数据面代码
 ```
 
-NI USRP-2922 是当前无线数据面主线，`USRP292x/` 与 `scripts/setup_usrp2922_network.sh` 属于交付材料的一部分。
-
-## 安全边界
-
-- 仓库不包含板卡 SSH 密码、Tailscale 登录凭据或私钥。
-- 板卡密码通过 Electron 界面或 CLI 交互输入，不写入仓库。
-- 复现镜像只包含 demo 和 smoke 所需依赖，不额外打包与评审复现无关的工具链。
-- OpenAMP、TVM/MNN/PyTorch、ML-KEM、Tongsuo、NI USRP-2922 相关目录均属于当前复现材料，不建议在评审前删除。
+NI USRP-2922 是当前无线数据面主线，`USRP292x/` 和 `scripts/setup_usrp2922_network.sh` 属于交付材料的一部分。
