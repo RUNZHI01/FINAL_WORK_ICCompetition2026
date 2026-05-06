@@ -1,42 +1,35 @@
 # 飞腾多核弱网安全语义视觉回传
 
-这是我们参加第十届全国大学生集成电路创新创业大赛使用的源码和复现仓库。
+这是第十届全国大学生集成电路创新创业大赛的源码和复现仓库。
 
-项目做的是低空弱网场景下的视觉回传：上位机发起任务，链路侧使用预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
+我们做的是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
 
-源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 复现脚本都已经放在仓库里。`Semantic-Communication/`、`liboqs/`、`board_deps/` 随交付包一起展开，不需要现场再初始化 submodule。
+评委复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
 
-## 先按这个选
+## 先跑哪一个
 
-| 现场条件 | 入口 | 结果 |
+| 如果现场只有 | 跑这个 | 能看到 |
 |---|---|---|
-| 只有 Docker，没有飞腾派 | `docker/repro.*` | 构建复现镜像，检查依赖、预录 API 和 Electron 主进程 |
-| 想先看桌面端界面 | `docker/run-demo.*` | 打开原生 Electron cockpit，默认使用预录数据 |
-| 能连接飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | 运行 Electron 真机链路，要求板端固定路径依赖已经安装 |
-| 要复测板端性能数字 | `docker/run-board-cli-smoke.*` | 跑 TVM / MNN / PyTorch 三条路径，生成 `logs/demo-kpi-summary.json` |
+| 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
+| 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
+| 能连上飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | Electron 连板端的真机链路 |
+| 要复测板端性能 | `docker/run-board-cli-smoke.*` | TVM / MNN / PyTorch 三路结果和 `logs/demo-kpi-summary.json` |
 
-## 演示链路
+## demo 里有什么
 
-```text
-图像 / latent 输入
-  -> Electron cockpit
-  -> ML-KEM / Tongsuo 安全信道
-  -> OpenAMP 控制面
-  -> 飞腾派板端 TVM / MNN / PyTorch 推理
-  -> 重建图像和性能 KPI
-```
-
-几个主要目录对应关系如下：
+看代码时可以先从这几处进：
 
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
 - `board_deps/`：板端固件、模型、runtime、输入样本和校验清单。
-- `docker/`：复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
+- `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
+
+实际演示时主要分成三块：数据面负责把 latent 或现场输入送到板端；控制面负责下发任务、读取状态和收集日志；Electron 负责把链路状态、重建结果和耗时展示出来。
 
 ## 1. Docker 基础复现
 
-这一步不需要飞腾派。它用来确认交付包能在容器里完成依赖检查、预录 API smoke 和 Electron 主进程 smoke。
+这一步不需要飞腾派，适合评委先检查仓库能不能在干净容器里跑起来。
 
 Linux / WSL:
 
@@ -50,7 +43,7 @@ Windows PowerShell:
 .\docker\repro.ps1
 ```
 
-关键成功标记：
+看到下面几行，基础复现就通过了：
 
 ```text
 deps-ok
@@ -59,11 +52,11 @@ electron-smoke-ok
 [repro] reproducibility validation completed
 ```
 
-`repro.*` 会构建 Docker 镜像，检查 Python、Node、Electron、liboqs 相关依赖，运行最小 pytest 集合，然后在 Xvfb 下启动真实 Electron 主进程。这里不会连接飞腾派，也不会复现 TVM / MNN / PyTorch 的板端性能数字。
+`repro.*` 会构建 Docker 镜像，检查 Python、Node、Electron、liboqs 相关依赖，运行一组最小 pytest，然后在 Xvfb 下把 Electron 应用实际拉起来做 smoke 检查。这一步只走预录数据，不连接飞腾派，也不复测板端性能数字。
 
 ## 2. 查看 Electron 桌面端
 
-只看上位机界面时运行：
+如果只想先看上位机界面，跑下面这个入口：
 
 Linux / WSL:
 
@@ -77,30 +70,28 @@ Windows PowerShell:
 .\docker\run-demo.ps1
 ```
 
-这个入口默认使用预录数据。Linux / WSL 需要可用的 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。
+这个模式默认使用预录数据。Linux / WSL 需要可用的 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。
 
 ## 3. 飞腾派真机演示
 
 真机演示需要评审机器和飞腾派在同一个 Tailscale 网络内。脚本里保留的历史地址只对应我们自己的验证环境；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定现场板卡地址。
 
-这一入口会复用 demo 原始启动链路，因此依赖飞腾派上若干固定路径。`docker/run-demo-wslg-tailscale.ps1` 不会自动安装这些文件，因为安装过程会写入 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 和 `/home/user/Downloads` 等板端路径。
+Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-wslg-tailscale.ps1` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。
 
-如果评委使用的是干净飞腾派，先把本仓库放到板端，然后在板端执行：
+如果是干净飞腾派，先把本仓库放到板端，然后在板端执行：
 
 ```bash
 bash board_deps/install-board-deps.sh
 bash board_deps/verify-board-deps.sh
 ```
 
-如果评委使用的是已经配置好的飞腾派，只需要先做非破坏性校验：
+如果板卡已经跑过 demo，先做一次校验即可：
 
 ```bash
 bash board_deps/verify-board-deps.sh
 ```
 
-校验通过后再启动 Electron 真机入口。
-
-Windows + WSLg 推荐入口：
+校验通过后再启动 Electron 真机入口：
 
 ```powershell
 .\docker\run-demo-wslg-tailscale.ps1
@@ -115,11 +106,11 @@ Windows + WSLg 推荐入口：
 
 Electron 界面里的板卡连接/授权区域会要求填写板卡 SSH 密码。
 
-## 4. 板端三路性能复现
+## 4. 板端三路性能复测
 
-这条路径用于复测板端 KPI。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，再在这个目录里运行 TVM、MNN、PyTorch 三条推理路径。
+如果评委要看板端实测数字，跑这一组脚本。它会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在隔离目录里跑 TVM、MNN、PyTorch 三条推理路径。
 
-这条路径和第 3 节不同：它优先使用仓库内的 `board_deps/runtime`、`board_deps/tvm`、`board_deps/mnn`、`board_deps/inputs`，在隔离目录中解包运行，不要求板端已经存在 demo 的固定 `/home/user/Downloads/...` 目录结构。它用于复测性能数字，但不替代 Electron 真机 demo 的固定路径环境。
+这和第 3 节的 Electron 真机 demo 不一样：CLI smoke 优先使用仓库内的 `board_deps/runtime`、`board_deps/tvm`、`board_deps/mnn`、`board_deps/inputs`，不要求板端已经存在 demo 使用的固定 `/home/user/Downloads/...` 目录结构。它适合复测性能数字，但不替代 Electron 真机 demo 的板端环境。
 
 Windows PowerShell:
 
@@ -140,13 +131,13 @@ $env:BOARD_CLI_MAX_INPUTS="3"
 .\docker\run-board-cli-smoke.ps1
 ```
 
-默认 `BOARD_CLI_MAX_INPUTS=300`。成功结束时最后一行应为：
+默认 `BOARD_CLI_MAX_INPUTS=300`。跑完最后一行应为：
 
 ```text
 cli-smoke-ok
 ```
 
-KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`，字段和 Electron 前端展示口径一致：
+KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`。字段和 Electron 前端展示口径一致：
 
 | 路径 | KPI 字段 |
 |---|---|
@@ -158,9 +149,9 @@ MNN 这里看 `total_ms`，因为前端展示的是端到端 wall time，包含�
 
 最近一次 300 输入隔离验证的参考值：TVM 约 `257 ms`，MNN 约 `363 ms`，PyTorch 约 `913 ms`。复测时数值会受板端温度、DDR 状态和后台进程影响。
 
-## 5. 板端材料
+## 5. 板端文件
 
-`board_deps/` 放的是板端复现需要的材料：
+`board_deps/` 里放的是板端运行会用到的文件：
 
 - OpenAMP 当前固件、DTB、源码、构建产物和运行服务。
 - TVM current / baseline artifact 与 TVM runtime。
@@ -177,7 +168,7 @@ bash board_deps/verify-board-deps.sh
 
 `board_deps/install-board-deps.sh` 会写入或覆盖板端 firmware、DTB、runtime 和模型，只适合初始化干净板卡。已经能跑 demo 的板卡，建议直接走第 4 节的 isolated CLI smoke。
 
-真机 Electron demo 依赖的主要板端路径包括：
+Electron 真机 demo 主要会用到下面这些板端路径：
 
 ```text
 /home/user/Downloads/5.1TVM优化结果/tvm_tune_logs/optimized_model.so
@@ -197,7 +188,7 @@ bash board_deps/verify-board-deps.sh
 /home/user/.openamp-demo/
 ```
 
-这些文件和目录由 `board_deps/install-board-deps.sh` 从仓库内材料恢复。评委如果只运行 `docker/run-demo-wslg-tailscale.ps1` 而没有先准备这些路径，Electron 可以启动，但 live 推理、OpenAMP 固件状态或安全信道相关功能可能会失败或回退。
+这些路径可以由 `board_deps/install-board-deps.sh` 从仓库内材料恢复。没有先准备这些文件时，Electron 界面仍可能启动，但 live 推理、OpenAMP 固件状态或安全信道相关功能可能会失败或回退。
 
 ## 6. 仓库结构
 
