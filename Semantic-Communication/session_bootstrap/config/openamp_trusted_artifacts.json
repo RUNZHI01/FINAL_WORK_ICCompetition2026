@@ -5,8 +5,8 @@
       "label": "baseline",
       "sha256": "85d701db0021c26412c3e5e08a4ca043470aaa01fb2d6792cb3b3b29e93bf849",
       "enabled": true,
-      "source": "session_bootstrap/reports/inference_local_scheme_a_payload_20260311_133729.md",
-      "note": "Baseline artifact SHA recorded with explicit expected/match fields in the local scheme-A payload validation."
+      "source": "board_deps/tvm/baseline/optimized_model.so",
+      "note": "Baseline artifact SHA recorded from the packaged board dependency artifact."
     },
     {
       "label": "current",

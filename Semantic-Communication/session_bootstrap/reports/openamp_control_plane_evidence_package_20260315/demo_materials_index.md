@@ -11,8 +11,6 @@
 |---|---|---|
 | [summary_report.md](summary_report.md) | 总览 | 控制面证据链、最终状态和边界 |
 | [coverage_matrix.md](coverage_matrix.md) | 覆盖矩阵 | P0/P1 项目和证据映射 |
-| [demo_four_act_runbook.md](demo_four_act_runbook.md) | 证据说明 | OpenAMP 控制面、FIT 和性能证据关系 |
-| [degraded_demo_plan.md](degraded_demo_plan.md) | 离线验证 | 无板卡时可核验内容与边界 |
 | [../openamp_demo_live_dualpath_status_20260317.md](../openamp_demo_live_dualpath_status_20260317.md) | live 记录 | 8115 实例 current / baseline 最近一次真机结果 |
 | [../openamp_phase5_release_v1.4.0_cold_boot_and_demo_success_2026-03-14.md](../openamp_phase5_release_v1.4.0_cold_boot_and_demo_success_2026-03-14.md) | 板级状态 | cold boot、remoteproc、RPMsg demo 路径 |
 | [../openamp_phase5_job_done_success_2026-03-15.md](../openamp_phase5_job_done_success_2026-03-15.md) | 控制闭环 | `JOB_DONE` 后状态收敛记录 |
@@ -29,4 +27,4 @@
 
 ## 边界
 
-本索引只列出评审复现需要的材料。与现场展示流程、临时操作策略、内部排练记录相关的内容不纳入交付材料。
+本索引只列出评审复现需要的材料。

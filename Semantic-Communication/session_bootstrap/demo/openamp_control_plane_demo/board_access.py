@@ -49,9 +49,9 @@ VALIDATED_OPENAMP_RUN_MANIFEST_CANDIDATES = (
     "session_bootstrap/reports/openamp_wrong_sha_fit_20260315_010828/run_manifest.json",
 )
 TRUSTED_BASELINE_SHA_REPORT_CANDIDATES = (
-    "session_bootstrap/reports/inference_compare_scheme_a_fair_fixed_20260311_154243.md",
-    "session_bootstrap/reports/inference_local_scheme_a_payload_20260311_133729.md",
-    "session_bootstrap/reports/inference_local_legacy_wrapper_20260311_015655.md",
+)
+TRUSTED_ARTIFACTS_CONFIG_CANDIDATES = (
+    "session_bootstrap/config/openamp_trusted_artifacts.json",
 )
 TRUSTED_CURRENT_ARTIFACT_REPORT_CANDIDATES = (
     "session_bootstrap/reports/phytium_baseline_seeded_warm_start_current_incremental_chunk4_20260313_131545.json",
@@ -346,6 +346,38 @@ def valid_sha256_text(raw: str) -> str:
     return ""
 
 
+def discover_trusted_artifact_sha(
+    label: str,
+    config_candidates: tuple[str, ...] = TRUSTED_ARTIFACTS_CONFIG_CANDIDATES,
+) -> str:
+    normalized_label = str(label or "").strip().lower()
+    if not normalized_label:
+        return ""
+
+    for raw_config_path in config_candidates:
+        config_path = resolve_existing_env(raw_config_path)
+        if config_path is None:
+            continue
+        try:
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        entries = payload.get("entries")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("label") or "").strip().lower() != normalized_label:
+                continue
+            if not bool(entry.get("enabled", False)):
+                continue
+            sha = valid_sha256_text(entry.get("sha256", ""))
+            if sha:
+                return sha
+    return ""
+
+
 def resolve_baseline_artifact_path(values: dict[str, str]) -> str:
     explicit = str(values.get("REMOTE_BASELINE_ARTIFACT") or "").strip()
     if explicit:
@@ -370,9 +402,13 @@ def discover_trusted_baseline_expected_sha(
     env_values: dict[str, str],
     report_candidates: tuple[str, ...] = TRUSTED_BASELINE_SHA_REPORT_CANDIDATES,
 ) -> str:
+    configured_sha = discover_trusted_artifact_sha("baseline")
+    if configured_sha and not report_candidates:
+        return configured_sha
+
     baseline_artifact_path = resolve_baseline_artifact_path(env_values)
     if not baseline_artifact_path:
-        return ""
+        return configured_sha
 
     for raw_report_path in report_candidates:
         report_path = resolve_existing_env(raw_report_path)
@@ -386,7 +422,7 @@ def discover_trusted_baseline_expected_sha(
         if report_artifact_path and report_artifact_path != baseline_artifact_path:
             continue
         return baseline_expected_sha
-    return ""
+    return configured_sha
 
 
 def discover_pytorch_reference_expected_sha(env_values: dict[str, str]) -> str:

@@ -1791,9 +1791,8 @@ def build_operator_snapshot() -> dict[str, Any]:
                 "不额外生成新的业务结论。"
             ),
             "items": [
-                link_entry(PACKAGE_ROOT / "README.md", "证据包索引"),
+                link_entry(PACKAGE_ROOT / "summary_report.md", "控制面总报告"),
                 link_entry(PACKAGE_ROOT / "coverage_matrix.md", "覆盖矩阵"),
-                link_entry(PACKAGE_ROOT / "demo_materials_index.md", "演示材料索引"),
                 link_entry(SCRIPTS_ROOT / "openamp_control_wrapper.py", "控制 wrapper"),
                 link_entry(SCRIPTS_ROOT / "openamp_rpmsg_bridge.py", "RPMsg bridge"),
             ],
@@ -1822,16 +1821,12 @@ def build_operator_snapshot() -> dict[str, Any]:
 
 def build_docs_snapshot() -> list[dict[str, Any]]:
     return [
-        link_entry(LATEST_LIVE_DUALPATH_REPORT, "2026-03-17 最新 live 双路径状态"),
-        link_entry(PYTORCH_REFERENCE_MANIFEST, "PyTorch 参考基线 manifest"),
-        link_entry(PACKAGE_ROOT / "README.md", "OpenAMP 证据包"),
-        link_entry(PACKAGE_ROOT / "summary_report.md", "总报告"),
-        link_entry(PACKAGE_ROOT / "coverage_matrix.md", "覆盖矩阵"),
-        link_entry(PACKAGE_ROOT / "demo_four_act_runbook.md", "四幕演示脚本"),
-        link_entry(PACKAGE_ROOT / "degraded_demo_plan.md", "降级演示预案"),
-        link_entry(REPORTS_ROOT / "phytium_speed_test_summary_20260313_162731.md", "性能摘要"),
         link_entry(PROJECT_ROOT / "README.md", "项目 README"),
-        link_entry(PROJECT_ROOT / "session_bootstrap" / "README.md", "session_bootstrap README"),
+        link_entry(PROJECT_ROOT / "docker" / "README.md", "Docker 复现说明"),
+        link_entry(PROJECT_ROOT / "board_deps" / "README.md", "板端依赖说明"),
+        link_entry(PACKAGE_ROOT / "summary_report.md", "OpenAMP 控制面总报告"),
+        link_entry(PACKAGE_ROOT / "coverage_matrix.md", "OpenAMP 覆盖矩阵"),
+        link_entry(PYTORCH_REFERENCE_MANIFEST, "PyTorch 参考基线 manifest"),
     ]
 
 
