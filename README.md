@@ -2,7 +2,7 @@
 
 这是我们参加第十届全国大学生集成电路创新创业大赛使用的源码和复现仓库。
 
-项目做的是低空弱网场景下的视觉回传：上位机发起任务，链路侧可以走预录 latent 或 NI USRP-2922，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
+项目做的是低空弱网场景下的视觉回传：上位机发起任务，链路侧使用预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
 
 源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 复现脚本都已经放在仓库里。`Semantic-Communication/`、`liboqs/`、`board_deps/` 随交付包一起展开，不需要现场再初始化 submodule。
 
@@ -15,8 +15,6 @@
 | 能连接飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | 运行 Electron 真机链路，要求板端固定路径依赖已经安装 |
 | 要复测板端性能数字 | `docker/run-board-cli-smoke.*` | 跑 TVM / MNN / PyTorch 三条路径，生成 `logs/demo-kpi-summary.json` |
 
-`internal/legacy-launchers/` 是早期主机直连脚本，评审复现一般不用看。
-
 ## 演示链路
 
 ```text
@@ -25,7 +23,7 @@
   -> ML-KEM / Tongsuo 安全信道
   -> OpenAMP 控制面
   -> 飞腾派板端 TVM / MNN / PyTorch 推理
-  -> 重建图像、性能 KPI 和日志证据
+  -> 重建图像和性能 KPI
 ```
 
 几个主要目录对应关系如下：
@@ -33,7 +31,6 @@
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
-- `USRP292x/`：NI USRP-2922 数据面代码。
 - `board_deps/`：板端固件、模型、runtime、输入样本和校验清单。
 - `docker/`：复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
@@ -202,19 +199,7 @@ bash board_deps/verify-board-deps.sh
 
 这些文件和目录由 `board_deps/install-board-deps.sh` 从仓库内材料恢复。评委如果只运行 `docker/run-demo-wslg-tailscale.ps1` 而没有先准备这些路径，Electron 可以启动，但 live 推理、OpenAMP 固件状态或安全信道相关功能可能会失败或回退。
 
-## 6. 报告和证据
-
-这些文件不是运行入口，主要用于追溯我们已经完成过的板端验证：
-
-| 文件 | 内容 |
-|---|---|
-| `Semantic-Communication/session_bootstrap/reports/inference_compare_currentsafe_chunk4_refresh_20260313_1758.md` | TVM payload 推理 current / baseline 对比 |
-| `Semantic-Communication/session_bootstrap/reports/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.md` | TVM 真实重建 current / baseline 对比 |
-| `Semantic-Communication/session_bootstrap/reports/openamp_demo_live_dualpath_status_20260317.md` | OpenAMP demo live 双路径真机状态 |
-| `Semantic-Communication/session_bootstrap/reports/openamp_phase5_fit03_watchdog_success_2026-03-15.md` | heartbeat timeout watchdog FIT 真机验证 |
-| `Semantic-Communication/session_bootstrap/reports/big_little_compare_20260318_123300.md` | big.LITTLE pipeline 吞吐对比 |
-
-## 7. 仓库结构
+## 6. 仓库结构
 
 ```text
 FINAL_WORK_ICCompetition2026/
@@ -224,10 +209,7 @@ FINAL_WORK_ICCompetition2026/
 ├── board_deps/                # 板端固件、runtime、模型、输入和校验清单
 ├── mlkem_link/                # ML-KEM / secure channel Python 包
 ├── scripts/                   # transport、run logger、TVM helper 和测试脚本
-├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面、报告和板端脚本
+├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面和板端脚本
 ├── liboqs/                    # liboqs 源码，Docker 构建时编译安装
-├── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
-└── USRP292x/                  # NI USRP-2922 数据面代码
+└── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
 ```
-
-NI USRP-2922 是当前无线数据面主线，`USRP292x/` 和 `scripts/setup_usrp2922_network.sh` 属于交付材料的一部分。
