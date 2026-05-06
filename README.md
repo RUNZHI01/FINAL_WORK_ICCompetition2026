@@ -2,9 +2,9 @@
 
 这是第十届全国大学生集成电路创新创业大赛的源码和复现仓库。
 
-我们做的是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
+本项目是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
 
-评委复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
+复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
 
 ## 先跑哪一个
 
@@ -30,7 +30,7 @@
 
 ## 1. Docker 基础复现
 
-这一步不需要飞腾派，适合评委先检查仓库能不能在干净容器里跑起来。
+这一步不需要飞腾派，适合先检查仓库能不能在干净容器里跑起来。
 
 Linux / WSL:
 
@@ -75,7 +75,7 @@ Windows PowerShell:
 
 ## 3. 飞腾派真机演示
 
-真机演示需要评审机器和飞腾派在同一个 Tailscale 网络内。脚本里保留的历史地址只对应我们自己的验证环境；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定现场板卡地址。
+真机演示需要运行机器和飞腾派在同一个 Tailscale 网络内。脚本里保留的默认地址只对应既有验证环境；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。
 
 Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-wslg-tailscale.ps1` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。
 
@@ -109,7 +109,7 @@ Electron 界面里的板卡连接/授权区域会要求填写板卡 SSH 密码�
 
 ## 4. 板端三路性能复测
 
-如果评委要看板端实测数字，优先跑完整自包含 smoke。它会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在隔离目录里跑 TVM、MNN、PyTorch 三条推理路径。
+如果要看板端实测数字，优先跑完整自包含 smoke。它会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在隔离目录里跑 TVM、MNN、PyTorch 三条推理路径。
 
 这和第 3 节的 Electron 真机 demo 不一样：CLI smoke 优先使用仓库内的 `board_deps/runtime`、`board_deps/tvm`、`board_deps/mnn`、`board_deps/inputs`，不要求板端已经存在 demo 使用的固定 `/home/user/Downloads/...` 目录结构。它适合复测性能数字，但不替代 Electron 真机 demo 的板端环境。
 
@@ -159,7 +159,7 @@ bash docker/run-board-cli-benchmark-fast.sh
 
 快速入口默认复用 `/home/user/iccomp_board_deps_cache/board_deps`，不再上传 `board_deps/runtime`、TVM/MNN/PyTorch 模型和输入大包，只同步代码覆盖层并软链接板端缓存。首次运行时会把缓存中的 Python runtime 解到 `/home/user/iccomp_board_deps_cache/runtime`；后续运行会复用该目录。快速入口默认只保留 `logs/`，会清理本次运行的临时 `repo/` 和 `work/`，避免持续占用板端空间。如需保留完整临时输出，可设置 `BOARD_CLI_FAST_KEEP_WORK=1`。
 
-KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`。字段和 Electron 前端展示口径一致：
+KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`。统计字段和 Electron 前端展示值一致：
 
 | 路径 | KPI 字段 |
 |---|---|

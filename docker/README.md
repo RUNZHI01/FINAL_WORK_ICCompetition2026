@@ -1,6 +1,6 @@
 # Docker 入口说明
 
-本目录面向评委的入口是 `repro.*`、`run-demo.*`、`run-demo-wslg-tailscale.ps1` 和 `run-board-cli-smoke.*`。日常快速测速可使用 `run-board-cli-benchmark-fast.*`；维护脚本单列在最后，评委完成复现通常不需要使用。
+本目录的主要复现入口是 `repro.*`、`run-demo.*`、`run-demo-wslg-tailscale.ps1` 和 `run-board-cli-smoke.*`。日常快速测速可使用 `run-board-cli-benchmark-fast.*`；维护脚本单列在最后，常规复现通常不需要使用。
 
 ## 基础复现
 
@@ -54,7 +54,7 @@ Windows + WSLg 推荐：
 .\docker\run-demo-tailscale.ps1
 ```
 
-前提是评委机器已经能登录到与飞腾派板卡相同的 Tailscale 网络。脚本内置的历史地址只适用于本队验证环境；复测时可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。板卡密码在 Electron demo 内填写。
+前提是运行机器已经能登录到与飞腾派板卡相同的 Tailscale 网络。脚本内置的默认地址只适用于既有验证环境；复测时可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。板卡密码在 Electron demo 内填写。
 
 ## 板端 CLI Smoke
 
@@ -105,7 +105,7 @@ bash docker/run-board-cli-benchmark-fast.sh
 
 快速入口要求板端已有 `/home/user/iccomp_board_deps_cache/board_deps`。它只上传代码覆盖层，不上传 `board_deps/runtime`、模型和输入大包；运行时把这些重依赖软链接到缓存目录。首次快速运行会在缓存下解出便携 Python runtime，后续复用该目录。默认只保留本次运行的 `logs/`，会清理临时 `repo/` 和 `work/`；需要保留完整输出时设置 `BOARD_CLI_FAST_KEEP_WORK=1`。
 
-性能口径与 Electron 前端一致：
+性能统计字段与 Electron 前端一致：
 
 - TVM：`inference_ms.median_ms`
 - MNN：`total_ms.median_ms`
@@ -115,7 +115,7 @@ MNN 选 `total_ms` 是为了匹配 demo 的端到端展示值；`run_ms` 只包�
 
 ## 队伍维护入口
 
-以下脚本用于刷新依赖、维护 Tailscale 登录态或生成额外交付压缩包，不属于评委最小复现步骤：
+以下脚本用于刷新依赖、维护 Tailscale 登录态或生成额外交付压缩包，不属于最小复现步骤：
 
 - `pull-board-deps.*`：从当前板端刷新 `board_deps/`。
 - `package-submission.sh`：从 GitHub fresh clone 生成 tar 包。

@@ -101,7 +101,7 @@ RUN_ROOT/logs/demo-kpi-summary.json
 
 快速入口不重复上传 runtime、模型和输入大包，只同步代码层并复用板端缓存。
 
-KPI 口径与 Electron demo 比较卡片一致：
+KPI 统计字段与 Electron demo 比较卡片一致：
 
 - TVM：`inference_ms.median_ms`
 - MNN：`total_ms.median_ms`
@@ -113,5 +113,5 @@ MNN 使用 `total_ms`，因为 demo 展示的是端到端 wall time，包括预�
 
 - `scripts/run-isolated-cli-smoke.sh`：在板端隔离目录中执行三路 CLI smoke。
 - `scripts/summarize-demo-kpis.py`：把 CLI 日志汇总成 demo 使用的 KPI JSON。
-- `scripts/make-portable-runtime-dirs.sh`：从已验证板卡重建便携 runtime 目录，评委复现不需要使用。
+- `scripts/make-portable-runtime-dirs.sh`：从已验证板卡重建便携 runtime 目录，常规复现不需要使用。
 - `reassemble-large-files.sh`：重组分片的大文件，用于安装或维护流程。

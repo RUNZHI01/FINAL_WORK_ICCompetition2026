@@ -109,7 +109,7 @@
 2. **current 是否真的在板上成功跑通** —— 是，且 `300/300` 完成。
 3. **baseline 是否已经通过 signed sideband 进入真机执行** —— 是，且 `300/300` 完成。
 
-本轮**没有**引入新的 benchmark 口径、没有重写旧 OpenAMP signed-admission 证据包，也没有新增板端失败结论。
+本轮**没有**引入新的 benchmark 指标定义、没有重写旧 OpenAMP signed-admission 证据包，也没有新增板端失败结论。
 
 ---
 
