@@ -1,6 +1,6 @@
 # OpenAMP Coverage Matrix
 
-- generated_at: `2026-03-15T03:20:00+0800`
+- recorded_at: `2026-03-15T03:20:00+0800`
 - package_id: `openamp_control_plane_evidence_package_20260315`
 - trusted_current_sha: `6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1`
 - final_live_firmware_sha: `2c4240e03deedd2cc6bbd1c7c34abee852aa8f7927a5187a5131659c4ce7878a`

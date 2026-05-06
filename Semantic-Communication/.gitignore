@@ -9,7 +9,6 @@ session_bootstrap/config/big_little_pipeline.current.runtime_*.env
 cockpit_native/.venv/
 
 # Local caches and editor files
-.codex_tmp/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

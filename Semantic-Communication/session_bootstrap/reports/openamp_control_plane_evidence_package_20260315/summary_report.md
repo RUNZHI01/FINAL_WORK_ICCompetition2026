@@ -1,8 +1,8 @@
 # OpenAMP 控制面证据总报告
 
-- generated_at: `2026-03-15T03:20:00+0800`
+- recorded_at: `2026-03-15T03:20:00+0800`
 - package_id: `openamp_control_plane_evidence_package_20260315`
-- scope: `release_v1.4.0 派生最小控制面在飞腾派真机上的控制闭环与正式 FIT 收证`
+- scope: `release_v1.4.0 派生最小控制面在飞腾派真机上的控制闭环与正式 FIT 验证记录`
 - primary_matrix: [coverage_matrix.md](coverage_matrix.md)
 - latest_live_status: [../openamp_demo_live_dualpath_status_20260317.md](../openamp_demo_live_dualpath_status_20260317.md)
 - final_verdict: `P0 已板级闭环；P1 FIT-01 / FIT-02 / FIT-03 最终均为 PASS`

@@ -25,7 +25,7 @@
 
 无板卡验证只能证明源码包、镜像、预录 UI、API 和证据文件自洽；它不替代板端性能复现，也不产生新的真机 FIT 结论。
 
-板端性能复现的唯一推荐入口是：
+板端性能复现对应以下命令：
 
 - Windows PowerShell: `docker/run-board-cli-smoke.ps1`
 - Linux / WSL: `docker/run-board-cli-smoke.sh`
