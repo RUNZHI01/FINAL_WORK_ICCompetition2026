@@ -68,6 +68,10 @@ The files were extracted from the live board `user@100.121.87.73`:
     `BOARD_CLI_MAX_INPUTS` for short debugging runs.
   - It unpacks runtime archives into the supplied run directory and does not
     depend on the board's existing conda environments.
+- `scripts/summarize-demo-kpis.py`
+  - Converts the isolated CLI logs into the same KPI convention used by the
+    Electron demo comparison cards: TVM `inference_ms.median_ms`, MNN
+    `total_ms.median_ms`, and PyTorch `run_median_ms`.
 - `scripts/make-portable-runtime-dirs.sh`
   - Maintainer helper for rebuilding the portable runtime directories from a
     known-good board. It is not needed for normal judging or demo execution.
@@ -123,6 +127,12 @@ touching the board's existing repositories or conda environments:
   `mnn_real_reconstruction.py`.
 - PyTorch reference: 300 prerecorded latent tensors decoded through
   `pytorch_reference_reconstruction.py` and `pytorch/compressed_gan.pt`.
+
+The demo-compatible KPI summary is written to:
+
+```text
+RUN_ROOT/logs/demo-kpi-summary.json
+```
 
 `downloads/uhd-v4.6.0.0` is intentionally not stored here because the UHD image
 archive is larger than GitHub's normal file limit. Keep it as an external

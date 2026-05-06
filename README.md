@@ -94,6 +94,12 @@ $env:REMOTE_PASS="..."
 cli-smoke-ok
 ```
 
+脚本会额外生成 `logs/demo-kpi-summary.json`。该文件按 Electron 前端的同一指标口径汇总性能：
+
+- TVM：`inference_ms.median_ms`
+- MNN：`total_ms.median_ms`
+- PyTorch：`run_median_ms`
+
 需要缩短调试时间时可以临时覆盖输入数量：
 
 ```powershell

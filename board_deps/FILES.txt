@@ -1,4 +1,4 @@
-./README.md	5687 bytes
+./README.md	6020 bytes
 ./crypto/liboqs-dist-aarch64.tar.gz	770860 bytes
 ./crypto/libtongsuo_sig_bridge.so	14624 bytes
 ./crypto/public_keys/board-auth-public-keys.tar.gz	2350 bytes
@@ -22,7 +22,8 @@
 ./runtime/mnn_py312.tar.gz.part-02	33509046 bytes
 ./runtime/tvm_py310.tar.gz	76557173 bytes
 ./scripts/make-portable-runtime-dirs.sh	3457 bytes
-./scripts/run-isolated-cli-smoke.sh	8594 bytes
+./scripts/run-isolated-cli-smoke.sh	8846 bytes
+./scripts/summarize-demo-kpis.py	5172 bytes
 ./tools/gen_identity_keys.py	3876 bytes
 ./tvm/baseline/optimized_model.so	1438664 bytes
 ./tvm/current/optimized_model.so	1672096 bytes

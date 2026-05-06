@@ -216,6 +216,12 @@ PYTHONPATH="${MNN_SP}" \
     --seed 1 | tee "${RUN_ROOT}/logs/pytorch.json"
 
 log "writing output index"
+log "writing demo KPI summary"
+LD_LIBRARY_PATH="${MNN_LIB}:${LD_LIBRARY_PATH:-}" \
+PYTHONPATH="${MNN_SP}" \
+"${MNN_PY}" "${REPO_ROOT}/board_deps/scripts/summarize-demo-kpis.py" "${RUN_ROOT}" \
+    | tee "${RUN_ROOT}/logs/demo-kpi-summary.stdout.json"
+
 find "${RUN_ROOT}/logs" "${RUN_ROOT}/work/outputs" -maxdepth 3 -type f \
     -printf '%p\t%s bytes\n' | sort | tee "${RUN_ROOT}/logs/files.txt"
 printf '%s\n' "${RUN_ROOT}" > "${RUN_ROOT}/logs/run_root.txt"
