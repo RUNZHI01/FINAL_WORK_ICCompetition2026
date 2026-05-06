@@ -52,7 +52,7 @@ class CryptoRuntimeTest(unittest.TestCase):
         previous = {name: sys.modules.get(name) for name in injected_modules}
         try:
             sys.modules.update(injected_modules)
-            spec = importlib.util.spec_from_file_location("_codex_test_tcp_client", script_path)
+            spec = importlib.util.spec_from_file_location("_demo_test_tcp_client", script_path)
             self.assertIsNotNone(spec)
             assert spec is not None and spec.loader is not None
             module = importlib.util.module_from_spec(spec)

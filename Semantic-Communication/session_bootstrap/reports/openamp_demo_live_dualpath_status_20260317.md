@@ -113,8 +113,12 @@
 
 ---
 
-## 5. 建议的后续引用口径
+## 5. 记录摘要
 
-后续若需要在自动续跑、日报或答辩材料中引用 2026-03-17 这轮 demo live 状态，建议统一使用如下口径：
+本记录只说明 2026-03-17 这轮 demo live 状态：
 
-> **8115 当前是唯一有效 demo 实例；current 已在 8115 上成功跑通；baseline 也已通过 signed sideband 进入真机执行；两侧最近 live reconstruction 均完成 300/300；`cool-har` 只是一次本地 probe 会话被外部 SIGTERM，不构成新的板端失败。**
+- `8115` 是当前有效 demo 实例。
+- current 已在 `8115` 上成功跑通。
+- baseline 已通过 signed sideband 进入真机执行。
+- 两侧最近 live reconstruction 均完成 `300/300`。
+- `cool-har` 是一次本地 probe 会话被外部 SIGTERM，不构成新的板端失败。

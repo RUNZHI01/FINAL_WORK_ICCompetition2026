@@ -24,9 +24,7 @@
 6. `/dev/rpmsg_ctrl0` 与 `/dev/rpmsg0` 都已存在。
 7. `sudo rpmsg-demo` 已成功 echo，至少打到 `Hello World! No:100`。
 
-因此，当前最精确的工程结论应更新为：
-
-**`release_v1.4.0` 候选固件已经通过飞腾板上的关键真机门禁：安装候选后可冷启动，`remoteproc0` 可拉起，`rpmsg-openamp-demo-channel` 可建立，并且官方 userspace `rpmsg-demo` 路径可在 `/dev/rpmsg_ctrl0` / `/dev/rpmsg0` 上完成真实 echo 往返。**
+本轮验证记录表明，安装该候选后可冷启动，`remoteproc0` 可拉起，`rpmsg-openamp-demo-channel` 可建立，并且官方 userspace `rpmsg-demo` 路径可在 `/dev/rpmsg_ctrl0` / `/dev/rpmsg0` 上完成真实 echo 往返。
 
 ## 2. 已确认的 live 固件身份
 
@@ -76,6 +74,4 @@ creating channel rpmsg-openamp-demo-channel
 3. 这**不**等于已证明它与板原始官方固件 byte-identical。
 4. `session_bootstrap/reports/openamp_phase5_firmware_delta_classification_2026-03-14.md` 中关于“候选不是 byte-identical runtime match”的结论仍然成立。
 
-所以，当前应采用的正式口径是：
-
-> `release_v1.4.0` 已通过飞腾板上的冷启动与官方 userspace RPMsg demo 真机验证，但这是一条运行门禁结论，不是对板原始官方固件字节级等价性的声明。
+本文件只记录冷启动与官方 userspace RPMsg demo 路径的真机验证结果，不声明该候选与板原始官方固件字节级等价。

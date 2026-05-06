@@ -164,6 +164,6 @@ NI USRP-2922 是当前无线数据面主线，`USRP292x/` 和 `scripts/setup_usr
 ## 7. 安全约束
 
 - 不提交 `REMOTE_PASS`、`PHYTIUM_PI_PASSWORD`、`TS_AUTHKEY` 或任何私钥。
-- 不把 Codex 或其他 AI 工具链装进复现镜像。
+- 不把与复现无关的辅助工具链装进复现镜像。
 - 不把 Electron demo 改成浏览器 preview。
 - 不删除 OpenAMP bridge、TVM/MNN/PyTorch 脚本、`mlkem_link/` 或 `scripts/` 中的 transport helper；这些仍被 demo 和板端链路引用。

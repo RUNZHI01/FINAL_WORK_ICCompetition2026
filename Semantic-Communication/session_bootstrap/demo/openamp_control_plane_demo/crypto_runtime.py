@@ -1188,7 +1188,7 @@ def run_ssh_command(
         askpass_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
         env["SSH_ASKPASS"] = str(askpass_path)
         env["SSH_ASKPASS_REQUIRE"] = "force"
-        env.setdefault("DISPLAY", "codex-askpass:0")
+        env.setdefault("DISPLAY", "mlkem-askpass:0")
         if shutil.which("setsid"):
             command = ["setsid", "-w", *ssh_command]
         else:

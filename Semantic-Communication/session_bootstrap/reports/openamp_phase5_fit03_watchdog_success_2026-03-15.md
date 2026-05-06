@@ -47,4 +47,4 @@
 - `FIT-02`：PASS
 - `FIT-03`：PASS
 
-下一步最值钱的工作已经从“补缺口”转向“汇总证据矩阵与总报告”。
+本文件只记录 heartbeat-timeout watchdog 修复后的真机验证结果。

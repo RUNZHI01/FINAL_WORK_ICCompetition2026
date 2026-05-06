@@ -4554,13 +4554,13 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "MemAvailable:     512000 kB",
                 "Buffers:           64000 kB",
                 "Cached:           256000 kB",
-                "__CODEX_MEMINFO_END__",
+                "__BOARD_MEMINFO_END__",
                 "cpu  100 0 50 850 0 0 0 0 0 0",
-                "__CODEX_STAT1_END__",
+                "__BOARD_STAT1_END__",
                 "cpu  130 0 60 870 0 0 0 0 0 0",
-                "__CODEX_STAT2_END__",
+                "__BOARD_STAT2_END__",
                 "1.25 0.50 0.25 1/100 1234",
-                "__CODEX_LOADAVG_END__",
+                "__BOARD_LOADAVG_END__",
                 "4",
             ]
         )

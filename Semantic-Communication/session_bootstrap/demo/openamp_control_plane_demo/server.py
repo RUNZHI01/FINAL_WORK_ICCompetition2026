@@ -1135,14 +1135,14 @@ def _board_telemetry_remote_command() -> str:
     return (
         "sh -lc '"
         "cat /proc/meminfo; "
-        "printf \"__CODEX_MEMINFO_END__\\n\"; "
+        "printf \"__BOARD_MEMINFO_END__\\n\"; "
         "cat /proc/stat; "
-        "printf \"__CODEX_STAT1_END__\\n\"; "
+        "printf \"__BOARD_STAT1_END__\\n\"; "
         "sleep 0.1; "
         "cat /proc/stat; "
-        "printf \"__CODEX_STAT2_END__\\n\"; "
+        "printf \"__BOARD_STAT2_END__\\n\"; "
         "cat /proc/loadavg; "
-        "printf \"__CODEX_LOADAVG_END__\\n\"; "
+        "printf \"__BOARD_LOADAVG_END__\\n\"; "
         "(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)"
         "'"
     )
@@ -1150,10 +1150,10 @@ def _board_telemetry_remote_command() -> str:
 
 def _parse_marker_sections(stdout: str) -> dict[str, str]:
     marker_to_name = {
-        "__CODEX_MEMINFO_END__": "meminfo",
-        "__CODEX_STAT1_END__": "stat1",
-        "__CODEX_STAT2_END__": "stat2",
-        "__CODEX_LOADAVG_END__": "loadavg",
+        "__BOARD_MEMINFO_END__": "meminfo",
+        "__BOARD_STAT1_END__": "stat1",
+        "__BOARD_STAT2_END__": "stat2",
+        "__BOARD_LOADAVG_END__": "loadavg",
     }
     section_order = ["meminfo", "stat1", "stat2", "loadavg", "cpu_cores"]
     sections: dict[str, list[str]] = {name: [] for name in section_order}
