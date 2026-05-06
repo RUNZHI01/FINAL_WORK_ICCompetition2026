@@ -71,7 +71,7 @@ Tailscale 状态保存在 Docker volume `iccomp-tailscale-state`。默认板端�
 
 ## 板端 CLI Smoke
 
-`run-board-cli-smoke.ps1` 用于验证本仓库里的板端推理产物是否足够自包含。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>` 目录，然后运行：
+`run-board-cli-smoke.ps1` 用于验证本仓库里的板端推理产物是否足够自包含。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>` 目录，然后默认每条路径处理 300 张输入：
 
 - TVM CLI 推理
 - MNN CLI 推理
@@ -88,6 +88,14 @@ $env:REMOTE_PASS="..."
 
 ```text
 cli-smoke-ok
+```
+
+需要短调试时可以覆盖输入数量：
+
+```powershell
+$env:REMOTE_PASS="..."
+$env:BOARD_CLI_MAX_INPUTS="3"
+.\docker\run-board-cli-smoke.ps1
 ```
 
 该脚本不会修改板端现有仓库，也不会向板端 conda 环境安装任何包；它只解压 `board_deps/runtime/` 中的便携运行时到新的隔离目录。

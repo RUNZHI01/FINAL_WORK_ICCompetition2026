@@ -75,7 +75,7 @@ Tailscale 登录状态保存在 Docker volume `iccomp-tailscale-state`。如板�
 
 ## 4. 板端三路 CLI Smoke
 
-该路径用于证明本仓库里的板端产物足够自包含。脚本会把当前仓库复制到飞腾派新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后只使用仓库内的 runtime、模型、输入和脚本运行三次推理：
+该路径用于证明本仓库里的板端产物足够自包含。脚本会把当前仓库复制到飞腾派新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后只使用仓库内的 runtime、模型、输入和脚本运行三条推理路径，默认每条路径处理 300 张输入：
 
 - TVM：`scripts/tvm_inference_helper.py`
 - MNN：`Semantic-Communication/session_bootstrap/scripts/mnn_real_reconstruction.py`
@@ -92,6 +92,14 @@ $env:REMOTE_PASS="..."
 
 ```text
 cli-smoke-ok
+```
+
+需要缩短调试时间时可以临时覆盖输入数量：
+
+```powershell
+$env:REMOTE_PASS="..."
+$env:BOARD_CLI_MAX_INPUTS="3"
+.\docker\run-board-cli-smoke.ps1
 ```
 
 该脚本不会修改板端现有仓库，不会向板端 conda 环境安装包；所有 Python 运行时解压到本次 smoke 的隔离目录。

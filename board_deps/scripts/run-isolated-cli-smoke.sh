@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="${1:?usage: run-isolated-cli-smoke.sh REPO_ROOT RUN_ROOT}"
 RUN_ROOT="${2:?usage: run-isolated-cli-smoke.sh REPO_ROOT RUN_ROOT}"
+MAX_INPUTS="${BOARD_CLI_MAX_INPUTS:-300}"
 
 REPO_ROOT="$(cd "${REPO_ROOT}" && pwd)"
 mkdir -p "${RUN_ROOT}/logs" "${RUN_ROOT}/work/places" "${RUN_ROOT}/work/mnn" \
@@ -61,10 +62,10 @@ import MNN
 print("MNN_PY_IMPORT_OK", torch.__version__, numpy.__version__)
 PY
 
-log "converting three PyTorch latent files to NPZ for TVM"
+log "converting ${MAX_INPUTS} PyTorch latent files to NPZ for TVM"
 LD_LIBRARY_PATH="${MNN_LIB}:${LD_LIBRARY_PATH:-}" \
 PYTHONPATH="${MNN_SP}" \
-"${MNN_PY}" - "${RUN_ROOT}/work/places" "${RUN_ROOT}/work/npz" <<'PY'
+"${MNN_PY}" - "${RUN_ROOT}/work/places" "${RUN_ROOT}/work/npz" "${MAX_INPUTS}" <<'PY'
 from pathlib import Path
 import sys
 import numpy as np
@@ -72,11 +73,15 @@ import torch
 
 input_root = Path(sys.argv[1])
 output_root = Path(sys.argv[2])
+max_inputs = int(sys.argv[3])
 output_root.mkdir(parents=True, exist_ok=True)
-files = sorted(input_root.rglob("*.pt"))[:3]
-print("pt_inputs", [str(path) for path in files])
-if len(files) < 3:
-    raise SystemExit("need at least 3 pt inputs")
+files = sorted(input_root.rglob("*.pt"))
+if max_inputs > 0:
+    files = files[:max_inputs]
+print("pt_input_count", len(files))
+print("pt_inputs_preview", [str(path) for path in files[:5]])
+if not files:
+    raise SystemExit("need at least one pt input")
 
 for path in files:
     payload = torch.load(path, map_location="cpu", weights_only=True)
@@ -96,7 +101,7 @@ for path in files:
         raise RuntimeError(f"no latent keys in {path}")
     np.savez(output_root / f"{path.stem}.npz", **data)
 
-print("npz_outputs", [str(path) for path in sorted(output_root.glob("*.npz"))])
+print("npz_output_count", len(list(output_root.glob("*.npz"))))
 PY
 
 TVM_RT="${REPO_ROOT}/board_deps/tvm/runtime"
@@ -123,20 +128,52 @@ from tvm import relax
 print("TVM_IMPORT_OK", tvm.__version__, relax.VirtualMachine)
 PY
 
-log "running TVM CLI inference"
-TVM_INPUT_FILE="$(find "${RUN_ROOT}/work/npz" -type f -name '*.npz' -print -quit)"
-if [ -z "${TVM_INPUT_FILE}" ]; then
+log "running TVM CLI inference for ${MAX_INPUTS} inputs"
+TVM_INPUT_COUNT="$(find "${RUN_ROOT}/work/npz" -type f -name '*.npz' | wc -l)"
+if [ "${TVM_INPUT_COUNT}" -le 0 ]; then
     printf 'missing TVM NPZ input under %s\n' "${RUN_ROOT}/work/npz" >&2
     exit 1
 fi
-"${TVM_PY}" "${REPO_ROOT}/scripts/tvm_inference_helper.py" \
-    --artifact-path "${REPO_ROOT}/board_deps/tvm/current/optimized_model.so" \
-    --input "${TVM_INPUT_FILE}" \
-    --output "${RUN_ROOT}/work/outputs/tvm/result.npy" \
-    --snr 10 \
-    --seed 1 | tee "${RUN_ROOT}/logs/tvm.json"
+mkdir -p "${RUN_ROOT}/work/outputs/tvm/results"
+: > "${RUN_ROOT}/logs/tvm.jsonl"
+while IFS= read -r TVM_INPUT_FILE; do
+    TVM_STEM="$(basename "${TVM_INPUT_FILE}" .npz)"
+    "${TVM_PY}" "${REPO_ROOT}/scripts/tvm_inference_helper.py" \
+        --artifact-path "${REPO_ROOT}/board_deps/tvm/current/optimized_model.so" \
+        --input "${TVM_INPUT_FILE}" \
+        --output "${RUN_ROOT}/work/outputs/tvm/results/${TVM_STEM}.npy" \
+        --snr 10 \
+        --seed 1 | tee -a "${RUN_ROOT}/logs/tvm.jsonl"
+done < <(find "${RUN_ROOT}/work/npz" -type f -name '*.npz' | sort)
+"${MNN_PY}" - "${RUN_ROOT}/logs/tvm.jsonl" "${RUN_ROOT}/work/outputs/tvm/summary.json" <<'PY'
+import json
+import statistics
+import sys
+from pathlib import Path
 
-log "running MNN CLI inference"
+records = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+ok = [item for item in records if item.get("status") == "ok"]
+run_ms = [float(item["inference_ms"]) for item in ok]
+load_ms = [float(item["load_ms"]) for item in ok if "load_ms" in item]
+summary = {
+    "status": "ok" if len(ok) == len(records) and records else "error",
+    "runtime": "tvm",
+    "processed_count": len(ok),
+    "record_count": len(records),
+    "run_mean_ms": statistics.mean(run_ms) if run_ms else None,
+    "run_median_ms": statistics.median(run_ms) if run_ms else None,
+    "run_min_ms": min(run_ms) if run_ms else None,
+    "run_max_ms": max(run_ms) if run_ms else None,
+    "load_mean_ms": statistics.mean(load_ms) if load_ms else None,
+    "output_dir": str(Path(sys.argv[2]).parent / "results"),
+}
+Path(sys.argv[2]).write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+print(json.dumps(summary, ensure_ascii=False))
+if summary["status"] != "ok":
+    raise SystemExit("TVM batch did not finish cleanly")
+PY
+
+log "running MNN CLI inference for ${MAX_INPUTS} inputs"
 LD_LIBRARY_PATH="${MNN_LIB}:${LD_LIBRARY_PATH:-}" \
 PYTHONPATH="${MNN_SP}" \
 "${MNN_PY}" "${REPO_ROOT}/Semantic-Communication/session_bootstrap/scripts/mnn_real_reconstruction.py" \
@@ -145,7 +182,7 @@ PYTHONPATH="${MNN_SP}" \
     --output-dir "${RUN_ROOT}/work/outputs/mnn" \
     --snr 10 \
     --variant mnn-isolated \
-    --max-inputs 3 \
+    --max-inputs "${MAX_INPUTS}" \
     --interpreter-count 1 \
     --session-threads 1 \
     --seed 1 | tee "${RUN_ROOT}/logs/mnn.json"
@@ -165,7 +202,7 @@ if [ -z "${PYTORCH_INPUT_DIR}" ]; then
     exit 1
 fi
 
-log "running PyTorch CLI inference"
+log "running PyTorch CLI inference for ${MAX_INPUTS} inputs"
 LD_LIBRARY_PATH="${MNN_LIB}:${LD_LIBRARY_PATH:-}" \
 PYTHONPATH="${MNN_SP}" \
 "${MNN_PY}" "${REPO_ROOT}/Semantic-Communication/session_bootstrap/scripts/pytorch_reference_reconstruction.py" \
@@ -175,7 +212,7 @@ PYTHONPATH="${MNN_SP}" \
     --output-dir "${RUN_ROOT}/work/outputs/pytorch" \
     --snr 10 \
     --device cpu \
-    --max-images 3 \
+    --max-images "${MAX_INPUTS}" \
     --seed 1 | tee "${RUN_ROOT}/logs/pytorch.json"
 
 log "writing output index"

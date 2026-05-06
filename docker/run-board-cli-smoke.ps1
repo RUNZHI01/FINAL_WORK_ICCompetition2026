@@ -7,6 +7,7 @@ $RemoteUser = if ($env:REMOTE_USER) { $env:REMOTE_USER } elseif ($env:PHYTIUM_PI
 $RemotePass = if ($env:REMOTE_PASS) { $env:REMOTE_PASS } elseif ($env:PHYTIUM_PI_PASSWORD) { $env:PHYTIUM_PI_PASSWORD } else { "" }
 $StateVolume = if ($env:TAILSCALE_STATE_VOLUME) { $env:TAILSCALE_STATE_VOLUME } else { "iccomp-tailscale-state" }
 $PingTarget = if ($env:TAILSCALE_PING_TARGET) { $env:TAILSCALE_PING_TARGET } else { $RemoteHost }
+$BoardCliMaxInputs = if ($env:BOARD_CLI_MAX_INPUTS) { $env:BOARD_CLI_MAX_INPUTS } else { "300" }
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 
@@ -58,6 +59,7 @@ docker run --rm `
     -e "REMOTE_HOST=$RemoteHost" `
     -e "REMOTE_USER=$RemoteUser" `
     -e "SSHPASS=$RemotePass" `
+    -e "BOARD_CLI_MAX_INPUTS=$BoardCliMaxInputs" `
     -e "LOCAL_SCRIPT_B64=$SmokeScriptB64" `
     "$ImageName" `
     bash -lc 'cd /repo && printf "%s" "$LOCAL_SCRIPT_B64" | base64 -d | bash'

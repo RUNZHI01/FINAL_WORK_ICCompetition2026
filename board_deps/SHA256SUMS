@@ -1,4 +1,4 @@
-9fbe8cd3bdd655dc0ab279c88fa1ce131172cf31c250ad8637ef14343c8e3bed  ./README.md
+51cd7cbee1faf09b030fa20e5d7998b2357d673b4f04d97054bb4116a1fd3775  ./README.md
 45b61ab8c4b81710ffdf90f0b5baf8de7afe8524be05cfb4ee38a57de2a51fe0  ./crypto/liboqs-dist-aarch64.tar.gz
 dfb160e93416db75fc095af95af03e533114fe20b1d2393a614edb53d27a0059  ./crypto/libtongsuo_sig_bridge.so
 5fe6e9fdbb4e230202a7c9cfda53591f08e10a53b4c7ddf58327149c3f184f5e  ./crypto/public_keys/board-auth-public-keys.tar.gz
@@ -22,7 +22,7 @@ d37aeaf03a5245e62a40b2b98acd228c9f2ccbdd76db4f6b2635ad978f807698  ./openamp/sour
 e5d008d52707207a0faed779908da331197819bf820f11a602d60ea76dd359fc  ./runtime/mnn_py312.tar.gz.part-02
 d606d21d1c1add5d819818c11d271ee96863efb86882bca1eb0a71cad1d72381  ./runtime/tvm_py310.tar.gz
 69530aff37b5cb40ef0e428cbde858a07a352ed8bb3bfd80f47a112a6740f690  ./scripts/make-portable-runtime-dirs.sh
-3906aab6fc6bbad4829a901bb1a102b1730d19f474e9d507f97131821ececd73  ./scripts/run-isolated-cli-smoke.sh
+588ec9c3305f87841f74135faf1a26dc9355bf54d8208e6624e8d2298ad33f98  ./scripts/run-isolated-cli-smoke.sh
 11a912c5a61304226346b6de2a01f60d688ac828345830f499ebb410d2e1f358  ./tools/gen_identity_keys.py
 85d701db0021c26412c3e5e08a4ca043470aaa01fb2d6792cb3b3b29e93bf849  ./tvm/baseline/optimized_model.so
 bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb  ./tvm/current/optimized_model.so

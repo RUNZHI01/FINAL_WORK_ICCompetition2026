@@ -63,9 +63,11 @@ The files were extracted from the live board `user@100.121.87.73`:
   - PyTorch JSCC sub-generator checkpoint used by
     `pytorch_reference_reconstruction.py`.
 - `scripts/run-isolated-cli-smoke.sh`
-  - Runs three isolated board-side command-line reconstructions: TVM, MNN, and
-    PyTorch. It unpacks runtime archives into the supplied run directory and
-    does not depend on the board's existing conda environments.
+  - Runs isolated board-side command-line reconstructions for TVM, MNN, and
+    PyTorch. The default is 300 inputs per path; override with
+    `BOARD_CLI_MAX_INPUTS` for short debugging runs.
+  - It unpacks runtime archives into the supplied run directory and does not
+    depend on the board's existing conda environments.
 - `scripts/make-portable-runtime-dirs.sh`
   - Maintainer helper for rebuilding the portable runtime directories from a
     known-good board. It is not needed for normal judging or demo execution.
@@ -112,14 +114,14 @@ Expected final line:
 cli-smoke-ok
 ```
 
-The smoke test validates three command-line inference paths without touching
-the board's existing repositories or conda environments:
+The smoke test validates three 300-input command-line inference paths without
+touching the board's existing repositories or conda environments:
 
-- TVM current artifact: one latent converted to NPZ and decoded through
+- TVM current artifact: 300 latents converted to NPZ and decoded through
   `scripts/tvm_inference_helper.py`.
-- MNN artifact: three prerecorded encoder outputs decoded through
+- MNN artifact: 300 prerecorded encoder outputs decoded through
   `mnn_real_reconstruction.py`.
-- PyTorch reference: three prerecorded latent tensors decoded through
+- PyTorch reference: 300 prerecorded latent tensors decoded through
   `pytorch_reference_reconstruction.py` and `pytorch/compressed_gan.pt`.
 
 `downloads/uhd-v4.6.0.0` is intentionally not stored here because the UHD image
