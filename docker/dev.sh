@@ -4,7 +4,7 @@
 # 用法:
 #   ./docker/dev.sh build              # 构建镜像
 #   ./docker/dev.sh pytest mlkem_link/tests/ -v   # 跑测试
-#   ./docker/dev.sh python scripts/demo_e2e.py    # 跑 demo
+#   ./docker/dev.sh python docker/check_deps.py   # 检查复现依赖
 #   ./docker/dev.sh bash                # 进入容器 shell
 #
 # 队友只需: git clone + Semantic-Communication clone + ./docker/dev.sh build

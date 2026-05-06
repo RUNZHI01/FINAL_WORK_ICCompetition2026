@@ -7,7 +7,7 @@
 #
 # 运行:
 #   ./docker/dev.sh pytest mlkem_link/tests/ -v
-#   ./docker/dev.sh python scripts/demo_e2e.py
+#   ./docker/dev.sh python docker/check_deps.py
 #   ./docker/dev.sh bash
 
 FROM hub.rat.dev/library/ubuntu:22.04

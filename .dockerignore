@@ -27,6 +27,7 @@ Semantic-Communication/cockpit_desktop/out/
 artifacts/
 evidence/
 downloads/
+board_deps/
 test_latent.bin
 test_latent_2kb.npz
 *.zip
