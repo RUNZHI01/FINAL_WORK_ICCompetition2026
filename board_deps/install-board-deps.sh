@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Warning: this installer writes board runtime files, firmware, and DTB files.
+# Use it only to initialize a clean Phytium Pi. For an already working demo
+# board, prefer docker/run-board-cli-smoke.* because it runs in an isolated
+# directory and does not overwrite the board environment.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BOARD_HOME="${BOARD_HOME:-/home/user}"

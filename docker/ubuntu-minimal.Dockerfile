@@ -99,7 +99,6 @@ RUN cd /tmp/cockpit_desktop \
     && npm cache clean --force
 
 COPY README.md requirements.txt /workspace/
-COPY start.sh cleanup.sh /workspace/
 COPY docker /workspace/docker
 COPY mlkem_link /workspace/mlkem_link
 COPY scripts /workspace/scripts
@@ -107,9 +106,9 @@ COPY Semantic-Communication /workspace/Semantic-Communication
 
 RUN ln -sfn /opt/iccomp-venv /workspace/.venv \
     && ln -sfn /opt/liboqs /workspace/liboqs-dist \
-    && sed -i 's/\r$//' /workspace/start.sh /workspace/cleanup.sh /workspace/docker/*.sh \
+    && sed -i 's/\r$//' /workspace/docker/*.sh \
     && find /workspace/Semantic-Communication -type f -name '*.sh' -exec sed -i 's/\r$//' {} + \
-    && chmod +x /workspace/start.sh /workspace/cleanup.sh /workspace/docker/*.sh \
+    && chmod +x /workspace/docker/*.sh \
     && mkdir -p /usr/local/share/fonts/iccomp-cockpit \
     && cp /workspace/Semantic-Communication/cockpit_desktop/src/renderer/src/assets/fonts/*.ttf /usr/local/share/fonts/iccomp-cockpit/ \
     && fc-cache -f

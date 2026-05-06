@@ -58,7 +58,7 @@ def write_rebuild_env(path: Path, *, builder_python: str, onnx_model: Path) -> N
                 "TUNE_NUM_TRIALS_PER_ITER=64",
                 "REMOTE_HOST=100.121.87.73",
                 "REMOTE_USER=user",
-                "REMOTE_PASS=user",
+                "REMOTE_PASS=demo-pass",
                 "REMOTE_SSH_PORT=22",
                 "REMOTE_TVM_PYTHON=env /opt/current-safe/bin/python",
                 "REMOTE_TVM_PRIMARY_DIR=/home/user/Downloads/5.1TVM优化结果",

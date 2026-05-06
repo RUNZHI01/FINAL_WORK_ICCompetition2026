@@ -830,7 +830,10 @@ def load_fit_summary(path: Path) -> dict[str, Any]:
         raw = evidence.get(key)
         if not raw:
             continue
-        links.append(link_entry(resolve_repo_path(raw), localize_fit_evidence_label(key)))
+        try:
+            links.append(link_entry(resolve_repo_path(raw), localize_fit_evidence_label(key)))
+        except ValueError:
+            continue
     return {
         "fit_id": payload["fit_id"],
         "status": payload["status"],

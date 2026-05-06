@@ -12,7 +12,20 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 
 if (-not $RemotePass) {
-    throw "Set REMOTE_PASS or PHYTIUM_PI_PASSWORD before running board CLI smoke."
+    $SecurePass = Read-Host -Prompt "Enter board SSH password" -AsSecureString
+    $Bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass)
+    try {
+        $RemotePass = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Bstr)
+    }
+    finally {
+        if ($Bstr -ne [IntPtr]::Zero) {
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Bstr)
+        }
+    }
+}
+
+if (-not $RemotePass) {
+    throw "board SSH password is required for board CLI smoke."
 }
 
 docker image inspect "$ImageName" *> $null

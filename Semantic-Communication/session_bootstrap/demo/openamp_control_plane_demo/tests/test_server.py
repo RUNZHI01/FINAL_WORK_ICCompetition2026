@@ -1112,7 +1112,7 @@ class DashboardStateTest(unittest.TestCase):
                     [
                         "REMOTE_HOST=100.121.87.73",
                         "REMOTE_USER=user",
-                        "REMOTE_PASS=user",
+                        "REMOTE_PASS=demo-pass",
                         "REMOTE_SSH_PORT=22",
                         "REMOTE_MNN_PYTHON=/home/user/anaconda3/envs/MNN/bin/python",
                         "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/encoder_outputs",
@@ -1175,7 +1175,7 @@ class DashboardStateTest(unittest.TestCase):
                     [
                         "REMOTE_HOST=100.121.87.73",
                         "REMOTE_USER=user",
-                        "REMOTE_PASS=user",
+                        "REMOTE_PASS=demo-pass",
                         "REMOTE_SSH_PORT=22",
                         "REMOTE_MNN_PYTHON=/home/user/anaconda3/envs/MNN/bin/python",
                         "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/encoder_outputs",

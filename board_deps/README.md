@@ -72,11 +72,17 @@ The files were extracted from the live board `user@100.121.87.73`:
   - Converts the isolated CLI logs into the same KPI convention used by the
     Electron demo comparison cards: TVM `inference_ms.median_ms`, MNN
     `total_ms.median_ms`, and PyTorch `run_median_ms`.
+  - MNN intentionally uses `total_ms`, not `run_ms`, because the Electron demo
+    reports end-to-end wall time including preprocessing, `runSession`,
+    postprocessing, and output writes.
 - `scripts/make-portable-runtime-dirs.sh`
   - Maintainer helper for rebuilding the portable runtime directories from a
     known-good board. It is not needed for normal judging or demo execution.
 
-Use these scripts on the board:
+Use these scripts on a clean board only. `install-board-deps.sh` writes runtime
+files, firmware, and DTB files under system locations; do not run it on a board
+that is already correctly configured for the demo unless you intend to refresh
+those files.
 
 ```bash
 bash board_deps/install-board-deps.sh
@@ -104,6 +110,15 @@ Docker/Tailscale state volume:
 $env:REMOTE_PASS="..."
 .\docker\run-board-cli-smoke.ps1
 ```
+
+Linux / WSL:
+
+```bash
+bash docker/run-board-cli-smoke.sh
+```
+
+If `REMOTE_PASS` or `PHYTIUM_PI_PASSWORD` is not set, the smoke script prompts
+for the board SSH password and keeps it in the current process only.
 
 The script copies the current repository to a fresh board directory named
 `/home/user/iccomp_repo_selfcontained_<timestamp>` and runs:

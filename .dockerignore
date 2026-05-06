@@ -23,7 +23,7 @@ tongsuo-dist*/
 Semantic-Communication/cockpit_desktop/node_modules/
 Semantic-Communication/cockpit_desktop/out/
 
-# Runtime evidence and generated data
+# Runtime evidence, local downloads, and generated data
 artifacts/
 evidence/
 downloads/
@@ -31,6 +31,15 @@ board_deps/
 test_latent.bin
 test_latent_2kb.npz
 *.zip
+
+# Credentials and local runtime state
+*.local.env
+*.secret.env
+Semantic-Communication/session_bootstrap/config/*.local.env
+Semantic-Communication/session_bootstrap/config/*.secret.env
+Semantic-Communication/session_bootstrap/config/agent_loops/
+Semantic-Communication/session_bootstrap/state/
+Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/runtime/event_archives/
 
 # Large or unrelated runtime assets
 Tongsuo/
@@ -49,31 +58,8 @@ doc/
 文档更新/
 初版PPT存在问题
 ppt_assets/
-Semantic-Communication/.codex/
-Semantic-Communication/.claude/
-Semantic-Communication/.playwright-cli/
-Semantic-Communication/.venv_image_render/
 Semantic-Communication/paper/
 Semantic-Communication/cicc_tech_doc/
-Semantic-Communication/DOCUMENTS/
-Semantic-Communication/Documents
-Semantic-Communication/PLAN_*.md
-Semantic-Communication/REVIEW_*.md
-Semantic-Communication/AI_HANDOFF_*.md
-Semantic-Communication/EXPERT_HANDOFF.md
-Semantic-Communication/GITHUB_PUBLISH_CHECKLIST.md
-Semantic-Communication/DESKTOP_APP_MIGRATION_PLAN.md
-Semantic-Communication/to_zzw.md
-Semantic-Communication/cockpit_desktop/AUDIT_REPORT_*.md
-Semantic-Communication/cockpit_desktop/FIXES_SUMMARY_*.md
-Semantic-Communication/cockpit_desktop/FINAL_FIXES_SUMMARY_*.md
-Semantic-Communication/cockpit_desktop/FONT_UPDATE.md
-Semantic-Communication/cockpit_desktop/*REDESIGN*.md
-Semantic-Communication/cockpit_desktop/QUICK*.md
-Semantic-Communication/cockpit_desktop/OPTIMIZATION_PLAN_2K.md
-Semantic-Communication/cockpit_desktop/COCKPIT_UI_OVERHAUL_PROPOSAL.md
-Semantic-Communication/cockpit_desktop/DESIGN_IMPROVEMENTS.md
-Semantic-Communication/cockpit_desktop/TROUBLESHOOTING.md
 
 # OS/editor noise
 .DS_Store

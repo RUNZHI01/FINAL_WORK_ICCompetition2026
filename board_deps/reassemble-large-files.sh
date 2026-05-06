@@ -28,3 +28,8 @@ reassemble \
     "${SCRIPT_DIR}/openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz" \
     "d434d475fdc4c20dfeb9db345c647033245b7a856de0bb6799c184f6232497df" \
     "${SCRIPT_DIR}"/openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz.part-*
+
+reassemble \
+    "${SCRIPT_DIR}/runtime/mnn_py312.tar.gz" \
+    "7f58094f51cd27b0832a14f22b721de9a53c554990cabe183b9960b67391b5da" \
+    "${SCRIPT_DIR}"/runtime/mnn_py312.tar.gz.part-*
