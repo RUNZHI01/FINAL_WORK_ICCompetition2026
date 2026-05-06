@@ -1,8 +1,8 @@
 # Docker 入口说明
 
-本目录只保留评委复现、原生 Electron、Tailscale 真机演示、板端 CLI smoke 和交付打包需要的脚本。不要把 `TS_AUTHKEY`、`REMOTE_PASS`、`PHYTIUM_PI_PASSWORD` 或任何私钥写入脚本、Dockerfile 或 README。
+本目录面向评委的入口是 `repro.*`、`run-demo.*`、`run-demo-wslg-tailscale.ps1` 和 `run-board-cli-smoke.*`。维护脚本单列在最后，评委完成复现通常不需要使用。
 
-## 评委复现
+## 基础复现
 
 Linux / WSL:
 
@@ -37,7 +37,7 @@ electron-smoke-ok
 .\docker\run-demo.ps1
 ```
 
-Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。该入口默认走 prerecorded，不自动接板。
+Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。该入口默认走预录数据，不自动接板。
 
 ## Tailscale 真机链路
 
@@ -54,7 +54,7 @@ Windows + WSLg 推荐：
 .\docker\run-demo-tailscale.ps1
 ```
 
-默认板端地址为 `100.121.87.73`，可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 覆盖。板卡密码在 Electron demo 内填写；脚本只负责把 host/user/Tailscale 状态传进容器。
+前提是评委机器已经能登录到与飞腾派板卡相同的 Tailscale 网络。脚本内置的历史地址只适用于本队验证环境；复测时可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。板卡密码在 Electron demo 内填写。
 
 ## 板端 CLI Smoke
 
@@ -80,9 +80,10 @@ bash docker/run-board-cli-smoke.sh
 
 MNN 选 `total_ms` 是为了匹配 demo 的端到端展示值；`run_ms` 只包含 `interpreter.runSession`，不用于交付 KPI。
 
-## 维护入口
+## 队伍维护入口
 
-- `pull-board-deps.*`：从当前板端刷新 `board_deps/`，队伍维护用。
-- `package-submission.sh`：从 GitHub fresh clone 生成 tar 包，只有需要额外交付压缩包时使用。
+以下脚本用于刷新依赖、维护 Tailscale 登录态或生成额外交付压缩包，不属于评委最小复现步骤：
+
+- `pull-board-deps.*`：从当前板端刷新 `board_deps/`。
+- `package-submission.sh`：从 GitHub fresh clone 生成 tar 包。
 - `start-tailscale.sh`、`tailscale-login.*`：维护 Docker volume 中的 Tailscale 登录态。
-

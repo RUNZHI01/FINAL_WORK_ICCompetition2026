@@ -4,17 +4,17 @@
 
 本仓库是独立交付包：`Semantic-Communication/`、`liboqs/`、`board_deps/` 和板端运行产物已经实物化，评委不需要初始化 submodule。目标是复现原生 Electron demo，并在具备飞腾派板卡时验证 TVM、MNN、PyTorch 三条推理路径。
 
-## 0. 评委路径选择
+## 0. 评委 30 秒路径选择
 
 - 只有 Docker、没有板卡：运行 `docker/repro.*`，验证镜像、API、预录图像和原生 Electron smoke。
-- 想看原生 Electron 窗口：运行 `docker/run-demo.*`。无板卡时使用 prerecorded 档位。
+- 想看原生 Electron 窗口：运行 `docker/run-demo.*`。该入口使用预录数据，不接入板端。
 - 有飞腾派和 Tailscale：运行 `docker/run-demo-wslg-tailscale.ps1`，在 demo 界面填写板卡密码后执行真机链路。
 - 要复现性能数字：运行 `docker/run-board-cli-smoke.*`，默认每条路径处理 300 个输入，输出 `logs/demo-kpi-summary.json`。
-- 不要运行 `internal/legacy-launchers/` 下的旧脚本；它们是队伍内部历史入口，评委路径不依赖它们。
+- `internal/legacy-launchers/` 是历史主机直连入口，评委复现不需要使用。
 
 ## 1. 基础 Docker 复现
 
-基础复现不连接板卡，不复现 TVM/MNN/PyTorch 性能数字。它用于确认 Docker 镜像、Python/Node/Electron/liboqs 依赖、预录 API 和 Electron 主进程可以工作。
+基础复现不连接板卡，也不复现 TVM/MNN/PyTorch 性能数字。它用于确认 Docker 镜像、Python/Node/Electron/liboqs 依赖、预录 API 和 Electron 主进程可以工作。
 
 Linux / WSL:
 
@@ -42,7 +42,7 @@ electron-smoke-ok
 [repro] reproducibility validation completed
 ```
 
-`repro.*` 启动的是真实 Electron 主进程，不是浏览器 preview。无显示环境下它使用 Xvfb 做 smoke。
+`repro.*` 会在无显示环境下使用 Xvfb 启动真实 Electron 主进程并完成 smoke 检查。
 
 ## 2. 原生 Electron Demo
 
@@ -58,11 +58,11 @@ Windows PowerShell:
 .\docker\run-demo.ps1
 ```
 
-Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。该入口默认使用 prerecorded 档位，不会自动接入飞腾派。要连接板卡请走第 3 节。
+Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。该入口默认使用预录数据，用于展示上位机界面和基本交互。要连接板卡请走第 3 节。
 
 ## 3. 有板卡 Electron 真机演示
 
-前提：评委机器需要能登录到与飞腾派相同的 Tailscale 网络。默认板端地址是 `100.121.87.73`，可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 覆盖。
+前提：评委机器需要能登录到与飞腾派板卡相同的 Tailscale 网络。脚本内置的历史地址只适用于本队验证环境，不是公网地址，也不是通用默认值；复测时可用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。
 
 Windows + WSLg 推荐入口：
 
@@ -77,7 +77,7 @@ Windows + WSLg 推荐入口：
 .\docker\run-demo-tailscale.ps1
 ```
 
-板卡密码在 Electron demo 的板卡连接/授权界面填写；仓库内不保存 `REMOTE_PASS`、`PHYTIUM_PI_PASSWORD`、Tailscale auth key 或私钥。
+板卡密码在 Electron demo 的板卡连接/授权界面填写；仓库内不保存板卡 SSH 密码、Tailscale 登录凭据或私钥。
 
 ## 4. 板端三路 CLI 性能复现
 
@@ -95,7 +95,7 @@ Linux / WSL:
 bash docker/run-board-cli-smoke.sh
 ```
 
-如果当前 shell 没有设置 `REMOTE_PASS` 或 `PHYTIUM_PI_PASSWORD`，脚本会交互式询问密码；输入不会写入磁盘。调试时可以缩短输入数量：
+脚本会交互式询问板卡 SSH 密码，输入只保存在当前进程中。调试时可以缩短输入数量：
 
 ```powershell
 $env:BOARD_CLI_MAX_INPUTS="3"
@@ -137,19 +137,13 @@ bash board_deps/verify-board-deps.sh
 
 `board_deps/install-board-deps.sh` 会安装或覆盖板端 firmware、DTB、runtime 和模型，只适合干净板卡初始化。已经能跑 demo 的板卡优先使用第 4 节的 isolated CLI smoke。
 
-从当前板端刷新依赖是队伍维护操作，不是评委入口：
-
-```powershell
-.\docker\pull-board-deps.ps1
-```
-
 ## 6. 仓库结构
 
 ```text
 FINAL_WORK_ICCompetition2026/
 ├── README.md
 ├── requirements.txt
-├── docker/                    # 复现、Electron、Tailscale、板端 smoke 和打包脚本
+├── docker/                    # 复现、Electron、Tailscale、板端 smoke 脚本
 ├── board_deps/                # 板端固件、运行时、模型、输入和校验清单
 ├── mlkem_link/                # ML-KEM / secure channel Python 包
 ├── scripts/                   # transport、run logger、TVM helper 和测试脚本
@@ -159,11 +153,11 @@ FINAL_WORK_ICCompetition2026/
 └── USRP292x/                  # NI USRP-2922 数据面代码
 ```
 
-NI USRP-2922 是当前无线数据面主线，`USRP292x/` 和 `scripts/setup_usrp2922_network.sh` 需要保留。B205 历史材料不属于当前交付主线。
+NI USRP-2922 是当前无线数据面主线，`USRP292x/` 和 `scripts/setup_usrp2922_network.sh` 需要保留。
 
-## 7. 安全约束
+## 7. 安全与提交边界
 
-- 不提交 `REMOTE_PASS`、`PHYTIUM_PI_PASSWORD`、`TS_AUTHKEY` 或任何私钥。
-- 不把与复现无关的辅助工具链装进复现镜像。
-- 不把 Electron demo 改成浏览器 preview。
-- 不删除 OpenAMP bridge、TVM/MNN/PyTorch 脚本、`mlkem_link/` 或 `scripts/` 中的 transport helper；这些仍被 demo 和板端链路引用。
+- 仓库不包含板卡 SSH 密码、Tailscale 登录凭据或私钥。
+- 板卡密码通过 Electron 界面或 CLI 交互输入，不写入仓库。
+- 复现镜像只包含 demo 和 smoke 所需依赖，不包含与复现无关的辅助工具链。
+- OpenAMP、TVM/MNN/PyTorch、ML-KEM、Tongsuo、NI USRP-2922 相关目录属于当前复现材料的一部分。
