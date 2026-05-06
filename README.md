@@ -4,7 +4,7 @@
 
 本项目是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
 
-复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
+复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、UHD images、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
 
 ## 先跑哪一个
 
@@ -23,7 +23,8 @@
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
-- `board_deps/`：板端固件、模型、runtime、输入样本和校验清单。
+- `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
+- `USRP292x/`：NI USRP-2922 / N210 数据面脚本、UHD 示例封装和 QPSK/ARQ 工具。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
 实际演示时主要分成三块：数据面负责把 latent 或现场输入送到板端；控制面负责下发任务、读取状态和收集日志；Electron 负责把链路状态、重建结果和耗时展示出来。
@@ -176,6 +177,7 @@ MNN 这里看 `total_ms`，因为前端展示的是端到端 wall time，包含�
 `board_deps/` 里放的是板端运行会用到的文件：
 
 - OpenAMP 当前固件、DTB、源码、构建产物和运行服务。
+- NI USRP-2922 / N210 使用的 UHD 4.6.0.0 images 官方包分片。
 - TVM current / baseline artifact 与 TVM runtime。
 - MNN 模型，以及 MNN / PyTorch 便携 runtime。
 - PyTorch JSCC generator checkpoint。
@@ -187,6 +189,20 @@ MNN 这里看 `total_ms`，因为前端展示的是端到端 wall time，包含�
 ```bash
 bash board_deps/verify-board-deps.sh
 ```
+
+UHD images 包因为超过 GitHub 单文件限制，以分片形式放在 `board_deps/usrp/uhd-images/`。需要使用官方 images 包时先重组：
+
+```bash
+bash board_deps/reassemble-large-files.sh
+```
+
+重组后得到：
+
+```text
+board_deps/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz
+```
+
+该文件可解压到 UHD 使用的 images 目录，也可以通过 `UHD_IMAGES_DIR` 指向解压后的 images 目录。
 
 `board_deps/install-board-deps.sh` 会写入或覆盖板端 firmware、DTB、runtime 和模型，只适合初始化干净板卡。已经能跑 demo 的板卡，建议直接走第 4 节的 isolated CLI smoke。
 
@@ -220,6 +236,7 @@ FINAL_WORK_ICCompetition2026/
 ├── requirements.txt
 ├── docker/                    # Docker 复现、Electron、Tailscale、板端 smoke 入口
 ├── board_deps/                # 板端固件、runtime、模型、输入和校验清单
+├── USRP292x/                  # NI USRP-2922 / N210 数据面工具
 ├── mlkem_link/                # ML-KEM / secure channel Python 包
 ├── scripts/                   # transport、run logger、TVM helper 和测试脚本
 ├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面和板端脚本

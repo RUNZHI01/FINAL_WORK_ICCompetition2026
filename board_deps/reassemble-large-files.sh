@@ -33,3 +33,8 @@ reassemble \
     "${SCRIPT_DIR}/runtime/mnn_py312.tar.gz" \
     "7f58094f51cd27b0832a14f22b721de9a53c554990cabe183b9960b67391b5da" \
     "${SCRIPT_DIR}"/runtime/mnn_py312.tar.gz.part-*
+
+reassemble \
+    "${SCRIPT_DIR}/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz" \
+    "a312587fbe9fffb6043cd96bae50ef283bb55a1e51e1435b5e4a350beb00e59d" \
+    "${SCRIPT_DIR}"/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz.part-*

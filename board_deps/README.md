@@ -34,6 +34,10 @@
   - TVM 输入 latent 目录。
 - `inputs/mnn-encoder-outputs.tar.gz`
   - MNN/PyTorch 输入 encoder output 目录。
+- `usrp/uhd-images/uhd-images_4.6.0.0.tar.xz.part-*`
+  - Ettus Research UHD 4.6.0.0 images archive for NI USRP-2922 / N210, split into 90 MiB parts.
+- `usrp/uhd-images/uhd-images_4.6.0.0.sha256`
+  - Upstream SHA256 checksum file for the UHD images release.
 - `openamp/firmware/openamp_core0.elf`
   - 当前 OpenAMP remoteproc 固件。
 - `openamp/firmware/phytium-pi-board-v3-openamp.dtb`
@@ -64,6 +68,20 @@ bash board_deps/install-board-deps.sh
 ```
 
 `install-board-deps.sh` 会写入 runtime、模型、firmware 和 DTB，并可能覆盖板端系统路径。已经能正常运行 demo 的板卡优先使用隔离 CLI smoke，不需要重新安装。
+
+UHD images 包需要按需重组：
+
+```bash
+bash board_deps/reassemble-large-files.sh
+```
+
+重组后的文件是：
+
+```text
+board_deps/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz
+```
+
+该脚本会校验重组后文件的 SHA256。UHD images 不会由 `install-board-deps.sh` 自动安装；控制 USRP 的主机应把该 archive 解压到 UHD 使用的 images 目录，或设置 `UHD_IMAGES_DIR` 指向解压后的 images 目录。
 
 ## 三路 CLI 性能复现
 

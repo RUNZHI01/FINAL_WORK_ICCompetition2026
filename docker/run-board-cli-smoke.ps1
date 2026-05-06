@@ -80,6 +80,7 @@ tar_excludes=(
     --exclude='liboqs/.git'
     --exclude='Tongsuo/.git'
     --exclude='board_deps/openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz.part-*'
+    --exclude='board_deps/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz.part-*'
 )
 
 tailscale_start="$(date +%s)"

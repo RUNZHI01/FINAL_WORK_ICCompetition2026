@@ -17,8 +17,10 @@ host_pic_to_latent/checkpoint/
 host_pic_to_latent/encoder_outputs*/
 host_pic_to_latent/reconstructions/
 
-# Local USRP firmware/image dumps
-usrp2920_images
+# Reassembled local copies of versioned USRP image archives.
+board_deps/usrp/uhd-images/uhd-images_4.6.0.0.tar.xz
+board_deps/usrp/uhd-images/uhd-images_4.6.0.0.tar.gz
+board_deps/usrp/uhd-images/uhd-images_4.6.0.0.zip
 
 # Local transient outputs
 out.dat

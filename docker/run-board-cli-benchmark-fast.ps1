@@ -76,6 +76,7 @@ fast_tar_excludes=(
     --exclude='board_deps/pytorch'
     --exclude='board_deps/inputs'
     --exclude='board_deps/crypto'
+    --exclude='board_deps/usrp'
     --exclude='**/node_modules'
     --exclude='**/__pycache__'
     --exclude='**/.pytest_cache'
