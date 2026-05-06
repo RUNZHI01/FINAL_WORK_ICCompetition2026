@@ -52,6 +52,23 @@ The files were extracted from the live board `user@100.121.87.73`:
 - `runtime/mlkem-remote-runtime-snapshot.tar.gz`
   - Current board-side ML-KEM TCP server, helper scripts, and `mlkem_link`
     package snapshot.
+- `runtime/tvm_py310.tar.gz`
+  - Portable Python 3.10 runtime used by the isolated TVM CLI smoke test.
+  - Extracts under the smoke run directory, not into `/home/user/anaconda3`.
+- `runtime/mnn_py312.tar.gz.part-*`
+  - Portable Python 3.12 runtime with MNN, PyTorch, TorchVision, Pillow, and
+    NumPy for isolated MNN and PyTorch CLI smoke tests.
+  - Split into 90 MiB chunks to stay below GitHub's per-file hard limit.
+- `pytorch/compressed_gan.pt`
+  - PyTorch JSCC sub-generator checkpoint used by
+    `pytorch_reference_reconstruction.py`.
+- `scripts/run-isolated-cli-smoke.sh`
+  - Runs three isolated board-side command-line reconstructions: TVM, MNN, and
+    PyTorch. It unpacks runtime archives into the supplied run directory and
+    does not depend on the board's existing conda environments.
+- `scripts/make-portable-runtime-dirs.sh`
+  - Maintainer helper for rebuilding the portable runtime directories from a
+    known-good board. It is not needed for normal judging or demo execution.
 
 Use these scripts on the board:
 
@@ -73,6 +90,37 @@ On Windows PowerShell:
 $env:REMOTE_PASS="..."
 .\docker\pull-board-deps.ps1
 ```
+
+Run the self-contained CLI smoke on the Phytium Pi through the existing
+Docker/Tailscale state volume:
+
+```powershell
+$env:REMOTE_PASS="..."
+.\docker\run-board-cli-smoke.ps1
+```
+
+The script copies the current repository to a fresh board directory named
+`/home/user/iccomp_repo_selfcontained_<timestamp>` and runs:
+
+```bash
+bash board_deps/scripts/run-isolated-cli-smoke.sh REPO_ROOT RUN_ROOT
+```
+
+Expected final line:
+
+```text
+cli-smoke-ok
+```
+
+The smoke test validates three command-line inference paths without touching
+the board's existing repositories or conda environments:
+
+- TVM current artifact: one latent converted to NPZ and decoded through
+  `scripts/tvm_inference_helper.py`.
+- MNN artifact: three prerecorded encoder outputs decoded through
+  `mnn_real_reconstruction.py`.
+- PyTorch reference: three prerecorded latent tensors decoded through
+  `pytorch_reference_reconstruction.py` and `pytorch/compressed_gan.pt`.
 
 `downloads/uhd-v4.6.0.0` is intentionally not stored here because the UHD image
 archive is larger than GitHub's normal file limit. Keep it as an external

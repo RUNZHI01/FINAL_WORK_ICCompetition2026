@@ -1,4 +1,4 @@
-e8e71b0b55fc262180bca05c8fe2631c710a5f2bb046864346762e22f5cb79af  ./README.md
+9fbe8cd3bdd655dc0ab279c88fa1ce131172cf31c250ad8637ef14343c8e3bed  ./README.md
 45b61ab8c4b81710ffdf90f0b5baf8de7afe8524be05cfb4ee38a57de2a51fe0  ./crypto/liboqs-dist-aarch64.tar.gz
 dfb160e93416db75fc095af95af03e533114fe20b1d2393a614edb53d27a0059  ./crypto/libtongsuo_sig_bridge.so
 5fe6e9fdbb4e230202a7c9cfda53591f08e10a53b4c7ddf58327149c3f184f5e  ./crypto/public_keys/board-auth-public-keys.tar.gz
@@ -14,8 +14,15 @@ c71a1e0efee6cb00e8bef70be160eb46a2d9c75706756729115c9b889dd3518e  ./openamp/firm
 23dc7c4dc403e40d603f8750b9bd507ccc64e8af46901fa29966064cb4823701  ./openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz.part-00
 f41d6f0202656163a2b2849786c4b035a3c71ced5ec309452d0248ccf7f10e53  ./openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz.part-01
 d37aeaf03a5245e62a40b2b98acd228c9f2ccbdd76db4f6b2635ad978f807698  ./openamp/source/semantic-communication-openamp-master-07ee28f.tar.gz
+3afcebc7471695a23bba9448dbc96bf4c07eee84d2ddf5f808501cb583e87763  ./pytorch/compressed_gan.pt
 87d47dddc1490a40433a5fc277f7bfdb285b899af75ed1b0f1a4ad40317bb82c  ./reassemble-large-files.sh
 111d2977bb8aa2093711bcabe369111e307b441d945137c22d6e768ee5ecb1c4  ./runtime/mlkem-remote-runtime-snapshot.tar.gz
+72eed111957d9fe32293fbdc368171e0e1287acd147227f39a8a061c49b70bc5  ./runtime/mnn_py312.tar.gz.part-00
+0b71757e40247996b5c0061f57380141a8e913b4087376bd2806b4acc93f5c45  ./runtime/mnn_py312.tar.gz.part-01
+e5d008d52707207a0faed779908da331197819bf820f11a602d60ea76dd359fc  ./runtime/mnn_py312.tar.gz.part-02
+d606d21d1c1add5d819818c11d271ee96863efb86882bca1eb0a71cad1d72381  ./runtime/tvm_py310.tar.gz
+69530aff37b5cb40ef0e428cbde858a07a352ed8bb3bfd80f47a112a6740f690  ./scripts/make-portable-runtime-dirs.sh
+3906aab6fc6bbad4829a901bb1a102b1730d19f474e9d507f97131821ececd73  ./scripts/run-isolated-cli-smoke.sh
 11a912c5a61304226346b6de2a01f60d688ac828345830f499ebb410d2e1f358  ./tools/gen_identity_keys.py
 85d701db0021c26412c3e5e08a4ca043470aaa01fb2d6792cb3b3b29e93bf849  ./tvm/baseline/optimized_model.so
 bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb  ./tvm/current/optimized_model.so

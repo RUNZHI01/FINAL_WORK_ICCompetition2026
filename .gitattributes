@@ -1,0 +1,10 @@
+/.gitattributes text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+*.ps1 text eol=crlf
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+SHA256SUMS text eol=lf
+FILES.txt text eol=lf

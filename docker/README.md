@@ -1,21 +1,15 @@
 # Docker 入口说明
 
-评委复现只需要 `ubuntu-minimal.Dockerfile` 和 `repro.*`。镜像会构建 Python 后端、`liboqs`、Node/Electron 依赖，并验证真实 Electron production demo。这里没有浏览器 preview 替代路径。
+本目录只保留评委复现、原生 Electron smoke、板端真机验证和交付打包需要的脚本。不要把 `TS_AUTHKEY`、`REMOTE_PASS`、`PHYTIUM_PI_PASSWORD` 或任何私钥写入脚本、Dockerfile 或 README。
 
-| 文件 | 用途 | 评委是否需要 |
-|---|---|---|
-| `ubuntu-minimal.Dockerfile` | 评委复现镜像，包含 Python、Node 20、Electron build、Xvfb、Tailscale CLI 和 `liboqs` | 是 |
-| `repro.sh` / `repro.ps1` | 构建镜像并运行依赖检查、pytest、API smoke、Electron Xvfb smoke | 是 |
-| `api-smoke.sh` | 启动 `server.py`，校验 prerecorded API、图像 data URI 和 `execution_mode=prerecorded` | 间接使用 |
-| `electron-smoke.sh` | 在 Xvfb 下启动真实 Electron 主进程并检查 `/api/health` | 间接使用 |
-| `run-demo.sh` / `run-demo.ps1` | 启动容器内真实 Electron demo，并把窗口转发到宿主机显示 | 可选 |
-| `package-submission.sh` | 从 GitHub 新仓库 fresh clone 并生成源码压缩包 | 交付前使用 |
-| `run-demo-tailscale.*` | 容器内启动 Tailscale 后运行真实 Electron demo | 队伍真机演示 |
-| `run-demo-wslg-tailscale.*` | Windows + WSLg 下显示原生 Electron，并启用 Tailscale | 队伍真机演示推荐 |
-| `tailscale-login.*` | 手动浏览器登录 Tailscale，并把状态保存到 Docker volume | 队伍真机演示可选 |
-| `start-tailscale.sh` | 容器内部 Tailscale daemon 启动脚本 | 间接使用 |
+## 评委复现
 
-## 最小复现
+评委最小路径只需要：
+
+- `ubuntu-minimal.Dockerfile`
+- `repro.sh` / `repro.ps1`
+- `api-smoke.sh`
+- `electron-smoke.sh`
 
 Linux / WSL:
 
@@ -35,13 +29,14 @@ Windows PowerShell:
 deps-ok
 api-smoke-ok
 electron-smoke-ok
+[repro] reproducibility validation completed
 ```
 
-`api-smoke.sh` 默认要求重建图像解码后不少于 50000 bytes，并要求 `execution_mode` 为 `prerecorded`。如果 demo 图像退化为 1x1 占位图，复现会直接失败。
+`repro.*` 会构建镜像、安装 Python/Node/Electron/liboqs 依赖、运行最小 pytest 集、校验 prerecorded API 返回非空图像，并在 Xvfb 下启动真实 Electron 主进程。这里没有浏览器 preview 替代路径。
 
 ## 原生窗口
 
-Linux / WSL:
+需要在宿主机看到原生 Electron 窗口时使用：
 
 ```bash
 ./docker/run-demo.sh
@@ -53,31 +48,11 @@ Windows PowerShell:
 .\docker\run-demo.ps1
 ```
 
-`run-demo.*` 需要宿主机提供 X server。无显示环境下请使用 `repro.*`，它会在容器内用 Xvfb 做无头 Electron smoke。
+Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 VcXsrv 或 Xming。无显示环境请使用 `repro.*`，它会用 Xvfb 做无头 Electron smoke。
 
 ## Tailscale 真机链路
 
-无板卡复现不需要登录 Tailscale。需要让容器内 demo 直连下位机 Tailscale IP 时，使用：
-
-```bash
-./docker/tailscale-login.sh
-./docker/run-demo-tailscale.sh
-```
-
-Windows PowerShell:
-
-```powershell
-.\docker\tailscale-login.ps1
-.\docker\run-demo-tailscale.ps1
-```
-
-Windows + WSLg 推荐：
-
-```powershell
-.\docker\run-demo-wslg-tailscale.ps1
-```
-
-如果需要把板端 SSH 密码传给 live 路径，只通过当前 shell 环境变量传入：
+需要容器内 Electron 直连飞腾派时使用：
 
 ```powershell
 $env:REMOTE_PASS="..."
@@ -85,23 +60,59 @@ $env:PHYTIUM_PI_PASSWORD="..."
 .\docker\run-demo-wslg-tailscale.ps1
 ```
 
-使用 auth key 非交互登录时：
+也可以先登录 Tailscale，再启动：
 
-```bash
-export TS_AUTHKEY=tskey-auth-...
-./docker/run-demo-tailscale.sh
+```powershell
+.\docker\tailscale-login.ps1
+.\docker\run-demo-tailscale.ps1
 ```
 
-注意：
+Tailscale 状态保存在 Docker volume `iccomp-tailscale-state`。默认板端地址是 `100.121.87.73`，可以用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 覆盖。
 
-- auth key、板端密码、私钥只能通过环境变量传入，不能提交到仓库或写进 Dockerfile。
-- 登录状态保存在 Docker volume `iccomp-tailscale-state`。
-- 默认板端检查地址为 `100.121.87.73`，可用 `TAILSCALE_PING_TARGET=<新的 100.x 地址>` 覆盖。
+## 板端 CLI Smoke
+
+`run-board-cli-smoke.ps1` 用于验证本仓库里的板端推理产物是否足够自包含。脚本会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>` 目录，然后运行：
+
+- TVM CLI 推理
+- MNN CLI 推理
+- PyTorch CLI 推理
+
+执行：
+
+```powershell
+$env:REMOTE_PASS="..."
+.\docker\run-board-cli-smoke.ps1
+```
+
+预期最后一行：
+
+```text
+cli-smoke-ok
+```
+
+该脚本不会修改板端现有仓库，也不会向板端 conda 环境安装任何包；它只解压 `board_deps/runtime/` 中的便携运行时到新的隔离目录。
+
+## 依赖拉取
+
+需要从当前板端重新拉取运行产物时使用：
+
+```powershell
+$env:REMOTE_PASS="..."
+.\docker\pull-board-deps.ps1
+```
+
+对应 Linux / WSL 脚本是：
+
+```bash
+REMOTE_PASS=... bash docker/pull-board-deps.sh
+```
 
 ## 打包
+
+提交并推送本仓库后生成交付源码包：
 
 ```bash
 ./docker/package-submission.sh
 ```
 
-脚本默认从 `https://github.com/RUNZHI01/FINAL_WORK_ICCompetition2026.git` fresh clone 远端源码，校验本地 HEAD 与远端 HEAD 一致，然后生成 `iccomp2026-submission.tar.gz`。本交付仓库已经实物化 `Semantic-Communication/` 和 `liboqs/`，不再使用 submodule。
+脚本会从 `https://github.com/RUNZHI01/FINAL_WORK_ICCompetition2026.git` fresh clone 远端源码，校验本地 HEAD 与远端 HEAD 一致，然后生成 `iccomp2026-submission.tar.gz`。本仓库已经实物化 `Semantic-Communication/` 和 `liboqs/`，不再使用 submodule。
