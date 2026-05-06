@@ -67,7 +67,7 @@ bash board_deps/install-board-deps.sh
 
 ## 三路 CLI 性能复现
 
-推荐从仓库根目录运行 Docker 包装脚本。脚本会连接飞腾派，复制当前仓库到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在该隔离目录内运行 TVM、MNN、PyTorch 三条命令行推理路径。
+推荐从仓库根目录运行 Docker 包装脚本。完整 smoke 会连接飞腾派，复制当前仓库到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在该隔离目录内运行 TVM、MNN、PyTorch 三条命令行推理路径。
 
 Windows PowerShell:
 
@@ -92,6 +92,14 @@ cli-smoke-ok
 ```text
 RUN_ROOT/logs/demo-kpi-summary.json
 ```
+
+完整 smoke 是自包含复现路径，当前仓库压缩上传约 `421 MB`，一次完整隔离目录通常占用 `1.7 GB` 到 `2.0 GB`。如需反复测速，先用 `BOARD_CLI_REFRESH_CACHE=1` 跑一次完整 smoke，把板端依赖写入 `/home/user/iccomp_board_deps_cache`，之后改用快速入口：
+
+```powershell
+.\docker\run-board-cli-benchmark-fast.ps1
+```
+
+快速入口不重复上传 runtime、模型和输入大包，只同步代码层并复用板端缓存。
 
 KPI 口径与 Electron demo 比较卡片一致：
 

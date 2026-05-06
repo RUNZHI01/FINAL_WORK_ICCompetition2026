@@ -13,7 +13,8 @@
 | 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
 | 能连上飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | Electron 连板端的真机链路 |
-| 要复测板端性能 | `docker/run-board-cli-smoke.*` | TVM / MNN / PyTorch 三路结果和 `logs/demo-kpi-summary.json` |
+| 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
+| 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |
 
 ## demo 里有什么
 
@@ -108,7 +109,7 @@ Electron 界面里的板卡连接/授权区域会要求填写板卡 SSH 密码�
 
 ## 4. 板端三路性能复测
 
-如果评委要看板端实测数字，跑这一组脚本。它会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在隔离目录里跑 TVM、MNN、PyTorch 三条推理路径。
+如果评委要看板端实测数字，优先跑完整自包含 smoke。它会通过 Docker 内的 Tailscale 连接飞腾派，把当前仓库复制到板端新的隔离目录 `/home/user/iccomp_repo_selfcontained_<timestamp>`，然后在隔离目录里跑 TVM、MNN、PyTorch 三条推理路径。
 
 这和第 3 节的 Electron 真机 demo 不一样：CLI smoke 优先使用仓库内的 `board_deps/runtime`、`board_deps/tvm`、`board_deps/mnn`、`board_deps/inputs`，不要求板端已经存在 demo 使用的固定 `/home/user/Downloads/...` 目录结构。它适合复测性能数字，但不替代 Electron 真机 demo 的板端环境。
 
@@ -136,6 +137,27 @@ $env:BOARD_CLI_MAX_INPUTS="3"
 ```text
 cli-smoke-ok
 ```
+
+完整 smoke 会显示每个阶段的开始、结束和耗时，包括 Tailscale、远端目录创建、仓库上传、远端解包、三路 benchmark 和结果汇总。当前仓库按这条路径上传的压缩流约 `421 MB`，板端完整隔离目录通常占用 `1.7 GB` 到 `2.0 GB`。这是为了验证“干净板端可从仓库材料复现”，不适合作为日常反复测速入口。
+
+如果要反复测速度，先准备一次板端依赖缓存，然后使用快速入口：
+
+```powershell
+$env:BOARD_CLI_REFRESH_CACHE="1"
+.\docker\run-board-cli-smoke.ps1
+Remove-Item Env:BOARD_CLI_REFRESH_CACHE
+
+.\docker\run-board-cli-benchmark-fast.ps1
+```
+
+Linux / WSL:
+
+```bash
+BOARD_CLI_REFRESH_CACHE=1 bash docker/run-board-cli-smoke.sh
+bash docker/run-board-cli-benchmark-fast.sh
+```
+
+快速入口默认复用 `/home/user/iccomp_board_deps_cache/board_deps`，不再上传 `board_deps/runtime`、TVM/MNN/PyTorch 模型和输入大包，只同步代码覆盖层并软链接板端缓存。首次运行时会把缓存中的 Python runtime 解到 `/home/user/iccomp_board_deps_cache/runtime`；后续运行会复用该目录。快速入口默认只保留 `logs/`，会清理本次运行的临时 `repo/` 和 `work/`，避免持续占用板端空间。如需保留完整临时输出，可设置 `BOARD_CLI_FAST_KEEP_WORK=1`。
 
 KPI 汇总写在板端隔离目录的 `logs/demo-kpi-summary.json`。字段和 Electron 前端展示口径一致：
 

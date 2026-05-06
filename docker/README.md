@@ -1,6 +1,6 @@
 # Docker 入口说明
 
-本目录面向评委的入口是 `repro.*`、`run-demo.*`、`run-demo-wslg-tailscale.ps1` 和 `run-board-cli-smoke.*`。维护脚本单列在最后，评委完成复现通常不需要使用。
+本目录面向评委的入口是 `repro.*`、`run-demo.*`、`run-demo-wslg-tailscale.ps1` 和 `run-board-cli-smoke.*`。日常快速测速可使用 `run-board-cli-benchmark-fast.*`；维护脚本单列在最后，评委完成复现通常不需要使用。
 
 ## 基础复现
 
@@ -71,6 +71,39 @@ bash docker/run-board-cli-smoke.sh
 ```
 
 脚本通过 Docker 内 Tailscale 连接飞腾派，将当前仓库复制到新的 `/home/user/iccomp_repo_selfcontained_<timestamp>`，再运行 `board_deps/scripts/run-isolated-cli-smoke.sh`。默认每条路径处理 300 个输入；调试可设置 `BOARD_CLI_MAX_INPUTS=3`。
+
+该入口是完整自包含复现路径，会上传仓库内的板端 runtime、模型和输入。当前仓库的压缩传输流约 `421 MB`，完整运行后的板端隔离目录通常为 `1.7 GB` 到 `2.0 GB`。脚本会输出每个阶段的耗时，便于判断是在上传、解包还是推理阶段。
+
+如需为快速测速准备板端缓存，可在完整 smoke 前设置：
+
+```powershell
+$env:BOARD_CLI_REFRESH_CACHE="1"
+.\docker\run-board-cli-smoke.ps1
+```
+
+Linux / WSL:
+
+```bash
+BOARD_CLI_REFRESH_CACHE=1 bash docker/run-board-cli-smoke.sh
+```
+
+缓存默认写到 `/home/user/iccomp_board_deps_cache`。
+
+## 板端快速测速
+
+Windows PowerShell:
+
+```powershell
+.\docker\run-board-cli-benchmark-fast.ps1
+```
+
+Linux / WSL:
+
+```bash
+bash docker/run-board-cli-benchmark-fast.sh
+```
+
+快速入口要求板端已有 `/home/user/iccomp_board_deps_cache/board_deps`。它只上传代码覆盖层，不上传 `board_deps/runtime`、模型和输入大包；运行时把这些重依赖软链接到缓存目录。首次快速运行会在缓存下解出便携 Python runtime，后续复用该目录。默认只保留本次运行的 `logs/`，会清理临时 `repo/` 和 `work/`；需要保留完整输出时设置 `BOARD_CLI_FAST_KEEP_WORK=1`。
 
 性能口径与 Electron 前端一致：
 

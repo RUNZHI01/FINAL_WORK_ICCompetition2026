@@ -17,10 +17,15 @@ log() {
 runtime_dir_or_unpack() {
     local name="$1"
     local dir="${RUN_ROOT}/runtime/${name}"
+    local cache_dir="${BOARD_CLI_RUNTIME_CACHE:-}"
     local archive="${REPO_ROOT}/board_deps/runtime/${name}.tar.gz"
     local part_prefix="${archive}.part-"
     if [ -d "${dir}" ]; then
         printf '%s\n' "${dir}"
+        return
+    fi
+    if [ -n "${cache_dir}" ] && [ -d "${cache_dir}/${name}" ]; then
+        printf '%s\n' "${cache_dir}/${name}"
         return
     fi
     if [ -f "${archive}" ]; then
