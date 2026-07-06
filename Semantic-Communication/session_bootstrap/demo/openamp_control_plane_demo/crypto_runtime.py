@@ -1035,7 +1035,7 @@ def _derive_remote_server_script(
             relative_script = Path("scripts/tcp_server.py")
         return f"{remote_project_root.rstrip('/')}/{relative_script.as_posix()}"
 
-    return "~/tcp_server.py"
+    return "/home/user/tcp_server.py"
 
 
 def build_remote_crypto_server_command(

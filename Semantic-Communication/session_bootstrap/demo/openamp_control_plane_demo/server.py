@@ -4138,11 +4138,14 @@ class DashboardState:
 
     def _ensure_board_tcp_server_impl(self, board_access: BoardAccessConfig) -> None:
         """通过 SSH 检测板卡 tcp_server 是否运行，如果没有则启动它。"""
+        env_values_kill = board_access.build_env()
+        if str(first_config_value(env_values_kill, keys=("OPENAMP_DEMO_DISABLE_TCP_AUTOSTART",), default="")).strip().lower() in {"1", "true", "yes", "on"}:
+            return
         host = board_access.host
         user = board_access.user
         password = board_access.password
         ssh_port = board_access.port or "22"
-        env_values = board_access.build_env()
+        env_values = env_values_kill
         status_port = parse_int_config(
             first_config_value(env_values, keys=STATUS_PORT_KEYS),
             DEFAULT_STATUS_PORT,
@@ -4521,7 +4524,7 @@ class DashboardState:
                 t0 = time.monotonic()
                 daemon_result = mgr.send_image(
                     str(tmp_path),
-                    "crypto_test",
+                    test_job_id,
                     run_tvm=False,
                     expect_result=False,
                 )
