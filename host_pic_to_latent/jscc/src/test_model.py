@@ -13,6 +13,7 @@ from natsort import natsorted
 from multiprocessing import Pool, get_context
 import hashlib
 import logging
+import numpy as np
 from tqdm.auto import tqdm
 import sys
 import traceback
@@ -122,6 +123,7 @@ class TestModel(nn.Module):
                     checksum = hashlib.md5(q_tensor.numpy().tobytes()).hexdigest()
 
                     torch.save({
+                        'latent': y_cpu.float(),
                         'quant': q_tensor,
                         'scale': scale,
                         'zero_point': zero_point,
@@ -293,8 +295,17 @@ class TestModel(nn.Module):
             if torch.isnan(y_dequant).any():
                 raise ValueError("NaN values in dequantized tensor")
 
-            # 添加噪声
-            y_noisy = self.AWGNChannel(y_dequant.unsqueeze(0), snr)
+            channel_mode = os.environ.get("JSCC_CHANNEL_MODE", "sim-awgn").strip().lower()
+            if channel_mode in ("real-usrp", "none"):
+                latent_tensor = data.get('latent')
+                if latent_tensor is not None:
+                    y_input = latent_tensor.to(device).float()
+                    y_noisy = y_input if y_input.ndim == 4 else y_input.unsqueeze(0)
+                else:
+                    y_noisy = y_dequant.unsqueeze(0)
+            else:
+                # 添加仿真噪声；真实 USRP 模式下不要再次注入 AWGN
+                y_noisy = self.AWGNChannel(y_dequant.unsqueeze(0), snr)
 
             # 生成过程
             with torch.inference_mode():
