@@ -23,10 +23,10 @@ IQ 直传跳过量化、QPSK 调制、CRC/ARQ。8-bit 量化引入的等效噪�
 | RX sc16 → 同步/CFO/相位均衡 → noisy latent | 解调 | `AnalogLatentLink.py:decode` 含 robust CFO-grid fallback、mid-pilot 线性相位跟踪 | ✅ 完成 |
 | noisy latent → TVM/Generator 重建 | 端到端 | `scripts/tvm_inference_helper.py:apply_channel` 支持 `--channel-mode real-usrp`，跳过软件 AWGN | ⚠️ 单元通，未与 server 集成 |
 | `latent_transport.py` 支持 `.pt` raw latent | batch runner 直接吃 encoder 输出 | `scripts/latent_transport.py:_load_float32_latent` 已支持 `.pt/.npz/.npy/.bin`；同时修复了 `_torch_load` 未定义的潜伏 bug | ✅ 完成 |
-| **Server 端 IQ 模式分支** | openamp `server.py` 知道走 IQ 而不是 QPSK | `tcp_server.py` / `openamp_control_plane_demo/server.py` 完全不认识 `AnalogLatentLink` | ❌ 未开始 |
-| **双机 SSH/SCP 远端 RX** | TX 在控制机，RX 在板卡 | `RunAnalogLatentBatch.py` 当前 reject 除 `local` 外的 `--rx-capture-mode` | ❌ 未开始 |
+| **Server 端 IQ 模式分支** | openamp `server.py` 知道走 IQ 而不是 QPSK | `usrp_runtime.py` 加 `JSCC_LINK_MODE` 开关 + 31 个 `ANALOG_*` env 变量；`server.py` 通过 `env_or_arg_pairs` 透传；IQ 模式切到 `RunAnalogLatentBatch.py`，QPSK 路径不动 | ✅ 完成 |
+| **双机 SSH/SCP 远端 RX** | TX 在控制机，RX 在板卡 | `RunAnalogLatentBatch.py` 加 SSH ControlMaster + SCP 流程，支持 `local` / `remote-pull` / `remote-decode` 三档；TX 始终在控制机 | ✅ 完成（待真机回归） |
 | **真机硬件验证** | 线缆 + 30 dB 衰减器 → 近距离空口 | 仅软件 loopback 和 `simulate-channel` 注入 | ❌ 未开始 |
-| **Cockpit UI IQ 模式标识** | 用户能看到 `link_mode`、`sync_metric`、`evm_rms`、`estimated_cfo_hz` | UI 完全没有 IQ 字段 | ❌ 未开始 |
+| **Cockpit UI IQ 模式标识** | 用户能看到 `link_mode`、`sync_metric`、`evm_rms`、`estimated_cfo_hz` | `usrp_runtime.py` 在 wrapper_summary 加 `link_mode` + `iq_radio_metrics` 聚合；前端 `types.ts` 加 `JsccLinkMode` / `IqRadioMetrics` + extract helpers；`DashboardPageMinimal.tsx` 在 USRP 模式下渲染紫色 IQ 直传 / 橙色 QPSK 兜底 badge + 样本/同步率/sync/EVM/CFO 内联指标 | ✅ 完成（待真机回归） |
 | **控制面与数据面解耦** | ML-KEM 走控制面，latent 走 USRP，互不耦合 | `tcp_client.py`/`tcp_server.py` 当前既传 latent 字节又传 manifest | ⚠️ 已设计未实施 |
 
 ## 软件验证已通过的项目
@@ -54,16 +54,16 @@ IQ 直传跳过量化、QPSK 调制、CRC/ARQ。8-bit 量化引入的等效噪�
 
 ### P0 — 真机可跑
 
-1. **server.py 加 IQ 模式分支**（半天）。`Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py` 当前通过 SSH 调用板卡上的 `tcp_server.py`。IQ 模式下需要改成调用 `RunAnalogLatentBatch.py`。最简方案：加 `JSCC_LINK_MODE={qpsk|iq-direct}` 环境变量，IQ 模式下走完全不同的 `_send_image_via_usrp()` 路径，QPSK 路径不动。
-2. **RunAnalogLatentBatch 加 remote-pull / remote-decode**（1 天）。把 `usrp_runtime.py` 里现有的 SSH/SCP 双机流程搬过来，让 TX 在控制机、RX 在板卡也能跑。
+1. ~~**server.py 加 IQ 模式分支**~~ ✅ 已完成（2026-07-07）。`usrp_runtime.py` 加 `JSCC_LINK_MODE` env 开关，qpsk 走原路，iq-direct 切到 `RunAnalogLatentBatch.py`；31 个 `ANALOG_*` env 变量透传到 CLI。QPSK baseline 完整保留，见 `_resolve_link_mode()` 安全 fallback。
+2. ~~**RunAnalogLatentBatch 加 remote-pull / remote-decode**~~ ✅ 已完成（2026-07-07）。`RunAnalogLatentBatch.py` 重构 `process_image`，支持 SSH ControlMaster + SCP + 远端 Python decode；TX 始终在控制机，RX 在板卡。dry-run 软件回归通过：`sync_metric=0.99989`，`evm_rms=0.0155`，`latent_mse_vs_tx=2.3e-4`。
 3. **线缆 + 30 dB 衰减器实测**（半天-1 天）。这是真正暴露问题的环节：实际 DC offset、本振不锁的相位漂移、TX/RX gain 配对。从低 gain 起步。
 4. **近距离空口实测 + TX/RX gain 调优**（1-2 天）。
 
 ### P1 — 产品化
 
-5. **Cockpit UI 加 IQ badge**（半天）。`server.py` 状态接口加 `link_mode` 字段，UI 显示 `sync_metric` / `evm_rms` / `estimated_cfo_hz`。
+5. ~~**Cockpit UI 加 IQ badge**~~ ✅ 已完成（2026-07-07）。后端：`usrp_runtime.py` 在 `wrapper_summary` 加 `link_mode` + `iq_radio_metrics`（sync_metric/evm_rms/estimated_cfo_hz/sync_success_ratio 跨 round_records 聚合）；`diagnostics` 也加 `link_mode` 字段。前端：`types.ts` 加 `JsccLinkMode` / `IqRadioMetrics` 类型 + `extractJsccLinkMode/extractIqRadioMetrics` helper；`DashboardPageMinimal.tsx` 在 USRP 模式下渲染紫色 "IQ 直传" / 橙色 "QPSK 兜底" badge，附带样本/同步率/sync/EVM/CFO 内联指标。
 6. **`BuildOtaTools.sh` 决策**：等 IQ 直传稳定后，是否砍掉 QpskFileDecode target？目前两条并存。
-7. **远端 decode 路径**：当前 `RunAnalogLatentBatch` 只支持本机 RX + 本机 decode。两机模式下 RX 在板卡，decode 也在板卡，结果 npz scp 回控制机。
+7. ~~**远端 decode 路径**~~ ✅ 已合并到 P0-2：`RunAnalogLatentBatch.py` 的 `remote-decode` 模式调板卡上的 `AnalogLatentLink.py decode`，npz/wire/summary SCP 回控制机。
 
 ### P2 — 优化
 
@@ -76,6 +76,51 @@ IQ 直传跳过量化、QPSK 调制、CRC/ARQ。8-bit 量化引入的等效噪�
 - **clipping**：`sc16_amplitude=3000` 是猜的数字幅度，不等于 RF 输出功率。真机要看 EVM 随 amplitude 的曲线，找到不 clipping 的最大值。
 - **RX 输入功率**：NI-USRP-2922 RX 最大输入功率 0 dBm。线缆直连高 gain 会烧前端，必须加衰减器（≥30 dB）从低 gain 起步。
 - **量化 latent 兼容性**：当前 `AnalogLatentLink.load_latent` 对 `.pt` 强制要求 `'latent'` 字段。旧 `.pt`（只有 `quant/scale/zero_point`）会被 reject。如果遇到旧 latent，要么重跑 encoder 补 `latent` 字段，要么在 `AnalogLatentLink` 加 dequant fallback（不推荐，违背 IQ 直传跳量化的初衷）。
+
+## 2026-07-07 远端接收端现状核对
+
+仅做只读核对，目标主机：`100.121.87.73`（`user/user`）。
+
+- **远端实际运行目录不是 FINAL_WORK 仓库树。**
+  当前可直接确认在用的顶层文件/目录是：
+  - `/home/user/USRP292x`
+  - `/home/user/tvm_inference_helper.py`
+  - `/home/user/latent_transport.py`
+
+- **远端 `/home/user/USRP292x` 仍以 QPSK 链路为主。**
+  已确认存在：
+  - `/home/user/USRP292x/RunQpskFileBatchSpoolArq.py`
+  - `/home/user/USRP292x/QpskFileLink.py`
+
+  已确认不存在：
+  - `/home/user/USRP292x/AnalogLatentLink.py`
+  - `/home/user/USRP292x/RunAnalogLatentBatch.py`
+  - `/home/user/USRP292x/test_analog_latent_link.py`
+
+  结论：远端接收端 **尚未同步 IQ 直传 runner**，当前 USRP 数据面仍是 QPSK 主线。
+
+- **远端辅助脚本已部分更新。**
+  `/home/user/tvm_inference_helper.py` 已包含 `channel_mode` / `real-usrp` 分支；`/home/user/latent_transport.py` 已支持 `float32-raw` 与 `webp-lossless`。这说明 **推理辅助层与 wire blob 辅助层有更新**，但没有与 IQ 直传 USRP runner 一起成套落地。
+
+- **远端 encoder/test_model 仍是旧口径。**
+  发现的历史 repo 样本：
+  - `/home/user/iccomp_repo_cli_20260506_034850/repo/host_pic_to_latent/jscc/src/test_model.py`
+  - `/home/user/iccomp_repo_cli_20260506_035921/repo/host_pic_to_latent/jscc/src/test_model.py`
+
+  这批文件时间为 `2026-05-04`，内容仍以 `quant/scale/zero_point` 和反量化路径为主，未确认具备 FINAL_WORK 当前的 raw `latent` 保存与 `real-usrp` 消费逻辑。
+
+- **当前判断**
+  远端不是“完全没更新”，但状态是：
+  - `tvm_inference_helper.py` / `latent_transport.py` 有更新
+  - `USRP292x` 核心 runner 仍停留在 QPSK
+  - `test_model.py` 仍接近旧量化口径
+
+  因此远端接收端 **还不是一套完整可用的 IQ 直传接收环境**。
+
+- **后续同步原则**
+  1. 继续以 `FINAL_WORK_ICCompetition2026/FINAL_WORK_ICCompetition2026` 为唯一主修改面。
+  2. 真正同步远端前，先在本地 FINAL_WORK 内冻结一版 IQ 直传所需文件集合。
+  3. 远端同步时默认只做覆盖/新增，不主动删除远端历史文件；确需清理时单独审计。
 
 ## 软件验证复现命令
 
