@@ -22,7 +22,7 @@
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
 - `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
-- `USRP292x/`：NI USRP-2922 / N210 数据面脚本、UHD 示例封装和 QPSK/ARQ 工具。
+- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：原有 QPSK/CRC/ARQ 可靠字节链路（当前演示主力），以及新增的 analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，WIP，详见 `INTEGRATION_STATUS.md`）。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
 实际演示时主要分成三块：数据面负责把 latent 或现场输入送到板端；控制面负责下发任务、读取状态和收集日志；Electron 负责把链路状态、重建结果和耗时展示出来。
@@ -231,13 +231,41 @@ Electron 真机 demo 主要会用到下面这些板端路径：
 ```text
 FINAL_WORK_ICCompetition2026/
 ├── README.md
+├── INTEGRATION_STATUS.md      # IQ 直传路线当前集成状态和待办（WIP）
+├── JSCC_TRAN_HANDOFF.md       # jscc_tran 分支原始 handoff（PHY 设计参考）
 ├── requirements.txt
 ├── docker/                    # Docker 复现、Electron、Tailscale、板端 smoke 入口
 ├── board_deps/                # 板端固件、runtime、模型、输入和校验清单
-├── USRP292x/                  # NI USRP-2922 / N210 数据面工具
+├── USRP292x/                  # NI USRP-2922 / N210 数据面（QPSK + IQ 直传并存）
 ├── mlkem_link/                # ML-KEM / secure channel Python 包
 ├── scripts/                   # transport、run logger、TVM helper 和测试脚本
 ├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面和板端脚本
 ├── liboqs/                    # liboqs 源码，Docker 构建时编译安装
-└── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
+├── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
+└── docs/                      # analog latent-IQ PHY 设计与完整方案文档
 ```
+
+## 7. IQ 直传路线（WIP）
+
+`feat/iq-direct-tx` 分支新增的 analog latent-IQ 直传链路把链路从
+
+```text
+JSCC Enc → 实数 latent → QPSK Mod → Channel → QPSK Demod → 实数 latent → JSCC Dec
+```
+
+简化为
+
+```text
+JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC Dec
+```
+
+跳过量化、QPSK 调制、CRC/ARQ，让真实无线信道直接作用在语义 latent 上。
+
+当前阶段：
+
+- QPSK 链路保留为主力演示路径，所有现有入口（`docker/run-*`、Electron、CLI smoke）默认走 QPSK。
+- IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
+- Encoder/TVM helper/latent_transport 三处增量补丁已落地，对 QPSK 路径零破坏（默认行为不变，需通过 `JSCC_CHANNEL_MODE=real-usrp` 等环境变量激活）。
+- Server 端集成、双机 SSH/SCP、真机验证、UI 标识尚未开始。
+
+详细差距清单、待办优先级、风险点和软件验证命令见 [`INTEGRATION_STATUS.md`](./INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。
