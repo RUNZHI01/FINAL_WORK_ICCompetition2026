@@ -1024,29 +1024,32 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             )
             capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
 
-            # Stage tx_sc16 + manifest on the remote RX host if needed
+            # Stage only what the selected RX mode consumes on the remote host.
+            # remote-pull captures remotely but decodes locally, so only the
+            # RX output path needs to exist on the board.
             if mode in ("remote-pull", "remote-decode"):
                 remote_run_dir = build_remote_run_dir(args, image)
-                remote_tx = f"{remote_run_dir}/tx_analog.sc16"
-                remote_manifest = f"{remote_run_dir}/manifest.json"
                 remote_batch_rx = f"{remote_run_dir}/batch_rx.sc16"
-                run_remote_command(
-                    remote_target,
-                    ["mkdir", "-p", remote_run_dir],
-                    image.image_dir / "remote_mkdir.log",
-                    control_socket=ssh_control_socket,
-                    timeout=20.0,
-                )
-                push_file_to_remote(
-                    remote_target, tx_sc16, remote_tx,
-                    image.image_dir / "remote_push_tx.log",
-                    control_socket=ssh_control_socket,
-                )
-                push_file_to_remote(
-                    remote_target, manifest_path, remote_manifest,
-                    image.image_dir / "remote_push_manifest.log",
-                    control_socket=ssh_control_socket,
-                )
+                remote_tx = f"{remote_run_dir}/tx_analog.sc16" if mode == "remote-decode" else ""
+                remote_manifest = f"{remote_run_dir}/manifest.json" if mode == "remote-decode" else ""
+                if mode == "remote-decode":
+                    run_remote_command(
+                        remote_target,
+                        ["mkdir", "-p", remote_run_dir],
+                        image.image_dir / "remote_mkdir.log",
+                        control_socket=ssh_control_socket,
+                        timeout=20.0,
+                    )
+                    push_file_to_remote(
+                        remote_target, tx_sc16, remote_tx,
+                        image.image_dir / "remote_push_tx.log",
+                        control_socket=ssh_control_socket,
+                    )
+                    push_file_to_remote(
+                        remote_target, manifest_path, remote_manifest,
+                        image.image_dir / "remote_push_manifest.log",
+                        control_socket=ssh_control_socket,
+                    )
             else:
                 remote_batch_rx = str(batch_rx)
 

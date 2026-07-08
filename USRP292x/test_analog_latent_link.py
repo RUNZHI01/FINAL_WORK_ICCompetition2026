@@ -438,6 +438,160 @@ def test_process_image_wait_command_uses_rx_timeout_budget(tmp_path, monkeypatch
     assert wait_timeout >= 30.0
 
 
+def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-pull",
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    pushed: list[str] = []
+    pulled: list[str] = []
+    cleaned: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+        return 0
+
+    def fake_run_remote_command(_target, remote_argv, _log_path, **_kwargs):
+        raise AssertionError(f"remote-pull should not run SSH setup commands: {remote_argv}")
+
+    def fake_push_file_to_remote(_target, _local_path, remote_path, _log_path, **_kwargs):
+        pushed.append(remote_path)
+
+    def fake_pull_file_from_remote(_target, remote_path, local_path, _log_path, **_kwargs):
+        pulled.append(remote_path)
+        local_path.write_bytes(b"rx")
+
+    def fake_cleanup_remote_file(_target, remote_path, _log_path, **_kwargs):
+        cleaned.append(remote_path)
+        return True
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        return f"OK {line}"
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", fake_push_file_to_remote)
+    monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file", fake_cleanup_remote_file)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert pushed == []
+    assert pulled == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+    assert cleaned == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+
+
+def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+    remote_commands: list[list[str]] = []
+    pushed: list[str] = []
+    pulled: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_run_remote_command(_target, remote_argv, _log_path, **_kwargs):
+        remote_commands.append(remote_argv)
+        return subprocess.CompletedProcess(args=remote_argv, returncode=0, stdout="", stderr="")
+
+    def fake_push_file_to_remote(_target, _local_path, remote_path, _log_path, **_kwargs):
+        pushed.append(remote_path)
+
+    def fake_pull_file_from_remote(_target, remote_path, local_path, _log_path, **_kwargs):
+        pulled.append(remote_path)
+        if local_path.name == "decode_summary.json":
+            local_path.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+        else:
+            local_path.write_bytes(b"payload")
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        return f"OK {line}"
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", fake_push_file_to_remote)
+    monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert remote_commands[0] == ["mkdir", "-p", "/tmp/analog_runs/run42/image_0000"]
+    assert pushed == [
+        "/tmp/analog_runs/run42/image_0000/tx_analog.sc16",
+        "/tmp/analog_runs/run42/image_0000/manifest.json",
+    ]
+    assert "/tmp/analog_runs/run42/image_0000/batch_rx.sc16" not in pulled
+    assert pulled[-3:] == [
+        "/tmp/analog_runs/run42/image_0000/received_latent.npz",
+        "/tmp/analog_runs/run42/image_0000/merged_round0.bin",
+        "/tmp/analog_runs/run42/image_0000/decode_summary.json",
+    ]
+
+
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):
     latent = np.linspace(-1.0, 1.0, num=1 * 8 * 8 * 8, dtype=np.float32).reshape(1, 8, 8, 8)
     input_dir = tmp_path / "inputs"
