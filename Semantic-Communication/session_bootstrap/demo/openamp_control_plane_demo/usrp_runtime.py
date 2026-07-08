@@ -59,9 +59,14 @@ from latent_transport import (  # noqa: E402
 )
 
 DEFAULT_RUNNER = REPO_ROOT / "USRP292x" / "RunQpskFileBatchSpoolArq.py"
+DEFAULT_ANALOG_RUNNER = REPO_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
 DEFAULT_INPUT_DIR = REPO_ROOT / "USRP292x" / "payloads" / "finalwork_webp5"
 DEFAULT_INPUT_FILE = REPO_ROOT / "USRP292x" / "payloads" / "source_latent_wire_blob.bin"
 DEFAULT_RUN_ROOT = REPO_ROOT / "USRP292x" / "qpsk_batch_spool_arq_runs"
+DEFAULT_ANALOG_RUN_ROOT = REPO_ROOT / "USRP292x" / "analog_latent_runs"
+LINK_MODE_QPSK = "qpsk"
+LINK_MODE_IQ_DIRECT = "iq-direct"
+LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
     / "Semantic-Communication"
@@ -83,6 +88,35 @@ DECODE_WORKERS_KEYS = ("BATCH_DECODE_WORKERS",)
 CHUNK_BYTES_KEYS = ("CHUNK_BYTES",)
 FAST_ARQ_PROFILE_KEYS = ("USRP_FAST_ARQ_PROFILE",)
 STOP_ON_FAIL_KEYS = ("USRP_STOP_ON_FAIL",)
+# ── IQ 直传 (AnalogLatentLink) 参数 KEYS ──
+ANALOG_SPS_KEYS = ("ANALOG_SPS",)
+ANALOG_RRC_BETA_KEYS = ("ANALOG_RRC_BETA",)
+ANALOG_RRC_SPAN_KEYS = ("ANALOG_RRC_SPAN",)
+ANALOG_AMP_KEYS = ("AMPLITUDE", "ANALOG_AMPLITUDE")
+ANALOG_ZERO_GUARD_KEYS = ("ANALOG_ZERO_GUARD_SAMPLES",)
+ANALOG_TAIL_GUARD_KEYS = ("ANALOG_TAIL_GUARD_SAMPLES",)
+ANALOG_CFO_PILOT_KEYS = ("ANALOG_CFO_PILOT_SYMBOLS",)
+ANALOG_SYNC_PILOT_KEYS = ("ANALOG_SYNC_PILOT_SYMBOLS",)
+ANALOG_DATA_BLOCK_KEYS = ("ANALOG_DATA_BLOCK_SYMBOLS",)
+ANALOG_MID_PILOT_KEYS = ("ANALOG_MID_PILOT_SYMBOLS",)
+ANALOG_CAPTURE_MARGIN_KEYS = ("ANALOG_CAPTURE_MARGIN_SAMPLES",)
+ANALOG_RX_POST_QUANTIZE_KEYS = ("ANALOG_RX_POST_QUANTIZE",)
+ANALOG_ROBUST_SYNC_KEYS = ("ANALOG_ROBUST_SYNC",)
+ANALOG_MIN_SYNC_METRIC_KEYS = ("ANALOG_MIN_SYNC_METRIC",)
+ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
+ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
+ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
+ANALOG_SCRAMBLE_KEY_KEYS = ("ANALOG_SCRAMBLE_KEY",)
+ANALOG_SCRAMBLE_KEY_HEX_KEYS = ("ANALOG_SCRAMBLE_KEY_HEX",)
+ANALOG_SCRAMBLE_CONTEXT_KEYS = ("ANALOG_SCRAMBLE_CONTEXT",)
+ANALOG_SIM_CFO_HZ_KEYS = ("ANALOG_SIM_CFO_HZ",)
+ANALOG_SIM_SNR_DB_KEYS = ("ANALOG_SIM_SNR_DB",)
+ANALOG_SIM_GAIN_KEYS = ("ANALOG_SIM_GAIN",)
+ANALOG_SIM_PHASE_DEG_KEYS = ("ANALOG_SIM_PHASE_DEG",)
+ANALOG_SIM_PHASE_DRIFT_DEG_KEYS = ("ANALOG_SIM_PHASE_DRIFT_DEG",)
+ANALOG_SIM_DC_REAL_KEYS = ("ANALOG_SIM_DC_REAL",)
+ANALOG_SIM_DC_IMAG_KEYS = ("ANALOG_SIM_DC_IMAG",)
+ANALOG_SIM_SEED_KEYS = ("ANALOG_SIM_SEED",)
 TIMEOUT_SEC_KEYS = ("USRP_JOB_TIMEOUT_SEC", "MLKEM_USRP_JOB_TIMEOUT_SEC")
 LOCAL_LATENT_DIR_KEYS = ("OPENAMP_DEMO_LOCAL_LATENT_DIR", "MLKEM_USRP_SOURCE_LATENT_DIR", "USRP_SOURCE_LATENT_DIR")
 LOCAL_LATENT_PATTERN_KEYS = ("OPENAMP_DEMO_LOCAL_LATENT_PATTERN", "USRP_SOURCE_LATENT_PATTERN")
@@ -1335,6 +1369,81 @@ def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def _aggregate_iq_radio_metrics(summary: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate IQ-direct PHY metrics (sync_metric / evm_rms / estimated_cfo_hz /
+    estimated_snr_db / rx_clipping_ratio / latent_mse_vs_tx) across all images
+    in an AnalogLatentLink batch_spool_summary.json.
+
+    Returns {} if no IQ round records are found. Mean and max are reported so
+    the cockpit can show both typical and worst-case link health.
+    """
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return {}
+
+    field_names = (
+        "sync_metric",
+        "evm_rms",
+        "estimated_cfo_hz",
+        "estimated_snr_db",
+        "rx_clipping_ratio",
+        "latent_mse_vs_tx",
+    )
+    collected: dict[str, list[float]] = {name: [] for name in field_names}
+    sync_success_count = 0
+    total_records = 0
+
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list):
+            # IQ runner may put fields directly on the image record
+            records = [image]
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            total_records += 1
+            if record.get("sync_success"):
+                sync_success_count += 1
+            for name in field_names:
+                value = record.get(name)
+                if value is None:
+                    continue
+                try:
+                    collected[name].append(float(value))
+                except (TypeError, ValueError):
+                    pass
+
+    if total_records == 0:
+        return {}
+
+    def _mean(values: list[float]) -> float | None:
+        return (sum(values) / len(values)) if values else None
+
+    def _max(values: list[float]) -> float | None:
+        return max(values) if values else None
+
+    metrics: dict[str, Any] = {
+        "sample_count": total_records,
+        "sync_success_count": sync_success_count,
+        "sync_success_ratio": round(sync_success_count / total_records, 4),
+    }
+    for name in field_names:
+        values = collected[name]
+        if not values:
+            metrics[name] = {"mean": None, "max": None}
+            continue
+        # Truncate to avoid floating-point noise on the wire
+        mean_v = _mean(values)
+        max_v = _max(values)
+        metrics[name] = {
+            "mean": round(mean_v, 6) if mean_v is not None else None,
+            "max": round(max_v, 6) if max_v is not None else None,
+        }
+    return metrics
+
+
 def _count_processed_from_results(results: list[dict[str, Any]]) -> int:
     processed = 0
     for item in results:
@@ -1409,6 +1518,23 @@ def _resolve_usrp_job_timeout_sec(env_values: dict[str, str], *, expected_output
     return max(300.0, float(max(1, int(expected_outputs))) * 5.0)
 
 
+def _resolve_link_mode(env_values: dict[str, str]) -> str:
+    """Return normalized link mode: 'qpsk' (default) or 'iq-direct'.
+
+    Reads JSCC_LINK_MODE / OPENAMP_DEMO_LINK_MODE. Accepts case-insensitive
+    variants like 'iq', 'analog', 'iq-direct', 'qpsk', 'baseline'. Any unknown
+    value falls back to qpsk baseline (safe default — preserves prior behavior).
+    """
+    raw = str(_first_value(env_values, LINK_MODE_KEYS) or "").strip().lower()
+    if raw in ("iq-direct", "iq_direct", "iq", "analog", "analog-iq"):
+        return LINK_MODE_IQ_DIRECT
+    return LINK_MODE_QPSK
+
+
+def _is_iq_direct_mode(env_values: dict[str, str]) -> bool:
+    return _resolve_link_mode(env_values) == LINK_MODE_IQ_DIRECT
+
+
 class UsrpBatchSpoolJob:
     def __init__(
         self,
@@ -1471,6 +1597,9 @@ class UsrpBatchSpoolJob:
         self._summary_path = self._run_dir / "batch_spool_summary.json"
         self._log_path = self._run_dir / "cockpit_usrp.log"
         self._runner_path = Path(runner_path)
+        self._link_mode = _resolve_link_mode(env_values)
+        if self._link_mode == LINK_MODE_IQ_DIRECT and not _first_value(env_values, RUNNER_SCRIPT_KEYS):
+            self._runner_path = DEFAULT_ANALOG_RUNNER
         self._timeout_sec = _resolve_usrp_job_timeout_sec(env_values, expected_outputs=self._expected_outputs)
 
         self._run_dir.mkdir(parents=True, exist_ok=True)
@@ -1651,12 +1780,6 @@ class UsrpBatchSpoolJob:
             self._run_id,
             "--run-root",
             str(self._run_root),
-            "--max-arq-rounds",
-            str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
-            "--decode-backend",
-            _first_value(env_values, DECODE_BACKEND_KEYS, "cpp"),
-            "--cpp-sync-mode",
-            _first_value(env_values, CPP_SYNC_MODE_KEYS, "header"),
             "--artifact-mode",
             _first_value(env_values, ARTIFACT_MODE_KEYS, "minimal"),
             "--rx-control-host",
@@ -1686,10 +1809,22 @@ class UsrpBatchSpoolJob:
         chunk_bytes = _parse_int(_first_value(env_values, CHUNK_BYTES_KEYS), 0)
         if chunk_bytes > 0:
             command.extend(["--chunk-bytes", str(chunk_bytes)])
-        if _parse_bool(_first_value(env_values, FAST_ARQ_PROFILE_KEYS), False):
-            command.append("--fast-arq-profile")
         if _parse_bool(_first_value(env_values, STOP_ON_FAIL_KEYS), False):
             command.append("--stop-on-fail")
+
+        if self._link_mode == LINK_MODE_IQ_DIRECT:
+            command.extend(self._build_analog_link_args(env_values))
+        else:
+            command.extend([
+                "--max-arq-rounds",
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
+                "--decode-backend",
+                _first_value(env_values, DECODE_BACKEND_KEYS, "cpp"),
+                "--cpp-sync-mode",
+                _first_value(env_values, CPP_SYNC_MODE_KEYS, "header"),
+            ])
+            if _parse_bool(_first_value(env_values, FAST_ARQ_PROFILE_KEYS), False):
+                command.append("--fast-arq-profile")
 
         env = access.build_subprocess_env()
         env["PYTHONUNBUFFERED"] = "1"
@@ -1720,6 +1855,111 @@ class UsrpBatchSpoolJob:
             return
 
         self._wait_for_completion()
+
+    def _build_analog_link_args(self, env_values: dict[str, str]) -> list[str]:
+        """Build CLI args for RunAnalogLatentBatch.py (IQ-direct mode).
+
+        Reads ANALOG_* / AMPLITUDE / SIM_* env vars; falls back to runner defaults
+        by emitting nothing when the env var is unset (runner's argparse default
+        takes over). All numeric defaults live in RunAnalogLatentBatch.py.
+        """
+        args: list[str] = []
+        sps = _first_value(env_values, ANALOG_SPS_KEYS)
+        if sps:
+            args.extend(["--sps", str(_parse_int(sps, 4))])
+        rrc_beta = _first_value(env_values, ANALOG_RRC_BETA_KEYS)
+        if rrc_beta:
+            args.extend(["--rrc-beta", str(_parse_float(rrc_beta, 0.35))])
+        rrc_span = _first_value(env_values, ANALOG_RRC_SPAN_KEYS)
+        if rrc_span:
+            args.extend(["--rrc-span", str(_parse_int(rrc_span, 8))])
+        amp = _first_value(env_values, ANALOG_AMP_KEYS)
+        if amp:
+            args.extend(["--amp", str(_parse_int(amp, 3000))])
+        zero_guard = _first_value(env_values, ANALOG_ZERO_GUARD_KEYS)
+        if zero_guard:
+            args.extend(["--zero-guard-samples", str(_parse_int(zero_guard, 4096))])
+        tail_guard = _first_value(env_values, ANALOG_TAIL_GUARD_KEYS)
+        if tail_guard:
+            args.extend(["--tail-guard-samples", str(_parse_int(tail_guard, 4096))])
+        cfo_pilot = _first_value(env_values, ANALOG_CFO_PILOT_KEYS)
+        if cfo_pilot:
+            args.extend(["--cfo-pilot-symbols", str(_parse_int(cfo_pilot, 1024))])
+        sync_pilot = _first_value(env_values, ANALOG_SYNC_PILOT_KEYS)
+        if sync_pilot:
+            args.extend(["--sync-pilot-symbols", str(_parse_int(sync_pilot, 1024))])
+        data_block = _first_value(env_values, ANALOG_DATA_BLOCK_KEYS)
+        if data_block:
+            args.extend(["--data-block-symbols", str(_parse_int(data_block, 4096))])
+        mid_pilot = _first_value(env_values, ANALOG_MID_PILOT_KEYS)
+        if mid_pilot:
+            args.extend(["--mid-pilot-symbols", str(_parse_int(mid_pilot, 128))])
+        margin = _first_value(env_values, ANALOG_CAPTURE_MARGIN_KEYS)
+        if margin:
+            args.extend(["--capture-margin-samples", str(_parse_int(margin, 20000))])
+
+        rx_post_quantize_raw = _first_value(env_values, ANALOG_RX_POST_QUANTIZE_KEYS)
+        if rx_post_quantize_raw:
+            if _parse_bool(rx_post_quantize_raw, True):
+                args.append("--rx-post-quantize")
+            else:
+                args.append("--no-rx-post-quantize")
+
+        sync_candidates = _first_value(env_values, ANALOG_SYNC_CANDIDATES_KEYS)
+        if sync_candidates:
+            args.extend(["--sync-candidates", str(_parse_int(sync_candidates, 12))])
+        min_sync_metric = _first_value(env_values, ANALOG_MIN_SYNC_METRIC_KEYS)
+        if min_sync_metric:
+            args.extend(["--min-sync-metric", str(_parse_float(min_sync_metric, 0.25))])
+        robust_sync_raw = _first_value(env_values, ANALOG_ROBUST_SYNC_KEYS)
+        if robust_sync_raw:
+            if _parse_bool(robust_sync_raw, True):
+                args.append("--robust-sync")
+            else:
+                args.append("--no-robust-sync")
+        robust_cfo_max = _first_value(env_values, ANALOG_ROBUST_CFO_MAX_HZ_KEYS)
+        if robust_cfo_max:
+            args.extend(["--robust-cfo-max-hz", str(_parse_float(robust_cfo_max, 8000.0))])
+        robust_cfo_step = _first_value(env_values, ANALOG_ROBUST_CFO_STEP_HZ_KEYS)
+        if robust_cfo_step:
+            args.extend(["--robust-cfo-step-hz", str(_parse_float(robust_cfo_step, 500.0))])
+
+        scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
+        if scramble_key:
+            args.extend(["--scramble-key", str(scramble_key)])
+        scramble_key_hex = _first_value(env_values, ANALOG_SCRAMBLE_KEY_HEX_KEYS)
+        if scramble_key_hex:
+            args.extend(["--scramble-key-hex", str(scramble_key_hex)])
+        scramble_ctx = _first_value(env_values, ANALOG_SCRAMBLE_CONTEXT_KEYS)
+        if scramble_ctx:
+            args.extend(["--scramble-context", str(scramble_ctx)])
+
+        sim_cfo = _first_value(env_values, ANALOG_SIM_CFO_HZ_KEYS)
+        if sim_cfo:
+            args.extend(["--sim-cfo-hz", str(_parse_float(sim_cfo, 0.0))])
+        sim_snr = _first_value(env_values, ANALOG_SIM_SNR_DB_KEYS)
+        if sim_snr:
+            args.extend(["--sim-snr-db", str(_parse_float(sim_snr, 0.0))])
+        sim_gain = _first_value(env_values, ANALOG_SIM_GAIN_KEYS)
+        if sim_gain:
+            args.extend(["--sim-gain", str(_parse_float(sim_gain, 1.0))])
+        sim_phase = _first_value(env_values, ANALOG_SIM_PHASE_DEG_KEYS)
+        if sim_phase:
+            args.extend(["--sim-phase-deg", str(_parse_float(sim_phase, 0.0))])
+        sim_drift = _first_value(env_values, ANALOG_SIM_PHASE_DRIFT_DEG_KEYS)
+        if sim_drift:
+            args.extend(["--sim-phase-drift-deg", str(_parse_float(sim_drift, 0.0))])
+        sim_dc_real = _first_value(env_values, ANALOG_SIM_DC_REAL_KEYS)
+        if sim_dc_real:
+            args.extend(["--sim-dc-real", str(_parse_float(sim_dc_real, 0.0))])
+        sim_dc_imag = _first_value(env_values, ANALOG_SIM_DC_IMAG_KEYS)
+        if sim_dc_imag:
+            args.extend(["--sim-dc-imag", str(_parse_float(sim_dc_imag, 0.0))])
+        sim_seed = _first_value(env_values, ANALOG_SIM_SEED_KEYS)
+        if sim_seed:
+            args.extend(["--sim-seed", str(_parse_int(sim_seed, 1))])
+
+        return args
 
     def _set_transport_progress(self, summary: dict[str, Any]) -> None:
         self._transport_total = max(1, int(summary.get("target_count") or self._expected_outputs))
@@ -1962,6 +2202,7 @@ class UsrpBatchSpoolJob:
         merge_wall_sec_mean = float(summary.get("merge_wall_sec_mean") or 0.0)
         diagnostics = {
             "transport_mode": "usrp_batch_spool",
+            "link_mode": self._link_mode,
             "input_source_mode": self._input_source_mode,
             "input_source_label": self._input_source_label,
             "summary_path": str(self._summary_path),
@@ -2027,7 +2268,10 @@ class UsrpBatchSpoolJob:
             "radio_sample_count": int(summary.get("pass_count") or 0),
             "transport_benchmark": transport_benchmark,
             "inference_benchmark": inference_benchmark,
+            "link_mode": self._link_mode,
         }
+        if self._link_mode == LINK_MODE_IQ_DIRECT:
+            wrapper_summary["iq_radio_metrics"] = _aggregate_iq_radio_metrics(summary)
         if self._inference_summary:
             wrapper_summary["inference_engine"] = self._inference_engine
             wrapper_summary["inference_summary"] = self._inference_summary
@@ -2256,6 +2500,7 @@ class UsrpBatchSpoolJob:
 
         diagnostics = {
             "transport_mode": "usrp_batch_spool",
+            "link_mode": self._link_mode,
             "input_source_mode": self._input_source_mode,
             "input_source_label": self._input_source_label,
             "summary_path": str(self._summary_path),

@@ -309,6 +309,90 @@ export type InferenceProgressInfo = {
   event_log?: string[]
 }
 
+// ---------------------------------------------------------------------------
+// JSCC link mode (QPSK baseline vs IQ-direct analog latent)
+// ---------------------------------------------------------------------------
+
+export type JsccLinkMode = 'qpsk' | 'iq-direct'
+
+export type IqRadioMetricAggregate = {
+  mean?: number
+  max?: number
+}
+
+export type IqRadioMetrics = {
+  sample_count?: number
+  sync_success_count?: number
+  sync_success_ratio?: number
+  sync_metric?: IqRadioMetricAggregate
+  evm_rms?: IqRadioMetricAggregate
+  estimated_cfo_hz?: IqRadioMetricAggregate
+  estimated_snr_db?: IqRadioMetricAggregate
+  rx_clipping_ratio?: IqRadioMetricAggregate
+  latent_mse_vs_tx?: IqRadioMetricAggregate
+}
+
+function normalizeJsccLinkMode(value: unknown): JsccLinkMode | undefined {
+  if (value == null) return undefined
+  const raw = String(value).trim().toLowerCase()
+  if (raw === 'iq-direct' || raw === 'iq' || raw === 'analog') return 'iq-direct'
+  if (raw === 'qpsk') return 'qpsk'
+  return undefined
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
+}
+
+function asMetricAggregate(value: unknown): IqRadioMetricAggregate | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  const mean = asNumber(record.mean)
+  const max = asNumber(record.max)
+  if (mean == null && max == null) return undefined
+  const result: IqRadioMetricAggregate = {}
+  if (mean != null) result.mean = mean
+  if (max != null) result.max = max
+  return result
+}
+
+export function extractJsccLinkMode(summary: JsonObject | undefined): JsccLinkMode | undefined {
+  if (!summary) return undefined
+  return normalizeJsccLinkMode(summary.link_mode)
+}
+
+export function extractIqRadioMetrics(summary: JsonObject | undefined): IqRadioMetrics | undefined {
+  if (!summary) return undefined
+  const raw = summary.iq_radio_metrics
+  if (!raw || typeof raw !== 'object') return undefined
+  const record = raw as Record<string, unknown>
+  const sampleCount = asNumber(record.sample_count)
+  const syncSuccessCount = asNumber(record.sync_success_count)
+  const syncSuccessRatio = asNumber(record.sync_success_ratio)
+  const metrics: IqRadioMetrics = {}
+  if (sampleCount != null) metrics.sample_count = sampleCount
+  if (syncSuccessCount != null) metrics.sync_success_count = syncSuccessCount
+  if (syncSuccessRatio != null) metrics.sync_success_ratio = syncSuccessRatio
+  const syncMetric = asMetricAggregate(record.sync_metric)
+  const evmRms = asMetricAggregate(record.evm_rms)
+  const cfoHz = asMetricAggregate(record.estimated_cfo_hz)
+  const snrDb = asMetricAggregate(record.estimated_snr_db)
+  const rxClipping = asMetricAggregate(record.rx_clipping_ratio)
+  const latentMse = asMetricAggregate(record.latent_mse_vs_tx)
+  if (syncMetric) metrics.sync_metric = syncMetric
+  if (evmRms) metrics.evm_rms = evmRms
+  if (cfoHz) metrics.estimated_cfo_hz = cfoHz
+  if (snrDb) metrics.estimated_snr_db = snrDb
+  if (rxClipping) metrics.rx_clipping_ratio = rxClipping
+  if (latentMse) metrics.latent_mse_vs_tx = latentMse
+  return metrics
+}
+
 export type RunInferenceResponse = {
   status?: string
   execution_mode?: string

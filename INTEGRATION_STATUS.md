@@ -2,7 +2,25 @@
 
 记录 `feat/iq-direct-tx` 分支上 analog latent-IQ 直传链路相对于最终目标 `JSCC Enc → IQ → Channel → IQ → JSCC Dec` 的集成进度。给接手者一个明确的"哪些已 wire、哪些待办、风险在哪"的清单。
 
-本文件随实际进度更新。PHY 层设计原理见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`JSCC_TRAN_HANDOFF.md`](./JSCC_TRAN_HANDOFF.md)。
+本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)，PHY 层设计原理见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`JSCC_TRAN_HANDOFF.md`](./JSCC_TRAN_HANDOFF.md)。
+
+## 安全信道当前状态（2026-07-08）
+
+ML-KEM + SM2 + ML-DSA 控制面 **已端到端打通**，与 IQ 直传数据面相互独立：
+
+- 握手结果：`handshake_ms ≈ 1396.4`、`last_sha256_match=true`、`session_count=1`、`bytes_sent=131072`。
+- 策略：`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`（SM2 + ML-DSA 双签同时校验），默认启用。
+- 角色：容器（x86_64）= Initiator/client，飞腾派（aarch64）= Responder/server。
+- 入口：`scripts/start_server_auth.sh`（容器端，15 个 `MLKEM_AUTH_*` env 全配齐）。
+- 容器端 x86_64 SM2 桥接库已编译并验证（见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)）。
+
+剩余的安全面相关任务：
+
+- 容器健康检查脚本标准化（当前散落在 `/tmp/test_*.py`），需要落到 `scripts/`。
+- 板端 `tcp_server` 自启动已经在 server.py SSH 阶段拉起，但没有 systemd/开机自启，重启板卡需要重新拉。
+- `control_guard_state=PROBE_ERROR` 和 `board status endpoint unavailable: timed out` 是 OpenAMP 控制面心跳问题，**与 ML-KEM 数据面无关**，单独追踪。
+
+
 
 ## 目标链路对照
 
@@ -184,3 +202,26 @@ IQ 直传不修改这个划分，只替换数据面的具体实现：
 - IQ 直传相关 commit：
   - `feat: add IQ-direct analog latent TX path alongside QPSK baseline`（PHY + 三处增量补丁）
 - QPSK baseline 相关 commit：见 `main` 分支历史
+
+## 已知问题（Known Issues）
+
+| 模块 | 现象 | 影响范围 | 临时方案 |
+|---|---|---|---|
+| OpenAMP 控制面 | `control_guard_state=PROBE_ERROR`，`error: "board status endpoint unavailable: timed out"` | Cockpit Dashboard 控制面卡片变红，**不影响** ML-KEM 握手和 latent 数据面 | 重启 server.py 或忽略；与 ML-KEM 通道相互独立 |
+| 远端板端 USRP292x | `/home/user/USRP292x/` 仍是 QPSK 主线，没有 `AnalogLatentLink.py` / `RunAnalogLatentBatch.py` | IQ 直传模式切到板端会找不到 runner | 真机 IQ 实测前先把 FINAL_WORK 仓库的 `USRP292x/AnalogLatentLink.py`、`RunAnalogLatentBatch.py`、`test_analog_latent_link.py` 同步过去 |
+| 远端板端 test_model.py | `/home/user/iccomp_repo_cli_*/repo/host_pic_to_latent/jscc/src/test_model.py` 仍是 `quant/scale/zero_point` 旧口径 | 旧 encoder 输出不带 `'latent'` raw 字段，`AnalogLatentLink.load_latent` 会 reject | 用 FINAL_WORK 内的 test_model.py 重新跑 encoder |
+| 容器 x86_64 SM2 keygen | vanilla OpenSSL 3.0.2 不支持 SM2 keygen via `EVP_PKEY_Q_keygen("SM2")`，返回 `rc=-1` | 无法在容器内重新生成 SM2 keypair | keygen 在板端 Tongsuo 里完成；容器只验签 |
+| Tailscale SSH | 到 `100.121.87.73` 偶发超时 | 批量 SCP 失败 | 在控制机用 retry loop（3-5 次重试），或启用 SSH ControlMaster 复用连接 |
+
+## 2026-07-08 集成快照
+
+- ✅ ML-KEM `DUAL_REQUIRED` 握手打通（容器 → 板端，1.4 s 量级，SHA-256 校验通过）
+- ✅ 容器 x86_64 `libtongsuo_sig_bridge.so` 编译并加载通过（apt-get + gcc 一行命令）
+- ✅ `scripts/start_server_auth.sh` 入口（15 个 `MLKEM_AUTH_*` env 全配齐）
+- ✅ `mlkem_link/auth.py` 偏移 bug 已修复（commit 在 `feat/iq-direct-tx`）
+- ✅ IQ 直传 server 端 wire：`JSCC_LINK_MODE` 开关 + 31 个 `ANALOG_*` env
+- ✅ IQ 直传双机 SSH/SCP RX：`local` / `remote-pull` / `remote-decode` 三档
+- ✅ Cockpit UI IQ badge（紫色 IQ / 橙色 QPSK）
+- ⏳ IQ 直传真机线缆 + 30 dB 衰减器实测（待做）
+- ⏳ 远端 `/home/user/USRP292x/` 同步 IQ runner（待做）
+- ❌ OpenAMP 控制面 PROBE_ERROR（与 ML-KEM 数据面独立追踪）

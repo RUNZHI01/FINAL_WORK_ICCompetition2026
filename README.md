@@ -2,7 +2,7 @@
 
 这是第十届全国大学生集成电路创新创业大赛的源码和复现仓库。
 
-本项目是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo 负责安全信道。
+本项目是一套面向低空弱网场景的视觉回传 demo：上位机发起任务，图像侧走预录 latent 或现场输入，飞腾派板端用 TVM / MNN / PyTorch 做语义重建，OpenAMP 负责板端控制面，ML-KEM / Tongsuo / liboqs 负责安全信道（默认 `DUAL_REQUIRED`，SM2 + ML-DSA-65 双签）。
 
 复现时不需要再拉额外 submodule。源码、模型、板端 runtime、OpenAMP 固件、UHD images、输入样本和 Docker 脚本都已经随仓库放好，`Semantic-Communication/`、`liboqs/`、`board_deps/` 都是交付包的一部分。
 
@@ -20,7 +20,7 @@
 
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
-- `mlkem_link/`：ML-KEM 安全信道相关 Python 代码。
+- `mlkem_link/`：ML-KEM + SM2 + ML-DSA 安全信道 Python 包（kem、auth、kdf、secure_channel、session）。
 - `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
 - `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：原有 QPSK/CRC/ARQ 可靠字节链路（当前演示主力），以及新增的 analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，WIP，详见 `INTEGRATION_STATUS.md`）。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
@@ -222,11 +222,77 @@ Electron 真机 demo 主要会用到下面这些板端路径：
 /lib/firmware/openamp_core0.elf
 /boot/phytium-pi-board-v3-openamp.dtb
 /home/user/.openamp-demo/
+/home/user/keys/server_sm2_identity.key
+/home/user/keys/server_sm2_identity.pub
+/home/user/keys/server_mldsa_identity.key
+/home/user/keys/server_mldsa_identity.pub
 ```
 
 这些路径可以由 `board_deps/install-board-deps.sh` 从仓库内材料恢复。没有先准备这些文件时，Electron 界面仍可能启动，但 live 推理、OpenAMP 固件状态或安全信道相关功能可能会失败或回退。
 
-## 6. 仓库结构
+## 6. ML-KEM 安全信道（默认启用）
+
+控制面跑在 ML-KEM + Tongsuo SM2 + liboqs ML-DSA-65 之上，认证策略默认 `DUAL_REQUIRED`：每次握手同时校验 SM2 和 ML-DSA 两种签名，抗量子 + 国密合规一起拿。容器是 Initiator/client，飞腾派是 Responder/server。
+
+### 6.1 关键组件
+
+```text
+mlkem_link/                 # Python 包：kem / auth / kdf / secure_channel / session
+docker/tongsuo_kem_bridge.c # ML-KEM-768 KEM 桥接（Tongsuo → Python ctypes）
+docker/tongsuo_sig_bridge.c # SM2 签名桥接（Tongsuo → Python ctypes）
+board_deps/crypto/          # aarch64 板端 libtongsuo_sig_bridge.so / liboqs-dist / public_keys
+```
+
+容器端额外需要的 x86_64 桥接库（`libtongsuo_sig_bridge.so`、liboqs）由 Dockerfile 在镜像构建阶段编译到 `/opt/liboqs` 与 `/workspace/artifacts/crypto/`。
+
+### 6.2 容器内启动带认证的 server
+
+`scripts/start_server_auth.sh` 是带认证模式启动 server.py 的入口，已经把 15 个 `MLKEM_AUTH_*` 环境变量配齐：
+
+```bash
+# 容器内（推荐用 start_server_auth.sh，不要直接 export）
+bash /workspace/scripts/start_server_auth.sh
+```
+
+关键环境变量（已写在脚本里，无需手动设置）：
+
+| 变量 | 容器（x86_64） | 板端（aarch64） |
+|---|---|---|
+| `TONGSUO_SIG_BRIDGE` | `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so` | `/home/user/libtongsuo_sig_bridge.so` |
+| `MLKEM_REMOTE_TONGSUO_SIG_BRIDGE` | `/home/user/libtongsuo_sig_bridge.so`（板端路径） | — |
+| `OQS_INSTALL_PATH` | `/opt/liboqs` | `/home/user/liboqs-dist` |
+| `MLKEM_REMOTE_OQS_INSTALL` | `/home/user/liboqs-dist`（板端路径） | — |
+| `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | `DUAL_REQUIRED` |
+| `MLKEM_AUTH_ENABLED` | `1` | `1` |
+| `MLKEM_AUTH_SERVER_ID` | `phytium-board` | `phytium-board` |
+
+容器只验签不签发，所以容器的 SM2 私钥可以缺失，但容器必须能读到板端 SM2/ML-DSA **公钥**（`/workspace/keys/server_*_identity.pub`），用于校验板端发来的签名。
+
+### 6.3 验证 handshake
+
+```bash
+# 容器内
+python /workspace/Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py
+```
+
+成功时日志应包含 `handshake_ms ≈ 1400`、`last_sha256_match=true`、`session_count=1`、`auth_enabled=true`、`sig_policy=DUAL_REQUIRED`、`server_id=phytium-board`。
+
+### 6.4 容器 x86_64 SM2 桥接编译
+
+容器是 x86_64，不能直接用 `board_deps/crypto/libtongsuo_sig_bridge.so`（aarch64 二进制）。Dockerfile 已经处理这部分，但如果需要重新编译：
+
+```bash
+# 容器内
+apt-get install -y libssl-dev
+gcc -O2 -fPIC -shared /workspace/docker/tongsuo_sig_bridge.c \
+  -o /workspace/artifacts/crypto/libtongsuo_sig_bridge.so -lcrypto
+```
+
+编译输出会有 `EC_KEY_*` deprecation 警告，无害。Ubuntu 22.04 自带的 vanilla OpenSSL 3.0.2 支持 SM2 sign/verify（走 deprecated `EC_KEY` 路径），**但不支持** SM2 keygen via `EVP_PKEY_Q_keygen("SM2")`，调用会返回 `rc=-1`。这不影响容器使用，因为容器只验签，keygen 在板端 Tongsuo 里完成。
+
+详细部署指南、典型故障和健康检查脚本见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)。
+
+## 7. 仓库结构
 
 ```text
 FINAL_WORK_ICCompetition2026/
@@ -242,10 +308,10 @@ FINAL_WORK_ICCompetition2026/
 ├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面和板端脚本
 ├── liboqs/                    # liboqs 源码，Docker 构建时编译安装
 ├── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
-└── docs/                      # analog latent-IQ PHY 设计与完整方案文档
+└── docs/                      # analog latent-IQ PHY 设计、ML-KEM 部署、完整方案文档
 ```
 
-## 7. IQ 直传路线（WIP）
+## 8. IQ 直传路线（WIP）
 
 `feat/iq-direct-tx` 分支新增的 analog latent-IQ 直传链路把链路从
 
@@ -263,9 +329,12 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 
 当前阶段：
 
-- QPSK 链路保留为主力演示路径，所有现有入口（`docker/run-*`、Electron、CLI smoke）默认走 QPSK。
+- QPSK 链路保留为主力演示路径，所有现有入口（`docker/run-*`、Electron、CLI smoke）默认走 QPSK。`JSCC_LINK_MODE` 环境变量是切换开关：`qpsk`（默认）走原路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
 - IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
 - Encoder/TVM helper/latent_transport 三处增量补丁已落地，对 QPSK 路径零破坏（默认行为不变，需通过 `JSCC_CHANNEL_MODE=real-usrp` 等环境变量激活）。
-- Server 端集成、双机 SSH/SCP、真机验证、UI 标识尚未开始。
+- Server 端 `JSCC_LINK_MODE` 开关、双机 SSH/SCP 远端 RX（`local` / `remote-pull` / `remote-decode` 三档）、Cockpit UI 紫色 IQ badge / 橙色 QPSK 兜底 badge 全部 wire 完成。
+- ML-KEM 安全信道（见第 6 节）已经独立可用，`DUAL_REQUIRED` 默认启用，handshake 在 1.4 s 量级、SHA-256 校验通过。
+- 仍未做：真机线缆 + 30 dB 衰减器实测、TX/RX gain 配对调优、远端 `/home/user/USRP292x/` 同步 IQ runner（当前板端 USRP292x 仍是 QPSK 主线）。
+- 已知 OpenAMP 控制面问题：`control_guard_state=PROBE_ERROR`、`board status endpoint unavailable: timed out`，与 ML-KEM 数据面相互独立，不影响握手和加密通道本身。
 
 详细差距清单、待办优先级、风险点和软件验证命令见 [`INTEGRATION_STATUS.md`](./INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。

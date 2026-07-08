@@ -14,13 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -146,6 +147,26 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def _validate_rx_capture_config(args: argparse.Namespace) -> None:
+    """Sanity-check rx-capture-mode against rx-control-host before doing work.
+
+    Catch the common mistake of selecting --rx-capture-mode=remote-pull/remote-decode
+    but forgetting to override --rx-control-host away from 127.0.0.1, which would
+    send the CAPTURE command to a local RX server with a remote-only file path.
+    """
+    mode = str(getattr(args, "rx_capture_mode", "local") or "local").strip().lower()
+    if mode == "local":
+        return
+    host = str(getattr(args, "rx_control_host", "") or "").strip().lower()
+    local_hosts = {"127.0.0.1", "localhost", "::1", ""}
+    if host in local_hosts:
+        raise SystemExit(
+            f"--rx-capture-mode={mode} requires --rx-control-host to point at the "
+            f"remote RX host (got {host or '<empty>'!r}). "
+            f"Override with --rx-control-host <board-ip> or RX_CONTROL_HOST env."
+        )
+
+
 def load_inputs(args: argparse.Namespace) -> list[Path]:
     if args.input is not None:
         paths = [args.input]
@@ -222,6 +243,191 @@ def run_control(host: str, port: int, line: str, log_path: Path, timeout: float)
     if not response.startswith("OK"):
         raise RuntimeError(f"control command failed: {line}\n{response}")
     return response
+
+
+# ── SSH/SCP helpers for remote-pull / remote-decode modes ──
+# Mirrors RunQpskFileBatchSpoolArq.py: uses sshpass when SSHPASS is set,
+# falls back to BatchMode=yes otherwise. Control master multiplexes auth.
+
+
+def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list[str]:
+    sshpass = os.environ.get("SSHPASS")
+    if sshpass is not None:
+        args = ["sshpass", "-e", "ssh", "-o", f"ConnectTimeout={timeout}"]
+    else:
+        args = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={timeout}"]
+    if control_socket:
+        args += ["-o", f"ControlPath={control_socket}", "-o", "ControlMaster=no"]
+    return args
+
+
+def _scp_base_args(timeout: int = 10, control_socket: str | None = None) -> list[str]:
+    sshpass = os.environ.get("SSHPASS")
+    if sshpass is not None:
+        args = ["sshpass", "-e", "scp", "-o", f"ConnectTimeout={timeout}"]
+    else:
+        args = ["scp", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={timeout}"]
+    if control_socket:
+        args += ["-o", f"ControlPath={control_socket}", "-o", "ControlMaster=no"]
+    return args
+
+
+def _ssh_control_socket_path() -> str:
+    return f"/tmp/usrp_analog_ssh_ctrl_{os.getpid()}"
+
+
+def _ssh_start_control_master(target: str) -> subprocess.Popen | None:
+    if not target:
+        return None
+    sock = _ssh_control_socket_path()
+    subprocess.run(
+        ["ssh", "-O", "exit", "-S", sock, target],
+        capture_output=True,
+        timeout=5,
+    )
+    try:
+        os.unlink(sock)
+    except FileNotFoundError:
+        pass
+    base = _ssh_base_args(timeout=15)
+    cmd = base + [
+        "-o", f"ControlPath={sock}",
+        "-o", "ControlMaster=yes",
+        "-o", "ControlPersist=300",
+        "-o", "ServerAliveInterval=30",
+        "-N",
+        target,
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(100):
+        if os.path.exists(sock):
+            return proc
+        time.sleep(0.1)
+    proc.terminate()
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+    return None
+
+
+def _run_external(cmd: list[str], log_path: Path, *, check: bool = True, timeout: float = 60.0) -> subprocess.CompletedProcess[str]:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        cmd,
+        cwd=PROJECT_ROOT,
+        env=os.environ.copy(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        timeout=timeout,
+    )
+    log_path.write_text(proc.stdout, encoding="utf-8")
+    if check and proc.returncode != 0:
+        raise RuntimeError(
+            f"command failed ({proc.returncode}): {' '.join(cmd)}\n{proc.stdout}"
+        )
+    return proc
+
+
+def _remote_path(target: str, remote_path: str) -> str:
+    return f"{target}:{remote_path}"
+
+
+def push_file_to_remote(
+    target: str,
+    local_path: Path,
+    remote_path: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    timeout: int = 30,
+) -> None:
+    cmd = _scp_base_args(timeout=timeout, control_socket=control_socket)
+    cmd += [str(local_path), _remote_path(target, remote_path)]
+    _run_external(cmd, log_path, check=True, timeout=timeout + 5)
+
+
+def pull_file_from_remote(
+    target: str,
+    remote_path: str,
+    local_path: Path,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    timeout: int = 60,
+) -> None:
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = _scp_base_args(timeout=timeout, control_socket=control_socket)
+    cmd += [_remote_path(target, remote_path), str(local_path)]
+    _run_external(cmd, log_path, check=True, timeout=timeout + 5)
+    if not local_path.is_file():
+        raise RuntimeError(f"remote pull succeeded but local file missing: {local_path}")
+
+
+def run_remote_command(
+    target: str,
+    remote_argv: list[str],
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    timeout: float = 120.0,
+) -> subprocess.CompletedProcess[str]:
+    """Run a shell-quoted command on the remote host via SSH."""
+    remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
+    full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
+    return _run_external(full, log_path, check=True, timeout=timeout)
+
+
+def cleanup_remote_file(
+    target: str,
+    remote_path: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    if not remote_path:
+        return False
+    remote_cmd = "bash -lc " + shlex.quote(f"rm -f {shlex.quote(remote_path)}")
+    full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
+    try:
+        _run_external(full, log_path, check=True, timeout=15.0)
+        return True
+    except RuntimeError:
+        return False
+
+
+def build_remote_run_dir(args: argparse.Namespace, image: ImageRecord) -> str:
+    """Remote directory under --remote-rx-run-root for this image."""
+    root = str(args.remote_rx_run_root).rstrip("/")
+    return f"{root}/{args.run_id}/image_{image.index:04d}"
+
+
+def remote_python_for_decode(args: argparse.Namespace) -> str:
+    """Pick the Python interpreter for remote AnalogLatentLink decode.
+
+    Order: REMOTE_DECODE_PYTHON env → /usr/bin/python3 → python3.
+    """
+    py = os.environ.get("REMOTE_DECODE_PYTHON", "").strip()
+    if py:
+        return py
+    return "python3"
+
+
+def remote_analog_link_path(args: argparse.Namespace) -> str:
+    """Remote path to AnalogLatentLink.py for remote-decode mode.
+
+    Defaults to <REMOTE_USRP_PROJECT_ROOT>/USRP292x/AnalogLatentLink.py.
+    Override with REMOTE_ANALOG_LINK_PATH env for ad-hoc testing.
+    """
+    env_override = os.environ.get("REMOTE_ANALOG_LINK_PATH", "").strip()
+    if env_override:
+        return env_override
+    project_root = os.environ.get(
+        "REMOTE_USRP_PROJECT_ROOT", "/home/user/iccomp_repo_selfcontained"
+    ).rstrip("/")
+    return f"{project_root}/USRP292x/AnalogLatentLink.py"
 
 
 def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> list[str]:
@@ -361,6 +567,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     out_wire = image.image_dir / "merged_round0.bin"
     decode_summary = image.image_dir / "decode_summary.json"
 
+    ssh_control_socket: str | None = None
+    ssh_master_proc: subprocess.Popen | None = None
+    remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
+
     try:
         make_started = time.monotonic()
         run_command(analog_make_args(args, image, tx_sc16, manifest_path), image.image_dir / "make.log")
@@ -377,24 +587,70 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 shutil.copy2(tx_sc16, batch_rx)
             rx_capture_wall_sec = 0.0
             tx_wall_sec = 0.0
+            decode_started = time.monotonic()
+            proc = run_command(
+                analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
+                image.image_dir / "decode.log",
+                check=False,
+            )
+            decode_wall_sec = time.monotonic() - decode_started
+            image.status = int(proc.returncode)
+            image.passed = proc.returncode == 0 and out_wire.is_file() and decode_summary.is_file()
+            if not image.passed:
+                image.error = f"analog decode failed with status {proc.returncode}"
         else:
-            if args.rx_capture_mode != "local":
-                raise RuntimeError(
-                    "RunAnalogLatentBatch.py currently supports --rx-capture-mode=local for real RF; "
-                    f"got {args.rx_capture_mode}"
-                )
+            mode = str(args.rx_capture_mode or "local").strip().lower()
+            if mode not in ("local", "remote-pull", "remote-decode"):
+                raise RuntimeError(f"unsupported --rx-capture-mode: {mode}")
+            if mode in ("remote-pull", "remote-decode"):
+                if not remote_target:
+                    raise RuntimeError(
+                        f"--rx-capture-mode={mode} requires --remote-rx-ssh-target (e.g. user@100.x.y.z)"
+                    )
+                ssh_master_proc = _ssh_start_control_master(remote_target)
+                ssh_control_socket = _ssh_control_socket_path() if ssh_master_proc else None
+
             capture_nsamps = int(manifest["capture_nsamps"])
             capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
+
+            # Stage tx_sc16 + manifest on the remote RX host if needed
+            if mode in ("remote-pull", "remote-decode"):
+                remote_run_dir = build_remote_run_dir(args, image)
+                remote_tx = f"{remote_run_dir}/tx_analog.sc16"
+                remote_manifest = f"{remote_run_dir}/manifest.json"
+                remote_batch_rx = f"{remote_run_dir}/batch_rx.sc16"
+                run_remote_command(
+                    remote_target,
+                    ["mkdir", "-p", remote_run_dir],
+                    image.image_dir / "remote_mkdir.log",
+                    control_socket=ssh_control_socket,
+                    timeout=20.0,
+                )
+                push_file_to_remote(
+                    remote_target, tx_sc16, remote_tx,
+                    image.image_dir / "remote_push_tx.log",
+                    control_socket=ssh_control_socket,
+                )
+                push_file_to_remote(
+                    remote_target, manifest_path, remote_manifest,
+                    image.image_dir / "remote_push_manifest.log",
+                    control_socket=ssh_control_socket,
+                )
+            else:
+                remote_batch_rx = str(batch_rx)
+
             rx_started = time.monotonic()
+            # Tell RX-side OtaRxPersistentServer to capture (rx_control_host points at RX)
             run_control(
                 args.rx_control_host,
                 args.rx_control_port,
-                f"CAPTURE file={batch_rx} duration=0 nsamps={capture_nsamps}",
+                f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration=0 nsamps={capture_nsamps}",
                 image.image_dir / "rx_capture.log",
                 capture_timeout,
             )
             time.sleep(max(0.0, float(args.tx_delay_sec)))
             tx_started = time.monotonic()
+            # TX is always local — local OtaTxPersistentServer sends the locally-generated tx_sc16
             run_control(
                 args.tx_control_host,
                 args.tx_control_port,
@@ -412,17 +668,102 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             )
             rx_capture_wall_sec = time.monotonic() - rx_started
 
-        decode_started = time.monotonic()
-        proc = run_command(
-            analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
-            image.image_dir / "decode.log",
-            check=False,
-        )
-        decode_wall_sec = time.monotonic() - decode_started
-        image.status = int(proc.returncode)
-        image.passed = proc.returncode == 0 and out_wire.is_file() and decode_summary.is_file()
-        if not image.passed:
-            image.error = f"analog decode failed with status {proc.returncode}"
+            if mode == "remote-pull":
+                pull_file_from_remote(
+                    remote_target, remote_batch_rx, batch_rx,
+                    image.image_dir / "rx_pull.log",
+                    control_socket=ssh_control_socket,
+                    timeout=int(capture_timeout + 60),
+                )
+
+            decode_started = time.monotonic()
+            if mode == "remote-decode":
+                # Run AnalogLatentLink.py decode on the remote host, then pull results back.
+                remote_npz = f"{remote_run_dir}/received_latent.npz"
+                remote_wire = f"{remote_run_dir}/merged_round0.bin"
+                remote_summary = f"{remote_run_dir}/decode_summary.json"
+                remote_argv = [
+                    remote_python_for_decode(args),
+                    remote_analog_link_path(args),
+                    "decode",
+                    "--rx-sc16", remote_batch_rx,
+                    "--manifest", remote_manifest,
+                    "--out-npz", remote_npz,
+                    "--out-wire", remote_wire,
+                    "--summary-json", remote_summary,
+                    "--sync-candidates", str(args.sync_candidates),
+                    "--min-sync-metric", str(args.min_sync_metric),
+                    "--robust-cfo-max-hz", str(args.robust_cfo_max_hz),
+                    "--robust-cfo-step-hz", str(args.robust_cfo_step_hz),
+                ]
+                remote_argv.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
+                if args.scramble_key:
+                    remote_argv.extend(["--scramble-key", str(args.scramble_key)])
+                if args.scramble_key_hex:
+                    remote_argv.extend(["--scramble-key-hex", str(args.scramble_key_hex)])
+                if args.scramble_context:
+                    remote_argv.extend(["--scramble-context", str(args.scramble_context)])
+                # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
+                # happens at capture time, not decode time. Remote decode reads what was captured.
+                run_remote_command(
+                    remote_target,
+                    remote_argv,
+                    image.image_dir / "remote_decode.log",
+                    control_socket=ssh_control_socket,
+                    timeout=max(120.0, capture_timeout),
+                )
+                # Pull npz/wire/summary back to local image_dir paths
+                pull_file_from_remote(
+                    remote_target, remote_npz, out_npz,
+                    image.image_dir / "remote_pull_npz.log",
+                    control_socket=ssh_control_socket,
+                    timeout=60,
+                )
+                pull_file_from_remote(
+                    remote_target, remote_wire, out_wire,
+                    image.image_dir / "remote_pull_wire.log",
+                    control_socket=ssh_control_socket,
+                    timeout=60,
+                )
+                pull_file_from_remote(
+                    remote_target, remote_summary, decode_summary,
+                    image.image_dir / "remote_pull_summary.log",
+                    control_socket=ssh_control_socket,
+                    timeout=30,
+                )
+                decode_wall_sec = time.monotonic() - decode_started
+                image.status = 0 if (out_wire.is_file() and decode_summary.is_file()) else 1
+                image.passed = out_wire.is_file() and decode_summary.is_file()
+                if not image.passed:
+                    image.error = "remote decode completed but expected outputs are missing"
+            else:
+                # local + remote-pull: decode locally
+                proc = run_command(
+                    analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
+                    image.image_dir / "decode.log",
+                    check=False,
+                )
+                decode_wall_sec = time.monotonic() - decode_started
+                image.status = int(proc.returncode)
+                image.passed = proc.returncode == 0 and out_wire.is_file() and decode_summary.is_file()
+                if not image.passed:
+                    image.error = f"analog decode failed with status {proc.returncode}"
+
+            # Remote cleanup — best effort, do not fail the run on cleanup errors
+            if mode in ("remote-pull", "remote-decode"):
+                for remote_file in (
+                    remote_batch_rx, remote_tx, remote_manifest,
+                    remote_npz if mode == "remote-decode" else "",
+                    remote_wire if mode == "remote-decode" else "",
+                    remote_summary if mode == "remote-decode" else "",
+                ):
+                    if remote_file:
+                        cleanup_remote_file(
+                            remote_target, remote_file,
+                            image.image_dir / f"remote_cleanup_{PurePosixPath(remote_file).name}.log",
+                            control_socket=ssh_control_socket,
+                        )
+
         summary_data = read_json(decode_summary) if decode_summary.is_file() else {}
         image.records.append({
             "round": 0,
@@ -432,6 +773,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "manifest": str(manifest_path),
             "merged_bin": str(out_wire),
             "decode_summary": str(decode_summary),
+            "rx_capture_mode": str(args.rx_capture_mode),
+            "remote_rx_ssh_target": remote_target or None,
             "waveform_samples": int(manifest.get("tx_waveform_samples") or 0),
             "capture_nsamps": int(manifest.get("capture_nsamps") or 0),
             "detected_airtime_ms": summary_data.get("detected_airtime_ms"),
@@ -462,11 +805,22 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
         })
+    finally:
+        if ssh_master_proc is not None:
+            try:
+                ssh_master_proc.terminate()
+                ssh_master_proc.wait(timeout=3)
+            except (subprocess.TimeoutExpired, OSError):
+                try:
+                    ssh_master_proc.kill()
+                except OSError:
+                    pass
     return image
 
 
 def main() -> int:
     args = parse_args()
+    _validate_rx_capture_config(args)
     inputs = load_inputs(args)
     run_dir = args.run_root / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)

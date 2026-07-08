@@ -22,6 +22,13 @@ import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
 import type { BatchStageProgress } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
+import {
+  extractIqRadioMetrics,
+  extractJsccLinkMode,
+  type IqRadioMetrics,
+  type JsccLinkMode,
+  type JsonObject,
+} from '../api/types'
 import s from './DashboardPageMinimal.module.css'
 
 const LIVE_LOG_ACTIONS = ['Processing block', 'Allocating memory', 'Optimizing tensor', 'Compiling kernel', 'Syncing device']
@@ -222,7 +229,7 @@ export function DashboardPageMinimal() {
   const chinaTheater = useAppStore((s) => s.chinaTheater)
   const setChinaTheater = useAppStore((s) => s.setChinaTheater)
   const [boardPassword, setBoardPassword] = useState('')
-  const [authEnabled, setAuthEnabled] = useState(false)
+  const [authEnabled, setAuthEnabled] = useState(true)
   const [authSigPolicy, setAuthSigPolicy] = useState<AuthSigPolicy>('DUAL_REQUIRED')
   const [authDirty, setAuthDirty] = useState(false)
   const [batchCount, setBatchCount] = useState<number>(300)
@@ -493,6 +500,10 @@ export function DashboardPageMinimal() {
   const pendingTransportMode = boardAccessMut.variables?.transport_mode
     ? normalizeTransportMode(boardAccessMut.variables.transport_mode)
     : undefined
+  const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
+  const activeLinkMode: JsccLinkMode | undefined = extractJsccLinkMode(currentWrapperSummary)
+  const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
+  const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : activeLinkMode === 'qpsk' ? 'QPSK 兜底' : '链路未触发'
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
   const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
     ? '20 张快演'
@@ -890,6 +901,61 @@ export function DashboardPageMinimal() {
                       当前: {activeTransport === 'usrp' ? 'USRP' : '预录'}
                     </div>
                   </div>
+                  {activeTransport === 'usrp' && (
+                    <div className={s.linkModeRow}>
+                      <div
+                        className={`${s.linkModeBadge} ${activeLinkMode === 'iq-direct' ? s.linkModeBadgeIq : s.linkModeBadgeQpsk}`}
+                        title={
+                          activeLinkMode === 'iq-direct'
+                            ? 'IQ 直传链路：JSCC 论文实现，latent 直接以模拟 IQ 波形发射，无量化编码。'
+                            : activeLinkMode === 'qpsk'
+                              ? 'QPSK 兜底链路：工程兜底方案，量化 latent 经 QPSK 调制 + ARQ 重传。'
+                              : '尚未触发推理；启动一次推理后这里会显示当前 JSCC 链路。'
+                        }
+                      >
+                        <span className={s.linkModeDot} />
+                        JSCC: {linkModeLabel}
+                      </div>
+                      {activeLinkMode && iqRadioMetrics && (
+                        <div className={s.linkModeMetrics}>
+                          {iqRadioMetrics.sample_count != null && (
+                            <span className={s.linkModeMetric}>
+                              <span className={s.linkModeMetricKey}>样本</span>
+                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.sample_count}</span>
+                            </span>
+                          )}
+                          {iqRadioMetrics.sync_success_ratio != null && (
+                            <span className={s.linkModeMetric}>
+                              <span className={s.linkModeMetricKey}>同步率</span>
+                              <span className={s.linkModeMetricVal}>
+                                {(iqRadioMetrics.sync_success_ratio * 100).toFixed(1)}%
+                              </span>
+                            </span>
+                          )}
+                          {iqRadioMetrics.sync_metric?.mean != null && (
+                            <span className={s.linkModeMetric}>
+                              <span className={s.linkModeMetricKey}>sync</span>
+                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.sync_metric.mean.toFixed(4)}</span>
+                            </span>
+                          )}
+                          {iqRadioMetrics.evm_rms?.mean != null && (
+                            <span className={s.linkModeMetric}>
+                              <span className={s.linkModeMetricKey}>EVM</span>
+                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.evm_rms.mean.toFixed(4)}</span>
+                            </span>
+                          )}
+                          {iqRadioMetrics.estimated_cfo_hz?.mean != null && (
+                            <span className={s.linkModeMetric}>
+                              <span className={s.linkModeMetricKey}>CFO</span>
+                              <span className={s.linkModeMetricVal}>
+                                {iqRadioMetrics.estimated_cfo_hz.mean.toFixed(1)} Hz
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className={s.transportSwitch}>
                     {TRANSPORT_OPTIONS.map((option) => {
                       const isActive = activeTransport === option.mode

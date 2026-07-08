@@ -10,8 +10,10 @@ export MLKEM_AUTH_SERVER_MLDSA_KEY=/home/user/keys/server_mldsa_identity.key
 export MLKEM_AUTH_SERVER_MLDSA_PUB=/home/user/keys/server_mldsa_identity.pub
 export MLKEM_AUTH_PEER_SM2_PUB=/workspace/keys/server_sm2_identity.pub
 export MLKEM_AUTH_PEER_MLDSA_PUB=/workspace/keys/server_mldsa_identity.pub
+# Container-side bridge is the x86_64 build under /workspace/artifacts/crypto;
+# REMOTE_* is the aarch64 path on the board.
 export MLKEM_REMOTE_TONGSUO_SIG_BRIDGE=/home/user/libtongsuo_sig_bridge.so
-export TONGSUO_SIG_BRIDGE=/home/user/libtongsuo_sig_bridge.so
+export TONGSUO_SIG_BRIDGE=/workspace/artifacts/crypto/libtongsuo_sig_bridge.so
 export MLKEM_REMOTE_OQS_INSTALL=/home/user/liboqs-dist
 export OQS_INSTALL_PATH=/opt/liboqs
 export MLKEM_STATUS_STARTUP_WAIT_SEC=60

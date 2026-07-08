@@ -1100,6 +1100,72 @@
   border: 1px solid rgba(5, 150, 105, 0.18);
 }
 
+.linkModeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.linkModeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.linkModeBadgeIq {
+  color: #6d28d9;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.28);
+}
+
+.linkModeBadgeQpsk {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.linkModeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.linkModeMetrics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.linkModeMetric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.linkModeMetricKey {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  opacity: 0.75;
+}
+
+.linkModeMetricVal {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .transportSwitch {
   display: grid;
   grid-template-columns: 1fr 1fr;
