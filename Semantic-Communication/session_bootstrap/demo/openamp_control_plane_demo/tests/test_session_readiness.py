@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -43,6 +44,87 @@ class DemoSessionReadinessTest(unittest.TestCase):
         self.assertEqual(report["variants"]["baseline"]["missing_env_fields"], [])
         self.assertEqual(report["blockers"], [])
         self.assertEqual(readiness.exit_code_for_report(report), readiness.EXIT_READY)
+
+    def test_usrp_readiness_is_inactive_for_prerecorded_defaults(self) -> None:
+        report = readiness.build_readiness_report()
+
+        self.assertFalse(report["overall"]["can_continue"]["live_usrp"])
+        self.assertFalse(report["usrp"]["enabled"])
+        self.assertFalse(report["usrp"]["ready"])
+        self.assertEqual(report["usrp"]["missing_fields"], [])
+        self.assertEqual(report["usrp"]["link_mode"], "qpsk")
+
+    def test_usrp_iq_readiness_reports_missing_remote_rx_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / "usrp.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "MLKEM_TRANSPORT_MODE=usrp",
+                        "OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp",
+                        "JSCC_LINK_MODE=iq-direct",
+                        "REMOTE_TVM_PYTHON=/home/user/anaconda3/envs/mlkem/bin/python",
+                        "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/简化版latent",
+                        "REMOTE_OUTPUT_BASE=/home/user/Downloads/jscc-test/jscc/infer_outputs",
+                        "REMOTE_SNR_CURRENT=10",
+                        "REMOTE_BATCH_CURRENT=300",
+                        "REMOTE_JSCC_DIR=/home/user/Downloads/jscc-test/jscc",
+                        "REMOTE_SNR_BASELINE=10",
+                        "REMOTE_BATCH_BASELINE=300",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            report = readiness.build_readiness_report(
+                host="100.121.87.73",
+                user="user",
+                password="demo-pass",
+                env_file=str(env_path),
+            )
+
+        self.assertTrue(report["usrp"]["enabled"])
+        self.assertFalse(report["usrp"]["ready"])
+        self.assertEqual(report["usrp"]["link_mode"], "iq-direct")
+        self.assertIn("REMOTE_USRP_RX_DIR", report["usrp"]["missing_fields"])
+        self.assertFalse(report["overall"]["can_continue"]["live_usrp"])
+        self.assertTrue(any(blocker["scope"] == "usrp" for blocker in report["blockers"]))
+
+    def test_usrp_iq_readiness_accepts_remote_rx_dir_and_reports_sync_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / "usrp.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "MLKEM_TRANSPORT_MODE=usrp",
+                        "OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp",
+                        "JSCC_LINK_MODE=iq-direct",
+                        "REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx",
+                        "REMOTE_TVM_PYTHON=/home/user/anaconda3/envs/mlkem/bin/python",
+                        "REMOTE_INPUT_DIR=/home/user/Downloads/jscc-test/简化版latent",
+                        "REMOTE_OUTPUT_BASE=/home/user/Downloads/jscc-test/jscc/infer_outputs",
+                        "REMOTE_SNR_CURRENT=10",
+                        "REMOTE_BATCH_CURRENT=300",
+                        "REMOTE_JSCC_DIR=/home/user/Downloads/jscc-test/jscc",
+                        "REMOTE_SNR_BASELINE=10",
+                        "REMOTE_BATCH_BASELINE=300",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            report = readiness.build_readiness_report(
+                host="100.121.87.73",
+                user="user",
+                password="demo-pass",
+                env_file=str(env_path),
+            )
+
+        self.assertTrue(report["usrp"]["enabled"])
+        self.assertTrue(report["usrp"]["ready"])
+        self.assertTrue(report["overall"]["can_continue"]["live_usrp"])
+        self.assertEqual(report["usrp"]["missing_fields"], [])
+        self.assertTrue(report["usrp"]["iq_board_sync"]["script"].endswith("scripts/prepare_iq_board_sync.sh"))
 
 
 if __name__ == "__main__":
