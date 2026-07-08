@@ -71,6 +71,16 @@ def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_al
         assert rel_path in extract_section
 
 
+def test_prepare_iq_board_sync_manifest_activates_board_tvm_env_for_validation() -> None:
+    script = (PROJECT_ROOT / "scripts" / "prepare_iq_board_sync.sh").read_text(encoding="utf-8")
+    validation_section = script.split("## 同步后板端验证", 1)[1]
+
+    assert "conda activate tvm310_safe" in validation_section
+    assert "python -m pytest test_analog_latent_link.py -v" in validation_section
+    assert "python /home/user/USRP292x/RunAnalogLatentBatch.py --help | head -3" in validation_section
+    assert "python3 -m pytest test_analog_latent_link.py -v" not in validation_section
+
+
 def test_prepare_iq_board_sync_powershell_wrapper_runs_docker_packager() -> None:
     script = read_script("prepare-iq-board-sync.ps1")
 
