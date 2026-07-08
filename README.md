@@ -340,7 +340,7 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 
 当前阶段：
 
-- QPSK 链路保留为主力演示路径，所有现有入口（`docker/run-*`、Electron、CLI smoke）默认走 QPSK。`JSCC_LINK_MODE` 环境变量和 Cockpit 的 JSCC 链路开关都可切换：`qpsk`（默认）走原路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
+- QPSK 链路保留为兜底演示路径；Cockpit 切到 USRP 模式时默认使用 `iq-direct`，也可在界面手动切回 `qpsk`。`JSCC_LINK_MODE` 环境变量和 Cockpit 的 JSCC 链路开关都可切换：`qpsk` 走原可靠字节链路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
 - IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
 - IQ 直传 batch runner 默认启用进程内本地 codec（`ANALOG_IN_PROCESS_LOCAL_CODEC=1`）和首次 latent loader warmup（`ANALOG_WARMUP_LOCAL_CODEC=1`），避免每张图重复启动 Python/torch。2026-07-09 软件 dry-run 验证真实 JSCC `.pt` 打包后的 transport-frame `.bin`、20/20 通过，per-image mean `194.60 ms`、median `192.30 ms`、p95 `232.94 ms`、airtime mean `17.517 ms`；裸 `.pt` 输入 mean `174.89 ms`。warmup 单独记录为 `codec_warmup_wall_sec`。
 - 真机 IQ 直传前可先生成板端同步包：Windows 运行 `.\docker\prepare-iq-board-sync.ps1`；容器内实际执行 `bash /workspace/scripts/prepare_iq_board_sync.sh`。该脚本只打包，不保存密码；manifest 会提示运行时输入 `SSHPASS` 后再 scp/ssh 到板端。

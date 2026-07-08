@@ -3337,6 +3337,7 @@ class DashboardState:
             except ValueError as exc:
                 raise ValueError("unsupported jscc_link_mode; expected qpsk or iq-direct") from exc
         if transport_mode == "usrp":
+            overrides.setdefault("JSCC_LINK_MODE", "iq-direct")
             overrides.setdefault("MLKEM_USRP_MODE", "ota")
             overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")
             local_image_dir = self._discover_default_local_usrp_image_dir()

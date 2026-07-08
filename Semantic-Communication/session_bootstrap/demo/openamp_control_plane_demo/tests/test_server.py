@@ -5630,6 +5630,32 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
         self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
 
+    def test_board_access_usrp_defaults_to_iq_direct_link_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
+        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "tcp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "tcp")
+        self.assertEqual(payload["board_access"]["input_source_mode"], "prerecorded")
+
     def test_usrp_live_payload_uses_original_gallery_range(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
