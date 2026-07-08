@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 DOCKER_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = DOCKER_DIR.parent
 
 
 def read_script(name: str) -> str:
@@ -50,3 +51,21 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
     for name in required_env:
         assert name in shell_script
         assert name in powershell_script
+
+
+def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_all_files() -> None:
+    script = (PROJECT_ROOT / "scripts" / "prepare_iq_board_sync.sh").read_text(encoding="utf-8")
+    extract_section = script.split("## 板端解压命令", 1)[1].split("## 同步后板端验证", 1)[0]
+
+    assert "SSHPASS=user" not in script
+    assert "SSHPASS=<board password>" not in script
+    for rel_path in (
+        "USRP292x/RunAnalogLatentBatch.py",
+        "USRP292x/AnalogLatentLink.py",
+        "USRP292x/test_analog_latent_link.py",
+        "host_pic_to_latent/jscc/src/test_model.py",
+        "scripts/tvm_inference_helper.py",
+        "scripts/latent_transport.py",
+    ):
+        assert rel_path in script
+        assert rel_path in extract_section
