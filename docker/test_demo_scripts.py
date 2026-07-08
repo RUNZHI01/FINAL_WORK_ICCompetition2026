@@ -69,3 +69,14 @@ def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_al
     ):
         assert rel_path in script
         assert rel_path in extract_section
+
+
+def test_prepare_iq_board_sync_powershell_wrapper_runs_docker_packager() -> None:
+    script = read_script("prepare-iq-board-sync.ps1")
+
+    assert "iccomp-ubuntu-minimal" in script
+    assert '"/workspace"' in script
+    assert "REPO_ROOT=/workspace" in script
+    assert "OUT_TAR=/workspace/artifacts/iq_board_sync.tar.gz" in script
+    assert "OUT_MANIFEST=/workspace/artifacts/iq_board_sync_manifest.txt" in script
+    assert "scripts/prepare_iq_board_sync.sh" in script
