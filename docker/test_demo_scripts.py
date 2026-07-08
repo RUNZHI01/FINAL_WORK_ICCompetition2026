@@ -23,6 +23,8 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"' in script
     assert 'ANALOG_IN_PROCESS_LOCAL_CODEC="${ANALOG_IN_PROCESS_LOCAL_CODEC:-1}"' in script
     assert 'ANALOG_WARMUP_LOCAL_CODEC="${ANALOG_WARMUP_LOCAL_CODEC:-1}"' in script
+    assert 'ANALOG_SPS="${ANALOG_SPS:-16}"' in script
+    assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-24000}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 

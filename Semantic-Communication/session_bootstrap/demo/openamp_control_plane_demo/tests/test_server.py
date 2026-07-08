@@ -3878,6 +3878,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--tx-file-path-prefix-from") + 1], str(usrp_runtime.REPO_ROOT))
         self.assertIn("--tx-file-path-prefix-to", command)
         self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
+        self.assertNotIn("--sps", command)
+        self.assertNotIn("--amp", command)
 
     def test_usrp_wire_sync_uses_scp_instead_of_ssh_stdin(self) -> None:
         access = usrp_runtime.BoardAccessConfig(
@@ -3976,6 +3978,10 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
         self.assertIn("--rx-capture-mode", command)
         self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-pull")
+        self.assertIn("--sps", command)
+        self.assertEqual(command[command.index("--sps") + 1], "16")
+        self.assertIn("--amp", command)
+        self.assertEqual(command[command.index("--amp") + 1], "24000")
         self.assertEqual(job._runner_env["REMOTE_USRP_PROJECT_ROOT"], "/home/user")
 
     def test_main_builds_server_and_serves_without_startup_probe(self) -> None:

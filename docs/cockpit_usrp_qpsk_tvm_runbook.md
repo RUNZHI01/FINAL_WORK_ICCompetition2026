@@ -20,6 +20,8 @@ $env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
 $env:REMOTE_USRP_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:JSCC_LINK_MODE="qpsk"
+$env:ANALOG_SPS="16"
+$env:ANALOG_AMPLITUDE="24000"
 $env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
 $env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
 $env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
@@ -51,7 +53,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
 - Earlier QPSK evidence: `batch-1783545491-1`, 1/1 transport pass, byte/bit errors 0, SHA matched.
 - USRP TVM stage now consumes stdout/stderr concurrently, recovers complete summaries from stale SSH wrappers, and accepts statusless complete summaries.
 - When `INFERENCE_CURRENT_CMD` selects `run_big_little_pipeline.sh`, USRP TVM uses the big.LITTLE wrapper with the current run-specific RX directory; verified affinity is big core `[2]`, little cores `[0,1]`.
-- IQ direct remains experimental, not the default. With `remote-pull`, RX/TX and local decode are reachable, but true OTA capture remains low SNR. `batch-1783548778-1` with amplitude 24000 showed high initial sync (`0.974`) but bad payload quality (estimated SNR about -3 dB, latent MSE about `9.4e5`). The decoder now rejects a CFO estimate when it degrades an already valid sync peak and records `cfo_estimator=.../rejected`; keep QPSK as the reliable live data plane until IQ payload quality is fixed.
+- IQ direct remains experimental, not the default. The current live OTA profile is `ANALOG_SPS=16`, `ANALOG_AMPLITUDE=24000`: `cockpit_iq_sps16_amp24000_retry_20260709_064549` passed strict decode with sync metric `0.981`, estimated SNR `14.35 dB`, latent MSE `17337`, detected airtime `65.152 ms`, and decode wall time `1.42 s`. This proves the IQ path is reachable, but it still needs decode speed and reconstruction-quality work before replacing QPSK.
+- Earlier IQ direct amplitude-only evidence remains useful for regression: `batch-1783548778-1` with amplitude 24000 showed high initial sync (`0.974`) but bad payload quality (estimated SNR about -3 dB, latent MSE about `9.4e5`). The decoder now rejects a CFO estimate when it degrades an already valid sync peak and records `cfo_estimator=.../rejected`.
 
 ## Useful Checks
 

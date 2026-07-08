@@ -71,6 +71,8 @@ DEFAULT_RUN_ROOT = REPO_ROOT / "USRP292x" / "qpsk_batch_spool_arq_runs"
 DEFAULT_ANALOG_RUN_ROOT = REPO_ROOT / "USRP292x" / "analog_latent_runs"
 LINK_MODE_QPSK = "qpsk"
 LINK_MODE_IQ_DIRECT = "iq-direct"
+DEFAULT_IQ_DIRECT_SPS = 16
+DEFAULT_IQ_DIRECT_AMPLITUDE = 24000
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
@@ -2030,14 +2032,15 @@ class UsrpBatchSpoolJob:
     def _build_analog_link_args(self, env_values: dict[str, str]) -> list[str]:
         """Build CLI args for RunAnalogLatentBatch.py (IQ-direct mode).
 
-        Reads ANALOG_* / AMPLITUDE / SIM_* env vars; falls back to runner defaults
-        by emitting nothing when the env var is unset (runner's argparse default
-        takes over). All numeric defaults live in RunAnalogLatentBatch.py.
+        Reads ANALOG_* / AMPLITUDE / SIM_* env vars. IQ-direct emits the
+        verified OTA defaults when no explicit override is provided.
         """
         args: list[str] = []
         sps = _first_value(env_values, ANALOG_SPS_KEYS)
         if sps:
             args.extend(["--sps", str(_parse_int(sps, 4))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--sps", str(DEFAULT_IQ_DIRECT_SPS)])
         rrc_beta = _first_value(env_values, ANALOG_RRC_BETA_KEYS)
         if rrc_beta:
             args.extend(["--rrc-beta", str(_parse_float(rrc_beta, 0.35))])
@@ -2047,6 +2050,8 @@ class UsrpBatchSpoolJob:
         amp = _first_value(env_values, ANALOG_AMP_KEYS)
         if amp:
             args.extend(["--amp", str(_parse_int(amp, 3000))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--amp", str(DEFAULT_IQ_DIRECT_AMPLITUDE)])
         zero_guard = _first_value(env_values, ANALOG_ZERO_GUARD_KEYS)
         if zero_guard:
             args.extend(["--zero-guard-samples", str(_parse_int(zero_guard, 4096))])
