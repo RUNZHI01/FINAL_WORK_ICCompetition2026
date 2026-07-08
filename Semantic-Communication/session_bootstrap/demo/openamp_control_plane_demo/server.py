@@ -6595,17 +6595,31 @@ class DashboardState:
                 expected_count=expected_count,
             )
 
-        try:
-            mgr.ensure_alive()
-            ping = mgr.ping()
-        except Exception as exc:
+        security_success = False
+        last_exc = None
+        for _attempt in range(3):
+            try:
+                mgr.ensure_alive()
+                ping = mgr.ping()
+                security_success = True
+                break
+            except Exception as exc:
+                last_exc = exc
+                if _attempt < 2:
+                    self._close_mlkem_session_manager()
+                    import time as _time
+                    _time.sleep(1.5)
+                    mgr = self._get_mlkem_session_manager(board_access, env_values)
+                    if mgr is None:
+                        break
+        if not security_success:
             return None, self._build_blocked_inference_payload(
                 variant=variant,
                 image_index=image_index,
                 status_category="crypto_unavailable",
                 source_label="ML-KEM 安全协议未就绪，回退展示（归档样例）",
                 message="ML-KEM 安全协议未建立，本次按安全策略不发起 Current live 重建。",
-                detail=str(exc),
+                detail=str(last_exc),
                 diagnostics={"crypto_enabled": True},
                 expected_count=expected_count,
             )
