@@ -66,9 +66,10 @@ $env:JSCC_LINK_MODE="iq-direct"
 OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded
 MLKEM_TRANSPORT_MODE=tcp
 MLKEM_AUTH_ENABLED=0
+MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 ```
 
-普通 `start-electron-prod-demo.sh` profile 仍默认 `MLKEM_AUTH_ENABLED=1`；上面的关闭只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。
+普通 `start-electron-prod-demo.sh` profile 仍默认 `MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`；上面的关闭只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。
 
 这一路用于恢复 cockpit desktop 下的 handwritten TVM + big.LITTLE 300 张测速口径。2026-07-08 的真机验证结果为 `300/300`、fallback `0`、mean `244.23 ms`、median `244.03 ms`、p95 `247.60 ms`；报告位于 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260708_233215.*`。
 
