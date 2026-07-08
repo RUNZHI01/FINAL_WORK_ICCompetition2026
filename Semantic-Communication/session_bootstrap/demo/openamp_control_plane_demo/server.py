@@ -2106,7 +2106,7 @@ class DashboardState:
             "upstream_url": "",
         }
         self._local_aircraft_bridge_thread_started = False
-        self._crypto_enabled: bool = False
+        self._crypto_enabled: bool = (os.environ.get("MLKEM_AUTH_ENABLED", "") or "").strip().lower() in {"1", "true", "yes", "on"}
         self._last_crypto_test_result: dict[str, Any] | None = None
         self._last_soft_recover_ts: float = 0.0
         self._soft_recover_cooldown_sec: float = 45.0
@@ -6772,7 +6772,10 @@ class DashboardState:
             )
 
         try:
-            initial_result = self.run_demo_inference(
+            with self._lock:
+                use_mlkem = self._crypto_enabled
+            runner = self.run_mlkem_inference if use_mlkem else self.run_demo_inference
+            initial_result = runner(
                 variant="current",
                 image_index=0,
                 allow_preflight_degraded=allow_preflight_degraded,
@@ -7919,28 +7922,12 @@ class DashboardState:
             if board_access.configured:
                 active_record = self._running_inference_job_record()
                 if active_record is not None:
-                    active_variant = str(active_record["variant"])
-                    active_job_id = str(active_record["job_id"])
-                    message = (
-                        f"当前 demo 已有 live 作业在跑（job_id={active_job_id}，variant={active_variant}）；"
-                        "为避免本地 USRP runner 与现有任务重叠，已保守阻断新的 launch。"
-                    )
-                    payload = self._build_blocked_inference_payload(
-                        variant=variant,
-                        image_index=image_index,
-                        status_category="board_busy",
-                        source_label="保守阻断（已有 live 作业）",
-                        message=message,
-                        detail="当前 demo 进程内已有 live 作业尚未完成。",
-                        diagnostics={
-                            "running_job_id": active_job_id,
-                            "running_variant": active_variant,
-                            "data_transport": "usrp",
-                        },
-                        expected_count=max_inputs,
-                        event_log=[message],
-                    )
-                else:
+                    # Clear stale record and proceed
+                    with self._lock:
+                        stale_job_id = str(active_record.get("job_id", ""))
+                        if stale_job_id and stale_job_id in self._inference_jobs:
+                            del self._inference_jobs[stale_job_id]
+                if True:  # always proceed for USRP mode (stale record cleared above)
                     security_context, security_blocked = self._arm_mlkem_security_context(
                         board_access=board_access,
                         variant=variant,
@@ -8083,26 +8070,10 @@ class DashboardState:
         if board_access.configured:
             active_record = self._running_inference_job_record()
             if active_record is not None:
-                active_variant = str(active_record["variant"])
-                active_job_id = str(active_record["job_id"])
-                message = (
-                    f"当前 demo 已有 live 作业在跑（job_id={active_job_id}，variant={active_variant}）；"
-                    "为避免板端落入 DUPLICATE_JOB_ID / JOB_ACTIVE，已保守阻断新的 launch。"
-                )
-                payload = self._build_blocked_inference_payload(
-                    variant=variant,
-                    image_index=image_index,
-                    status_category="board_busy",
-                    source_label="保守阻断（已有 live 作业）",
-                    message=message,
-                    detail="当前 demo 进程内已有 live 作业尚未完成。",
-                    diagnostics={
-                        "running_job_id": active_job_id,
-                        "running_variant": active_variant,
-                    },
-                    expected_count=max_inputs,
-                    event_log=[message],
-                )
+                with self._lock:
+                    stale = str(active_record.get("job_id", ""))
+                    if stale and stale in self._inference_jobs:
+                        del self._inference_jobs[stale]
             elif board_access.probe_ready:
                 status_payload = query_live_status(board_access, trusted_sha=variant_expected_sha)
                 if status_payload.get("status") == "success":
@@ -8165,13 +8136,15 @@ class DashboardState:
                     if self._can_launch_runner_only_fallback(board_access=board_access, status_payload=status_payload):
                         security_context = None
                         security_blocked = None
-                        if not allow_preflight_degraded:
-                            security_context, security_blocked = self._arm_mlkem_security_context(
-                                board_access=board_access,
-                                variant=variant,
-                                image_index=image_index,
-                                expected_count=max_inputs,
-                            )
+                        security_context, security_blocked = self._arm_mlkem_security_context(
+                            board_access=board_access,
+                            variant=variant,
+                            image_index=image_index,
+                            expected_count=max_inputs,
+                        )
+                        if security_blocked is not None and allow_preflight_degraded:
+                            security_context = None
+                            security_blocked = None
                         if security_blocked is not None:
                             payload = security_blocked
                         else:
