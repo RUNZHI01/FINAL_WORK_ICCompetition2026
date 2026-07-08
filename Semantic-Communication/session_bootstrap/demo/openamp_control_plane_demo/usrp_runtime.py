@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import traceback
@@ -183,6 +184,13 @@ HOST_IMAGE_LATENT_MANIFEST_VERSION = 1
 CONTROL_PING_TIMEOUT_SEC = 2.0
 CONTROL_START_TIMEOUT_SEC = 15.0
 CONTROL_SHUTDOWN_TIMEOUT_SEC = 5.0
+CHILD_PROCESS_ENV = {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+}
 
 BOARD_DECODE_SCRIPT = r'''#!/usr/bin/env python3
 from __future__ import annotations
@@ -1255,9 +1263,33 @@ def _sync_and_decode_wire_blobs_on_remote(
     remote_dir = f"{remote_root_text}/{remote_subdir}".rstrip("/")
     remote_python_cmd = str(remote_python or "").strip() or "python3"
     payload = _tar_directory_bytes(local_stage_dir)
+    local_tar_path: Path | None = None
+    remote_tar_path = f"/tmp/cockpit_usrp_wire_{os.getpid()}_{int(time.time() * 1000)}.tar.gz"
+    scp_env = os.environ.copy()
+    scp_env.update(CHILD_PROCESS_ENV)
+    scp_env["SSHPASS"] = access.password
+    scp_command = [
+        "sshpass",
+        "-e",
+        "scp",
+        "-q",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "BatchMode=no",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-P",
+        access.port,
+    ]
     remote_command = (
         f"set -euo pipefail && mkdir -p {shlex.quote(remote_dir)} "
-        f"&& tar xzf - -C {shlex.quote(remote_dir)} "
+        f"&& tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_dir)} "
+        f"&& rm -f {shlex.quote(remote_tar_path)} "
         f"&& cd {shlex.quote(remote_dir)} "
         f"&& {remote_python_cmd} decode_usrp_wire.py --wire-dir _wire --output-dir ."
     )
@@ -1275,13 +1307,39 @@ def _sync_and_decode_wire_blobs_on_remote(
         "--",
         remote_command,
     ]
-    result = subprocess.run(
-        command,
-        input=payload,
-        capture_output=True,
-        cwd=REPO_ROOT,
-        check=False,
-    )
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp:
+            tmp.write(payload)
+            local_tar_path = Path(tmp.name)
+        scp_result = subprocess.run(
+            [
+                *scp_command,
+                str(local_tar_path),
+                f"{access.user}@{access.host}:{remote_tar_path}",
+            ],
+            capture_output=True,
+            cwd=REPO_ROOT,
+            env=scp_env,
+            check=False,
+        )
+        if scp_result.returncode != 0:
+            stderr = scp_result.stderr.decode("utf-8", errors="ignore").strip()
+            stdout = scp_result.stdout.decode("utf-8", errors="ignore").strip()
+            detail = stderr or stdout or f"scp rc={scp_result.returncode}"
+            raise RuntimeError(f"板端 USRP RX 目录上传失败: {detail}")
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            env=scp_env,
+            check=False,
+        )
+    finally:
+        if local_tar_path is not None:
+            try:
+                local_tar_path.unlink()
+            except OSError:
+                pass
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="ignore").strip()
         stdout = result.stdout.decode("utf-8", errors="ignore").strip()
@@ -1771,7 +1829,11 @@ class UsrpBatchSpoolJob:
             self._rx_control_port = rx_port
             self._tx_control_host = tx_host
             self._tx_control_port = tx_port
-            rx_capture_mode = _first_value(env_values, RX_CAPTURE_MODE_KEYS, "remote-decode" if rx_host == access.host else "local")
+            if rx_host == access.host:
+                default_rx_capture_mode = "remote-pull" if self._link_mode == LINK_MODE_IQ_DIRECT else "remote-decode"
+            else:
+                default_rx_capture_mode = "local"
+            rx_capture_mode = _first_value(env_values, RX_CAPTURE_MODE_KEYS, default_rx_capture_mode)
             remote_rx_target = _remote_ssh_target(access, env_values)
             remote_run_root = _first_value(env_values, REMOTE_RX_RUN_ROOT_KEYS, DEFAULT_REMOTE_RX_RUN_ROOT)
             remote_project_root = _remote_usrp_project_root(env_values)
@@ -1889,6 +1951,22 @@ class UsrpBatchSpoolJob:
 
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             command.extend(self._build_analog_link_args(env_values))
+            tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
+            tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
+            if _tx_server_uses_docker(env_values):
+                tx_path_prefix_from = tx_path_prefix_from or str(REPO_ROOT)
+                tx_path_prefix_to = tx_path_prefix_to or _first_value(
+                    env_values,
+                    TX_DOCKER_MOUNT_TARGET_KEYS,
+                    DEFAULT_TX_DOCKER_MOUNT_TARGET,
+                )
+            if tx_path_prefix_from and tx_path_prefix_to:
+                command.extend([
+                    "--tx-file-path-prefix-from",
+                    tx_path_prefix_from,
+                    "--tx-file-path-prefix-to",
+                    tx_path_prefix_to,
+                ])
         else:
             command.extend([
                 "--max-arq-rounds",
@@ -1919,6 +1997,8 @@ class UsrpBatchSpoolJob:
 
         env = access.build_subprocess_env()
         env["PYTHONUNBUFFERED"] = "1"
+        env.setdefault("REMOTE_USRP_PROJECT_ROOT", remote_project_root)
+        env.setdefault("USRP_REMOTE_PROJECT_ROOT", remote_project_root)
         if access.password:
             env.setdefault("SSHPASS", access.password)
 

@@ -46,6 +46,18 @@ def test_tar_directory_bytes_round_trips_nested_files(tmp_path):
     assert (destination / "000" / "reference.bin").read_bytes() == b"abc"
 
 
+def test_extract_tar_bytes_ignores_ssh_terminal_control_prefix(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "decode_summary.json").write_text('{"crc_ok": true}', encoding="utf-8")
+    destination = tmp_path / "destination"
+
+    payload = b"\x1b[?9001l\x1b[?1004l" + qpsk_batch.tar_directory_bytes(source)
+    qpsk_batch.extract_tar_bytes(payload, destination)
+
+    assert (destination / "decode_summary.json").read_text(encoding="utf-8") == '{"crc_ok": true}'
+
+
 def test_push_directory_to_remote_uses_ssh_stdin_without_shell(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

@@ -227,6 +227,217 @@ def test_process_image_dry_run_uses_in_process_local_codec(tmp_path, monkeypatch
     assert (image.image_dir / "merged_round0.bin").is_file()
 
 
+def test_tx_control_file_path_maps_workspace_path_to_container_mount(tmp_path):
+    repo_root = tmp_path / "repo"
+    tx_file = repo_root / "USRP292x" / "analog_latent_runs" / "run1" / "image_0000" / "tx_analog.sc16"
+
+    mapped = analog_batch.translate_tx_control_file_path(tx_file, str(repo_root), "/host_workspace")
+
+    assert mapped == "/host_workspace/USRP292x/analog_latent_runs/run1/image_0000/tx_analog.sc16"
+
+
+def test_ssh_base_args_uses_docker_runner_when_requested(monkeypatch):
+    monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
+    monkeypatch.setenv("OPENAMP_SSH_DOCKER_IMAGE", "iccomp-usrp-tx:latest")
+
+    args = analog_batch._ssh_base_args(timeout=30)
+
+    assert args[:6] == ["docker", "run", "--rm", "-i", "-e", "SSHPASS"]
+    assert "iccomp-usrp-tx:latest" in args
+    assert args[-4:] == ["-o", "ConnectTimeout=30", "-o", "PreferredAuthentications=password,keyboard-interactive"]
+
+
+def test_ssh_base_args_uses_stable_password_options_for_local_runner(monkeypatch):
+    monkeypatch.delenv("OPENAMP_SSH_RUNNER", raising=False)
+    monkeypatch.setenv("SSHPASS", "demo-pass")
+
+    args = analog_batch._ssh_base_args(timeout=30)
+
+    assert args[:3] == ["sshpass", "-e", "ssh"]
+    assert "StrictHostKeyChecking=no" in args
+    assert "UserKnownHostsFile=/dev/null" in args
+    assert "BatchMode=no" in args
+    assert "ConnectTimeout=30" in args
+    assert "PreferredAuthentications=password,keyboard-interactive" in args
+
+
+def test_ssh_start_control_master_skips_docker_runner(monkeypatch):
+    monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
+
+    result = analog_batch._ssh_start_control_master("user@board")
+
+    assert result is None
+
+
+def test_ssh_start_control_master_honors_disable_env(monkeypatch):
+    monkeypatch.delenv("OPENAMP_SSH_RUNNER", raising=False)
+    monkeypatch.setenv("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", "1")
+
+    def fail_popen(*_args, **_kwargs):
+        raise AssertionError("ControlMaster must not start when disabled")
+
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fail_popen)
+
+    result = analog_batch._ssh_start_control_master("user@board")
+
+    assert result is None
+
+
+def test_remote_analog_decode_args_sets_pythonpath_for_board_layout(monkeypatch):
+    monkeypatch.setenv("REMOTE_USRP_PROJECT_ROOT", "/home/user")
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+
+    argv = analog_batch.remote_analog_decode_args(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+    )
+
+    assert argv[:4] == [
+        "env",
+        "PYTHONPATH=/home/user/scripts:/home/user",
+        "python3",
+        "/home/user/USRP292x/AnalogLatentLink.py",
+    ]
+
+
+def test_cleanup_remote_file_treats_timeout_as_best_effort_failure(tmp_path, monkeypatch):
+    def fake_run_external(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["ssh"], timeout=15.0)
+
+    monkeypatch.setattr(analog_batch, "_run_external", fake_run_external)
+
+    ok = analog_batch.cleanup_remote_file(
+        "user@board",
+        "/tmp/run/batch_rx.sc16",
+        tmp_path / "cleanup.log",
+    )
+
+    assert ok is False
+
+
+def test_push_file_to_remote_uses_ssh_stdin_with_docker_runner(tmp_path, monkeypatch):
+    source = tmp_path / "tx_analog.sc16"
+    source.write_bytes(b"iq")
+    completed = subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"OK\n", stderr=b"")
+    monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
+    monkeypatch.setenv("OPENAMP_SSH_DOCKER_IMAGE", "iccomp-usrp-tx:latest")
+
+    with monkeypatch.context() as m:
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append((cmd, kwargs))
+            return completed
+
+        m.setattr(analog_batch.subprocess, "run", fake_run)
+        analog_batch.push_file_to_remote(
+            "user@board",
+            source,
+            "/tmp/run/tx_analog.sc16",
+            tmp_path / "push.log",
+        )
+
+    command, kwargs = calls[0]
+    assert command[:6] == ["docker", "run", "--rm", "-i", "-e", "SSHPASS"]
+    assert command[-2:] == ["user@board", "mkdir -p /tmp/run && cat > /tmp/run/tx_analog.sc16"]
+    assert kwargs["input"] == b"iq"
+    assert kwargs["shell"] is False
+
+
+def test_pull_file_from_remote_uses_ssh_stdout_with_docker_runner(tmp_path, monkeypatch):
+    destination = tmp_path / "received_latent.npz"
+    completed = subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"rx", stderr=b"")
+    monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
+    monkeypatch.setenv("OPENAMP_SSH_DOCKER_IMAGE", "iccomp-usrp-tx:latest")
+
+    with monkeypatch.context() as m:
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append((cmd, kwargs))
+            return completed
+
+        m.setattr(analog_batch.subprocess, "run", fake_run)
+        analog_batch.pull_file_from_remote(
+            "user@board",
+            "/tmp/run/received_latent.npz",
+            destination,
+            tmp_path / "pull.log",
+        )
+
+    command, kwargs = calls[0]
+    assert command[:6] == ["docker", "run", "--rm", "-i", "-e", "SSHPASS"]
+    assert command[-2:] == ["user@board", "cat /tmp/run/received_latent.npz"]
+    assert kwargs["shell"] is False
+    assert destination.read_bytes() == b"rx"
+
+
+def test_process_image_wait_command_uses_rx_timeout_budget(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": True}), encoding="utf-8")
+        return 0
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    analog_batch.process_image(args, image)
+
+    capture_line = next(line for line in control_lines if line.startswith("CAPTURE "))
+    capture_parts = dict(part.split("=", 1) for part in capture_line.split() if "=" in part)
+    assert float(capture_parts["duration"]) >= 0.3
+    assert int(capture_parts["nsamps"]) == 0
+    wait_line = next(line for line in control_lines if line.startswith("WAIT timeout="))
+    wait_timeout = float(wait_line.split("=", 1)[1])
+    assert wait_timeout >= 30.0
+
+
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):
     latent = np.linspace(-1.0, 1.0, num=1 * 8 * 8 * 8, dtype=np.float32).reshape(1, 8, 8, 8)
     input_dir = tmp_path / "inputs"

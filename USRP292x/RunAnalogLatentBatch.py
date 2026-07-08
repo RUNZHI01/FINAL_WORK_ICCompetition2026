@@ -138,7 +138,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rx-control-port", type=int, default=env_int("RX_CONTROL_PORT", 29220))
     parser.add_argument("--tx-control-host", default=os.environ.get("TX_CONTROL_HOST", "127.0.0.1"))
     parser.add_argument("--tx-control-port", type=int, default=env_int("TX_CONTROL_PORT", 29221))
+    parser.add_argument(
+        "--tx-file-path-prefix-from",
+        default=os.environ.get("TX_FILE_PATH_PREFIX_FROM", ""),
+        help="local path prefix to rewrite before sending TX file paths to a containerized TX server.",
+    )
+    parser.add_argument(
+        "--tx-file-path-prefix-to",
+        default=os.environ.get("TX_FILE_PATH_PREFIX_TO", ""),
+        help="TX server-visible replacement prefix for --tx-file-path-prefix-from.",
+    )
     parser.add_argument("--tx-delay-sec", type=float, default=env_float("PERSISTENT_RX_TX_DELAY", 0.010))
+    parser.add_argument("--rx-tail-sec", type=float, default=env_float("ANALOG_RX_TAIL_SEC", 0.300))
     parser.add_argument("--rx-timeout-sec", type=float, default=env_float("BATCH_RX_TIMEOUT_SEC", 30.0))
     parser.add_argument("--tx-timeout-sec", type=float, default=env_float("BATCH_TX_TIMEOUT_SEC", 30.0))
 
@@ -293,17 +304,80 @@ def run_control(host: str, port: int, line: str, log_path: Path, timeout: float)
     return response
 
 
+def translate_tx_control_file_path(path: Path, prefix_from: str, prefix_to: str) -> str:
+    source_text = str(prefix_from or "").strip()
+    target_text = str(prefix_to or "").strip()
+    if not source_text or not target_text:
+        return str(path)
+    try:
+        source_root = Path(source_text).resolve()
+        path_resolved = Path(path).resolve()
+        relative = path_resolved.relative_to(source_root)
+    except (OSError, ValueError):
+        return str(path)
+    target_root = target_text.rstrip("/\\")
+    return f"{target_root}/{relative.as_posix()}"
+
+
 # ── SSH/SCP helpers for remote-pull / remote-decode modes ──
 # Mirrors RunQpskFileBatchSpoolArq.py: uses sshpass when SSHPASS is set,
 # falls back to BatchMode=yes otherwise. Control master multiplexes auth.
 
 
 def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list[str]:
+    if os.environ.get("OPENAMP_SSH_RUNNER", "").strip().lower() == "docker":
+        image = os.environ.get("OPENAMP_SSH_DOCKER_IMAGE", "iccomp-usrp-tx:latest")
+        return [
+            "docker",
+            "run",
+            "--rm",
+            "-i",
+            "-e",
+            "SSHPASS",
+            image,
+            "sshpass",
+            "-e",
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "BatchMode=no",
+            "-o",
+            f"ConnectTimeout={timeout}",
+            "-o",
+            "PreferredAuthentications=password,keyboard-interactive",
+        ]
     sshpass = os.environ.get("SSHPASS")
     if sshpass is not None:
-        args = ["sshpass", "-e", "ssh", "-o", f"ConnectTimeout={timeout}"]
+        args = [
+            "sshpass",
+            "-e",
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "BatchMode=no",
+            "-o",
+            f"ConnectTimeout={timeout}",
+            "-o",
+            "PreferredAuthentications=password,keyboard-interactive",
+        ]
     else:
-        args = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={timeout}"]
+        args = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            f"ConnectTimeout={timeout}",
+        ]
     if control_socket:
         args += ["-o", f"ControlPath={control_socket}", "-o", "ControlMaster=no"]
     return args
@@ -312,9 +386,33 @@ def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list
 def _scp_base_args(timeout: int = 10, control_socket: str | None = None) -> list[str]:
     sshpass = os.environ.get("SSHPASS")
     if sshpass is not None:
-        args = ["sshpass", "-e", "scp", "-o", f"ConnectTimeout={timeout}"]
+        args = [
+            "sshpass",
+            "-e",
+            "scp",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "BatchMode=no",
+            "-o",
+            f"ConnectTimeout={timeout}",
+            "-o",
+            "PreferredAuthentications=password,keyboard-interactive",
+        ]
     else:
-        args = ["scp", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={timeout}"]
+        args = [
+            "scp",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            f"ConnectTimeout={timeout}",
+        ]
     if control_socket:
         args += ["-o", f"ControlPath={control_socket}", "-o", "ControlMaster=no"]
     return args
@@ -325,7 +423,12 @@ def _ssh_control_socket_path() -> str:
 
 
 def _ssh_start_control_master(target: str) -> subprocess.Popen | None:
-    if not target:
+    if (
+        not target
+        or os.environ.get("OPENAMP_SSH_RUNNER", "").strip().lower() == "docker"
+        or os.environ.get("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+    ):
         return None
     sock = _ssh_control_socket_path()
     subprocess.run(
@@ -392,6 +495,25 @@ def push_file_to_remote(
     control_socket: str | None = None,
     timeout: int = 30,
 ) -> None:
+    if os.environ.get("OPENAMP_SSH_RUNNER", "").strip().lower() == "docker":
+        remote_parent = str(PurePosixPath(remote_path).parent)
+        remote_cmd = f"mkdir -p {shlex.quote(remote_parent)} && cat > {shlex.quote(remote_path)}"
+        cmd = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [target, remote_cmd]
+        proc = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            input=local_path.read_bytes(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=False,
+            check=False,
+        )
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text((proc.stdout or b"").decode("utf-8", errors="replace"), encoding="utf-8")
+        if proc.returncode != 0:
+            raise RuntimeError(f"remote file push failed ({proc.returncode}): {' '.join(cmd)}")
+        return
     cmd = _scp_base_args(timeout=timeout, control_socket=control_socket)
     cmd += [str(local_path), _remote_path(target, remote_path)]
     _run_external(cmd, log_path, check=True, timeout=timeout + 5)
@@ -407,6 +529,29 @@ def pull_file_from_remote(
     timeout: int = 60,
 ) -> None:
     local_path.parent.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("OPENAMP_SSH_RUNNER", "").strip().lower() == "docker":
+        cmd = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [
+            target,
+            f"cat {shlex.quote(remote_path)}",
+        ]
+        proc = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+        )
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text((proc.stderr or b"").decode("utf-8", errors="replace"), encoding="utf-8")
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"remote file pull failed ({proc.returncode}): {' '.join(cmd)}\n"
+                f"{(proc.stderr or b'').decode('utf-8', errors='replace')}"
+            )
+        local_path.write_bytes(proc.stdout or b"")
+        return
     cmd = _scp_base_args(timeout=timeout, control_socket=control_socket)
     cmd += [_remote_path(target, remote_path), str(local_path)]
     _run_external(cmd, log_path, check=True, timeout=timeout + 5)
@@ -442,7 +587,7 @@ def cleanup_remote_file(
     try:
         _run_external(full, log_path, check=True, timeout=15.0)
         return True
-    except RuntimeError:
+    except (RuntimeError, subprocess.TimeoutExpired):
         return False
 
 
@@ -476,6 +621,16 @@ def remote_analog_link_path(args: argparse.Namespace) -> str:
         "REMOTE_USRP_PROJECT_ROOT", "/home/user/iccomp_repo_selfcontained"
     ).rstrip("/")
     return f"{project_root}/USRP292x/AnalogLatentLink.py"
+
+
+def remote_pythonpath_for_decode(args: argparse.Namespace) -> str:
+    override = os.environ.get("REMOTE_ANALOG_PYTHONPATH", "").strip()
+    if override:
+        return override
+    project_root = os.environ.get(
+        "REMOTE_USRP_PROJECT_ROOT", "/home/user/iccomp_repo_selfcontained"
+    ).rstrip("/")
+    return f"{project_root}/scripts:{project_root}"
 
 
 def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> list[str]:
@@ -575,6 +730,49 @@ def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path,
         str(out_wire),
         "--summary-json",
         str(summary),
+        "--sync-candidates",
+        str(args.sync_candidates),
+        "--min-sync-metric",
+        str(args.min_sync_metric),
+        "--robust-cfo-max-hz",
+        str(args.robust_cfo_max_hz),
+        "--robust-cfo-step-hz",
+        str(args.robust_cfo_step_hz),
+    ]
+    cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
+    if args.scramble_key:
+        cmd.extend(["--scramble-key", str(args.scramble_key)])
+    if args.scramble_key_hex:
+        cmd.extend(["--scramble-key-hex", str(args.scramble_key_hex)])
+    if args.scramble_context:
+        cmd.extend(["--scramble-context", str(args.scramble_context)])
+    return cmd
+
+
+def remote_analog_decode_args(
+    args: argparse.Namespace,
+    remote_batch_rx: str,
+    remote_manifest: str,
+    remote_npz: str,
+    remote_wire: str,
+    remote_summary: str,
+) -> list[str]:
+    cmd = [
+        "env",
+        f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
+        remote_python_for_decode(args),
+        remote_analog_link_path(args),
+        "decode",
+        "--rx-sc16",
+        remote_batch_rx,
+        "--manifest",
+        remote_manifest,
+        "--out-npz",
+        remote_npz,
+        "--out-wire",
+        remote_wire,
+        "--summary-json",
+        remote_summary,
         "--sync-candidates",
         str(args.sync_candidates),
         "--min-sync-metric",
@@ -820,6 +1018,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 ssh_control_socket = _ssh_control_socket_path() if ssh_master_proc else None
 
             capture_nsamps = int(manifest["capture_nsamps"])
+            capture_duration = max(
+                0.001,
+                float(args.tx_delay_sec) + (capture_nsamps / float(args.rate)) + float(args.rx_tail_sec),
+            )
             capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
 
             # Stage tx_sc16 + manifest on the remote RX host if needed
@@ -853,17 +1055,22 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             run_control(
                 args.rx_control_host,
                 args.rx_control_port,
-                f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration=0 nsamps={capture_nsamps}",
+                f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration={capture_duration:.6f} nsamps=0",
                 image.image_dir / "rx_capture.log",
                 capture_timeout,
             )
             time.sleep(max(0.0, float(args.tx_delay_sec)))
             tx_started = time.monotonic()
             # TX is always local — local OtaTxPersistentServer sends the locally-generated tx_sc16
+            tx_control_file = translate_tx_control_file_path(
+                tx_sc16,
+                args.tx_file_path_prefix_from,
+                args.tx_file_path_prefix_to,
+            )
             run_control(
                 args.tx_control_host,
                 args.tx_control_port,
-                f"SEND file={tx_sc16}",
+                f"SEND file={tx_control_file}",
                 image.image_dir / "tx_send.log",
                 args.tx_timeout_sec,
             )
@@ -871,7 +1078,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             run_control(
                 args.rx_control_host,
                 args.rx_control_port,
-                f"WAIT timeout={capture_nsamps / float(args.rate) + 1.0:.6f}",
+                f"WAIT timeout={capture_timeout:.6f}",
                 image.image_dir / "rx_wait.log",
                 capture_timeout,
             )
@@ -891,27 +1098,14 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 remote_npz = f"{remote_run_dir}/received_latent.npz"
                 remote_wire = f"{remote_run_dir}/merged_round0.bin"
                 remote_summary = f"{remote_run_dir}/decode_summary.json"
-                remote_argv = [
-                    remote_python_for_decode(args),
-                    remote_analog_link_path(args),
-                    "decode",
-                    "--rx-sc16", remote_batch_rx,
-                    "--manifest", remote_manifest,
-                    "--out-npz", remote_npz,
-                    "--out-wire", remote_wire,
-                    "--summary-json", remote_summary,
-                    "--sync-candidates", str(args.sync_candidates),
-                    "--min-sync-metric", str(args.min_sync_metric),
-                    "--robust-cfo-max-hz", str(args.robust_cfo_max_hz),
-                    "--robust-cfo-step-hz", str(args.robust_cfo_step_hz),
-                ]
-                remote_argv.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
-                if args.scramble_key:
-                    remote_argv.extend(["--scramble-key", str(args.scramble_key)])
-                if args.scramble_key_hex:
-                    remote_argv.extend(["--scramble-key-hex", str(args.scramble_key_hex)])
-                if args.scramble_context:
-                    remote_argv.extend(["--scramble-context", str(args.scramble_context)])
+                remote_argv = remote_analog_decode_args(
+                    args,
+                    remote_batch_rx,
+                    remote_manifest,
+                    remote_npz,
+                    remote_wire,
+                    remote_summary,
+                )
                 # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
                 # happens at capture time, not decode time. Remote decode reads what was captured.
                 run_remote_command(

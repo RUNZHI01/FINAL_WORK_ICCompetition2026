@@ -576,10 +576,23 @@ def tar_directory_bytes(source_dir: Path) -> bytes:
     return buffer.getvalue()
 
 
+def strip_leading_non_tar_bytes(payload: bytes) -> bytes:
+    """Remove SSH/banner noise that may appear before a streamed tar header."""
+    if len(payload) >= 262 and payload[257:262] == b'ustar':
+        return payload
+    scan_limit = min(len(payload), 16 * 1024)
+    for offset in range(1, scan_limit):
+        magic_start = offset + 257
+        magic_end = magic_start + 5
+        if magic_end <= len(payload) and payload[magic_start:magic_end] == b'ustar':
+            return payload[offset:]
+    return payload
+
+
 def extract_tar_bytes(payload: bytes, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_root = output_dir.resolve()
-    with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as archive:
+    with tarfile.open(fileobj=io.BytesIO(strip_leading_non_tar_bytes(payload)), mode='r:*') as archive:
         members = archive.getmembers()
         for member in members:
             target = (output_dir / member.name).resolve()

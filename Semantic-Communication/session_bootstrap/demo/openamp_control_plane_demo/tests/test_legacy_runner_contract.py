@@ -18,6 +18,7 @@ DEMO_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = DEMO_ROOT.parents[2]
 LEGACY_RUNNER = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_legacy_tvm_compat.sh"
 CURRENT_RUNNER = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_current_real_reconstruction.sh"
+BIG_LITTLE_RUNNER = REPO_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
 
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
@@ -36,6 +37,13 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class LegacyCompatRunnerContractTest(unittest.TestCase):
+    def test_big_little_ssh_mode_uploads_runner_script_without_stdin(self) -> None:
+        script = BIG_LITTLE_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn("scp", script)
+        self.assertIn("REMOTE_RUNNER_SCRIPT", script)
+        self.assertNotIn('bash -s \\\n      <"$runner_script"', script)
+
     def test_local_runner_emits_json_summary_after_legacy_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_dir = Path(temp_dir_name)
