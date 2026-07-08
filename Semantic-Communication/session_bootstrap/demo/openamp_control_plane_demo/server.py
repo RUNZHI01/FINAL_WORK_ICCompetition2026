@@ -8,6 +8,7 @@ import html
 import json
 import mimetypes
 import os
+import queue
 import re
 import shutil
 import shlex
@@ -126,6 +127,7 @@ WORKSPACE_ROOT = REPO_ROOT.parents[2] if len(REPO_ROOT.parents) > 2 else PACKAGE
 DEFAULT_MNN_BATCH_ENV_FILE = REPO_ROOT / "session_bootstrap" / "config" / "mnn_benchmark.phytium_pi.example.env"
 REMOTE_MNN_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_mnn_reconstruction.sh"
 REMOTE_TVM_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_current_real_reconstruction.sh"
+BIG_LITTLE_PIPELINE_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
 DEFAULT_USRP_REMOTE_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
 USRP_REMOTE_OUTPUT_ROOT_KEYS = ("OPENAMP_DEMO_USRP_OUTPUT_ROOT", "USRP_REMOTE_OUTPUT_ROOT")
 DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
@@ -2024,6 +2026,51 @@ def _parse_json_stdout_payload(raw: str) -> dict[str, Any]:
     raise ValueError("runner produced no JSON payload")
 
 
+def _current_tvm_batch_uses_big_little(env_values: dict[str, str]) -> bool:
+    runner = str(env_values.get("OPENAMP_TVM_BATCH_RUNNER") or env_values.get("OPENAMP_DEMO_TVM_BATCH_RUNNER") or "").strip().lower()
+    if runner in {"biglittle", "big_little", "big-little", "pipeline"}:
+        return True
+    command = str(env_values.get("INFERENCE_CURRENT_CMD") or "").strip().lower()
+    return "run_big_little_pipeline.sh" in command
+
+
+def _flatten_big_little_pipeline_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    pipeline = payload.get("pipeline") if isinstance(payload.get("pipeline"), dict) else None
+    if not pipeline:
+        return payload
+    for key in (
+        "processed_count",
+        "input_count",
+        "selected_input_count",
+        "available_input_count",
+        "load_ms",
+        "vm_init_ms",
+        "run_count",
+        "run_samples_ms",
+        "run_median_ms",
+        "run_mean_ms",
+        "run_min_ms",
+        "run_max_ms",
+        "run_variance_ms2",
+        "output_shape",
+        "output_dtype",
+        "snr",
+        "batch_size",
+        "save_format",
+        "seed",
+        "max_inputs",
+        "big_cores",
+        "little_cores",
+        "execution_mode",
+        "backend",
+    ):
+        if key in pipeline and key not in payload:
+            payload[key] = pipeline[key]
+    if "selected_input_count" not in payload and "input_count" in pipeline:
+        payload["selected_input_count"] = pipeline["input_count"]
+    return payload
+
+
 def _json_safe_copy(value: Any) -> Any:
     return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
@@ -3340,6 +3387,19 @@ class DashboardState:
             overrides.setdefault("JSCC_LINK_MODE", "iq-direct")
             overrides.setdefault("MLKEM_USRP_MODE", "ota")
             overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")
+            for runner_key in (
+                "OPENAMP_SSH_RUNNER",
+                "OPENAMP_SSH_DOCKER_IMAGE",
+                "OPENAMP_USRP_TX_RUNNER",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE",
+                "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET",
+                "OPENAMP_TVM_BATCH_RUNNER",
+                "OPENAMP_DEMO_TVM_BATCH_RUNNER",
+                "OPENAMP_TVM_BATCH_EXIT_GRACE_SEC",
+            ):
+                runner_value = str(os.environ.get(runner_key) or "").strip()
+                if runner_value:
+                    overrides.setdefault(runner_key, runner_value)
             local_image_dir = self._discover_default_local_usrp_image_dir()
             if local_image_dir:
                 overrides.setdefault("OPENAMP_DEMO_LOCAL_IMAGE_DIR", local_image_dir)
@@ -3347,8 +3407,10 @@ class DashboardState:
                 local_latent_dir = self._discover_default_local_usrp_latent_dir()
                 if local_latent_dir:
                     overrides.setdefault("OPENAMP_DEMO_LOCAL_LATENT_DIR", local_latent_dir)
+                    overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
             else:
                 overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = str(payload.get("local_latent_dir") or "").strip()
+                overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
             if str(payload.get("local_latent_pattern") or "").strip():
                 overrides["OPENAMP_DEMO_LOCAL_LATENT_PATTERN"] = str(payload.get("local_latent_pattern") or "").strip()
             if str(payload.get("remote_usrp_rx_dir") or "").strip():
@@ -6293,9 +6355,10 @@ class DashboardState:
                 "processed_count": 0,
             }
 
+        runner_script = BIG_LITTLE_PIPELINE_SCRIPT if _current_tvm_batch_uses_big_little(env_values) else REMOTE_TVM_RECONSTRUCTION_SCRIPT
         command = [
             resolve_bash_executable(),
-            str(REMOTE_TVM_RECONSTRUCTION_SCRIPT),
+            str(runner_script),
             "--variant",
             "current",
             "--max-inputs",
@@ -6328,76 +6391,154 @@ class DashboardState:
             }
 
         stdout_lines: list[str] = []
-        stderr_text = ""
+        stderr_lines: list[str] = []
+        stdout_queue: queue.Queue[Any] = queue.Queue()
+        stdout_done = {"value": False}
         timeout_flag = {"value": False}
+        stale_wrapper_after_complete = {"value": False}
         completed_count = 0
         all_progress_received = {"value": False}
         progress_done_deadline = {"value": 0.0}
+        stdout_sentinel = object()
 
         def _kill_proc_on_timeout() -> None:
             timeout_flag["value"] = True
             try:
-                proc.kill()
+                if os.name == "nt" and getattr(proc, "pid", None):
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    proc.kill()
             except OSError:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+
+        def _read_stdout() -> None:
+            try:
+                if proc.stdout is not None:
+                    for raw_line in proc.stdout:
+                        stdout_queue.put(raw_line)
+            finally:
+                stdout_queue.put(stdout_sentinel)
+
+        def _read_stderr() -> None:
+            if proc.stderr is None:
+                return
+            read_any = False
+            try:
+                for raw_line in proc.stderr:
+                    stderr_lines.append(raw_line)
+                    read_any = True
+                if not read_any and hasattr(proc.stderr, "read"):
+                    tail = proc.stderr.read()
+                    if tail:
+                        stderr_lines.append(tail)
+            except TypeError:
+                stderr_lines.append(proc.stderr.read())
+
+        def _process_stdout_line(raw_line: str) -> None:
+            nonlocal completed_count
+            stdout_lines.append(raw_line)
+            stripped = raw_line.strip()
+            if not stripped:
+                return
+            try:
+                line_payload = json.loads(stripped)
+            except json.JSONDecodeError:
+                return
+            progress_payload = line_payload.get("openamp_demo_progress") if isinstance(line_payload, dict) else None
+            if not isinstance(progress_payload, dict):
+                return
+            try:
+                delta = int(progress_payload.get("delta") or 0)
+            except (TypeError, ValueError):
+                delta = 0
+            if delta <= 0:
+                return
+            try:
+                completed_from_payload = int(progress_payload.get("completed_count") or 0)
+            except (TypeError, ValueError):
+                completed_from_payload = 0
+            completed_count = min(max(1, count), max(completed_from_payload, completed_count + delta))
+            if progress_callback is not None:
+                progress_callback(completed_count, max(1, count))
+            if completed_count >= count and not all_progress_received["value"]:
+                all_progress_received["value"] = True
+                grace_raw = env.get("OPENAMP_TVM_BATCH_EXIT_GRACE_SEC") or os.environ.get("OPENAMP_TVM_BATCH_EXIT_GRACE_SEC", "5.0")
+                try:
+                    grace_sec = max(0.1, float(grace_raw))
+                except (TypeError, ValueError):
+                    grace_sec = 5.0
+                progress_done_deadline["value"] = time.monotonic() + grace_sec
+
+        def _drain_stdout_queue(*, block: bool = False) -> None:
+            while True:
+                try:
+                    item = stdout_queue.get(timeout=0.05 if block else 0.0)
+                except queue.Empty:
+                    return
+                if item is stdout_sentinel:
+                    stdout_done["value"] = True
+                    continue
+                _process_stdout_line(str(item))
+                block = False
+
+        stdout_thread = threading.Thread(target=_read_stdout, daemon=True)
+        stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+
+        deadline = time.monotonic() + timeout_sec
+        while True:
+            _drain_stdout_queue(block=True)
+            poll = getattr(proc, "poll", None)
+            returncode = poll() if callable(poll) else getattr(proc, "returncode", None)
+            if returncode is not None:
+                break
+            now = time.monotonic()
+            if all_progress_received["value"] and progress_done_deadline["value"] and now >= progress_done_deadline["value"]:
+                stale_wrapper_after_complete["value"] = True
+                _kill_proc_on_timeout()
+                break
+            if now >= deadline:
+                _kill_proc_on_timeout()
+                break
+
+        try:
+            proc.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            _kill_proc_on_timeout()
+            try:
+                proc.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
                 pass
 
-        timer = threading.Timer(timeout_sec, _kill_proc_on_timeout)
-        timer.start()
-        try:
-            assert proc.stdout is not None
-            for raw_line in proc.stdout:
-                stdout_lines.append(raw_line)
-                stripped = raw_line.strip()
-                if not stripped:
-                    continue
-                try:
-                    line_payload = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                progress_payload = line_payload.get("openamp_demo_progress") if isinstance(line_payload, dict) else None
-                if not isinstance(progress_payload, dict):
-                    continue
-                try:
-                    delta = int(progress_payload.get("delta") or 0)
-                except (TypeError, ValueError):
-                    delta = 0
-                if delta <= 0:
-                    continue
-                try:
-                    completed_from_payload = int(progress_payload.get("completed_count") or 0)
-                except (TypeError, ValueError):
-                    completed_from_payload = 0
-                completed_count = min(max(1, count), max(completed_from_payload, completed_count + delta))
-                if progress_callback is not None:
-                    progress_callback(completed_count, max(1, count))
-                if completed_count >= count and not all_progress_received["value"]:
-                    all_progress_received["value"] = True
-                    progress_done_deadline["value"] = time.monotonic() + 5.0
-                if all_progress_received["value"] and time.monotonic() >= progress_done_deadline["value"]:
-                    break
-            proc.wait()
-            if proc.stderr is not None:
-                stderr_text = proc.stderr.read()
-        finally:
-            timer.cancel()
+        stdout_thread.join(timeout=2.0)
+        stderr_thread.join(timeout=2.0)
+        _drain_stdout_queue(block=False)
+        stderr_text = "".join(stderr_lines)
 
-        if proc.returncode is None:
-            proc.kill()
-            proc.wait()
-
-        if timeout_flag["value"]:
-            return {
-                "status": "timeout",
-                "message": "TVM 批量推理超时。",
-                "errors": ["TimeoutExpired: TVM batch timed out"],
-                "selected_input_count": count,
-                "processed_count": completed_count,
-            }
+        proc_returncode = getattr(proc, "returncode", None)
 
         stdout_text = "".join(stdout_lines)
         try:
             payload = _parse_json_stdout_payload(stdout_text)
+            payload = _flatten_big_little_pipeline_payload(payload)
         except (json.JSONDecodeError, ValueError) as exc:
+            if timeout_flag["value"]:
+                return {
+                    "status": "timeout",
+                    "message": "TVM 批量推理超时。",
+                    "errors": ["TimeoutExpired: TVM batch timed out"],
+                    "selected_input_count": count,
+                    "processed_count": completed_count,
+                }
             stderr = (stderr_text or "").strip()
             stdout = stdout_text.strip()
             detail = stderr or stdout or str(exc)
@@ -6409,15 +6550,40 @@ class DashboardState:
                 "processed_count": 0,
             }
 
+        try:
+            parsed_processed = int(payload.get("processed_count") or completed_count or 0)
+        except (TypeError, ValueError):
+            parsed_processed = completed_count
+        try:
+            parsed_selected = int(payload.get("selected_input_count") or payload.get("input_count") or count or 1)
+        except (TypeError, ValueError):
+            parsed_selected = max(1, count)
+        complete_payload = parsed_processed >= max(1, min(max(1, parsed_selected), max(1, count)))
+        if complete_payload and not str(payload.get("status") or "").strip() and not payload.get("errors"):
+            payload["status"] = "ok"
+
+        if timeout_flag["value"] and not complete_payload:
+            return {
+                "status": "timeout",
+                "message": "TVM 批量推理超时。",
+                "errors": ["TimeoutExpired: TVM batch timed out"],
+                "selected_input_count": count,
+                "processed_count": completed_count,
+            }
+
         if progress_callback is not None:
-            processed = int(payload.get("processed_count") or completed_count or 0)
-            selected = int(payload.get("selected_input_count") or payload.get("input_count") or count or 1)
+            processed = parsed_processed
+            selected = parsed_selected
             if processed > completed_count:
                 progress_callback(min(processed, max(1, selected)), max(1, selected))
 
-        if proc.returncode != 0 and str(payload.get("status") or "ok").lower() in {"ok", "success"}:
+        if timeout_flag["value"] and complete_payload:
+            payload["wrapper_timeout_recovered"] = True
+        if stale_wrapper_after_complete["value"] and complete_payload:
+            payload["stale_wrapper_after_complete"] = True
+        if proc_returncode != 0 and str(payload.get("status") or "ok").lower() in {"ok", "success"} and not complete_payload:
             payload["status"] = "error"
-        if proc.returncode != 0 and not payload.get("errors"):
+        if proc_returncode != 0 and not payload.get("errors") and not complete_payload:
             payload["errors"] = [((stderr_text or "").strip() or stdout_text.strip() or f"returncode={proc.returncode}")]
         return payload
 
@@ -6448,8 +6614,11 @@ class DashboardState:
                 "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
                 "REMOTE_INPUT_SOURCE_MODE": "usrp",
                 "REMOTE_USRP_RX_DIR": remote_dir,
+                "REMOTE_INPUT_DIR": remote_dir,
                 "REMOTE_OUTPUT_BASE": usrp_output_base,
                 "INFERENCE_REAL_OUTPUT_PREFIX": usrp_output_prefix,
+                "BIG_LITTLE_OUTPUT_PREFIX": usrp_output_prefix,
+                "BIG_LITTLE_REPORT_PREFIX": usrp_output_prefix,
             }
         )
 

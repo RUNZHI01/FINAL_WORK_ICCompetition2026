@@ -49,6 +49,12 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "MLKEM_AUTH_SIG_POLICY",
         "OPENAMP_SSH_RUNNER",
         "OPENAMP_SSH_DOCKER_IMAGE",
+        "OPENAMP_USRP_TX_RUNNER",
+        "OPENAMP_USRP_TX_DOCKER_IMAGE",
+        "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET",
+        "OPENAMP_TVM_BATCH_RUNNER",
+        "OPENAMP_DEMO_TVM_BATCH_RUNNER",
+        "OPENAMP_TVM_BATCH_EXIT_GRACE_SEC",
     }
 
     for name in required_env:

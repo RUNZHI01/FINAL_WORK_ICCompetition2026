@@ -86,6 +86,9 @@ RUN_ROOT_KEYS = ("MLKEM_USRP_RUN_ROOT", "USRP_RUN_ROOT")
 MAX_ARQ_ROUNDS_KEYS = ("MLKEM_USRP_MAX_ARQ_ROUNDS", "USRP_MAX_ARQ_ROUNDS")
 DECODE_BACKEND_KEYS = ("QPSK_DECODE_BACKEND",)
 CPP_SYNC_MODE_KEYS = ("QPSK_CPP_SYNC_MODE",)
+TX_DOCKER_MOUNT_TARGET_KEYS = ("OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET", "USRP_TX_DOCKER_MOUNT_TARGET")
+TX_FILE_PATH_PREFIX_FROM_KEYS = ("OPENAMP_USRP_TX_FILE_PATH_PREFIX_FROM", "USRP_TX_FILE_PATH_PREFIX_FROM")
+TX_FILE_PATH_PREFIX_TO_KEYS = ("OPENAMP_USRP_TX_FILE_PATH_PREFIX_TO", "USRP_TX_FILE_PATH_PREFIX_TO")
 ARTIFACT_MODE_KEYS = ("USRP_ARTIFACT_MODE",)
 BATCH_SIZE_KEYS = ("BATCH_SIZE",)
 DECODE_WORKERS_KEYS = ("BATCH_DECODE_WORKERS",)
@@ -162,6 +165,7 @@ INFERENCE_ENGINE_TVM = "tvm"
 INFERENCE_ENGINE_MNN = "mnn"
 DEFAULT_RX_CONTROL_PORT = "29220"
 DEFAULT_TX_CONTROL_PORT = "29221"
+DEFAULT_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
 DEFAULT_REMOTE_USRP_PROJECT_ROOT = "/home/user"
 DEFAULT_REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"
 DEFAULT_RATE = "5000000"
@@ -369,10 +373,62 @@ def _control_is_ready(host: str, port: str) -> tuple[bool, str]:
     return response.startswith("OK"), response
 
 
+def _tx_server_uses_docker(env_values: dict[str, str]) -> bool:
+    runner = _first_value(env_values, ("OPENAMP_USRP_TX_RUNNER", "USRP_TX_RUNNER")).lower()
+    local_binary = REPO_ROOT / "USRP292x" / "OtaTxPersistentServer"
+    force_local = runner in {"local", "host", "bash"}
+    return runner == "docker" or (not force_local and not local_binary.exists() and shutil.which("docker") is not None)
+
+
 def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port: str) -> dict[str, Any]:
     script = REPO_ROOT / "USRP292x" / "OtaTxPersistentServer.sh"
     if not script.is_file():
         return {"status": "error", "message": f"TX persistent server 脚本不存在: {script}"}
+    use_docker = _tx_server_uses_docker(env_values)
+    if use_docker:
+        image = _first_value(env_values, ("OPENAMP_USRP_TX_DOCKER_IMAGE", "USRP_TX_DOCKER_IMAGE"), "iccomp-usrp-tx:latest")
+        mount_target = _first_value(env_values, TX_DOCKER_MOUNT_TARGET_KEYS, DEFAULT_TX_DOCKER_MOUNT_TARGET)
+        command = [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--mount",
+            f"type=bind,source={REPO_ROOT},target={mount_target}",
+            "-p",
+            f"127.0.0.1:{tx_port}:{tx_port}",
+            "-e",
+            f"DEVICE_ARGS={_first_value(env_values, ('TX_ARGS',), DEFAULT_TX_ARGS)}",
+            "-e",
+            f"RATE={_first_value(env_values, ('RATE',), DEFAULT_RATE)}",
+            "-e",
+            f"FREQ={_first_value(env_values, ('FREQ',), DEFAULT_FREQ)}",
+            "-e",
+            f"GAIN={_first_value(env_values, ('TX_GAIN',), DEFAULT_TX_GAIN)}",
+            "-e",
+            f"ANT={_first_value(env_values, ('TX_ANT',), 'TX/RX')}",
+            "-e",
+            "BIND_ADDR=0.0.0.0",
+            "-e",
+            f"PORT={tx_port}",
+            image,
+            "bash",
+            "/workspace/USRP292x/OtaTxPersistentServer.sh",
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
+        if result.returncode != 0:
+            return {
+                "status": "error",
+                "runner": "docker",
+                "message": (result.stderr or result.stdout or f"docker rc={result.returncode}").strip(),
+            }
+        return {
+            "status": "started",
+            "runner": "docker",
+            "container_id": (result.stdout or "").strip(),
+            "image": image,
+            "port": str(tx_port),
+        }
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"tx_persistent_cockpit_{int(time.time())}.log"
     env = os.environ.copy()
@@ -386,39 +442,54 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
         "PORT": str(tx_port),
     })
     with log_path.open("w", encoding="utf-8") as log:
-        proc = subprocess.Popen(
-            [str(script)],
-            cwd=REPO_ROOT,
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
+        try:
+            proc = subprocess.Popen(
+                [resolve_bash_executable(), str(script)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            return {
+                "status": "error",
+                "message": f"TX persistent server 启动失败: {type(exc).__name__}: {exc}",
+                "log_path": str(log_path),
+            }
     return {"status": "started", "pid": proc.pid, "log_path": str(log_path)}
 
 
 def _run_remote_command(access: BoardAccessConfig, command: str, *, timeout: float = 20.0) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(
-        [
-            resolve_bash_executable(),
-            str(SSH_HELPER),
-            "--host",
-            access.host,
-            "--user",
-            access.user,
-            "--pass",
-            access.password,
-            "--port",
-            access.port,
-            "--",
-            command,
-        ],
-        capture_output=True,
-        cwd=REPO_ROOT,
-        timeout=timeout,
-        check=False,
-    )
+    cmd = [
+        resolve_bash_executable(),
+        str(SSH_HELPER),
+        "--host",
+        access.host,
+        "--user",
+        access.user,
+        "--pass",
+        access.password,
+        "--port",
+        access.port,
+        "--",
+        command,
+    ]
+    try:
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, bytes) else str(exc.stdout or "").encode("utf-8", errors="replace")
+        stderr = exc.stderr if isinstance(exc.stderr, bytes) else str(exc.stderr or "").encode("utf-8", errors="replace")
+        detail = f"TimeoutExpired: remote command timed out after {timeout:.1f}s".encode("utf-8")
+        stderr = (stderr + b"\n" + detail).strip()
+        return subprocess.CompletedProcess(cmd, 124, stdout=stdout, stderr=stderr)
 
 
 def _start_remote_rx_server(
@@ -449,7 +520,7 @@ def _start_remote_rx_server(
         f"> {shlex.quote(remote_log)} 2>&1 < /dev/null & "
         "sleep 1"
     )
-    proc = _run_remote_command(access, remote_cmd, timeout=20.0)
+    proc = _run_remote_command(access, remote_cmd, timeout=60.0)
     stdout = proc.stdout.decode("utf-8", errors="replace").strip()
     stderr = proc.stderr.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
@@ -1823,10 +1894,26 @@ class UsrpBatchSpoolJob:
                 "--max-arq-rounds",
                 str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
                 "--decode-backend",
-                _first_value(env_values, DECODE_BACKEND_KEYS, "cpp"),
+                _first_value(env_values, DECODE_BACKEND_KEYS, "python"),
                 "--cpp-sync-mode",
                 _first_value(env_values, CPP_SYNC_MODE_KEYS, "header"),
             ])
+            tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
+            tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
+            if _tx_server_uses_docker(env_values):
+                tx_path_prefix_from = tx_path_prefix_from or str(REPO_ROOT)
+                tx_path_prefix_to = tx_path_prefix_to or _first_value(
+                    env_values,
+                    TX_DOCKER_MOUNT_TARGET_KEYS,
+                    DEFAULT_TX_DOCKER_MOUNT_TARGET,
+                )
+            if tx_path_prefix_from and tx_path_prefix_to:
+                command.extend([
+                    "--tx-file-path-prefix-from",
+                    tx_path_prefix_from,
+                    "--tx-file-path-prefix-to",
+                    tx_path_prefix_to,
+                ])
             if _parse_bool(_first_value(env_values, FAST_ARQ_PROFILE_KEYS), False):
                 command.append("--fast-arq-profile")
 

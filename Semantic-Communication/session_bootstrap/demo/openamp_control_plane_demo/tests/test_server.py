@@ -124,6 +124,26 @@ class FakePopen:
         return self.returncode
 
 
+class KillableFakePopen(FakePopen):
+    def __init__(self, stdout_lines: list[str] | None = None, *, stderr_text: str = "", returncode: int | None = None) -> None:
+        super().__init__(stdout_lines=stdout_lines, stderr_text=stderr_text, returncode=returncode or 0)
+        self.returncode = returncode
+        self.killed = False
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = 124
+
+    def wait(self, timeout: float | None = None) -> int:
+        if self.returncode is None:
+            time.sleep(0.01)
+            return 124
+        return self.returncode
+
+
 class NonClosingBytesIO(io.BytesIO):
     def close(self) -> None:
         return
@@ -582,6 +602,195 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(current["inference_benchmark"]["inference_ms"]["median_ms"], 244.09)
         self.assertEqual(current["benchmark"]["total_ms"]["mean_ms"], 244.74)
         self.assertEqual(current["runner_summary"]["pipeline"]["little_cores"], [0, 1])
+
+    def test_run_tvm_batch_accepts_complete_summary_from_stale_wrapper_process(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/input",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+            },
+            source_summary="test",
+        )
+        complete_summary = {
+            "status": "ok",
+            "processed_count": 1,
+            "selected_input_count": 1,
+            "run_samples_ms": [252.3],
+            "run_median_ms": 252.3,
+            "run_mean_ms": 252.3,
+        }
+        progress_seen: list[tuple[int, int]] = []
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=KillableFakePopen(
+                stdout_lines=[
+                    json.dumps({"openamp_demo_progress": {"delta": 1, "completed_count": 1}}) + "\n",
+                    json.dumps(complete_summary) + "\n",
+                ],
+                stderr_text="wrapper exited after remote result was written",
+                returncode=124,
+            ),
+        ):
+            payload = state._run_tvm_batch_with_access(
+                access,
+                count=1,
+                progress_callback=lambda completed, total: progress_seen.append((completed, total)),
+            )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["run_median_ms"], 252.3)
+        self.assertEqual(progress_seen, [(1, 1)])
+
+    def test_run_tvm_batch_marks_statusless_complete_summary_ok(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/input",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+            },
+            source_summary="test",
+        )
+        statusless_summary = {
+            "processed_count": 1,
+            "input_count": 1,
+            "run_samples_ms": [608.835],
+            "run_median_ms": 608.835,
+            "run_mean_ms": 608.835,
+        }
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=FakePopen(
+                stdout_lines=[json.dumps(statusless_summary) + "\n"],
+                returncode=0,
+            ),
+        ):
+            payload = state._run_tvm_batch_with_access(access, count=1)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["run_median_ms"], 608.835)
+
+    def test_run_tvm_batch_flattens_big_little_wrapper_summary(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/usrp-rx",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+                "INFERENCE_CURRENT_CMD": "bash ./session_bootstrap/scripts/run_big_little_pipeline.sh --variant current --max-inputs 300",
+            },
+            source_summary="test",
+        )
+        wrapper_summary = {
+            "status": "ok",
+            "runner": "run_big_little_pipeline.sh",
+            "pipeline": {
+                "status": "ok",
+                "processed_count": 2,
+                "input_count": 2,
+                "run_samples_ms": [243.7, 244.1],
+                "run_median_ms": 243.9,
+                "run_mean_ms": 243.9,
+                "big_cores": [2],
+                "little_cores": [0, 1],
+            },
+        }
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=FakePopen(stdout_lines=[json.dumps(wrapper_summary) + "\n"], returncode=0),
+        ):
+            payload = state._run_tvm_batch_with_access(access, count=2)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["runner"], "run_big_little_pipeline.sh")
+        self.assertEqual(payload["processed_count"], 2)
+        self.assertEqual(payload["run_median_ms"], 243.9)
+        self.assertEqual(payload["big_cores"], [2])
+
+    def test_run_tvm_batch_uses_big_little_script_when_current_command_selects_it(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/usrp-rx",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+                "INFERENCE_CURRENT_CMD": "bash ./session_bootstrap/scripts/run_big_little_pipeline.sh --variant current --max-inputs 300",
+            },
+            source_summary="test",
+        )
+        captured: dict[str, object] = {}
+
+        def fake_popen(command, *args, **kwargs):
+            captured["command"] = list(command)
+            captured["env"] = dict(kwargs.get("env") or {})
+            return FakePopen(
+                stdout_lines=[
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "runner": "run_big_little_pipeline.sh",
+                            "pipeline": {
+                                "status": "ok",
+                                "processed_count": 2,
+                                "input_count": 2,
+                                "run_samples_ms": [244.0, 245.0],
+                                "run_median_ms": 244.5,
+                                "run_mean_ms": 244.5,
+                            },
+                        }
+                    )
+                    + "\n"
+                ],
+                returncode=0,
+            )
+
+        with patch("server.subprocess.Popen", side_effect=fake_popen):
+            payload = state._run_tvm_batch_with_access(access, count=2)
+
+        command = captured["command"]
+        self.assertIn("run_big_little_pipeline.sh", str(command[1]))
+        self.assertIn("--max-inputs", command)
+        self.assertEqual(command[command.index("--max-inputs") + 1], "2")
+        self.assertEqual(payload["processed_count"], 2)
 
     def test_runner_only_fallback_allows_host_env_error_preflight(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -1325,8 +1534,11 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(env["REMOTE_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx")
+        self.assertEqual(env["REMOTE_INPUT_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx")
         self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/tvm")
         self.assertEqual(env["INFERENCE_REAL_OUTPUT_PREFIX"], "openamp3_usrp_123")
+        self.assertEqual(env["BIG_LITTLE_OUTPUT_PREFIX"], "openamp3_usrp_123")
+        self.assertEqual(env["BIG_LITTLE_REPORT_PREFIX"], "openamp3_usrp_123")
 
     def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -2552,10 +2764,14 @@ class DashboardStateTest(unittest.TestCase):
                 "port": "22",
             },
             fallback=state._board_access.with_env_overrides(
-                {"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"}
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "MLKEM_STATUS_STARTUP_WAIT_SEC": "2",
+                }
             ),
         )
         captured: list[str] = []
+        monotonic_value = {"value": 0.0}
 
         def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
             del kwargs
@@ -2572,23 +2788,24 @@ class DashboardStateTest(unittest.TestCase):
                 )
             return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
 
+        def fake_fetch_json_direct(*args: object, **kwargs: object):
+            del args, kwargs
+            if any("echo restart-remote-server" in command for command in captured):
+                return {"cipher_suite": "sm4-gcm"}
+            raise RuntimeError("status down")
+
+        def fake_monotonic() -> float:
+            monotonic_value["value"] += 10.0
+            return monotonic_value["value"]
+
         with (
-            patch(
-                "server.fetch_json_direct",
-                side_effect=[
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    {"cipher_suite": "sm4-gcm"},
-                ],
-            ),
+            patch("server.fetch_json_direct", side_effect=fake_fetch_json_direct),
             patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
             patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
             patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
             patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
             patch("server.time.sleep", return_value=None),
+            patch("server.time.monotonic", side_effect=fake_monotonic),
         ):
             state._ensure_board_tcp_server(board_access)
 
@@ -3511,6 +3728,120 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(summary["fail_count"], 1)
         self.assertEqual(summary["pending_count"], 260)
         self.assertFalse(summary["all_pass"])
+
+    def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            fake_proc = Mock(pid=4242)
+            with patch("usrp_runtime.subprocess.Popen", return_value=fake_proc) as popen:
+                result = usrp_runtime._start_local_tx_server(
+                    {"OPENAMP_USRP_TX_RUNNER": "local"},
+                    log_dir=Path(temp_dir_name),
+                    tx_port="29221",
+                )
+
+        self.assertEqual(result["status"], "started")
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], usrp_runtime.resolve_bash_executable())
+        self.assertTrue(str(command[1]).endswith("OtaTxPersistentServer.sh"))
+
+    def test_usrp_local_tx_server_can_start_from_docker_image(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            result = Mock(returncode=0, stdout="container-123\n", stderr="")
+            env_values = {
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+            }
+            with (
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=9999)),
+                patch("usrp_runtime.subprocess.run", return_value=result) as run,
+            ):
+                payload = usrp_runtime._start_local_tx_server(env_values, log_dir=Path(temp_dir_name), tx_port="29221")
+
+        self.assertEqual(payload["status"], "started")
+        self.assertEqual(payload["runner"], "docker")
+        command = run.call_args.args[0]
+        self.assertEqual(command[:4], ["docker", "run", "-d", "--rm"])
+        self.assertIn("--mount", command)
+        mount_value = command[command.index("--mount") + 1]
+        self.assertIn(f"source={usrp_runtime.REPO_ROOT}", mount_value)
+        self.assertIn("target=/host_workspace", mount_value)
+        self.assertIn("-p", command)
+        self.assertIn("127.0.0.1:29221:29221", command)
+        self.assertIn("iccomp-usrp-tx:latest", command)
+        self.assertEqual(command[-2:], ["bash", "/workspace/USRP292x/OtaTxPersistentServer.sh"])
+
+    def test_usrp_remote_command_timeout_returns_error_completed_process(self) -> None:
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        timeout = subprocess.TimeoutExpired(["ssh"], 20.0, output=b"partial", stderr=b"timeout")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=timeout):
+            result = usrp_runtime._run_remote_command(access, "echo ok", timeout=20.0)
+
+        self.assertEqual(result.returncode, 124)
+        self.assertIn(b"TimeoutExpired", result.stderr)
+
+    def test_usrp_qpsk_runner_command_defaults_to_python_decode_backend(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "qpsk",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+
+        command = job._runner_command
+        self.assertIn("--decode-backend", command)
+        self.assertEqual(command[command.index("--decode-backend") + 1], "python")
+        self.assertIn("--tx-file-path-prefix-from", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-from") + 1], str(usrp_runtime.REPO_ROOT))
+        self.assertIn("--tx-file-path-prefix-to", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
 
     def test_main_builds_server_and_serves_without_startup_probe(self) -> None:
         args = Namespace(
@@ -5636,6 +5967,54 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertTrue((image_dir / "00000001.jpg").is_file())
         self.assertTrue((image_dir / "00000050.jpg").is_file())
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"], str(image_dir))
+
+    def test_board_access_usrp_defaults_use_existing_latent_cache_without_reencoding(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        latent_dir = Path(payload["board_access"]["local_usrp_input_dir"])
+        self.assertTrue(any(latent_dir.glob("*.pt")))
+        env = state._board_access.build_env()
+        self.assertEqual(env["OPENAMP_DEMO_LOCAL_LATENT_DIR"], str(latent_dir))
+        self.assertEqual(env["OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED"], "0")
+
+    def test_board_access_usrp_forwards_docker_runner_environment(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "OPENAMP_SSH_RUNNER": "docker",
+                "OPENAMP_SSH_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
+                "OPENAMP_TVM_BATCH_EXIT_GRACE_SEC": "0.5",
+            },
+            clear=False,
+        ):
+            status, _, _ = request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "qpsk"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        env = state._board_access.build_env()
+        self.assertEqual(env["OPENAMP_SSH_RUNNER"], "docker")
+        self.assertEqual(env["OPENAMP_SSH_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(env["OPENAMP_USRP_TX_RUNNER"], "docker")
+        self.assertEqual(env["OPENAMP_USRP_TX_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(env["OPENAMP_TVM_BATCH_RUNNER"], "biglittle")
+        self.assertEqual(env["OPENAMP_TVM_BATCH_EXIT_GRACE_SEC"], "0.5")
 
     def test_board_access_endpoint_accepts_jscc_link_mode_override(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
