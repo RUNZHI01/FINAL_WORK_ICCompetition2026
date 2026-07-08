@@ -123,7 +123,7 @@ test('current live mnn result is recorded as mnn comparison', () => {
     label: 'MNN重建',
     reconstructionMs: 329.6,
     runMs: 161.9,
-    sampleCount: undefined,
+    sampleCount: 5,
     quality: {
       psnr_db: 37.0445,
       ssim: 0.9749,
@@ -131,17 +131,32 @@ test('current live mnn result is recorded as mnn comparison', () => {
   })
 })
 
-test('current prerecorded result is ignored for comparison', () => {
+test('current prerecorded TVM result can hydrate comparison', () => {
   const result = comparisonResultFromInferencePayload({
     status: 'success',
     execution_mode: 'prerecorded',
     variant: 'current',
     timings: {
       total_ms: 123.4,
+      payload_ms: 118.2,
+    },
+    quality: {
+      psnr_db: 37.0445,
+      ssim: 0.9749,
     },
   })
 
-  assert.equal(result, undefined)
+  assert.deepEqual(result, {
+    engine: 'tvm',
+    label: 'TVM重建',
+    reconstructionMs: 123.4,
+    runMs: 118.2,
+    sampleCount: undefined,
+    quality: {
+      psnr_db: 37.0445,
+      ssim: 0.9749,
+    },
+  })
 })
 
 test('baseline fallback reference result still hydrates comparison from timings', () => {
