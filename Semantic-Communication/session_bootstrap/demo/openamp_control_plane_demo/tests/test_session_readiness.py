@@ -125,6 +125,9 @@ class DemoSessionReadinessTest(unittest.TestCase):
         self.assertTrue(report["overall"]["can_continue"]["live_usrp"])
         self.assertEqual(report["usrp"]["missing_fields"], [])
         self.assertTrue(report["usrp"]["iq_board_sync"]["script"].endswith("scripts/prepare_iq_board_sync.sh"))
+        self.assertEqual(report["usrp"]["iq_board_sync"]["board_validation_env"], "tvm310_safe")
+        self.assertTrue(report["usrp"]["iq_board_sync"]["manifest_activates_board_env"])
+        self.assertIn("iq_env=tvm310_safe", readiness.render_text(report))
 
 
 if __name__ == "__main__":

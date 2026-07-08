@@ -51,6 +51,7 @@ IQ_SYNC_SCRIPT = DELIVERY_ROOT / "scripts" / "prepare_iq_board_sync.sh"
 IQ_SYNC_POWERSHELL = DELIVERY_ROOT / "docker" / "prepare-iq-board-sync.ps1"
 IQ_SYNC_TAR = DELIVERY_ROOT / "artifacts" / "iq_board_sync.tar.gz"
 IQ_SYNC_MANIFEST = DELIVERY_ROOT / "artifacts" / "iq_board_sync_manifest.txt"
+IQ_BOARD_VALIDATION_ENV = "tvm310_safe"
 
 
 def parse_args() -> argparse.Namespace:
@@ -193,6 +194,16 @@ def build_blockers(session_public: dict[str, Any], variants: dict[str, dict[str,
     return blockers
 
 
+def iq_sync_manifest_activates_board_env() -> bool:
+    if not IQ_SYNC_SCRIPT.is_file():
+        return False
+    try:
+        script = IQ_SYNC_SCRIPT.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return f"conda activate {IQ_BOARD_VALIDATION_ENV}" in script
+
+
 def build_usrp_report(access: Any) -> dict[str, Any]:
     env_values = access.build_env()
     session_public = access.to_public_dict()
@@ -224,6 +235,8 @@ def build_usrp_report(access: Any) -> dict[str, Any]:
             "powershell_wrapper": delivery_relative(IQ_SYNC_POWERSHELL),
             "tar": delivery_relative(IQ_SYNC_TAR),
             "manifest": delivery_relative(IQ_SYNC_MANIFEST),
+            "board_validation_env": IQ_BOARD_VALIDATION_ENV,
+            "manifest_activates_board_env": iq_sync_manifest_activates_board_env(),
             "script_exists": IQ_SYNC_SCRIPT.is_file(),
             "powershell_wrapper_exists": IQ_SYNC_POWERSHELL.is_file(),
             "bundle_exists": IQ_SYNC_TAR.is_file(),
@@ -450,6 +463,7 @@ def render_text(report: dict[str, Any]) -> str:
             f"ready={'yes' if usrp['ready'] else 'no'} "
             f"link={usrp['link_mode']} "
             f"remote_rx={usrp['remote_usrp_rx_dir'] or '-'} "
+            f"iq_env={usrp['iq_board_sync']['board_validation_env']} "
             f"missing={', '.join(usrp['missing_fields']) or 'none'}"
         ),
     ]
