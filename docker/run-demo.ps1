@@ -44,6 +44,22 @@ $DockerArgs = @(
     "-e", "DISPLAY=$Display"
 )
 
+foreach ($Name in @(
+    "ICCOMP_COCKPIT_PROFILE",
+    "REMOTE_HOST", "PHYTIUM_PI_HOST",
+    "REMOTE_USER", "PHYTIUM_PI_USER",
+    "REMOTE_PASS", "PHYTIUM_PI_PASSWORD",
+    "REMOTE_SSH_PORT", "PHYTIUM_PI_PORT",
+    "OPENAMP_DEMO_INPUT_SOURCE_MODE",
+    "MLKEM_TRANSPORT_MODE", "MLKEM_AUTH_ENABLED",
+    "OPENAMP_SSH_RUNNER", "OPENAMP_SSH_DOCKER_IMAGE"
+)) {
+    $Value = [Environment]::GetEnvironmentVariable($Name)
+    if ($Value) {
+        $DockerArgs += @("-e", "${Name}=${Value}")
+    }
+}
+
 if ($EnableTailscale) {
     $DockerArgs += @(
         "--cap-add=NET_ADMIN",

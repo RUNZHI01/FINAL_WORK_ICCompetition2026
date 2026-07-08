@@ -52,11 +52,15 @@ REPO_ROOT = _discover_repo_root()
 ROOT_SCRIPTS = REPO_ROOT / "scripts"
 if str(ROOT_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(ROOT_SCRIPTS))
+SESSION_SCRIPTS = REPO_ROOT / "Semantic-Communication" / "session_bootstrap" / "scripts"
+if str(SESSION_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SESSION_SCRIPTS))
 
 from latent_transport import (  # noqa: E402
     build_transport_blob,
     unpack_transport_frame,
 )
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
 
 DEFAULT_RUNNER = REPO_ROOT / "USRP292x" / "RunQpskFileBatchSpoolArq.py"
 DEFAULT_ANALOG_RUNNER = REPO_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
@@ -397,7 +401,7 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
 def _run_remote_command(access: BoardAccessConfig, command: str, *, timeout: float = 20.0) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         [
-            "bash",
+            resolve_bash_executable(),
             str(SSH_HELPER),
             "--host",
             access.host,
@@ -1187,7 +1191,7 @@ def _sync_and_decode_wire_blobs_on_remote(
         f"&& {remote_python_cmd} decode_usrp_wire.py --wire-dir _wire --output-dir ."
     )
     command = [
-        "bash",
+        resolve_bash_executable(),
         str(SSH_HELPER),
         "--host",
         access.host,

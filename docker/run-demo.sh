@@ -20,6 +20,20 @@ fi
 
 docker_args=(--rm -it --name "${CONTAINER_NAME}")
 
+for name in \
+    ICCOMP_COCKPIT_PROFILE \
+    REMOTE_HOST PHYTIUM_PI_HOST \
+    REMOTE_USER PHYTIUM_PI_USER \
+    REMOTE_PASS PHYTIUM_PI_PASSWORD \
+    REMOTE_SSH_PORT PHYTIUM_PI_PORT \
+    OPENAMP_DEMO_INPUT_SOURCE_MODE \
+    MLKEM_TRANSPORT_MODE MLKEM_AUTH_ENABLED \
+    OPENAMP_SSH_RUNNER OPENAMP_SSH_DOCKER_IMAGE; do
+    if [ -n "${!name:-}" ]; then
+        docker_args+=(-e "${name}=${!name}")
+    fi
+done
+
 if [ "${ENABLE_TAILSCALE:-0}" = "1" ]; then
     docker_args+=(--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun)
     docker_args+=(-v "${TAILSCALE_STATE_VOLUME:-iccomp-tailscale-state}:/var/lib/tailscale")

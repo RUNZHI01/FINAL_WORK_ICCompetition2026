@@ -73,6 +73,10 @@ REMOTE_AUTH_SERVER_KEYS = (
 _LOCAL_CRYPTO_CLIENT_CAP_CACHE: dict[Path, dict[str, bool]] = {}
 _LOCAL_CRYPTO_SERVER_CAP_CACHE: dict[Path, dict[str, bool]] = {}
 
+SSH_RUNNER_ENV = "OPENAMP_SSH_RUNNER"
+SSH_DOCKER_IMAGE_ENV = "OPENAMP_SSH_DOCKER_IMAGE"
+DEFAULT_SSH_DOCKER_IMAGE = "iccomp-usrp-tx:latest"
+
 
 def _sources(env_values: Mapping[str, str] | None) -> tuple[Mapping[str, str], Mapping[str, str]]:
     return env_values or {}, os.environ
@@ -141,6 +145,13 @@ def _resolve_existing_path(raw_path: str, *, base_dir: Path | None = None) -> Pa
     if exists:
         return candidate
     return None
+
+
+def _path_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
 
 
 def _append_unique(paths: list[Path], seen: set[Path], candidate: Path | None) -> None:
@@ -1159,6 +1170,51 @@ def build_remote_crypto_server_command(
     return f"bash -c {shlex_quote('; '.join(command_steps))}"
 
 
+def _wrap_ssh_password_command(
+    command: list[str],
+    *,
+    password: str,
+) -> tuple[list[str], dict[str, str], Path | None]:
+    env = dict(os.environ)
+    askpass_path: Path | None = None
+
+    if password and shutil.which("sshpass"):
+        env["SSHPASS"] = password
+        return ["sshpass", "-e", *command], env, askpass_path
+
+    if password:
+        fd, raw_path = tempfile.mkstemp(prefix="mlkem-askpass-", suffix=".sh", text=True)
+        askpass_path = Path(raw_path)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\n")
+            handle.write(f"printf '%s\\n' {shlex_quote(password)}\n")
+        askpass_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        env["SSH_ASKPASS"] = str(askpass_path)
+        env["SSH_ASKPASS_REQUIRE"] = "force"
+        env.setdefault("DISPLAY", "mlkem-askpass:0")
+        if shutil.which("setsid"):
+            return ["setsid", "-w", *command], env, askpass_path
+
+    return command, env, askpass_path
+
+
+def _docker_ssh_runner_enabled(password: str) -> bool:
+    if not password:
+        return False
+    runner = str(os.environ.get(SSH_RUNNER_ENV, "") or "").strip().lower()
+    return runner == "docker" and bool(shutil.which("docker"))
+
+
+def _docker_ssh_env(password: str) -> dict[str, str]:
+    env = dict(os.environ)
+    env["SSHPASS"] = password
+    return env
+
+
+def _docker_ssh_image() -> str:
+    return str(os.environ.get(SSH_DOCKER_IMAGE_ENV, "") or "").strip() or DEFAULT_SSH_DOCKER_IMAGE
+
+
 def run_ssh_command(
     *,
     host: str,
@@ -1181,34 +1237,88 @@ def run_ssh_command(
         f"{user}@{host}",
         remote_command,
     ]
-    env = dict(os.environ)
-    askpass_path: Path | None = None
-
-    if password and shutil.which("sshpass"):
-        env["SSHPASS"] = password
-        command = ["sshpass", "-e", *ssh_command]
-    elif password:
-        fd, raw_path = tempfile.mkstemp(prefix="mlkem-askpass-", suffix=".sh", text=True)
-        askpass_path = Path(raw_path)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("#!/bin/sh\n")
-            handle.write(f"printf '%s\\n' {shlex_quote(password)}\n")
-        askpass_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-        env["SSH_ASKPASS"] = str(askpass_path)
-        env["SSH_ASKPASS_REQUIRE"] = "force"
-        env.setdefault("DISPLAY", "mlkem-askpass:0")
-        if shutil.which("setsid"):
-            command = ["setsid", "-w", *ssh_command]
-        else:
-            command = ssh_command
+    if _docker_ssh_runner_enabled(password):
+        command = ["docker", "run", "--rm", "-e", "SSHPASS", _docker_ssh_image(), "sshpass", "-e", *ssh_command]
+        env = _docker_ssh_env(password)
+        askpass_path = None
     else:
-        command = ssh_command
+        command, env, askpass_path = _wrap_ssh_password_command(ssh_command, password=password)
 
     try:
         return subprocess.run(
             command,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            env=env,
+            stdin=subprocess.DEVNULL,
+        )
+    finally:
+        if askpass_path is not None:
+            try:
+                askpass_path.unlink()
+            except OSError:
+                pass
+
+
+def run_scp_file(
+    *,
+    host: str,
+    user: str,
+    password: str,
+    port: str | int,
+    local_path: str | Path,
+    remote_path: str,
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    local_path = Path(local_path)
+    local_arg = str(local_path)
+    docker_args: list[str] = []
+    if _docker_ssh_runner_enabled(password):
+        resolved_local = local_path.resolve()
+        docker_args = ["-v", f"{resolved_local.parent}:/upload:ro"]
+        local_arg = f"/upload/{resolved_local.name}"
+
+    scp_command = [
+        "scp",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "BatchMode=no",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-P",
+        str(port),
+        local_arg,
+        f"{user}@{host}:{remote_path}",
+    ]
+    if _docker_ssh_runner_enabled(password):
+        command = [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "SSHPASS",
+            *docker_args,
+            _docker_ssh_image(),
+            "sshpass",
+            "-e",
+            *scp_command,
+        ]
+        env = _docker_ssh_env(password)
+        askpass_path = None
+    else:
+        command, env, askpass_path = _wrap_ssh_password_command(scp_command, password=password)
+
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=env,
             stdin=subprocess.DEVNULL,

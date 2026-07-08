@@ -2,6 +2,9 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $env:ENABLE_TAILSCALE = "1"
+if (-not $env:ICCOMP_COCKPIT_PROFILE) {
+    $env:ICCOMP_COCKPIT_PROFILE = "tvm250-prerecorded"
+}
 if (-not $env:CONTAINER_NAME) {
     $env:CONTAINER_NAME = "iccomp-electron-demo-tailscale"
 }

@@ -576,7 +576,7 @@ class RunRemoteReconstructionTest(unittest.TestCase):
         self.assertEqual(
             command,
             (
-                f"bash {REMOTE_PYTORCH_REFERENCE_SCRIPT} --max-images 1 --seed 0 "
+                f"bash {inference_runner.bash_path(REMOTE_PYTORCH_REFERENCE_SCRIPT)} --max-images 1 --seed 0 "
                 f"--expected-sha256 {'b' * 64}"
             ),
         )
@@ -598,7 +598,8 @@ class RunRemoteReconstructionTest(unittest.TestCase):
         self.assertEqual(
             command,
             (
-                f"bash {REMOTE_RECONSTRUCTION_SCRIPT} --variant current --profile-ops --max-inputs 3 --seed 7"
+                f"bash {inference_runner.bash_path(REMOTE_RECONSTRUCTION_SCRIPT)} "
+                "--variant current --profile-ops --max-inputs 3 --seed 7"
             ),
         )
         self.assertNotIn("--max-inputs 1", command)
@@ -618,10 +619,21 @@ class RunRemoteReconstructionTest(unittest.TestCase):
 
         self.assertEqual(
             command,
-            (
-                "bash "
-                f"{PROJECT_ROOT / 'session_bootstrap' / 'scripts' / 'run_big_little_pipeline.sh'} "
-                "--variant current --execution-mode pipeline --max-inputs 120 --seed 7"
+            shlex.join(
+                [
+                    "bash",
+                    inference_runner.bash_path(
+                        PROJECT_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
+                    ),
+                    "--variant",
+                    "current",
+                    "--execution-mode",
+                    "pipeline",
+                    "--max-inputs",
+                    "120",
+                    "--seed",
+                    "7",
+                ]
             ),
         )
         self.assertNotIn("--max-inputs 300", command)
@@ -637,8 +649,17 @@ class RunRemoteReconstructionTest(unittest.TestCase):
 
         self.assertEqual(
             command,
-            (
-                f"bash {REMOTE_RECONSTRUCTION_SCRIPT} --variant current --max-inputs 300 --seed 0"
+            shlex.join(
+                [
+                    "bash",
+                    inference_runner.bash_path(REMOTE_RECONSTRUCTION_SCRIPT),
+                    "--variant",
+                    "current",
+                    "--max-inputs",
+                    "300",
+                    "--seed",
+                    "0",
+                ]
             ),
         )
         self.assertNotIn("run_remote_legacy_tvm_compat.sh", command)
@@ -836,7 +857,7 @@ class RunRemoteReconstructionTest(unittest.TestCase):
             str(inference_runner.DEFAULT_MAX_INPUTS),
         )
         runner_cmd = command[command.index("--runner-cmd") + 1]
-        self.assertIn(str(REMOTE_RECONSTRUCTION_SCRIPT), runner_cmd)
+        self.assertIn(inference_runner.bash_path(REMOTE_RECONSTRUCTION_SCRIPT), runner_cmd)
         self.assertNotIn("run_remote_legacy_tvm_compat.sh", runner_cmd)
         self.assertIn(f"--max-inputs {inference_runner.DEFAULT_MAX_INPUTS}", runner_cmd)
         self.assertIn("--seed 0", runner_cmd)

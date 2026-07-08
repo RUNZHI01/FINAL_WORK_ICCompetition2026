@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import shlex
 import signal
 import subprocess
@@ -70,6 +71,49 @@ LINK_HEALTH_PROFILES = {
         "effective_throughput_kbps": 0,
     },
 }
+
+BASH_ENV_KEYS = ("OPENAMP_BASH", "GIT_BASH", "BASH")
+
+
+def resolve_bash_executable() -> str:
+    for key in BASH_ENV_KEYS:
+        raw = str(os.environ.get(key, "") or "").strip()
+        if raw and Path(raw).is_file():
+            return raw
+
+    if os.name == "nt":
+        git_exe = shutil.which("git")
+        if git_exe:
+            git_root = Path(git_exe).resolve().parents[1]
+            for candidate in (
+                git_root / "usr" / "bin" / "bash.exe",
+                git_root / "bin" / "bash.exe",
+            ):
+                if candidate.is_file():
+                    return str(candidate)
+        for raw in (
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            r"C:\Program Files\Git\bin\bash.exe",
+        ):
+            candidate = Path(raw)
+            if candidate.is_file():
+                return str(candidate)
+
+    return shutil.which("bash") or "bash"
+
+
+def terminate_process(process: subprocess.Popen[Any]) -> int:
+    if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        time.sleep(1.0)
+        if process.poll() is None:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        return int(process.wait(timeout=5))
+    process.terminate()
+    time.sleep(1.0)
+    if process.poll() is None:
+        process.kill()
+    return int(process.wait(timeout=5))
 
 
 def parse_args() -> argparse.Namespace:
@@ -364,7 +408,7 @@ def emit_event(
         hook_started = time.monotonic()
         try:
             result = subprocess.run(
-                ["bash", "-lc", hook_cmd],
+                [resolve_bash_executable(), "-lc", hook_cmd],
                 check=False,
                 input=json.dumps(event, ensure_ascii=False),
                 text=True,
@@ -446,7 +490,7 @@ def build_manifest(
         "variant": variant,
         "job_flags": job_flags,
         "runner_cmd": args.runner_cmd,
-        "runner_cmd_shell_quoted": shlex.join(["bash", "-lc", args.runner_cmd]),
+        "runner_cmd_shell_quoted": shlex.join([resolve_bash_executable(), "-lc", args.runner_cmd]),
         "expected_sha256": expected_sha256,
         "expected_outputs": expected_outputs,
         "deadline_ms": deadline_ms,
@@ -896,12 +940,12 @@ def main() -> int:
         logfile.write(f"runner_cmd={args.runner_cmd}\n")
         logfile.flush()
         process = subprocess.Popen(
-            ["bash", "-lc", args.runner_cmd],
+            [resolve_bash_executable(), "-lc", args.runner_cmd],
             cwd=PROJECT_ROOT,
             stdout=logfile,
             stderr=subprocess.STDOUT,
             text=True,
-            preexec_fn=os.setsid,
+            preexec_fn=os.setsid if hasattr(os, "setsid") else None,
         )
         try:
             last_heartbeat = start_time
@@ -913,11 +957,7 @@ def main() -> int:
                     break
                 if args.runner_timeout_sec > 0 and elapsed > args.runner_timeout_sec:
                     timed_out = True
-                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-                    time.sleep(1.0)
-                    if process.poll() is None:
-                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                    return_code = process.wait(timeout=5)
+                    return_code = terminate_process(process)
                     break
                 if time.monotonic() - last_heartbeat >= args.heartbeat_interval_sec:
                     emit_event(

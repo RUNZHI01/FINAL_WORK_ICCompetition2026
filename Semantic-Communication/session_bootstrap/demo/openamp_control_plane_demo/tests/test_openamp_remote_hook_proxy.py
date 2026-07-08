@@ -17,7 +17,14 @@ DEMO_ROOT = Path(__file__).resolve().parents[1]
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
-from openamp_remote_hook_proxy import SSH_HELPER, build_bridge_bundle_base64, build_remote_command, main, normalize_args  # noqa: E402
+from openamp_remote_hook_proxy import (  # noqa: E402
+    SSH_HELPER,
+    build_bridge_bundle_base64,
+    build_remote_command,
+    main,
+    normalize_args,
+    resolve_bash_executable,
+)
 
 
 class OpenampRemoteHookProxyTest(unittest.TestCase):
@@ -147,7 +154,7 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         command = run.call_args.args[0]
-        self.assertEqual(command[:2], ["bash", str(SSH_HELPER)])
+        self.assertEqual(command[:2], [resolve_bash_executable(), str(SSH_HELPER)])
         remote_command = command[-1]
         hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
         self.assertIn(f"HOOK_EVENT_B64={hook_event_b64}", remote_command)

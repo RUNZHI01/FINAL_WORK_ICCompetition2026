@@ -21,6 +21,7 @@ from board_probe import (  # noqa: E402
     SSH_WITH_PASSWORD_SCRIPT,
     build_probe_command,
     load_probe_output,
+    resolve_bash_executable,
     run_live_probe,
     write_probe_output,
 )
@@ -56,7 +57,7 @@ class BuildProbeCommandTest(unittest.TestCase):
         self.assertEqual(
             command,
             [
-                "bash",
+                resolve_bash_executable(),
                 str(SSH_WITH_PASSWORD_SCRIPT),
                 "--host",
                 "demo-board",
@@ -88,7 +89,7 @@ class BuildProbeCommandTest(unittest.TestCase):
         self.assertEqual(
             command,
             [
-                "bash",
+                resolve_bash_executable(),
                 str(SSH_WITH_PASSWORD_SCRIPT),
                 "--host",
                 "demo-board",
@@ -119,7 +120,7 @@ class BuildProbeCommandTest(unittest.TestCase):
         self.assertEqual(
             command,
             [
-                "bash",
+                resolve_bash_executable(),
                 str(CONNECT_SCRIPT),
                 "--env",
                 env_file,
@@ -299,6 +300,10 @@ class RunLiveProbeTest(unittest.TestCase):
         with patch("board_probe.now_iso", return_value="2026-03-15T12:07:00+0800"):
             payload = run_live_probe(env_file=env_file, timeout_sec=4.0)
 
+        diagnostic_error = payload["diagnostics"].get("error", "")
+        self.assertIn("No such file or directory", diagnostic_error)
+        self.assertIn("missing-probe.env", diagnostic_error)
+        payload = {**payload, "diagnostics": {"error": "<missing env file>"}}
         self.assertEqual(
             payload,
             {
@@ -309,7 +314,7 @@ class RunLiveProbeTest(unittest.TestCase):
                 "summary": "板卡探测配置不可用，请检查环境文件、主机和端口设置。",
                 "error": "板卡探测配置不可用，请检查环境文件、主机和端口设置。",
                 "details": {},
-                "diagnostics": {"error": f"[Errno 2] No such file or directory: '{PROJECT_ROOT / env_file}'"},
+                "diagnostics": {"error": "<missing env file>"},
             },
         )
 

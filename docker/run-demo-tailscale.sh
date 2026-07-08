@@ -2,6 +2,7 @@
 set -euo pipefail
 
 export ENABLE_TAILSCALE=1
+export ICCOMP_COCKPIT_PROFILE="${ICCOMP_COCKPIT_PROFILE:-tvm250-prerecorded}"
 export CONTAINER_NAME="${CONTAINER_NAME:-iccomp-electron-demo-tailscale}"
 export TAILSCALE_HOSTNAME="${TAILSCALE_HOSTNAME:-iccomp-demo}"
 export TAILSCALE_PING_TARGET="${TAILSCALE_PING_TARGET:-100.121.87.73}"

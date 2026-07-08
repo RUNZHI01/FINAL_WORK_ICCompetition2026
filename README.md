@@ -76,7 +76,18 @@ Windows PowerShell:
 
 真机演示需要运行机器和飞腾派在同一个 Tailscale 网络内。脚本里保留的默认地址只对应既有验证环境；复测时请用 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定实际板卡地址。
 
-Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-wslg-tailscale.ps1` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。
+Windows 现场优先使用原生 PowerShell + Docker，不走 WSL。用于恢复 cockpit desktop 下 handwritten TVM + big.LITTLE 300 张测速口径时，运行：
+
+```powershell
+$env:REMOTE_HOST="100.121.87.73"
+$env:REMOTE_USER="user"
+$env:REMOTE_PASS="<board password>"
+.\docker\run-demo-tailscale.ps1
+```
+
+`run-demo-tailscale.*` 默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。2026-07-08 的 cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.23 ms`、median `244.03 ms`、p95 `247.60 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260708_233215.*`。
+
+Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-tailscale.*` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。
 
 如果是干净飞腾派，先把本仓库放到板端，然后在板端执行：
 

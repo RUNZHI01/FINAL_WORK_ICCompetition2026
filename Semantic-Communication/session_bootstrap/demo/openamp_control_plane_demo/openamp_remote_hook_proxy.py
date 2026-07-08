@@ -16,6 +16,12 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
+
 SSH_HELPER = PROJECT_ROOT / "session_bootstrap" / "scripts" / "ssh_with_password.sh"
 BRIDGE_SCRIPT = PROJECT_ROOT / "session_bootstrap" / "scripts" / "openamp_rpmsg_bridge.py"
 PROTOCOL_SCRIPT = PROJECT_ROOT / "openamp_mock" / "protocol.py"
@@ -291,7 +297,7 @@ def main() -> int:
     remote_command = build_remote_command(args, phase=phase, job_id=job_id, hook_event_b64=hook_event_b64)
     remote_input = f"{args.password}\n"
     command = [
-        "bash",
+        resolve_bash_executable(),
         str(SSH_HELPER),
         "--host",
         args.host,

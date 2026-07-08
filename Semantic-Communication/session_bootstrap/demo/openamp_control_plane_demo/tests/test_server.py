@@ -482,6 +482,107 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(system_payload["recent_results"]["current"]["timings"]["payload_ms"], 239.2)
         self.assertEqual(system_payload["recent_results"]["current"]["timings"]["total_ms"], 251.7)
 
+    def test_compute_tvm_benchmark_accepts_big_little_wrapper_payload(self) -> None:
+        benchmark = server._compute_tvm_benchmark(
+            {
+                "status": "ok",
+                "runner": "run_big_little_pipeline.sh",
+                "pipeline": {
+                    "status": "ok",
+                    "processed_count": 3,
+                    "run_samples_ms": [243.717, 244.086, 246.424],
+                    "run_median_ms": 244.086,
+                    "run_mean_ms": 244.742,
+                    "big_cores": [2],
+                    "little_cores": [0, 1],
+                },
+            }
+        )
+
+        self.assertEqual(benchmark["inference_ms"]["n"], 3)
+        self.assertEqual(benchmark["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(benchmark["total_ms"]["mean_ms"], 244.74)
+
+    def test_start_batch_inference_uses_runner_summary_for_tvm_benchmark(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-biglittle-live-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "真实在线推进 + handwritten big.LITTLE",
+                "message": "TVM big.LITTLE completed.",
+                "artifact_sha": "sha-biglittle",
+                "sample": {"label": "sample-biglittle"},
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "timings": {"payload_ms": 999.0, "total_ms": 1001.0},
+                "runner_summary": {
+                    "status": "ok",
+                    "run_id": "biglittle-run-001",
+                    "runner": "run_big_little_pipeline.sh",
+                    "pipeline": {
+                        "status": "ok",
+                        "processed_count": 3,
+                        "execution_mode": "pipeline",
+                        "run_samples_ms": [243.717, 244.086, 246.424],
+                        "run_median_ms": 244.086,
+                        "run_mean_ms": 244.742,
+                        "big_cores": [2],
+                        "little_cores": [0, 1],
+                    },
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["completed"], 3)
+        self.assertEqual(final_state["benchmark"]["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(final_state["benchmark"]["total_ms"]["mean_ms"], 244.74)
+        self.assertEqual(final_state["runner_summary"]["pipeline"]["big_cores"], [2])
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+        self.assertEqual(status, 200)
+        current = system_payload["recent_results"]["current"]
+        self.assertEqual(current["run_id"], "biglittle-run-001")
+        self.assertEqual(current["processed_count"], 3)
+        self.assertEqual(current["inference_benchmark"]["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(current["benchmark"]["total_ms"]["mean_ms"], 244.74)
+        self.assertEqual(current["runner_summary"]["pipeline"]["little_cores"], [0, 1])
+
     def test_runner_only_fallback_allows_host_env_error_preflight(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -739,51 +840,38 @@ class DashboardStateTest(unittest.TestCase):
         self.assertIn("远端推理配置不完整或不可用", batch_state["message"])
         run_demo_inference.assert_called_once()
 
-    def test_start_batch_inference_returns_blocked_when_crypto_client_diagnostics_include_paths(self) -> None:
-        env_file = "session_bootstrap/config/inference_demo_openamp_mean4_v7.2026-04-20.phytium_pi.env"
-        state = DashboardState(env_file, 30.0, probe_cache_path=None)
+    def test_start_batch_inference_uses_standard_runner_when_crypto_enabled(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True
-        state._board_access = server.build_board_access_config(
-            {
-                "host": "demo-board",
-                "user": "demo-user",
-                "password": "demo-pass",
-                "port": "22",
-                "env_file": env_file,
-            },
-            fallback=state._board_access,
-        )
-
-        preflight = {
-            "status": "success",
-            "guard_state": "READY",
-            "last_fault_code": "NONE",
-            "heartbeat_ok": 1,
-            "total_fault_count": 0,
-            "logs": [],
-        }
 
         with (
-            patch.object(state, "_ensure_board_tcp_server", return_value=None),
-            patch.object(state, "_get_mlkem_session_manager", return_value=None),
-            patch("server.query_live_status", return_value=preflight),
-            patch(
-                "server.resolve_local_crypto_client",
-                return_value=(Path("/tmp/legacy_tcp_client.py"), [Path("/tmp/legacy_tcp_client.py")]),
-            ),
-            patch.object(state, "_emit_inference_rejection_events", return_value=None),
+            patch.object(
+                state,
+                "run_demo_inference",
+                return_value={
+                    "status": "fallback",
+                    "execution_mode": "prerecorded",
+                    "request_state": "completed",
+                    "status_category": "config_error",
+                    "source_label": "配置不完整，回退展示（归档样例）",
+                    "message": "远端推理配置不完整或不可用，请检查连接信息和推理环境参数。 当前已回退到预录结果。",
+                    "live_progress": {"completed_count": 0, "expected_count": 3},
+                },
+            ) as run_demo_inference,
+            patch.object(state, "run_mlkem_inference", side_effect=AssertionError("legacy ML-KEM data path should not be used")),
         ):
             payload = state.start_batch_inference(count=3)
 
         self.assertEqual(payload["status"], "blocked")
-        self.assertEqual(payload["status_category"], "client_missing")
+        self.assertEqual(payload["status_category"], "config_error")
         self.assertEqual(payload["engine"], "tvm")
         self.assertEqual(payload["service_mode"], "FULL_FRAME")
         batch_state = state.get_batch_state()
         self.assertEqual(batch_state["status"], "done")
         self.assertEqual(batch_state["completed"], 0)
         self.assertEqual(batch_state["fallback"], 3)
-        self.assertEqual(batch_state["status_category"], "client_missing")
+        self.assertEqual(batch_state["status_category"], "config_error")
+        run_demo_inference.assert_called_once()
 
     def test_start_batch_inference_alert_mode_keeps_batch_state_accessible_and_completes(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -2572,6 +2660,50 @@ class DashboardStateTest(unittest.TestCase):
                 "/home/demo-user/mlkem_link/kem.py",
             ],
         )
+
+    def test_write_remote_text_file_uses_scp_instead_of_embedding_large_content(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        large_content = "PAYLOAD-CONTENT-" * 6000
+        ssh_commands: list[str] = []
+        scp_calls: list[dict[str, object]] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            ssh_commands.append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        def fake_run_scp_file(**kwargs: object):
+            local_path = Path(str(kwargs["local_path"]))
+            scp_calls.append({**kwargs, "uploaded_content": local_path.read_text(encoding="utf-8")})
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.run_scp_file", side_effect=fake_run_scp_file),
+        ):
+            state._write_remote_text_file(
+                board_access,
+                remote_path="/home/demo-user/tcp_server.py",
+                content=large_content,
+                mode=0o755,
+                timeout=25.0,
+            )
+
+        self.assertEqual(len(scp_calls), 1)
+        self.assertEqual(scp_calls[0]["uploaded_content"], large_content)
+        self.assertTrue(str(scp_calls[0]["remote_path"]).startswith("/home/demo-user/.tcp_server.py."))
+        self.assertEqual(len(ssh_commands), 2)
+        self.assertLess(max(len(command) for command in ssh_commands), 2000)
+        self.assertNotIn(large_content[:200], "\n".join(ssh_commands))
 
     def test_get_crypto_status_fetches_board_status_without_proxy(self) -> None:
         class FakeResponse:

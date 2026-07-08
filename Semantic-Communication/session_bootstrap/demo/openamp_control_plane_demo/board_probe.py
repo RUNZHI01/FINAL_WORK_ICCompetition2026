@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,12 @@ from remote_failure import build_diagnostics, build_operator_message, classify_s
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
+
 REPORTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "reports"
 CONNECT_SCRIPT = PROJECT_ROOT / "session_bootstrap" / "scripts" / "connect_phytium_pi.sh"
 SSH_WITH_PASSWORD_SCRIPT = PROJECT_ROOT / "session_bootstrap" / "scripts" / "ssh_with_password.sh"
@@ -139,7 +146,7 @@ def build_probe_command(env_file: str | None = None, env_values: dict[str, str] 
     host, user, password, port = resolve_probe_login(values)
     if host and user and password:
         return [
-            "bash",
+            resolve_bash_executable(),
             str(SSH_WITH_PASSWORD_SCRIPT),
             "--host",
             host,
@@ -153,7 +160,7 @@ def build_probe_command(env_file: str | None = None, env_values: dict[str, str] 
             remote_cmd,
         ]
 
-    command = ["bash", str(CONNECT_SCRIPT)]
+    command = [resolve_bash_executable(), str(CONNECT_SCRIPT)]
     if env_file:
         command.extend(["--env", env_file])
     command.extend(["--", remote_cmd])

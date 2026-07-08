@@ -14,6 +14,7 @@ import shlex
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http import HTTPStatus
@@ -28,6 +29,9 @@ from urllib.error import HTTPError, URLError
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+SESSION_SCRIPTS_ROOT = REPO_ROOT / "session_bootstrap" / "scripts"
+if str(SESSION_SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SESSION_SCRIPTS_ROOT))
 
 from aircraft_position_bridge import FIELD_PATH_CANDIDATES, build_config_from_env_values, fetch_normalized_payload
 from archive_replay import ArchiveSessionNotFoundError, list_archive_sessions, load_archive_session
@@ -66,6 +70,7 @@ from crypto_runtime import (
     resolve_local_mlkem_runtime_root,
     resolve_local_oqs_install,
     resolve_local_crypto_server,
+    run_scp_file,
     run_ssh_command,
 )
 from demo_data import (
@@ -101,6 +106,7 @@ from inference_runner import (
     launch_remote_reconstruction_job,
     load_signed_manifest_summary,
 )
+from openamp_control_wrapper import resolve_bash_executable
 from usrp_runtime import (
     INFERENCE_ENGINE_MNN,
     INFERENCE_ENGINE_NONE,
@@ -810,6 +816,46 @@ def _build_remote_text_write_command(remote_path: str, content: str, mode: int) 
         f"os.chmod(path, {mode})\n"
         "PY"
     )
+
+
+def _build_remote_python_exec_command(script: str) -> str:
+    encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
+    python_command = (
+        "import base64; "
+        f"exec(base64.b64decode({encoded!r}).decode('utf-8'))"
+    )
+    return (
+        "if command -v python3 >/dev/null 2>&1; then PY=python3; "
+        "elif command -v python >/dev/null 2>&1; then PY=python; "
+        "else echo 'python not found on remote host' >&2; exit 127; fi; "
+        f"$PY -c {shlex.quote(python_command)}"
+    )
+
+
+def _build_remote_file_copy_prepare_command(remote_temp_path: str) -> str:
+    script = "\n".join(
+        [
+            "from pathlib import Path",
+            f"path = Path({json.dumps(remote_temp_path)}).expanduser()",
+            "path.parent.mkdir(parents=True, exist_ok=True)",
+        ]
+    )
+    return _build_remote_python_exec_command(script)
+
+
+def _build_remote_file_copy_finalize_command(remote_temp_path: str, remote_path: str, mode: int) -> str:
+    script = "\n".join(
+        [
+            "import os",
+            "from pathlib import Path",
+            f"tmp = Path({json.dumps(remote_temp_path)}).expanduser()",
+            f"dest = Path({json.dumps(remote_path)}).expanduser()",
+            "dest.parent.mkdir(parents=True, exist_ok=True)",
+            "os.replace(tmp, dest)",
+            f"os.chmod(dest, {int(mode)})",
+        ]
+    )
+    return _build_remote_python_exec_command(script)
 
 
 def _remote_http_wait_command(
@@ -2024,7 +2070,12 @@ def _metric_from_values(values: list[float]) -> dict[str, Any] | None:
 
 
 def _compute_tvm_benchmark(summary: dict[str, Any]) -> dict[str, Any]:
-    samples = summary.get("run_samples_ms") if isinstance(summary, dict) and isinstance(summary.get("run_samples_ms"), list) else []
+    payload = summary if isinstance(summary, dict) else {}
+    for nested_key in ("inference_summary", "pipeline"):
+        nested = payload.get(nested_key) if isinstance(payload, dict) else None
+        if isinstance(nested, dict):
+            payload = nested
+    samples = payload.get("run_samples_ms") if isinstance(payload.get("run_samples_ms"), list) else []
     values: list[float] = []
     for item in samples:
         try:
@@ -2032,6 +2083,28 @@ def _compute_tvm_benchmark(summary: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError):
             continue
     metric = _metric_from_values(values)
+    if metric is None:
+        run_summary = payload.get("run_summary") if isinstance(payload.get("run_summary"), dict) else None
+        metric = _metric_from_summary_stat(run_summary)
+    if metric is None:
+        try:
+            count = int(payload.get("run_count") or payload.get("processed_count") or 0)
+            mean_ms = float(payload.get("run_mean_ms"))
+            median_ms = float(payload.get("run_median_ms"))
+            min_ms = float(payload.get("run_min_ms") or mean_ms)
+            max_ms = float(payload.get("run_max_ms") or mean_ms)
+        except (TypeError, ValueError):
+            metric = None
+        else:
+            if count > 0:
+                metric = {
+                    "n": count,
+                    "min_ms": round(min_ms, 2),
+                    "max_ms": round(max_ms, 2),
+                    "mean_ms": round(mean_ms, 2),
+                    "median_ms": round(median_ms, 2),
+                    "p95_ms": None,
+                }
     return {
         "handshake_ms": None,
         "encrypt_ms": None,
@@ -3838,18 +3911,60 @@ class DashboardState:
         mode: int,
         timeout: float,
     ) -> None:
-        proc = run_ssh_command(
-            host=board_access.host,
-            user=board_access.user,
-            password=board_access.password,
-            port=board_access.port or "22",
-            remote_command=_build_remote_text_write_command(remote_path, content, mode),
-            timeout=timeout,
+        remote_target = PurePosixPath(remote_path)
+        remote_temp_path = str(
+            remote_target.parent
+            / f".{remote_target.name}.{os.getpid()}.{threading.get_ident()}.tmp"
         )
-        if proc.returncode == 0:
-            return
-        error_output = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
-        raise RuntimeError(f"failed to write remote file {remote_path}: {error_output}")
+        local_tmp_path: Path | None = None
+        try:
+            fd, raw_tmp_path = tempfile.mkstemp(prefix="openamp-remote-", suffix=".txt", text=True)
+            local_tmp_path = Path(raw_tmp_path)
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+                handle.write(content)
+
+            prepare_proc = run_ssh_command(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                remote_command=_build_remote_file_copy_prepare_command(remote_temp_path),
+                timeout=timeout,
+            )
+            if prepare_proc.returncode != 0:
+                error_output = prepare_proc.stderr.strip() or prepare_proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"failed to prepare remote file {remote_path}: {error_output}")
+
+            copy_proc = run_scp_file(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                local_path=local_tmp_path,
+                remote_path=remote_temp_path,
+                timeout=timeout,
+            )
+            if copy_proc.returncode != 0:
+                error_output = copy_proc.stderr.strip() or copy_proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"failed to copy remote file {remote_path}: {error_output}")
+
+            finalize_proc = run_ssh_command(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                remote_command=_build_remote_file_copy_finalize_command(remote_temp_path, remote_path, mode),
+                timeout=timeout,
+            )
+            if finalize_proc.returncode != 0:
+                error_output = finalize_proc.stderr.strip() or finalize_proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"failed to finalize remote file {remote_path}: {error_output}")
+        finally:
+            if local_tmp_path is not None:
+                try:
+                    local_tmp_path.unlink()
+                except OSError:
+                    pass
 
     def _aircraft_position_upstream_probe_snapshot(
         self,
@@ -5662,8 +5777,90 @@ class DashboardState:
         )
         return payload
 
-    def _update_last_inference_summary(self, payload: dict[str, Any], variant: str) -> None:
+    def _hydrate_recent_inference_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         cached_payload = _json_safe_copy(payload)
+        live_attempt = (
+            cached_payload.get("live_attempt")
+            if isinstance(cached_payload.get("live_attempt"), dict)
+            else {}
+        )
+        runner_summary = (
+            cached_payload.get("runner_summary")
+            if isinstance(cached_payload.get("runner_summary"), dict)
+            else {}
+        )
+        wrapper_summary = (
+            cached_payload.get("wrapper_summary")
+            if isinstance(cached_payload.get("wrapper_summary"), dict)
+            else {}
+        )
+        if not runner_summary and isinstance(live_attempt.get("runner_summary"), dict):
+            runner_summary = live_attempt["runner_summary"]
+            cached_payload["runner_summary"] = runner_summary
+        if not wrapper_summary and isinstance(live_attempt.get("wrapper_summary"), dict):
+            wrapper_summary = live_attempt["wrapper_summary"]
+            cached_payload["wrapper_summary"] = wrapper_summary
+
+        board_summary = self._extract_board_runner_summary(runner_summary)
+        run_id = (
+            str(cached_payload.get("run_id") or "").strip()
+            or str(runner_summary.get("run_id") or "").strip()
+            or str(wrapper_summary.get("run_id") or "").strip()
+            or str(board_summary.get("run_id") or "").strip()
+        )
+        if run_id:
+            cached_payload["run_id"] = run_id
+
+        processed = (
+            self._status_int(cached_payload.get("processed_count"))
+            or self._status_int(board_summary.get("processed_count"))
+            or self._status_int(board_summary.get("output_count"))
+            or self._status_int(board_summary.get("run_count"))
+            or self._status_int(runner_summary.get("processed_count"))
+            or self._status_int(wrapper_summary.get("processed_count"))
+        )
+        if processed:
+            cached_payload["processed_count"] = processed
+            cached_payload.setdefault("completed_count", processed)
+
+        selected = (
+            self._status_int(cached_payload.get("selected_input_count"))
+            or self._status_int(board_summary.get("selected_input_count"))
+            or self._status_int(board_summary.get("input_count"))
+            or self._status_int(board_summary.get("available_input_count"))
+            or self._status_int(runner_summary.get("selected_input_count"))
+            or self._status_int(wrapper_summary.get("selected_input_count"))
+        )
+        if selected:
+            cached_payload["selected_input_count"] = selected
+
+        benchmark = (
+            cached_payload.get("inference_benchmark")
+            if isinstance(cached_payload.get("inference_benchmark"), dict)
+            else None
+        )
+        if benchmark is None:
+            benchmark = (
+                wrapper_summary.get("inference_benchmark")
+                if isinstance(wrapper_summary.get("inference_benchmark"), dict)
+                else None
+            )
+        if benchmark is None or not benchmark.get("inference_ms"):
+            candidate = (
+                _compute_mnn_benchmark(board_summary)
+                if isinstance(board_summary.get("sample_stats"), dict)
+                else _compute_tvm_benchmark(runner_summary or board_summary)
+            )
+            if isinstance(candidate.get("inference_ms"), dict):
+                benchmark = candidate
+        if isinstance(benchmark, dict) and benchmark.get("inference_ms"):
+            cached_payload["inference_benchmark"] = benchmark
+            cached_payload["benchmark"] = benchmark
+
+        return cached_payload
+
+    def _update_last_inference_summary(self, payload: dict[str, Any], variant: str) -> None:
+        cached_payload = self._hydrate_recent_inference_payload(payload)
         timings = payload.get("timings") if isinstance(payload.get("timings"), dict) else {}
         sample = payload.get("sample") if isinstance(payload.get("sample"), dict) else {}
         self._last_inference_result = {
@@ -5925,7 +6122,7 @@ class DashboardState:
 
         output_prefix = f"mnn_demo_batch_{int(time.time())}"
         command = [
-            "bash",
+            resolve_bash_executable(),
             str(REMOTE_MNN_RECONSTRUCTION_SCRIPT),
             "--variant",
             "current",
@@ -6064,7 +6261,7 @@ class DashboardState:
             }
 
         command = [
-            "bash",
+            resolve_bash_executable(),
             str(REMOTE_TVM_RECONSTRUCTION_SCRIPT),
             "--variant",
             "current",
@@ -6772,10 +6969,10 @@ class DashboardState:
             )
 
         try:
-            with self._lock:
-                use_mlkem = self._crypto_enabled
-            runner = self.run_mlkem_inference if use_mlkem else self.run_demo_inference
-            initial_result = runner(
+            # Batch TVM must stay on the standard live runner so INFERENCE_CURRENT_CMD
+            # can select the handwritten big.LITTLE pipeline. ML-KEM is control/auth
+            # context here, not the batch data path.
+            initial_result = self.run_demo_inference(
                 variant="current",
                 image_index=0,
                 allow_preflight_degraded=allow_preflight_degraded,
@@ -6913,6 +7110,10 @@ class DashboardState:
                 timings = last_result.get("timings") if isinstance(last_result.get("timings"), dict) else {}
                 runner_summary = live_attempt.get("runner_summary") if isinstance(live_attempt.get("runner_summary"), dict) else {}
                 wrapper_summary = live_attempt.get("wrapper_summary") if isinstance(live_attempt.get("wrapper_summary"), dict) else {}
+                if not runner_summary and isinstance(last_result.get("runner_summary"), dict):
+                    runner_summary = last_result["runner_summary"]
+                if not wrapper_summary and isinstance(last_result.get("wrapper_summary"), dict):
+                    wrapper_summary = last_result["wrapper_summary"]
                 artifacts = live_attempt.get("artifacts") if isinstance(live_attempt.get("artifacts"), dict) else {}
                 stage_progress = live_attempt.get("stage_progress") if isinstance(live_attempt.get("stage_progress"), dict) else {}
                 host_stage = stage_progress.get("host_preprocess") if isinstance(stage_progress.get("host_preprocess"), dict) else {}
@@ -6921,6 +7122,7 @@ class DashboardState:
                 inference_summary = wrapper_summary.get("inference_summary") if isinstance(wrapper_summary.get("inference_summary"), dict) else {}
                 transport_benchmark = wrapper_summary.get("transport_benchmark") if isinstance(wrapper_summary.get("transport_benchmark"), dict) else None
                 inference_benchmark = wrapper_summary.get("inference_benchmark") if isinstance(wrapper_summary.get("inference_benchmark"), dict) else None
+                tvm_summary = inference_summary or runner_summary or wrapper_summary
 
                 with self._lock:
                     state = self._batch_state
@@ -6964,6 +7166,17 @@ class DashboardState:
                         total_ms = wrapper_summary.get("per_image_ms")
                     if total_ms is not None and is_live:
                         samples["total_ms"] = [float(total_ms)]
+                    if not is_usrp_batch and is_live and inference_benchmark is None and tvm_summary:
+                        inference_benchmark = _compute_tvm_benchmark(tvm_summary)
+                    if (
+                        not is_usrp_batch
+                        and is_live
+                        and inference_benchmark
+                        and inference_benchmark.get("inference_ms")
+                    ):
+                        state["benchmark"] = inference_benchmark
+                        state["inference_benchmark"] = inference_benchmark
+                        state["runner_summary"] = tvm_summary
                     if is_usrp_batch:
                         if inference_benchmark is None and inference_summary:
                             inference_benchmark = _compute_tvm_benchmark(inference_summary)

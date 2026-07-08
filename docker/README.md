@@ -41,7 +41,28 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 
 ## Tailscale 真机链路
 
-Windows + WSLg 推荐：
+当前 Windows 现场复现优先使用原生 PowerShell + Docker，不走 WSL：
+
+```powershell
+$env:REMOTE_HOST="100.121.87.73"
+$env:REMOTE_USER="user"
+$env:REMOTE_PASS="<board password>"
+.\docker\run-demo-tailscale.ps1
+```
+
+`run-demo-tailscale.*` 默认设置 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`。该 profile 固定为预录 latent 输入、TCP/Tailscale 控制连接，并默认关闭 ML-KEM auth gate：
+
+```text
+OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded
+MLKEM_TRANSPORT_MODE=tcp
+MLKEM_AUTH_ENABLED=0
+```
+
+普通 `start-electron-prod-demo.sh` profile 仍默认 `MLKEM_AUTH_ENABLED=1`；上面的关闭只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。
+
+这一路用于恢复 cockpit desktop 下的 handwritten TVM + big.LITTLE 300 张测速口径。2026-07-08 的真机验证结果为 `300/300`、fallback `0`、mean `244.23 ms`、median `244.03 ms`、p95 `247.60 ms`；报告位于 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260708_233215.*`。
+
+旧 WSLg 入口仍保留给已有 WSLg 环境使用；当前 Windows 现场不要走这条路径：
 
 ```powershell
 .\docker\run-demo-wslg-tailscale.ps1

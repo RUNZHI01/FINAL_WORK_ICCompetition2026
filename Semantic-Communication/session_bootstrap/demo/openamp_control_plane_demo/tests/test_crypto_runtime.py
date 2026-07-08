@@ -289,6 +289,119 @@ class CryptoRuntimeTest(unittest.TestCase):
         self.assertEqual(captured["env"]["SSH_ASKPASS_REQUIRE"], "force")
         self.assertFalse(Path(str(captured["env"]["SSH_ASKPASS"])).exists())
 
+    def test_run_ssh_command_uses_utf8_replacement_decoding(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured.update(kwargs)
+            return subprocess.CompletedProcess(args[0], 0, stdout="ok\n", stderr="")
+
+        with patch("crypto_runtime.subprocess.run", side_effect=fake_run):
+            crypto_runtime.run_ssh_command(
+                host="demo-board",
+                user="demo-user",
+                password="",
+                port="22",
+                remote_command="echo ready",
+                timeout=5,
+            )
+
+        self.assertIs(captured["text"], True)
+        self.assertEqual(captured["encoding"], "utf-8")
+        self.assertEqual(captured["errors"], "replace")
+
+    def test_run_ssh_command_uses_docker_runner_when_requested(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured["command"] = args[0]
+            captured["env"] = kwargs["env"]
+            return subprocess.CompletedProcess(args[0], 0, stdout="ok\n", stderr="")
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OPENAMP_SSH_RUNNER": "docker",
+                    "OPENAMP_SSH_DOCKER_IMAGE": "demo-ssh-image:latest",
+                },
+            ),
+            patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"),
+            patch("crypto_runtime.subprocess.run", side_effect=fake_run),
+        ):
+            crypto_runtime.run_ssh_command(
+                host="demo-board",
+                user="demo-user",
+                password="demo-pass",
+                port="22",
+                remote_command="echo ready",
+                timeout=5,
+            )
+
+        command = captured["command"]
+        self.assertEqual(command[:5], ["docker", "run", "--rm", "-e", "SSHPASS"])
+        self.assertIn("demo-ssh-image:latest", command)
+        self.assertIn("sshpass", command)
+        self.assertIn("ssh", command)
+        self.assertEqual(captured["env"]["SSHPASS"], "demo-pass")
+
+    def test_run_scp_file_uses_docker_runner_when_requested(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured["command"] = args[0]
+            captured["env"] = kwargs["env"]
+            return subprocess.CompletedProcess(args[0], 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_file = Path(temp_dir) / "payload.txt"
+            local_file.write_text("payload", encoding="utf-8")
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "OPENAMP_SSH_RUNNER": "docker",
+                        "OPENAMP_SSH_DOCKER_IMAGE": "demo-ssh-image:latest",
+                    },
+                ),
+                patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"),
+                patch("crypto_runtime.subprocess.run", side_effect=fake_run),
+            ):
+                crypto_runtime.run_scp_file(
+                    host="demo-board",
+                    user="demo-user",
+                    password="demo-pass",
+                    port="22",
+                    local_path=local_file,
+                    remote_path="/tmp/payload.txt",
+                    timeout=5,
+                )
+
+        command = captured["command"]
+        self.assertEqual(command[:5], ["docker", "run", "--rm", "-e", "SSHPASS"])
+        self.assertIn("demo-ssh-image:latest", command)
+        self.assertIn("scp", command)
+        self.assertIn("/upload/payload.txt", command)
+        self.assertIn("/tmp/payload.txt", command[-1])
+        self.assertEqual(captured["env"]["SSHPASS"], "demo-pass")
+
+    def test_resolve_local_oqs_install_discovers_nested_liboqs_dist(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            current_repo = temp_root / "Semantic-Communication"
+            nested_oqs = current_repo / "liboqs" / "liboqs-dist"
+            (current_repo / "session_bootstrap").mkdir(parents=True)
+            nested_oqs.mkdir(parents=True)
+
+            with (
+                patch.object(crypto_runtime, "PROJECT_ROOT", current_repo),
+                patch.object(crypto_runtime.Path, "cwd", return_value=current_repo),
+            ):
+                resolved, searched = crypto_runtime.resolve_local_oqs_install({})
+
+        self.assertEqual(resolved, nested_oqs.resolve())
+        self.assertIn(nested_oqs.resolve(), searched)
+
     def test_build_local_crypto_client_command_uses_detected_oqs_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
