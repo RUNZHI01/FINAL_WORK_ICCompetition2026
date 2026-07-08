@@ -4,9 +4,11 @@
 import json
 import subprocess
 import sys
+from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
+import torch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +18,23 @@ ANALOG_LINK = PROJECT_ROOT / "USRP292x" / "AnalogLatentLink.py"
 ANALOG_BATCH = PROJECT_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
 
 from USRP292x import AnalogLatentLink as analog  # noqa: E402
+from USRP292x import RunAnalogLatentBatch as analog_batch  # noqa: E402
+
+
+def test_load_latent_accepts_quantized_pt_jscc_output(tmp_path):
+    quant = torch.arange(1 * 4 * 4 * 4, dtype=torch.uint8).reshape(1, 4, 4, 4)
+    scale = torch.tensor(0.25, dtype=torch.float32)
+    zero_point = torch.tensor(8.0, dtype=torch.float32)
+    input_path = tmp_path / "quantized_latent.pt"
+    torch.save({"quant": quant, "scale": scale, "zero_point": zero_point}, input_path)
+
+    latent, info = analog.load_latent(input_path)
+
+    expected = (quant.numpy().astype(np.float32) - 8.0) * 0.25
+    assert latent.shape == expected.shape
+    assert np.allclose(latent, expected)
+    assert info["dtype"] == "float32"
+    assert info["source_format"] == "pt"
 
 
 def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
@@ -145,6 +164,67 @@ def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):
     assert (image_dir / "merged_round0.bin").is_file()
     assert summary["phy"] == "analog-latent-iq"
     assert summary["images"][0]["passed"] is True
+    assert summary["pass_count"] == 1
+    assert summary["all_pass"] is True
+    assert summary["in_process_local_codec"] is True
+    assert summary["codec_warmup_wall_sec"] >= 0.0
+    assert summary["per_image_sec"] > 0.0
+    assert summary["payload_airtime_ms_mean"] > 0.0
+    assert summary["decode_total_wall_sec_mean"] > 0.0
+
+
+def test_process_image_dry_run_uses_in_process_local_codec(tmp_path, monkeypatch):
+    latent = np.linspace(-0.5, 0.5, num=1 * 4 * 4 * 4, dtype=np.float32).reshape(1, 4, 4, 4)
+    input_path = tmp_path / "case0.npz"
+    np.savez(input_path, latent=latent)
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=True,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        rate=5_000_000.0,
+        sps=4,
+        rrc_beta=0.35,
+        rrc_span=8,
+        amp=3000,
+        zero_guard_samples=256,
+        tail_guard_samples=256,
+        cfo_pilot_symbols=128,
+        sync_pilot_symbols=128,
+        data_block_symbols=256,
+        mid_pilot_symbols=32,
+        capture_margin_samples=256,
+        rx_post_quantize=False,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_sync=True,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+    )
+
+    def fail_run_command(*_args, **_kwargs):
+        raise AssertionError("dry-run local codec should not spawn AnalogLatentLink subprocesses")
+
+    monkeypatch.setattr(analog_batch, "run_command", fail_run_command)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert (image.image_dir / "tx_analog.sc16").is_file()
+    assert (image.image_dir / "decode_summary.json").is_file()
+    assert (image.image_dir / "merged_round0.bin").is_file()
 
 
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):

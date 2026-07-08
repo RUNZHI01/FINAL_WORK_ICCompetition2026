@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -36,6 +37,12 @@ CHILD_THREAD_ENV = {
     "NUMEXPR_NUM_THREADS": "1",
     "VECLIB_MAXIMUM_THREADS": "1",
 }
+for _thread_env_name, _thread_env_value in CHILD_THREAD_ENV.items():
+    os.environ.setdefault(_thread_env_name, _thread_env_value)
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from USRP292x import AnalogLatentLink as analog_link  # noqa: E402
 
 
 @dataclass
@@ -87,6 +94,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-fail", action="store_true")
     parser.add_argument("--artifact-mode", choices=("minimal", "full", "board"), default=os.environ.get("USRP_ARTIFACT_MODE", "minimal"))
+    parser.add_argument(
+        "--in-process-local-codec",
+        dest="in_process_local_codec",
+        action="store_true",
+        default=os.environ.get("ANALOG_IN_PROCESS_LOCAL_CODEC", "1") != "0",
+        help="Run local AnalogLatentLink make/decode in this process instead of spawning Python per image.",
+    )
+    parser.add_argument(
+        "--subprocess-local-codec",
+        dest="in_process_local_codec",
+        action="store_false",
+        help="Use the older subprocess-per-stage local codec path.",
+    )
+    parser.add_argument(
+        "--warmup-local-codec",
+        dest="warmup_local_codec",
+        action="store_true",
+        default=os.environ.get("ANALOG_WARMUP_LOCAL_CODEC", "1") != "0",
+        help="Preload the first local latent before per-image timing to keep setup out of transport metrics.",
+    )
+    parser.add_argument(
+        "--no-warmup-local-codec",
+        dest="warmup_local_codec",
+        action="store_false",
+        help="Include first-use latent loader/import setup in the first image timing.",
+    )
 
     # Compatibility arguments accepted from usrp_runtime.py/QPSK runner.
     parser.add_argument("--max-arq-rounds", type=int, default=0)
@@ -120,6 +153,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sync-pilot-symbols", type=int, default=env_int("ANALOG_SYNC_PILOT_SYMBOLS", 1024))
     parser.add_argument("--data-block-symbols", type=int, default=env_int("ANALOG_DATA_BLOCK_SYMBOLS", 4096))
     parser.add_argument("--mid-pilot-symbols", type=int, default=env_int("ANALOG_MID_PILOT_SYMBOLS", 128))
+    parser.add_argument("--cfo-seed", type=int, default=env_int("ANALOG_CFO_SEED", 1001))
+    parser.add_argument("--sync-seed", type=int, default=env_int("ANALOG_SYNC_SEED", 1002))
+    parser.add_argument("--mid-pilot-seed", type=int, default=env_int("ANALOG_MID_PILOT_SEED", 1003))
     parser.add_argument("--capture-margin-samples", type=int, default=env_int("ANALOG_CAPTURE_MARGIN_SAMPLES", 20_000))
     parser.add_argument("--rx-post-quantize", dest="rx_post_quantize", action="store_true", default=os.environ.get("ANALOG_RX_POST_QUANTIZE", "1") != "0")
     parser.add_argument("--no-rx-post-quantize", dest="rx_post_quantize", action="store_false")
@@ -195,6 +231,18 @@ def load_inputs(args: argparse.Namespace) -> list[Path]:
     if args.cycle_inputs:
         return [resolved[idx % len(resolved)] for idx in range(args.count)]
     raise RuntimeError(f"count={args.count} requires {args.count} inputs, got {len(resolved)}")
+
+
+def warmup_local_codec(args: argparse.Namespace, inputs: list[Path]) -> float:
+    if not bool(getattr(args, "in_process_local_codec", False)):
+        return 0.0
+    if not bool(getattr(args, "warmup_local_codec", True)):
+        return 0.0
+    if not inputs:
+        return 0.0
+    started = time.monotonic()
+    analog_link.load_latent(inputs[0])
+    return time.monotonic() - started
 
 
 def run_command(cmd: list[str], log_path: Path, *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -465,6 +513,12 @@ def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path
         str(args.data_block_symbols),
         "--mid-pilot-symbols",
         str(args.mid_pilot_symbols),
+        "--cfo-seed",
+        str(getattr(args, "cfo_seed", 1001)),
+        "--sync-seed",
+        str(getattr(args, "sync_seed", 1002)),
+        "--mid-pilot-seed",
+        str(getattr(args, "mid_pilot_seed", 1003)),
         "--capture-margin-samples",
         str(args.capture_margin_samples),
         "--rx-post-quantize" if args.rx_post_quantize else "--no-rx-post-quantize",
@@ -476,6 +530,34 @@ def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path
     if args.scramble_context:
         cmd.extend(["--scramble-context", str(args.scramble_context)])
     return cmd
+
+
+def analog_make_namespace(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        input=str(image.input_path),
+        out_sc16=str(tx_sc16),
+        manifest=str(manifest),
+        job_id=f"image_{image.index:04d}",
+        rate=float(args.rate),
+        sps=int(args.sps),
+        rrc_beta=float(args.rrc_beta),
+        rrc_span=int(args.rrc_span),
+        amp=int(args.amp),
+        zero_guard_samples=int(args.zero_guard_samples),
+        tail_guard_samples=int(args.tail_guard_samples),
+        cfo_pilot_symbols=int(args.cfo_pilot_symbols),
+        sync_pilot_symbols=int(args.sync_pilot_symbols),
+        data_block_symbols=int(args.data_block_symbols),
+        mid_pilot_symbols=int(args.mid_pilot_symbols),
+        cfo_seed=int(getattr(args, "cfo_seed", 1001)),
+        sync_seed=int(getattr(args, "sync_seed", 1002)),
+        mid_pilot_seed=int(getattr(args, "mid_pilot_seed", 1003)),
+        capture_margin_samples=int(args.capture_margin_samples),
+        rx_post_quantize=bool(args.rx_post_quantize),
+        scramble_key=str(getattr(args, "scramble_key", "") or ""),
+        scramble_key_hex=str(getattr(args, "scramble_key_hex", "") or ""),
+        scramble_context=str(getattr(args, "scramble_context", "") or ""),
+    )
 
 
 def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path, out_npz: Path, out_wire: Path, summary: Path) -> list[str]:
@@ -510,6 +592,31 @@ def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path,
     if args.scramble_context:
         cmd.extend(["--scramble-context", str(args.scramble_context)])
     return cmd
+
+
+def analog_decode_namespace(
+    args: argparse.Namespace,
+    batch_rx: Path,
+    manifest: Path,
+    out_npz: Path,
+    out_wire: Path,
+    summary: Path,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        rx_sc16=str(batch_rx),
+        manifest=str(manifest),
+        out_npz=str(out_npz),
+        out_wire=str(out_wire),
+        summary_json=str(summary),
+        sync_candidates=int(args.sync_candidates),
+        min_sync_metric=float(args.min_sync_metric),
+        robust_sync=bool(args.robust_sync),
+        robust_cfo_max_hz=float(args.robust_cfo_max_hz),
+        robust_cfo_step_hz=float(args.robust_cfo_step_hz),
+        scramble_key=str(getattr(args, "scramble_key", "") or ""),
+        scramble_key_hex=str(getattr(args, "scramble_key_hex", "") or ""),
+        scramble_context=str(getattr(args, "scramble_context", "") or ""),
+    )
 
 
 def simulated_channel_enabled(args: argparse.Namespace) -> bool:
@@ -557,6 +664,82 @@ def analog_simulate_args(args: argparse.Namespace, tx_sc16: Path, manifest: Path
     return cmd
 
 
+def analog_simulate_namespace(args: argparse.Namespace, tx_sc16: Path, manifest: Path, batch_rx: Path, summary: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        tx_sc16=str(tx_sc16),
+        manifest=str(manifest),
+        out_sc16=str(batch_rx),
+        cfo_hz=float(args.sim_cfo_hz),
+        snr_db=None if args.sim_snr_db is None else float(args.sim_snr_db),
+        gain=float(args.sim_gain),
+        phase_deg=float(args.sim_phase_deg),
+        phase_drift_deg=float(args.sim_phase_drift_deg),
+        dc_real=float(args.sim_dc_real),
+        dc_imag=float(args.sim_dc_imag),
+        seed=int(args.sim_seed),
+        summary_json=str(summary),
+    )
+
+
+def run_in_process_make(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest_path: Path, log_path: Path) -> dict[str, Any]:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        manifest = analog_link.make_waveform(analog_make_namespace(args, image, tx_sc16, manifest_path))
+    except Exception:
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+        raise
+    write_json(log_path, {
+        "status": "ok",
+        "mode": "in-process",
+        "manifest": str(manifest_path),
+        "out_sc16": str(tx_sc16),
+        "tx_waveform_samples": manifest["tx_waveform_samples"],
+        "capture_nsamps": manifest["capture_nsamps"],
+    })
+    return manifest
+
+
+def run_in_process_simulate(args: argparse.Namespace, tx_sc16: Path, manifest_path: Path, batch_rx: Path, summary: Path, log_path: Path) -> None:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        sim_summary = analog_link.simulate_channel(analog_simulate_namespace(args, tx_sc16, manifest_path, batch_rx, summary))
+    except Exception:
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+        raise
+    write_json(log_path, {
+        "status": "ok",
+        "mode": "in-process",
+        "out_sc16": str(batch_rx),
+        "simulated_cfo_hz": sim_summary["simulated_cfo_hz"],
+        "simulated_snr_db": sim_summary["simulated_snr_db"],
+    })
+
+
+def run_in_process_decode(
+    args: argparse.Namespace,
+    batch_rx: Path,
+    manifest_path: Path,
+    out_npz: Path,
+    out_wire: Path,
+    decode_summary: Path,
+    log_path: Path,
+) -> int:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        summary = analog_link.decode_waveform(analog_decode_namespace(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary))
+    except Exception:
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+        return 1
+    write_json(log_path, {
+        "status": "ok",
+        "mode": "in-process",
+        "summary_json": str(decode_summary),
+        "sync_metric": summary["sync_metric"],
+        "estimated_cfo_hz": summary["estimated_cfo_hz"],
+    })
+    return 0
+
+
 def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     started = time.monotonic()
     image.image_dir.mkdir(parents=True, exist_ok=True)
@@ -570,34 +753,60 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     ssh_control_socket: str | None = None
     ssh_master_proc: subprocess.Popen | None = None
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
+    use_in_process_local_codec = bool(getattr(args, "in_process_local_codec", False))
 
     try:
         make_started = time.monotonic()
-        run_command(analog_make_args(args, image, tx_sc16, manifest_path), image.image_dir / "make.log")
+        if use_in_process_local_codec:
+            manifest = run_in_process_make(args, image, tx_sc16, manifest_path, image.image_dir / "make.log")
+        else:
+            run_command(analog_make_args(args, image, tx_sc16, manifest_path), image.image_dir / "make.log")
+            manifest = read_json(manifest_path)
         make_wall_sec = time.monotonic() - make_started
-        manifest = read_json(manifest_path)
 
         if args.dry_run:
             if simulated_channel_enabled(args):
-                run_command(
-                    analog_simulate_args(args, tx_sc16, manifest_path, batch_rx, image.image_dir / "simulate_channel_summary.json"),
-                    image.image_dir / "simulate_channel.log",
-                )
+                if use_in_process_local_codec:
+                    run_in_process_simulate(
+                        args,
+                        tx_sc16,
+                        manifest_path,
+                        batch_rx,
+                        image.image_dir / "simulate_channel_summary.json",
+                        image.image_dir / "simulate_channel.log",
+                    )
+                else:
+                    run_command(
+                        analog_simulate_args(args, tx_sc16, manifest_path, batch_rx, image.image_dir / "simulate_channel_summary.json"),
+                        image.image_dir / "simulate_channel.log",
+                    )
             else:
                 shutil.copy2(tx_sc16, batch_rx)
             rx_capture_wall_sec = 0.0
             tx_wall_sec = 0.0
             decode_started = time.monotonic()
-            proc = run_command(
-                analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
-                image.image_dir / "decode.log",
-                check=False,
-            )
+            if use_in_process_local_codec:
+                returncode = run_in_process_decode(
+                    args,
+                    batch_rx,
+                    manifest_path,
+                    out_npz,
+                    out_wire,
+                    decode_summary,
+                    image.image_dir / "decode.log",
+                )
+            else:
+                proc = run_command(
+                    analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
+                    image.image_dir / "decode.log",
+                    check=False,
+                )
+                returncode = int(proc.returncode)
             decode_wall_sec = time.monotonic() - decode_started
-            image.status = int(proc.returncode)
-            image.passed = proc.returncode == 0 and out_wire.is_file() and decode_summary.is_file()
+            image.status = int(returncode)
+            image.passed = returncode == 0 and out_wire.is_file() and decode_summary.is_file()
             if not image.passed:
-                image.error = f"analog decode failed with status {proc.returncode}"
+                image.error = f"analog decode failed with status {returncode}"
         else:
             mode = str(args.rx_capture_mode or "local").strip().lower()
             if mode not in ("local", "remote-pull", "remote-decode"):
@@ -738,16 +947,28 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     image.error = "remote decode completed but expected outputs are missing"
             else:
                 # local + remote-pull: decode locally
-                proc = run_command(
-                    analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
-                    image.image_dir / "decode.log",
-                    check=False,
-                )
+                if use_in_process_local_codec:
+                    returncode = run_in_process_decode(
+                        args,
+                        batch_rx,
+                        manifest_path,
+                        out_npz,
+                        out_wire,
+                        decode_summary,
+                        image.image_dir / "decode.log",
+                    )
+                else:
+                    proc = run_command(
+                        analog_decode_args(args, batch_rx, manifest_path, out_npz, out_wire, decode_summary),
+                        image.image_dir / "decode.log",
+                        check=False,
+                    )
+                    returncode = int(proc.returncode)
                 decode_wall_sec = time.monotonic() - decode_started
-                image.status = int(proc.returncode)
-                image.passed = proc.returncode == 0 and out_wire.is_file() and decode_summary.is_file()
+                image.status = int(returncode)
+                image.passed = returncode == 0 and out_wire.is_file() and decode_summary.is_file()
                 if not image.passed:
-                    image.error = f"analog decode failed with status {proc.returncode}"
+                    image.error = f"analog decode failed with status {returncode}"
 
             # Remote cleanup — best effort, do not fail the run on cleanup errors
             if mode in ("remote-pull", "remote-decode"):
@@ -774,6 +995,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "merged_bin": str(out_wire),
             "decode_summary": str(decode_summary),
             "rx_capture_mode": str(args.rx_capture_mode),
+            "in_process_local_codec": use_in_process_local_codec,
             "remote_rx_ssh_target": remote_target or None,
             "waveform_samples": int(manifest.get("tx_waveform_samples") or 0),
             "capture_nsamps": int(manifest.get("capture_nsamps") or 0),
@@ -818,12 +1040,73 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     return image
 
 
+def _record_float_values(images: list[ImageRecord], field_name: str) -> list[float]:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            value = record.get(field_name)
+            if value is None:
+                continue
+            try:
+                values.append(float(value))
+            except (TypeError, ValueError):
+                continue
+    return values
+
+
+def _mean(values: list[float]) -> float:
+    return float(sum(values) / len(values)) if values else 0.0
+
+
+def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            waveform_samples = int(record.get("waveform_samples") or 0)
+            if waveform_samples > 0:
+                values.append(float(waveform_samples * 4))
+                continue
+            tx_path = Path(str(record.get("tx_sc16") or ""))
+            if tx_path.is_file():
+                values.append(float(tx_path.stat().st_size))
+    return _mean(values)
+
+
+def build_transport_metrics(images: list[ImageRecord]) -> dict[str, Any]:
+    total_values = _record_float_values(images, "total_wall_sec")
+    make_values = _record_float_values(images, "make_wall_sec")
+    tx_values = _record_float_values(images, "tx_wall_sec")
+    rx_values = _record_float_values(images, "rx_capture_wall_sec")
+    decode_values = _record_float_values(images, "decode_wall_sec")
+    airtime_ms_values = _record_float_values(images, "detected_airtime_ms")
+    total_mean = _mean(total_values)
+    decode_mean = _mean(decode_values)
+    airtime_sec_mean = _mean(airtime_ms_values) / 1000.0 if airtime_ms_values else 0.0
+    merge_mean = 0.0
+    return {
+        "per_image_sec": total_mean,
+        "total_wall_sec_mean": total_mean,
+        "make_wall_sec_mean": _mean(make_values),
+        "tx_wall_sec_mean": _mean(tx_values),
+        "rx_capture_wall_sec_mean": _mean(rx_values),
+        "decode_total_wall_sec_mean": decode_mean,
+        "merge_wall_sec_mean": merge_mean,
+        "payload_airtime_ms_mean": _mean(airtime_ms_values),
+        "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": max(
+            0.0,
+            total_mean - airtime_sec_mean - decode_mean - merge_mean,
+        ),
+        "compared_transmitted_bytes_mean": _mean_transmitted_bytes(images),
+    }
+
+
 def main() -> int:
     args = parse_args()
     _validate_rx_capture_config(args)
     inputs = load_inputs(args)
     run_dir = args.run_root / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+    codec_warmup_wall_sec = warmup_local_codec(args, inputs)
 
     images = [
         ImageRecord(index=idx, input_path=path, image_dir=run_dir / f"image_{idx:04d}")
@@ -837,6 +1120,8 @@ def main() -> int:
         completed.append(result)
         if args.stop_on_fail and not result.passed:
             break
+    passed_count = sum(1 for image in completed if image.passed)
+    failed_count = sum(1 for image in completed if not image.passed)
 
     summary = {
         "version": 1,
@@ -846,10 +1131,16 @@ def main() -> int:
         "run_dir": str(run_dir),
         "target_count": int(args.count),
         "completed_count": len(completed),
-        "passed_count": sum(1 for image in completed if image.passed),
-        "failed_count": sum(1 for image in completed if not image.passed),
+        "passed_count": passed_count,
+        "failed_count": failed_count,
+        "pass_count": passed_count,
+        "fail_count": failed_count,
+        "pending_count": max(0, int(args.count) - len(completed)),
+        "all_pass": len(completed) == int(args.count) and failed_count == 0,
         "payload_is_bit_exact": False,
         "dry_run": bool(args.dry_run),
+        "in_process_local_codec": bool(getattr(args, "in_process_local_codec", False)),
+        "codec_warmup_wall_sec": codec_warmup_wall_sec,
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
         "rate": float(args.rate),
         "sps": int(args.sps),
@@ -872,6 +1163,7 @@ def main() -> int:
             "seed": int(args.sim_seed),
         },
         "wall_sec": time.monotonic() - started,
+        **build_transport_metrics(completed),
         "images": [
             {
                 "index": image.index,

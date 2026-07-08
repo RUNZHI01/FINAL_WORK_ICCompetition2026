@@ -82,9 +82,26 @@ def _load_float32_latent(path: str) -> tuple[np.ndarray, dict[str, Any]]:
     """加载旧路径可用的 float32 latent。"""
     if path.endswith('.pt'):
         payload = _torch_load(path)
-        if not isinstance(payload, dict) or 'latent' not in payload:
+        if not isinstance(payload, dict):
             raise ValueError(f'{path} 不包含 raw float latent 字段 "latent"')
-        arr = payload['latent']
+        if 'latent' in payload:
+            arr = payload['latent']
+        elif {'quant', 'scale', 'zero_point'}.issubset(payload.keys()):
+            quant = payload['quant']
+            scale = payload['scale']
+            zero_point = payload['zero_point']
+            if hasattr(quant, 'detach'):
+                quant = quant.detach().cpu().numpy()
+            if hasattr(scale, 'detach'):
+                scale = scale.detach().cpu().numpy()
+            if hasattr(zero_point, 'detach'):
+                zero_point = zero_point.detach().cpu().numpy()
+            arr = (np.asarray(quant, dtype=np.float32) - np.asarray(zero_point, dtype=np.float32)) * np.asarray(
+                scale,
+                dtype=np.float32,
+            )
+        else:
+            raise ValueError(f'{path} 不包含 raw float latent 字段 "latent"')
         if hasattr(arr, 'detach'):
             arr = arr.detach().cpu().numpy()
         arr = np.asarray(arr, dtype=np.float32)

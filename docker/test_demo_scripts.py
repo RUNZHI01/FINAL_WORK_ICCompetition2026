@@ -19,6 +19,8 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-tcp}"' in script
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-0}"' in script
     assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"' in script
+    assert 'ANALOG_IN_PROCESS_LOCAL_CODEC="${ANALOG_IN_PROCESS_LOCAL_CODEC:-1}"' in script
+    assert 'ANALOG_WARMUP_LOCAL_CODEC="${ANALOG_WARMUP_LOCAL_CODEC:-1}"' in script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -37,6 +39,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "OPENAMP_DEMO_INPUT_SOURCE_MODE",
         "JSCC_LINK_MODE",
         "OPENAMP_DEMO_LINK_MODE",
+        "ANALOG_IN_PROCESS_LOCAL_CODEC",
+        "ANALOG_WARMUP_LOCAL_CODEC",
         "MLKEM_TRANSPORT_MODE",
         "MLKEM_AUTH_ENABLED",
         "OPENAMP_SSH_RUNNER",
