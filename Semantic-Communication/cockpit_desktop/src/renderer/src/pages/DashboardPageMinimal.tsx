@@ -22,6 +22,7 @@ import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
 import type { BatchStageProgress } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
+import { buildBoardReadinessItems, type BoardReadinessTone } from '../hooks/boardReadiness'
 import {
   extractIqRadioMetrics,
   extractJsccLinkMode,
@@ -119,6 +120,19 @@ function normalizeBatchCountInput(rawValue: string, fallback: number): number {
     return fallback
   }
   return Math.max(1, Math.min(Math.trunc(parsed), MAX_BATCH_COUNT))
+}
+
+function readinessToneClass(tone: BoardReadinessTone): string {
+  switch (tone) {
+    case 'ready':
+      return s.readinessItemReady
+    case 'blocked':
+      return s.readinessItemBlocked
+    case 'warn':
+      return s.readinessItemWarn
+    default:
+      return s.readinessItemInfo
+  }
 }
 
 const LiveLogStream = memo(function LiveLogStream({ isRunning }: { isRunning: boolean }) {
@@ -544,6 +558,7 @@ export function DashboardPageMinimal() {
   const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
   const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : 'QPSK 兜底'
+  const boardReadinessItems = buildBoardReadinessItems(boardAccess)
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
   const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
     ? '20 张快演'
@@ -940,6 +955,19 @@ export function DashboardPageMinimal() {
                     <div className={`${s.transportBadge} ${activeTransport === 'usrp' ? s.transportBadgeUsr : s.transportBadgeTcp}`}>
                       当前: {activeTransport === 'usrp' ? 'USRP' : '预录'}
                     </div>
+                  </div>
+                  <div className={s.readinessGrid} aria-label="链路就绪状态">
+                    {boardReadinessItems.map((item) => (
+                      <div
+                        key={item.key}
+                        className={`${s.readinessItem} ${readinessToneClass(item.tone)}`}
+                        title={item.detail}
+                      >
+                        <span className={s.readinessLabel}>{item.label}</span>
+                        <span className={s.readinessValue}>{item.value}</span>
+                        <span className={s.readinessDetail}>{item.detail}</span>
+                      </div>
+                    ))}
                   </div>
                   {activeTransport === 'usrp' && (
                     <div className={s.linkModeRow}>

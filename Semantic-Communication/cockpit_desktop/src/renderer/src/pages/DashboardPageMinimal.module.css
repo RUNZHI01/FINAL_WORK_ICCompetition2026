@@ -1100,6 +1100,68 @@
   border: 1px solid rgba(5, 150, 105, 0.18);
 }
 
+.readinessGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.readinessItem {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.readinessItemReady {
+  border-color: rgba(5, 150, 105, 0.20);
+  background: rgba(236, 253, 245, 0.70);
+}
+
+.readinessItemBlocked {
+  border-color: rgba(220, 38, 38, 0.20);
+  background: rgba(254, 242, 242, 0.72);
+}
+
+.readinessItemWarn {
+  border-color: rgba(217, 119, 6, 0.22);
+  background: rgba(255, 251, 235, 0.76);
+}
+
+.readinessItemInfo {
+  border-color: rgba(26, 86, 219, 0.16);
+  background: rgba(239, 246, 255, 0.68);
+}
+
+.readinessLabel {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.readinessValue {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.readinessDetail {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .linkModeRow {
   display: flex;
   flex-wrap: wrap;
@@ -1573,6 +1635,9 @@
   .settingRow {
     flex-direction: column;
     align-items: stretch;
+  }
+  .readinessGrid {
+    grid-template-columns: 1fr;
   }
   .settingActions {
     justify-content: stretch;
