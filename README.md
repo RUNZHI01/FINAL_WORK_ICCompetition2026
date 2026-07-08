@@ -85,7 +85,16 @@ $env:REMOTE_PASS="<board password>"
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。Cockpit 的推理结果对比会接收当前 TVM/MNN 的预录成功结果，因此顶部重建耗时和对比卡片会按同一轮结果刷新。2026-07-08 的 cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.23 ms`、median `244.03 ms`、p95 `247.60 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260708_233215.*`。
+`run-demo-tailscale.*` 默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。Cockpit 的推理结果对比会接收当前 TVM/MNN 的预录成功结果，因此顶部重建耗时和对比卡片会按同一轮结果刷新。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
+
+如果临时绕开 Docker cockpit、直接在 Windows 原生后端调试，必须避免 `C:\Windows\System32\bash.exe` 的 WSL stub。使用 Git Bash 并让 SSH helper 走 Docker runner：
+
+```powershell
+$env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
+$env:GIT_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
+$env:OPENAMP_SSH_RUNNER="docker"
+$env:OPENAMP_SSH_DOCKER_IMAGE="iccomp-usrp-tx:latest"
+```
 
 Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-tailscale.*` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。
 
