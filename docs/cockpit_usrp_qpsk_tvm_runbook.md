@@ -19,6 +19,7 @@ $env:REMOTE_SSH_PORT="22"
 $env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
 $env:REMOTE_USRP_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON="/home/user/venv/bin/python"
+$env:JSCC_LINK_MODE="qpsk"
 $env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
 $env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
 $env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
@@ -45,11 +46,12 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
 ## Verified Milestones
 
 - Prerecorded TVM big.LITTLE path: `openamp3_handwritten_mean4_v7_big_little_current_20260709_052201.json`, 300/300, median 243.30 ms, mean 252.91 ms, p95 311.88 ms. This is the 250 ms reproduction reference.
+- USRP/QPSK + TVM big.LITTLE path after backend restart with `user/user`: `batch-1783549789-1`, 1/1 success, fallback 0; TVM inference 281.527 ms for the single online sample. Raw log: `openamp3_usrp_1783549789_current_20260709_063102.raw.log`.
 - USRP/QPSK + TVM big.LITTLE path: `batch-1783548059-1`, 1/1 success; TVM inference 284.345 ms for the single online sample, artifact SHA matched, affinity applied with inferencer on big core `[2]` and pre/post on little cores `[0,1]`.
 - Earlier QPSK evidence: `batch-1783545491-1`, 1/1 transport pass, byte/bit errors 0, SHA matched.
 - USRP TVM stage now consumes stdout/stderr concurrently, recovers complete summaries from stale SSH wrappers, and accepts statusless complete summaries.
 - When `INFERENCE_CURRENT_CMD` selects `run_big_little_pipeline.sh`, USRP TVM uses the big.LITTLE wrapper with the current run-specific RX directory; verified affinity is big core `[2]`, little cores `[0,1]`.
-- IQ direct remains experimental, not the default. With `remote-pull`, RX/TX and local decode are reachable, but true OTA capture `batch-1783547715-1` produced low sync/SNR (`sync_metric` about 0.09, estimated SNR about -3 dB), so keep QPSK as the reliable live data plane.
+- IQ direct remains experimental, not the default. With `remote-pull`, RX/TX and local decode are reachable, but true OTA capture remains low SNR. `batch-1783548778-1` with amplitude 24000 showed high initial sync (`0.974`) but bad payload quality (estimated SNR about -3 dB, latent MSE about `9.4e5`). The decoder now rejects a CFO estimate when it degrades an already valid sync peak and records `cfo_estimator=.../rejected`; keep QPSK as the reliable live data plane until IQ payload quality is fixed.
 
 ## Useful Checks
 

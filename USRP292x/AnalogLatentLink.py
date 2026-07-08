@@ -817,22 +817,47 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             min_sync_metric=min_sync_metric,
         )
     except RuntimeError as normal_exc:
-        if not robust_enabled:
+        recovered_after_cfo_reject = False
+        if abs(estimated_cfo_hz) >= 5.0 and float(sync0["sync_metric"]) >= min_sync_metric:
+            try:
+                payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
+                    rx_dc,
+                    taps,
+                    sync,
+                    manifest,
+                    cfo_hz=0.0,
+                    rate=rate,
+                    sps=sps,
+                    max_candidates=max_candidates,
+                    min_sync_metric=min_sync_metric,
+                )
+                sync_debug["rejected_cfo_hz"] = float(estimated_cfo_hz)
+                sync_debug["rejected_cfo_error"] = str(normal_exc)
+                estimated_cfo_hz = 0.0
+                cfo_method = f"{cfo_method}/rejected"
+                sync_search_mode = "normal-cfo-rejected"
+                sync_debug["sync_search_mode"] = sync_search_mode
+            except RuntimeError:
+                pass
+            else:
+                recovered_after_cfo_reject = True
+        if not recovered_after_cfo_reject and not robust_enabled:
             raise
-        payload_symbols, payload_metrics, sync_final, estimated_cfo_hz, cfo_method, sync_debug = robust_cfo_grid_recover(
-            rx_dc,
-            taps,
-            sync,
-            manifest,
-            rate=rate,
-            sps=sps,
-            max_candidates=max_candidates,
-            min_sync_metric=min_sync_metric,
-            cfo_max_hz=float(getattr(args, "robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
-            cfo_step_hz=float(getattr(args, "robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
-        )
-        sync_debug["normal_sync_error"] = str(normal_exc)
-        sync_search_mode = str(sync_debug["sync_search_mode"])
+        if not recovered_after_cfo_reject and robust_enabled:
+            payload_symbols, payload_metrics, sync_final, estimated_cfo_hz, cfo_method, sync_debug = robust_cfo_grid_recover(
+                rx_dc,
+                taps,
+                sync,
+                manifest,
+                rate=rate,
+                sps=sps,
+                max_candidates=max_candidates,
+                min_sync_metric=min_sync_metric,
+                cfo_max_hz=float(getattr(args, "robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
+                cfo_step_hz=float(getattr(args, "robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
+            )
+            sync_debug["normal_sync_error"] = str(normal_exc)
+            sync_search_mode = str(sync_debug["sync_search_mode"])
     n_complex = int(manifest["n_complex"])
     if payload_symbols.size < n_complex:
         raise RuntimeError(f"recovered {payload_symbols.size} symbols, expected {n_complex}")

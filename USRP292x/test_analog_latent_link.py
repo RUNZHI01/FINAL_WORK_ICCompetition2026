@@ -936,6 +936,67 @@ def test_robust_sync_rejects_false_peak_then_recovers_3khz_cfo_at_5db(tmp_path):
     assert summary["evm_rms"] < 0.30
 
 
+def test_decode_rejects_cfo_estimate_when_it_degrades_existing_sync(tmp_path, monkeypatch):
+    latent = np.linspace(-0.75, 0.75, num=1 * 4 * 8 * 8, dtype=np.float32).reshape(1, 4, 8, 8)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    np.savez(input_path, latent=latent)
+
+    common = {
+        "rate": 5_000_000.0,
+        "sps": 4,
+        "rrc_beta": 0.35,
+        "rrc_span": 8,
+        "amp": 3000,
+        "zero_guard_samples": 256,
+        "tail_guard_samples": 256,
+        "cfo_pilot_symbols": 128,
+        "sync_pilot_symbols": 128,
+        "data_block_symbols": 256,
+        "mid_pilot_symbols": 32,
+        "cfo_seed": 1001,
+        "sync_seed": 1002,
+        "mid_pilot_seed": 1003,
+        "capture_margin_samples": 256,
+        "rx_post_quantize": False,
+        "scramble_key": "",
+        "scramble_key_hex": "",
+        "scramble_context": "",
+    }
+    analog.make_waveform(Namespace(
+        input=str(input_path),
+        out_sc16=str(tx_sc16),
+        manifest=str(manifest),
+        job_id="bad-cfo-guard",
+        **common,
+    ))
+
+    def bad_cfo_estimate(*_args, **_kwargs):
+        return 25000.0, "forced-bad"
+
+    monkeypatch.setattr(analog, "estimate_cfo_from_known_pilot", bad_cfo_estimate)
+    summary = analog.decode_waveform(Namespace(
+        rx_sc16=str(tx_sc16),
+        manifest=str(manifest),
+        out_npz=str(tmp_path / "received_latent.npz"),
+        out_wire="",
+        summary_json=str(tmp_path / "decode_summary.json"),
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_sync=False,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    ))
+
+    assert summary["sync_metric"] > 0.95
+    assert summary["estimated_cfo_hz"] == 0.0
+    assert summary["cfo_estimator"] == "forced-bad/rejected"
+
+
 def test_mid_pilot_linear_phase_tracking_recovers_symbol_block():
     cfo_len = 8
     sync_len = 8
