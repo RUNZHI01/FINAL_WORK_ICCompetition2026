@@ -38,6 +38,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "REMOTE_SSH_PORT",
         "PHYTIUM_PI_PORT",
         "OPENAMP_DEMO_INPUT_SOURCE_MODE",
+        "REMOTE_USRP_RX_DIR",
         "JSCC_LINK_MODE",
         "OPENAMP_DEMO_LINK_MODE",
         "ANALOG_IN_PROCESS_LOCAL_CODEC",

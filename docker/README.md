@@ -50,6 +50,16 @@ $env:REMOTE_PASS="<board password>"
 .\docker\run-demo-tailscale.ps1
 ```
 
+切 USRP/IQ 现场链路时，同一入口会转发 `REMOTE_USRP_RX_DIR`，例如：
+
+```powershell
+$env:MLKEM_TRANSPORT_MODE="usrp"
+$env:OPENAMP_DEMO_INPUT_SOURCE_MODE="usrp"
+$env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
+$env:JSCC_LINK_MODE="iq-direct"
+.\docker\run-demo-tailscale.ps1
+```
+
 `run-demo-tailscale.*` 默认设置 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`。该 profile 固定为预录 latent 输入、TCP/Tailscale 控制连接，并默认关闭 ML-KEM auth gate：
 
 ```text
