@@ -176,9 +176,20 @@ def run_inference(
     return result, output_np
 
 
-def daemon_loop(*, artifact_path: str, snr: float, channel_mode: str) -> int:
+def daemon_loop(*, artifact_path: str, snr: float, channel_mode: str, cpu_affinity: int | None = None) -> int:
     """守护模式：加载一次模型，通过 stdin JSON 连续推理。"""
     requests_served = 0
+
+    if cpu_affinity is not None:
+        try:
+            os.sched_setaffinity(0, {cpu_affinity})
+        except (OSError, AttributeError) as exc:
+            print(
+                f"[tvm_helper] WARNING: sched_setaffinity({cpu_affinity}) failed ({exc}), "
+                "continuing without CPU affinity",
+                flush=True,
+            )
+
     dev, fn, load_ms = load_runtime(artifact_path)
 
     def _write(payload: dict[str, object]) -> None:
@@ -263,13 +274,19 @@ def main():
     )
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--daemon", action="store_true", help="常驻模式：stdin JSON 请求，stdout JSON 响应")
+    parser.add_argument("--cpu-affinity", type=int, default=None, help="绑定 CPU 核心（仅 daemon 模式）")
     args = parser.parse_args()
 
     if args.seed is not None:
         np.random.seed(args.seed)
 
     if args.daemon:
-        return daemon_loop(artifact_path=args.artifact_path, snr=args.snr, channel_mode=args.channel_mode)
+        return daemon_loop(
+            artifact_path=args.artifact_path,
+            snr=args.snr,
+            channel_mode=args.channel_mode,
+            cpu_affinity=args.cpu_affinity,
+        )
 
     if not args.input or not args.output:
         parser.error("非 daemon 模式需要 --input 和 --output")

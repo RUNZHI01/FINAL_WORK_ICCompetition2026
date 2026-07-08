@@ -825,8 +825,15 @@ class MlkemSessionManager:
         assert self._proc.stdout is not None
 
         try:
-            ready_line = self._read_line(timeout=self._startup_timeout)
-            ready = json.loads(ready_line)
+            ready = None
+            for _skip in range(20):
+                ready_line = self._read_line(timeout=self._startup_timeout)
+                stripped = ready_line.strip()
+                if stripped and stripped.startswith("{"):
+                    ready = json.loads(stripped)
+                    break
+            if ready is None:
+                raise RuntimeError(f"daemon 未输出有效 JSON: {ready_line[:200] if ready_line else '(empty)'}")
             if ready.get("status") != "ready":
                 raise RuntimeError(f"daemon 未就绪: {ready}")
             self._handshake_ms = ready.get("handshake_ms", 0.0)
@@ -841,6 +848,7 @@ class MlkemSessionManager:
                     stderr_tail = (self._proc.stderr.read() or "").strip()[-400:]
                 except Exception:
                     stderr_tail = ""
+            print(f"[MlkemSessionManager] daemon 启动失败: {e}; stderr={stderr_tail}", flush=True)
             self._kill_proc()
             detail = f"{e}"
             if stderr_tail:
