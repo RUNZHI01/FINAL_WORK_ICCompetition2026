@@ -87,7 +87,7 @@ for raw in reversed(path.read_text(encoding="utf-8", errors="replace").splitline
         payload = json.loads(line)
     except Exception:
         continue
-    print(json.dumps(payload, ensure_ascii=False))
+    print(json.dumps(payload, ensure_ascii=True))
     raise SystemExit(0)
 raise SystemExit(1)
 PY

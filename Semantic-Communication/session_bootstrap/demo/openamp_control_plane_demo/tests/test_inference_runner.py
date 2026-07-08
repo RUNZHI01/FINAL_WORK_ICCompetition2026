@@ -109,6 +109,80 @@ def build_signed_bundle(temp_dir: Path, *, variant: str = "current") -> tuple[Pa
 
 
 class RunRemoteReconstructionTest(unittest.TestCase):
+    def test_parse_runner_summary_tolerates_local_path_encoding_bytes(self) -> None:
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+            runner_log_path = Path(temp_dir) / "runner.log"
+            payload_prefix = (
+                b'{"status":"ok","runner":"run_big_little_pipeline.sh",'
+                b'"log_file":"E:/Main/Career/'
+            )
+            payload_suffix = (
+                b'/openamp.log","pipeline":{"status":"ok","processed_count":3,'
+                b'"input_count":3,"run_median_ms":253.271,"run_mean_ms":262.139}}\n'
+            )
+            runner_log_path.write_bytes(payload_prefix + b"\xbc\xaf\xb4\xb4\xc8\xfc" + payload_suffix)
+
+            summary = inference_runner.parse_runner_summary_from_log(runner_log_path)
+
+        self.assertEqual(summary["status"], "ok")
+        self.assertEqual(summary["pipeline"]["processed_count"], 3)
+        self.assertAlmostEqual(summary["pipeline"]["run_median_ms"], 253.271)
+
+    def test_runner_only_live_job_accepts_big_little_wrapper_log_with_local_encoding_bytes(self) -> None:
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+            output_dir = Path(temp_dir)
+            runner_log_path = output_dir / "runner.log"
+            trace_path = output_dir / "control_trace.jsonl"
+            trace_path.write_text("", encoding="utf-8")
+            (output_dir / "wrapper_summary.json").write_text(
+                json.dumps({"result": "success", "runner_exit_code": 0}, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            payload_prefix = (
+                b'{"status":"ok","runner":"run_big_little_pipeline.sh",'
+                b'"run_id":"biglittle-encoding-demo","log_file":"E:/Main/Career/'
+            )
+            payload_suffix = (
+                b'/openamp.log","pipeline":{"status":"ok","processed_count":3,'
+                b'"input_count":3,"run_samples_ms":[284.035,249.11,253.271],'
+                b'"run_median_ms":253.271,"run_mean_ms":262.139,'
+                b'"big_cores":[2],"little_cores":[0,1]}}\n'
+            )
+            runner_log_path.write_bytes(payload_prefix + b"\xbc\xaf\xb4\xb4\xc8\xfc" + payload_suffix)
+
+            job = LiveRemoteReconstructionJob.__new__(LiveRemoteReconstructionJob)
+            job.job_id = "3838347825"
+            job.variant = "current"
+            job._timeout_sec = 10.0
+            job._expected_outputs = 3
+            job._output_dir = output_dir
+            job._trace_path = trace_path
+            job._summary_path = output_dir / "wrapper_summary.json"
+            job._runner_log_path = runner_log_path
+            job._lock = Lock()
+            job._final_snapshot = None
+            job._control_transport = inference_runner.CONTROL_TRANSPORT_NONE
+            job._control_preflight = None
+            job._admission = {"mode": "legacy_sha"}
+            job._input_source_mode = "prerecorded"
+            job._input_source_label = "预录模式"
+
+            fake_process = Mock()
+            fake_process.communicate.return_value = ("", "")
+            fake_process.returncode = 0
+            job._process = fake_process
+
+            job._wait_for_completion()
+
+            snapshot = job._final_snapshot
+            assert snapshot is not None
+            self.assertEqual(snapshot["status"], "success")
+            self.assertEqual(snapshot["execution_mode"], "live")
+            self.assertEqual(snapshot["runner_summary"]["pipeline"]["processed_count"], 3)
+            self.assertEqual(snapshot["progress"]["completed_count"], 3)
+            self.assertEqual(snapshot["progress"]["expected_count"], 3)
+            self.assertEqual(snapshot["progress"]["count_source"], "runner_summary.processed_count")
+
     def assert_live_signed_demo_trace(self, *, variant: str) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

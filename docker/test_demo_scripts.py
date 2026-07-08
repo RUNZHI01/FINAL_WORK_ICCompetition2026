@@ -93,3 +93,11 @@ def test_prepare_iq_board_sync_powershell_wrapper_runs_docker_packager() -> None
     assert "OUT_TAR=/workspace/artifacts/iq_board_sync.tar.gz" in script
     assert "OUT_MANIFEST=/workspace/artifacts/iq_board_sync_manifest.txt" in script
     assert "scripts/prepare_iq_board_sync.sh" in script
+
+
+def test_big_little_wrapper_intermediate_json_is_ascii_safe() -> None:
+    script = (PROJECT_ROOT / "Semantic-Communication" / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "json.dumps(payload, ensure_ascii=True)" in script
