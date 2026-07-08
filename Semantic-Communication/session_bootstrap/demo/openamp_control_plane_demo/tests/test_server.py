@@ -5585,6 +5585,27 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["board_access"]["input_source_mode"], "prerecorded")
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "prerecorded")
 
+    def test_board_access_endpoint_accepts_remote_usrp_rx_dir_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "password": "demo-pass",
+                    "transport_mode": "usrp",
+                    "remote_usrp_rx_dir": "/home/user/cockpit_usrp_rx",
+                }
+            ).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(payload["board_access"]["remote_usrp_rx_dir"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(state._board_access.build_env()["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+
     def test_board_access_endpoint_rejects_unsupported_transport_mode(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 

@@ -1170,6 +1170,19 @@
   margin-top: 8px;
 }
 
+.usrpRxConfig {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.usrpRxInputRow {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
 .linkModeBadge {
   display: inline-flex;
   align-items: center;
@@ -1635,6 +1648,9 @@
   .settingRow {
     flex-direction: column;
     align-items: stretch;
+  }
+  .usrpRxInputRow {
+    flex-direction: column;
   }
   .readinessGrid {
     grid-template-columns: 1fr;

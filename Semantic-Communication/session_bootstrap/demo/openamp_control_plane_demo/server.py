@@ -3351,6 +3351,8 @@ class DashboardState:
                 overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = str(payload.get("local_latent_dir") or "").strip()
             if str(payload.get("local_latent_pattern") or "").strip():
                 overrides["OPENAMP_DEMO_LOCAL_LATENT_PATTERN"] = str(payload.get("local_latent_pattern") or "").strip()
+            if str(payload.get("remote_usrp_rx_dir") or "").strip():
+                overrides["REMOTE_USRP_RX_DIR"] = str(payload.get("remote_usrp_rx_dir") or "").strip()
         else:
             overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "prerecorded")
         return overrides

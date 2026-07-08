@@ -264,6 +264,8 @@ export function DashboardPageMinimal() {
   const [authEnabled, setAuthEnabled] = useState(true)
   const [authSigPolicy, setAuthSigPolicy] = useState<AuthSigPolicy>('DUAL_REQUIRED')
   const [authDirty, setAuthDirty] = useState(false)
+  const [remoteUsrPRxDir, setRemoteUsrPRxDir] = useState('')
+  const [remoteUsrPRxDirDirty, setRemoteUsrPRxDirDirty] = useState(false)
   const [batchCount, setBatchCount] = useState<number>(300)
   const [batchCountTouched, setBatchCountTouched] = useState(false)
   const [toasts, setToasts] = useState<{ id: number; text: string; type: 'success' | 'error' }[]>([])
@@ -310,6 +312,11 @@ export function DashboardPageMinimal() {
     if (batchCountTouched) return
     setBatchCount(activeTransport === 'usrp' ? 20 : 300)
   }, [activeTransport, batchCountTouched])
+
+  useEffect(() => {
+    if (remoteUsrPRxDirDirty) return
+    setRemoteUsrPRxDir(String(boardAccess?.remote_usrp_rx_dir || ''))
+  }, [boardAccess?.remote_usrp_rx_dir, remoteUsrPRxDirDirty])
 
   const handleRunInference = useCallback(
     (count: number = batchCount) => {
@@ -559,6 +566,32 @@ export function DashboardPageMinimal() {
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
   const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : 'QPSK 兜底'
   const boardReadinessItems = buildBoardReadinessItems(boardAccess)
+  const handleSaveRemoteUsrPRxDir = useCallback(
+    () => {
+      const remoteRxDir = remoteUsrPRxDir.trim()
+      if (!remoteRxDir) {
+        showToast('请输入板端 USRP RX 目录', 'error')
+        return
+      }
+      boardAccessMut.mutate(
+        {
+          transport_mode: 'usrp',
+          jscc_link_mode: activeLinkMode,
+          remote_usrp_rx_dir: remoteRxDir,
+        },
+        {
+          onSuccess: () => {
+            setRemoteUsrPRxDirDirty(false)
+            showToast('USRP RX 目录已保存', 'success')
+          },
+          onError: (error) => {
+            showToast(`保存 USRP RX 目录失败: ${error.message}`, 'error')
+          },
+        },
+      )
+    },
+    [activeLinkMode, boardAccessMut, remoteUsrPRxDir, showToast],
+  )
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
   const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
     ? '20 张快演'
@@ -971,6 +1004,35 @@ export function DashboardPageMinimal() {
                   </div>
                   {activeTransport === 'usrp' && (
                     <div className={s.linkModeRow}>
+                      <div className={s.usrpRxConfig}>
+                        <label className={s.formLabel} htmlFor="remote-usrp-rx-dir">板端 USRP RX 目录</label>
+                        <div className={s.usrpRxInputRow}>
+                          <input
+                            id="remote-usrp-rx-dir"
+                            type="text"
+                            placeholder="/home/user/cockpit_usrp_rx"
+                            aria-label="板端 USRP RX 目录"
+                            value={remoteUsrPRxDir}
+                            onChange={(event) => {
+                              setRemoteUsrPRxDir(event.target.value)
+                              setRemoteUsrPRxDirDirty(true)
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') handleSaveRemoteUsrPRxDir()
+                            }}
+                            className={s.passwordInput}
+                          />
+                          <button
+                            type="button"
+                            className={s.btnFilledSm}
+                            onClick={handleSaveRemoteUsrPRxDir}
+                            disabled={boardAccessMut.isPending}
+                          >
+                            {boardAccessMut.isPending ? '保存中...' : '保存 RX'}
+                          </button>
+                        </div>
+                        <div className={s.settingCaption}>板端 USRP 解包后的 payload 会从该目录进入 TVM/MNN 重建。</div>
+                      </div>
                       <div
                         className={`${s.linkModeBadge} ${activeLinkMode === 'iq-direct' ? s.linkModeBadgeIq : s.linkModeBadgeQpsk}`}
                         title={

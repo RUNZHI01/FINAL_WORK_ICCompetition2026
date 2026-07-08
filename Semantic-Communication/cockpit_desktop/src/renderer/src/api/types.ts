@@ -476,6 +476,7 @@ export type BoardAccessPayload = {
   jscc_link_mode?: JsccLinkMode
   local_latent_dir?: string
   local_latent_pattern?: string
+  remote_usrp_rx_dir?: string
   auth_enabled?: boolean
   auth_sig_policy?: string
   auth_server_id?: string
