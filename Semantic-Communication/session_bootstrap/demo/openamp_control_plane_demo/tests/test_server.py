@@ -5630,6 +5630,31 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
         self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
 
+    def test_usrp_live_payload_uses_original_gallery_range(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+
+        payload = state._build_live_payload_from_batch_summary(
+            engine="tvm",
+            job_id="usrp-gallery-50",
+            count=50,
+            summary={
+                "processed_count": 50,
+                "selected_input_count": 50,
+                "run_samples_ms": [250.0],
+                "run_median_ms": 250.0,
+                "run_mean_ms": 250.0,
+            },
+        )
+
+        self.assertEqual(payload["original_gallery"]["mode"], "usrp")
+        self.assertEqual(payload["original_gallery"]["range"]["start"], 1)
+        self.assertEqual(payload["original_gallery"]["range"]["end"], 50)
+        self.assertEqual(payload["original_gallery"]["images"][0]["filename"], "00000001.jpg")
+        self.assertEqual(payload["original_gallery"]["images"][-1]["filename"], "00000050.jpg")
+        self.assertTrue(payload["image_sources"]["original_path"].endswith("00000001.jpg"))
+        self.assertTrue(payload["original_image_b64"].startswith("data:image/jpeg;base64,"))
+
     def test_board_access_env_switch_refreshes_current_trusted_sha_runtime(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         legacy_env = "session_bootstrap/tmp/inference_real_reconstruction_compare_currentsafe_chunk4_refresh_20260313_1758.env"
@@ -6682,6 +6707,8 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertIn("systemStatus.safety_panel", body)
         self.assertIn('"/api/recover"', body)
         self.assertIn("selectedCompareViewerSample", body)
+        self.assertIn("originalGallerySummary", body)
+        self.assertIn("original_gallery", body)
         self.assertIn('document.getElementById("compareViewerBoard")', body)
         self.assertIn("baselineLiveDisplayLabel", body)
         self.assertIn("PyTorch reference archive", body)

@@ -12,6 +12,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = PROJECT_ROOT.parent
+WORKSPACE_ROOT = PROJECT_ROOT.parents[2] if len(PROJECT_ROOT.parents) > 2 else REPO_ROOT
 REPORTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "reports"
 PACKAGE_ROOT = REPORTS_ROOT / "openamp_control_plane_evidence_package_20260315"
 SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
@@ -21,6 +22,11 @@ PYTORCH_REFERENCE_ROOT = (
 )
 PYTORCH_REFERENCE_MANIFEST = PYTORCH_REFERENCE_ROOT / "pytorch_reference_manifest.json"
 DEMO_SAMPLES_ROOT = Path(__file__).resolve().parent / "static" / "demo_samples"
+USRP_ORIGINAL_IMAGE_DIR_CANDIDATES = (
+    REPO_ROOT / "host_pic_to_latent" / "airfield300",
+    REPO_ROOT / "host_pic_to_latent" / "airfield",
+    WORKSPACE_ROOT / "原始图像",
+)
 
 FAULT_CODE_NAMES = {
     0: "NONE",
@@ -512,6 +518,75 @@ def image_data_uri(path_value: str) -> str:
         return f"data:image/png;base64,{placeholder_png}"
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _image_number(path: Path, fallback: int) -> int:
+    match = re.search(r"(\d+)$", path.stem)
+    if not match:
+        return fallback
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return fallback
+
+
+def _collect_original_images(image_dir: Path) -> list[Path]:
+    files: list[Path] = []
+    for pattern in ("*.jpg", "*.jpeg", "*.png"):
+        files.extend(path for path in image_dir.glob(pattern) if path.is_file())
+    files.sort(key=lambda path: path.name)
+    return files
+
+
+def _image_gallery_entry(path: Path, ordinal: int) -> dict[str, Any]:
+    return {
+        "index": ordinal,
+        "number": _image_number(path, ordinal),
+        "filename": path.name,
+        "path": repo_relative(path),
+    }
+
+
+def build_original_gallery_snapshot(mode: str, *, count: int = 1) -> dict[str, Any]:
+    normalized_mode = "usrp" if str(mode or "").strip().lower() == "usrp" else "prerecorded"
+    requested_count = max(1, int(count or 1))
+    if normalized_mode == "usrp":
+        for image_dir in USRP_ORIGINAL_IMAGE_DIR_CANDIDATES:
+            images = _collect_original_images(image_dir)
+            if not images:
+                continue
+            selected = images[:requested_count]
+            first = selected[0]
+            last = selected[-1]
+            return {
+                "mode": "usrp",
+                "label": "USRP 原始图像",
+                "source_dir": repo_relative(image_dir),
+                "requested_count": requested_count,
+                "count": len(selected),
+                "range": {
+                    "start": _image_number(first, 1),
+                    "end": _image_number(last, len(selected)),
+                    "label": f"{first.stem}-{last.stem}",
+                },
+                "preview_image_path": repo_relative(first),
+                "preview_image_b64": image_data_uri(str(first)),
+                "images": [_image_gallery_entry(path, index + 1) for index, path in enumerate(selected)],
+            }
+
+    fixture = PRERECORDED_SAMPLE_FIXTURES[0]
+    original_path = fixture["original_path"]
+    return {
+        "mode": normalized_mode,
+        "label": "预录样例原图",
+        "source_dir": repo_relative(original_path.parent),
+        "requested_count": requested_count,
+        "count": 1,
+        "range": {"start": 1, "end": 1, "label": original_path.stem},
+        "preview_image_path": repo_relative(original_path),
+        "preview_image_b64": image_data_uri(str(original_path)),
+        "images": [_image_gallery_entry(original_path, 1)],
+    }
 
 
 @lru_cache(maxsize=2)

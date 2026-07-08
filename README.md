@@ -343,7 +343,7 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 - QPSK 链路保留为主力演示路径，所有现有入口（`docker/run-*`、Electron、CLI smoke）默认走 QPSK。`JSCC_LINK_MODE` 环境变量和 Cockpit 的 JSCC 链路开关都可切换：`qpsk`（默认）走原路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
 - IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
 - Encoder/TVM helper/latent_transport 三处增量补丁已落地，对 QPSK 路径零破坏（默认行为不变，需通过 `JSCC_CHANNEL_MODE=real-usrp` 等环境变量激活）。
-- Server 端 `JSCC_LINK_MODE` 开关、双机 SSH/SCP 远端 RX（`local` / `remote-pull` / `remote-decode` 三档）、Cockpit UI IQ/QPSK 选择与结果 badge 全部 wire 完成。USRP 默认资产发现会优先使用 final 包内 latent，也会兼容工作区根目录的 `原始图像/00000001.jpg...` 和 `jscc-test/encoder_outputs/`。
+- Server 端 `JSCC_LINK_MODE` 开关、双机 SSH/SCP 远端 RX（`local` / `remote-pull` / `remote-decode` 三档）、Cockpit UI IQ/QPSK 选择与结果 badge 全部 wire 完成。USRP 默认资产发现会优先使用 final 包内 latent，也会兼容工作区根目录的 `原始图像/00000001.jpg...` 和 `jscc-test/encoder_outputs/`；USRP live payload 会附带 `original_gallery`，例如 50 张任务展示 `00000001-00000050` 的原图范围。
 - ML-KEM 安全信道（见第 6 节）已经独立可用，`DUAL_REQUIRED` 默认启用，handshake 在 1.4 s 量级、SHA-256 校验通过。
 - 仍未做：真机线缆 + 30 dB 衰减器实测、TX/RX gain 配对调优、远端 `/home/user/USRP292x/` 同步 IQ runner（当前板端 USRP292x 仍是 QPSK 主线）。
 - 已知 OpenAMP 控制面问题：`control_guard_state=PROBE_ERROR`、`board status endpoint unavailable: timed out`，与 ML-KEM 数据面相互独立，不影响握手和加密通道本身。

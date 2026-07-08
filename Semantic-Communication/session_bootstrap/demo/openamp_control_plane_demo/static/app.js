@@ -2494,6 +2494,23 @@ function resultMatchesSelectedSample(result, sampleIndex) {
   return Boolean(result) && Number(result.image_index) === Number(sampleIndex);
 }
 
+function originalGallerySummary(result) {
+  const gallery = result?.original_gallery;
+  if (!gallery || typeof gallery !== "object") return null;
+  const range = gallery.range || {};
+  const mode = String(gallery.mode || "unknown");
+  const label = gallery.label || (mode === "usrp" ? "USRP 原始图像" : "原始图像");
+  const count = Number(gallery.count || 0);
+  const requested = Number(gallery.requested_count || count || 0);
+  const rangeLabel = range.label || `${range.start || "?"}-${range.end || "?"}`;
+  return {
+    label,
+    rangeLabel,
+    countLabel: `${count || requested || 0} / ${requested || count || 0}`,
+    sourceDir: gallery.source_dir || "",
+  };
+}
+
 function compareViewerMetrics(pane) {
   const chips = [];
   if (pane.executionMode) {
@@ -2592,6 +2609,7 @@ function renderCompareViewer(snapshot) {
     return;
   }
 
+  const gallerySummary = originalGallerySummary(state.currentResult);
   document.getElementById("compareViewerContext").innerHTML = [
     `
       <div class="compare-context-card">
@@ -2607,6 +2625,13 @@ function renderCompareViewer(snapshot) {
         <small>${escapeHtml(`image_index=${compareSample.index}`)}</small>
       </div>
     `,
+    gallerySummary ? `
+      <div class="compare-context-card">
+        <span>原图范围</span>
+        <strong>${escapeHtml(`${gallerySummary.label} ｜ ${gallerySummary.rangeLabel}`)}</strong>
+        <small>${escapeHtml(`${gallerySummary.countLabel} ｜ ${gallerySummary.sourceDir}`)}</small>
+      </div>
+    ` : "",
   ].join("");
 
   document.getElementById("compareViewerBoard").innerHTML = [

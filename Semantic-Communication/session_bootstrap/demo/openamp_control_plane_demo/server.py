@@ -80,6 +80,7 @@ from demo_data import (
     build_fault_replay,
     build_job_manifest_contract_snapshot,
     build_link_director_catalog,
+    build_original_gallery_snapshot,
     build_prerecorded_inference_result,
     build_recover_replay,
     build_snapshot,
@@ -5485,6 +5486,23 @@ class DashboardState:
                 },
             }
         )
+        if local_crypto_transport_mode(self._board_access.build_env()) == "usrp":
+            original_gallery = build_original_gallery_snapshot("usrp", count=total)
+            payload["original_gallery"] = original_gallery
+            preview_image_b64 = str(original_gallery.get("preview_image_b64") or "")
+            preview_image_path = str(original_gallery.get("preview_image_path") or "")
+            if preview_image_b64:
+                payload["original_image_b64"] = preview_image_b64
+            if preview_image_path:
+                image_sources = payload.get("image_sources") if isinstance(payload.get("image_sources"), dict) else {}
+                payload["image_sources"] = {**image_sources, "original_path": preview_image_path}
+            gallery_range = original_gallery.get("range") if isinstance(original_gallery.get("range"), dict) else {}
+            payload["sample"] = {
+                **(payload.get("sample") if isinstance(payload.get("sample"), dict) else {}),
+                "label": str(original_gallery.get("label") or "USRP 原始图像"),
+                "title": f"USRP 原始图像 {gallery_range.get('label') or ''}".strip(),
+                "note": f"本轮 USRP 批量使用原始图像范围 {gallery_range.get('label') or ''}。",
+            }
         return payload
 
     def refresh_live_probe(self) -> dict[str, Any]:
