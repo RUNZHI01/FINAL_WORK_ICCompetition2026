@@ -15,6 +15,28 @@
 | 能连上飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | Electron 连板端的真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
 | 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |
+| 一键启动全链路 | `bash scripts/start_all.sh [usrp] [图片目录]` | 自动启动容器、板端服务、USRP、cockpit |
+
+## 一键启动（推荐日常使用）
+
+`scripts/start_all.sh` 自动完成全链路启动：
+
+```bash
+# 预录模式
+bash scripts/start_all.sh
+
+# USRP / QPSK OTA 模式
+bash scripts/start_all.sh usrp
+```
+
+首次 USRP 模式需要先初始化数据（只需一次）：
+
+```bash
+bash scripts/init_usrp_data.sh board          # 从板端拉取 NPZ latent
+bash scripts/init_usrp_data.sh local /images   # 从本地拷贝图片
+```
+
+脚本自动执行的步骤：Docker 容器检查 → 板端连通性 → tcp_server + TVM daemon（含 CPU 亲和性）→ USRP 控制服务 → server.py → ML-KEM 加密 → Cockpit Desktop（`http://localhost:5173`）
 
 ## 主要目录
 
