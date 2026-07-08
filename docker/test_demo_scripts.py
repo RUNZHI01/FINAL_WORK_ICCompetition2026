@@ -23,6 +23,8 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"' in script
     assert 'ANALOG_IN_PROCESS_LOCAL_CODEC="${ANALOG_IN_PROCESS_LOCAL_CODEC:-1}"' in script
     assert 'ANALOG_WARMUP_LOCAL_CODEC="${ANALOG_WARMUP_LOCAL_CODEC:-1}"' in script
+    assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
+    assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -40,6 +42,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "PHYTIUM_PI_PORT",
         "OPENAMP_DEMO_INPUT_SOURCE_MODE",
         "REMOTE_USRP_RX_DIR",
+        "REMOTE_USRP_DECODE_PYTHON",
+        "OPENAMP_DEMO_REMOTE_DECODE_PYTHON",
         "JSCC_LINK_MODE",
         "OPENAMP_DEMO_LINK_MODE",
         "ANALOG_IN_PROCESS_LOCAL_CODEC",
@@ -49,6 +53,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "MLKEM_AUTH_SIG_POLICY",
         "OPENAMP_SSH_RUNNER",
         "OPENAMP_SSH_DOCKER_IMAGE",
+        "SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER",
         "OPENAMP_USRP_TX_RUNNER",
         "OPENAMP_USRP_TX_DOCKER_IMAGE",
         "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET",
