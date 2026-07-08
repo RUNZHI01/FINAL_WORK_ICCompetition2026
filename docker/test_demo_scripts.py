@@ -18,6 +18,7 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'OPENAMP_DEMO_INPUT_SOURCE_MODE="${OPENAMP_DEMO_INPUT_SOURCE_MODE:-prerecorded}"' in script
     assert 'MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-tcp}"' in script
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-0}"' in script
+    assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"' in script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -34,6 +35,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "REMOTE_SSH_PORT",
         "PHYTIUM_PI_PORT",
         "OPENAMP_DEMO_INPUT_SOURCE_MODE",
+        "JSCC_LINK_MODE",
+        "OPENAMP_DEMO_LINK_MODE",
         "MLKEM_TRANSPORT_MODE",
         "MLKEM_AUTH_ENABLED",
         "OPENAMP_SSH_RUNNER",

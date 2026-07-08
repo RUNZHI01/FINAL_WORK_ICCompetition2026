@@ -61,6 +61,19 @@ const TRANSPORT_OPTIONS: { mode: TransportMode; label: string; caption: string }
   },
 ]
 
+const LINK_MODE_OPTIONS: { mode: JsccLinkMode; label: string; caption: string }[] = [
+  {
+    mode: 'qpsk',
+    label: 'QPSK',
+    caption: '可靠字节链路，保留 CRC/ARQ 兜底。',
+  },
+  {
+    mode: 'iq-direct',
+    label: 'IQ 直传',
+    caption: 'JSCC latent 直接映射模拟 IQ 波形。',
+  },
+]
+
 const MAX_BATCH_COUNT = 300
 
 function numericValue(value: unknown): number | undefined {
@@ -93,6 +106,11 @@ function normalizeAuthSigPolicy(rawValue: string | undefined): AuthSigPolicy {
 
 function normalizeTransportMode(rawValue: unknown): TransportMode {
   return String(rawValue || '').trim().toLowerCase() === 'usrp' ? 'usrp' : 'tcp'
+}
+
+function normalizeJsccLinkModeValue(rawValue: unknown): JsccLinkMode {
+  const normalized = String(rawValue || '').trim().toLowerCase()
+  return normalized === 'iq-direct' || normalized === 'iq' || normalized === 'analog' ? 'iq-direct' : 'qpsk'
 }
 
 function normalizeBatchCountInput(rawValue: string, fallback: number): number {
@@ -378,6 +396,24 @@ export function DashboardPageMinimal() {
     [boardAccessMut, showToast],
   )
 
+  const handleSelectLinkMode = useCallback(
+    (mode: JsccLinkMode) => {
+      const selected = LINK_MODE_OPTIONS.find((option) => option.mode === mode)
+      boardAccessMut.mutate(
+        { transport_mode: 'usrp', jscc_link_mode: mode },
+        {
+          onSuccess: () => {
+            showToast(`JSCC 链路已切换: ${selected?.label ?? mode}`, 'success')
+          },
+          onError: (error) => {
+            showToast(`切换 JSCC 链路失败: ${error.message}`, 'error')
+          },
+        },
+      )
+    },
+    [boardAccessMut, showToast],
+  )
+
   // Derived data
   const recentResults = status?.recent_results
   const currentResultFromStore = lastCompletedInference?.variant === 'current' ? lastCompletedInference : undefined
@@ -390,8 +426,8 @@ export function DashboardPageMinimal() {
     baselineComparisonFromPayload
     ?? comparisonResults.pytorch
   const tvmComparison =
-    currentComparisonFromPayload
-    ?? comparisonResults.tvm
+    comparisonResults.tvm
+    ?? currentComparisonFromPayload
   const mnnComparison =
     comparisonResults.mnn
   const comparisonRows = [pytorchComparison, tvmComparison, mnnComparison]
@@ -500,10 +536,14 @@ export function DashboardPageMinimal() {
   const pendingTransportMode = boardAccessMut.variables?.transport_mode
     ? normalizeTransportMode(boardAccessMut.variables.transport_mode)
     : undefined
+  const configuredLinkMode = normalizeJsccLinkModeValue(boardAccess?.jscc_link_mode)
+  const pendingJsccLinkMode = boardAccessMut.variables?.jscc_link_mode
+    ? normalizeJsccLinkModeValue(boardAccessMut.variables.jscc_link_mode)
+    : undefined
   const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
-  const activeLinkMode: JsccLinkMode | undefined = extractJsccLinkMode(currentWrapperSummary)
+  const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
-  const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : activeLinkMode === 'qpsk' ? 'QPSK 兜底' : '链路未触发'
+  const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : 'QPSK 兜底'
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
   const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
     ? '20 张快演'
@@ -908,13 +948,34 @@ export function DashboardPageMinimal() {
                         title={
                           activeLinkMode === 'iq-direct'
                             ? 'IQ 直传链路：JSCC 论文实现，latent 直接以模拟 IQ 波形发射，无量化编码。'
-                            : activeLinkMode === 'qpsk'
-                              ? 'QPSK 兜底链路：工程兜底方案，量化 latent 经 QPSK 调制 + ARQ 重传。'
-                              : '尚未触发推理；启动一次推理后这里会显示当前 JSCC 链路。'
+                            : 'QPSK 兜底链路：工程兜底方案，量化 latent 经 QPSK 调制 + ARQ 重传。'
                         }
                       >
                         <span className={s.linkModeDot} />
                         JSCC: {linkModeLabel}
+                      </div>
+                      <div className={s.linkModeSwitch}>
+                        {LINK_MODE_OPTIONS.map((option) => {
+                          const isActive = configuredLinkMode === option.mode
+                          const isPending = boardAccessMut.isPending && pendingJsccLinkMode === option.mode
+                          return (
+                            <button
+                              key={option.mode}
+                              type="button"
+                              className={`${s.linkModeOption} ${isActive ? s.linkModeOptionActive : ''}`}
+                              aria-pressed={isActive}
+                              disabled={boardAccessMut.isPending}
+                              onClick={() => {
+                                if (!isActive) handleSelectLinkMode(option.mode)
+                              }}
+                            >
+                              <span className={s.linkModeOptionLabel}>
+                                {isPending ? '切换中...' : option.label}
+                              </span>
+                              <span className={s.linkModeOptionCaption}>{option.caption}</span>
+                            </button>
+                          )
+                        })}
                       </div>
                       {activeLinkMode && iqRadioMetrics && (
                         <div className={s.linkModeMetrics}>

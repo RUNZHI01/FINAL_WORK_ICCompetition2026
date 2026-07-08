@@ -41,6 +41,7 @@ from board_access import (
     build_demo_default_board_access,
     current_input_source_mode,
     load_env_file,
+    normalize_jscc_link_mode,
     normalize_transport_mode,
 )
 from board_probe import DEFAULT_LIVE_PROBE_OUTPUT, is_successful_probe, load_probe_output, run_live_probe, write_probe_output
@@ -119,20 +120,25 @@ from usrp_runtime import (
 
 
 STATIC_ROOT = Path(__file__).resolve().parent / "static"
+PACKAGE_ROOT = REPO_ROOT.parent
+WORKSPACE_ROOT = REPO_ROOT.parents[2] if len(REPO_ROOT.parents) > 2 else PACKAGE_ROOT
 DEFAULT_MNN_BATCH_ENV_FILE = REPO_ROOT / "session_bootstrap" / "config" / "mnn_benchmark.phytium_pi.example.env"
 REMOTE_MNN_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_mnn_reconstruction.sh"
 REMOTE_TVM_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_current_real_reconstruction.sh"
 DEFAULT_USRP_REMOTE_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
 USRP_REMOTE_OUTPUT_ROOT_KEYS = ("OPENAMP_DEMO_USRP_OUTPUT_ROOT", "USRP_REMOTE_OUTPUT_ROOT")
 DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
-    REPO_ROOT.parent / "host_pic_to_latent" / "encoder_outputs_airfield300",
-    REPO_ROOT.parent / "host_pic_to_latent" / "encoder_outputs",
-    REPO_ROOT.parent / "artifacts" / "host_pic_to_latent_300_smoke" / "encoder_outputs",
-    REPO_ROOT.parent / "artifacts" / "host_pic_to_latent_smoke" / "encoder_outputs",
+    PACKAGE_ROOT / "usrp_latent_input",
+    WORKSPACE_ROOT / "jscc-test" / "encoder_outputs",
+    PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_airfield300",
+    PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs",
+    PACKAGE_ROOT / "artifacts" / "host_pic_to_latent_300_smoke" / "encoder_outputs",
+    PACKAGE_ROOT / "artifacts" / "host_pic_to_latent_smoke" / "encoder_outputs",
 )
 DEFAULT_LOCAL_USRP_IMAGE_DIR_CANDIDATES = (
-    REPO_ROOT.parent / "host_pic_to_latent" / "airfield300",
-    REPO_ROOT.parent / "host_pic_to_latent" / "airfield",
+    PACKAGE_ROOT / "host_pic_to_latent" / "airfield300",
+    PACKAGE_ROOT / "host_pic_to_latent" / "airfield",
+    WORKSPACE_ROOT / "原始图像",
 )
 MLKEM_MODERN_INPUT_BYTES = 1 * 32 * 32 * 32 * 4
 MLKEM_LEGACY_INPUT_BYTES = 1 * 3 * 64 * 64 * 4
@@ -3323,6 +3329,12 @@ class DashboardState:
             raise ValueError("unsupported transport_mode; expected tcp or usrp") from exc
 
         overrides["MLKEM_TRANSPORT_MODE"] = transport_mode
+        raw_jscc_link_mode = str(payload.get("jscc_link_mode") or "").strip()
+        if raw_jscc_link_mode:
+            try:
+                overrides["JSCC_LINK_MODE"] = normalize_jscc_link_mode(raw_jscc_link_mode)
+            except ValueError as exc:
+                raise ValueError("unsupported jscc_link_mode; expected qpsk or iq-direct") from exc
         if transport_mode == "usrp":
             overrides.setdefault("MLKEM_USRP_MODE", "ota")
             overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")

@@ -5599,7 +5599,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["message"], "unsupported transport_mode; expected tcp or usrp")
 
-    def test_board_access_usrp_defaults_prefer_local_airfield300_image_dir(self) -> None:
+    def test_board_access_usrp_defaults_discover_workspace_original_images(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
         status, _, payload = request_json(
@@ -5610,8 +5610,25 @@ class DemoHTTPServerTest(unittest.TestCase):
         )
 
         self.assertEqual(status, 200)
-        self.assertTrue(payload["board_access"]["local_usrp_image_dir"].endswith("host_pic_to_latent/airfield300"))
-        self.assertTrue(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"].endswith("host_pic_to_latent/airfield300"))
+        image_dir = Path(payload["board_access"]["local_usrp_image_dir"])
+        self.assertEqual(image_dir.name, "原始图像")
+        self.assertTrue((image_dir / "00000001.jpg").is_file())
+        self.assertTrue((image_dir / "00000050.jpg").is_file())
+        self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"], str(image_dir))
+
+    def test_board_access_endpoint_accepts_jscc_link_mode_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "iq-direct"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
+        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
 
     def test_board_access_env_switch_refreshes_current_trusted_sha_runtime(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)

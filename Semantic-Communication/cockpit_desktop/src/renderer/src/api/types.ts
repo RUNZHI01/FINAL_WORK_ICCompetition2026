@@ -473,6 +473,7 @@ export type BoardAccessPayload = {
   port?: number | string
   env_file?: string
   transport_mode?: string
+  jscc_link_mode?: JsccLinkMode
   local_latent_dir?: string
   local_latent_pattern?: string
   auth_enabled?: boolean
@@ -494,6 +495,7 @@ export type BoardAccessResponse = JsonObject & {
   input_source_tone?: string
   input_source_summary?: string
   remote_usrp_rx_dir?: string
+  jscc_link_mode?: JsccLinkMode | string
   local_usrp_input_dir?: string
   local_usrp_image_dir?: string
   remote_prerecorded_input_dir?: string

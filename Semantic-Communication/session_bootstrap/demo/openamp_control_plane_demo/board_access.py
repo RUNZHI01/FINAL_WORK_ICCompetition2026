@@ -17,6 +17,7 @@ PORT_KEYS = ("REMOTE_SSH_PORT", "PHYTIUM_PI_PORT")
 TRANSPORT_MODE_KEYS = ("MLKEM_TRANSPORT_MODE", "MLKEM_DATA_TRANSPORT", "MLKEM_TRANSPORT")
 INPUT_SOURCE_MODE_KEYS = ("OPENAMP_DEMO_INPUT_SOURCE_MODE", "REMOTE_INPUT_SOURCE_MODE")
 REMOTE_USRP_RX_DIR_KEYS = ("REMOTE_USRP_RX_DIR",)
+JSCC_LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 
 INFERENCE_SHARED_REQUIRED_KEYS = (
     "REMOTE_TVM_PYTHON",
@@ -211,6 +212,28 @@ def input_source_mode_summary(mode: str) -> str:
 
 def current_remote_usrp_rx_dir(env_values: dict[str, str]) -> str:
     return first_non_empty(env_values, REMOTE_USRP_RX_DIR_KEYS)
+
+
+def normalize_jscc_link_mode(raw: str | None, *, default: str = "qpsk") -> str:
+    value = str(raw or "").strip().lower()
+    if not value:
+        return default
+    if value in {"qpsk", "baseline"}:
+        return "qpsk"
+    if value in {"iq-direct", "iq_direct", "iq", "analog", "analog-iq"}:
+        return "iq-direct"
+    raise ValueError("unsupported jscc_link_mode")
+
+
+def current_jscc_link_mode(env_values: dict[str, str]) -> str:
+    for key in JSCC_LINK_MODE_KEYS:
+        value = str(env_values.get(key, "")).strip()
+        if value:
+            try:
+                return normalize_jscc_link_mode(value)
+            except ValueError:
+                return "qpsk"
+    return "qpsk"
 
 
 def sanitize_env_values(values: dict[str, str]) -> dict[str, str]:
@@ -773,6 +796,7 @@ class BoardAccessConfig:
             "input_source_tone": input_source_mode_tone(input_source_mode),
             "input_source_summary": input_source_mode_summary(input_source_mode),
             "remote_usrp_rx_dir": current_remote_usrp_rx_dir(env_values),
+            "jscc_link_mode": current_jscc_link_mode(env_values),
             "local_usrp_input_dir": first_non_empty(
                 env_values,
                 ("OPENAMP_DEMO_LOCAL_LATENT_DIR", "MLKEM_USRP_SOURCE_LATENT_DIR", "USRP_SOURCE_LATENT_DIR"),
