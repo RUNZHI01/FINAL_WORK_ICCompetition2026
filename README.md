@@ -12,7 +12,7 @@
 |---|---|---|
 | 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
-| 能连上飞腾派和 Tailscale | `docker/run-demo-wslg-tailscale.ps1` | Electron 连板端的真机链路 |
+| 能连上飞腾派和 Tailscale | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
 | 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |
 
@@ -79,21 +79,22 @@ Windows PowerShell:
 Windows 现场优先使用原生 PowerShell + Docker，不走 WSL。用于恢复 cockpit desktop 下 handwritten TVM + big.LITTLE 300 张测速口径时，运行：
 
 ```powershell
-$env:REMOTE_HOST="100.121.87.73"
-$env:REMOTE_USER="user"
-$env:REMOTE_PASS="<board password>"
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。Cockpit 的推理结果对比会接收当前 TVM/MNN 的预录成功结果，因此顶部重建耗时和对比卡片会按同一轮结果刷新。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
+`run-demo-tailscale.*` 默认写入当前验证环境：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、Paramiko SSH runner、Docker USRP TX runner、板端 `/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不进仓库；在 Electron 界面填写，或运行前临时设置 `REMOTE_PASS`。
 
-如果临时绕开 Docker cockpit、直接在 Windows 原生后端调试，必须避免 `C:\Windows\System32\bash.exe` 的 WSL stub。使用 Git Bash 并让 SSH helper 走 Docker runner：
+这个入口默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。Cockpit 的推理结果对比会接收当前 TVM/MNN 的预录成功结果，因此顶部重建耗时和对比卡片会按同一轮结果刷新。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
+
+切到 USRP 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面应由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 用于让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk` 兜底。
+
+如果临时绕开 Docker cockpit、直接在 Windows 原生后端调试，必须避免 `C:\Windows\System32\bash.exe` 的 WSL stub。使用 Git Bash，并让 SSH helper 走 Paramiko runner：
 
 ```powershell
 $env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
 $env:GIT_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
-$env:OPENAMP_SSH_RUNNER="docker"
-$env:OPENAMP_SSH_DOCKER_IMAGE="iccomp-usrp-tx:latest"
+$env:OPENAMP_SSH_RUNNER="paramiko"
+$env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER="1"
 ```
 
 Electron 真机 demo 会沿用原始板端目录结构，所以板卡上要先有固件、模型、runtime 和 Tongsuo / liboqs 相关文件。`docker/run-demo-tailscale.*` 只负责启动上位机和网络链路，不会自动改写板端的 `/lib/firmware`、`/boot`、`/usr/local/tongsuo` 或 `/home/user/Downloads`。

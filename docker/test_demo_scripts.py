@@ -81,6 +81,55 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         assert name in powershell_script
 
 
+def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() -> None:
+    shell_script = read_script("run-demo-tailscale.sh")
+    powershell_script = read_script("run-demo-tailscale.ps1")
+
+    shell_defaults = (
+        'REMOTE_HOST="${REMOTE_HOST:-100.121.87.73}"',
+        'REMOTE_USER="${REMOTE_USER:-user}"',
+        'REMOTE_SSH_PORT="${REMOTE_SSH_PORT:-22}"',
+        'OPENAMP_SSH_RUNNER="${OPENAMP_SSH_RUNNER:-paramiko}"',
+        'SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER="${SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER:-1}"',
+        'OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"',
+        'OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"',
+        'OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="${OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET:-/host_workspace}"',
+        'REMOTE_USRP_RX_DIR="${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}"',
+        'REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/tmp/usrp292x_remote_runs}"',
+        'REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"',
+        'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"',
+        'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"',
+        'JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"',
+        'ANALOG_REMOTE_DECODE_RESULT_MODE="${ANALOG_REMOTE_DECODE_RESULT_MODE:-remote-dir}"',
+        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-2}"',
+        'OPENAMP_TVM_BATCH_RUNNER="${OPENAMP_TVM_BATCH_RUNNER:-biglittle}"',
+    )
+    powershell_defaults = (
+        '$env:REMOTE_HOST = "100.121.87.73"',
+        '$env:REMOTE_USER = "user"',
+        '$env:REMOTE_SSH_PORT = "22"',
+        '$env:OPENAMP_SSH_RUNNER = "paramiko"',
+        '$env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER = "1"',
+        '$env:OPENAMP_USRP_TX_RUNNER = "docker"',
+        '$env:OPENAMP_USRP_TX_DOCKER_IMAGE = "iccomp-usrp-tx:latest"',
+        '$env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"',
+        '$env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"',
+        '$env:REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"',
+        '$env:REMOTE_USRP_PROJECT_ROOT = "/home/user"',
+        '$env:REMOTE_USRP_DECODE_PYTHON = "/home/user/venv/bin/python"',
+        '$env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"',
+        '$env:JSCC_LINK_MODE = "iq-direct"',
+        '$env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"',
+        '$env:USRP_MAX_ARQ_ROUNDS = "2"',
+        '$env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"',
+    )
+
+    for expected in shell_defaults:
+        assert expected in shell_script
+    for expected in powershell_defaults:
+        assert expected in powershell_script
+
+
 def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_all_files() -> None:
     script = (PROJECT_ROOT / "scripts" / "prepare_iq_board_sync.sh").read_text(encoding="utf-8")
     extract_section = script.split("## 板端解压命令", 1)[1].split("## 同步后板端验证", 1)[0]

@@ -14,6 +14,57 @@ if (-not $env:TAILSCALE_HOSTNAME) {
 if (-not $env:TAILSCALE_PING_TARGET) {
     $env:TAILSCALE_PING_TARGET = "100.121.87.73"
 }
+if (-not $env:REMOTE_HOST) {
+    $env:REMOTE_HOST = "100.121.87.73"
+}
+if (-not $env:REMOTE_USER) {
+    $env:REMOTE_USER = "user"
+}
+if (-not $env:REMOTE_SSH_PORT) {
+    $env:REMOTE_SSH_PORT = "22"
+}
+if (-not $env:OPENAMP_SSH_RUNNER) {
+    $env:OPENAMP_SSH_RUNNER = "paramiko"
+}
+if (-not $env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER) {
+    $env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER = "1"
+}
+if (-not $env:OPENAMP_USRP_TX_RUNNER) {
+    $env:OPENAMP_USRP_TX_RUNNER = "docker"
+}
+if (-not $env:OPENAMP_USRP_TX_DOCKER_IMAGE) {
+    $env:OPENAMP_USRP_TX_DOCKER_IMAGE = "iccomp-usrp-tx:latest"
+}
+if (-not $env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET) {
+    $env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
+}
+if (-not $env:REMOTE_USRP_RX_DIR) {
+    $env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"
+}
+if (-not $env:REMOTE_RX_RUN_ROOT) {
+    $env:REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"
+}
+if (-not $env:REMOTE_USRP_PROJECT_ROOT) {
+    $env:REMOTE_USRP_PROJECT_ROOT = "/home/user"
+}
+if (-not $env:REMOTE_USRP_DECODE_PYTHON) {
+    $env:REMOTE_USRP_DECODE_PYTHON = "/home/user/venv/bin/python"
+}
+if (-not $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON) {
+    $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"
+}
+if (-not $env:JSCC_LINK_MODE) {
+    $env:JSCC_LINK_MODE = "iq-direct"
+}
+if (-not $env:ANALOG_REMOTE_DECODE_RESULT_MODE) {
+    $env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"
+}
+if (-not $env:USRP_MAX_ARQ_ROUNDS) {
+    $env:USRP_MAX_ARQ_ROUNDS = "2"
+}
+if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
+    $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"
+}
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 & (Join-Path $ScriptDir "run-demo.ps1")
