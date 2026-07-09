@@ -1865,6 +1865,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     rx_capture_wall_sec = 0.0
     rx_wait_wall_sec = 0.0
     tx_wall_sec = 0.0
+    make_wall_sec = 0.0
+    decode_wall_sec = 0.0
 
     try:
         make_started = time.monotonic()
@@ -2254,6 +2256,17 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "round": 0,
             "input": str(image.input_path),
             "error": image.error,
+            "make_wall_sec": make_wall_sec,
+            "tx_wall_sec": tx_wall_sec,
+            "rx_arm_wall_sec": rx_arm_wall_sec,
+            "rx_capture_wall_sec": rx_capture_wall_sec,
+            "rx_wait_wall_sec": rx_wait_wall_sec,
+            "rx_pull_wall_sec": rx_pull_wall_sec,
+            "decode_wall_sec": decode_wall_sec,
+            "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
+            "retry_wait_wall_sec": retry_wait_wall_sec,
+            "merge_wall_sec": merge_wall_sec,
+            "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
             "remote_decode_restart_wall_sec": remote_decode_restart_wall_sec,
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,

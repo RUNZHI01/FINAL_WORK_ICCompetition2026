@@ -2077,6 +2077,76 @@ def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, mon
     assert result.records[0]["remote_decode_restart_wall_sec"] >= 0.0
 
 
+def test_process_image_remote_decode_error_preserves_stage_timings(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+
+    class FailingWorker:
+        def decode(self, _request, _log_path, *, timeout):
+            del timeout
+            raise RuntimeError("no sync candidate had a complete frame")
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=FailingWorker(),
+        remote_decode_request_timeout_sec=0.0,
+        remote_decode_restart_on_timeout=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="skip",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert "no sync candidate" in result.error
+    record = result.records[0]
+    assert record["make_wall_sec"] >= 0.0
+    assert record["tx_wall_sec"] >= 0.0
+    assert record["rx_arm_wall_sec"] >= 0.0
+    assert record["rx_capture_wall_sec"] >= 0.0
+    assert record["rx_wait_wall_sec"] >= 0.0
+    assert record["decode_wall_sec"] >= 0.0
+    assert record["remote_decode_restart_wall_sec"] == 0.0
+
+
 def test_pipeline_finalize_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):
     image = analog_batch.ImageRecord(
         index=7,
