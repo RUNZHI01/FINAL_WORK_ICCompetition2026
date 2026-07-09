@@ -54,9 +54,11 @@ Remove-Item Env:ANALOG_RX_SESSION_CONTROL -ErrorAction SilentlyContinue
 Remove-Item Env:ANALOG_RETRY_ON_BURST_MISS -ErrorAction SilentlyContinue
 Remove-Item Env:ANALOG_RETRY_ON_LOW_SYNC -ErrorAction SilentlyContinue
 Remove-Item Env:ANALOG_LOW_SYNC_RETRY_THRESHOLD -ErrorAction SilentlyContinue
+Remove-Item Env:ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC -ErrorAction SilentlyContinue
+Remove-Item Env:ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT -ErrorAction SilentlyContinue
 ```
 
-TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`、`ANALOG_PRECONNECT_CONTROL`、`ANALOG_RX_SESSION_CONTROL`、`ANALOG_RETRY_ON_BURST_MISS` 或 `ANALOG_RETRY_ON_LOW_SYNC`：这些路径已有实测数据，只保留给定向实验。
+TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`、`ANALOG_PRECONNECT_CONTROL`、`ANALOG_RX_SESSION_CONTROL`、`ANALOG_RETRY_ON_BURST_MISS`、`ANALOG_RETRY_ON_LOW_SYNC` 或 remote decode request timeout/restart envs：这些路径已有实测数据，只保留给定向实验。
 
 ## Start Cockpit Backend
 
@@ -124,6 +126,7 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 - `ANALOG_RETRY_ON_BURST_MISS=1` is an opt-in experiment, not the default. In 50-image testing it removed slow low-burst fallback decode (`decode max 674.28 -> 197.08 ms`) and improved transport median (`283.31 -> 199.90 ms`), but p95 worsened (`326.58 -> 783.40 ms`) because RX capture had separate long-tail stalls.
 - `ANALOG_PRECONNECT_CONTROL=1` and `ANALOG_RX_SESSION_CONTROL=1` are also opt-in diagnostics. Preconnect improved TX control time but not transport median. RX same-session control increased median and p95, so do not use it for the default 300-image run.
 - `ANALOG_RETRY_ON_LOW_SYNC=1` is not a default. It can reduce decode queue stalls in short runs, but the 300-image validation showed consecutive RF/RX bad captures can exhaust retries and lose all-pass.
+- `ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC` and `ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT=1` are opt-in diagnostics for decode-worker stalls. Use them only in a controlled run because an aggressive timeout can turn a slow-but-successful decode into an ARQ retry.
 - Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
 - The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
 - The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.

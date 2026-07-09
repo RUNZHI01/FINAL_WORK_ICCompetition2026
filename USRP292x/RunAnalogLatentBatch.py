@@ -164,6 +164,20 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
         help="Board-side flat directory for --remote-decode-result-mode=remote-dir decoded latent .npz files.",
     )
+    parser.add_argument(
+        "--remote-decode-request-timeout-sec",
+        type=float,
+        default=env_float("ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC", 0.0),
+        help="Optional per-image timeout for the persistent remote decode worker. 0 keeps the existing long timeout.",
+    )
+    parser.add_argument(
+        "--remote-decode-restart-on-timeout",
+        dest="remote_decode_restart_on_timeout",
+        action="store_true",
+        default=env_bool("ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT", False),
+        help="Restart the persistent remote decode worker after a request timeout so a later ARQ attempt can continue.",
+    )
+    parser.add_argument("--no-remote-decode-restart-on-timeout", dest="remote_decode_restart_on_timeout", action="store_false")
 
     parser.add_argument("--rx-control-host", default=os.environ.get("RX_CONTROL_HOST", "127.0.0.1"))
     parser.add_argument("--rx-control-port", type=int, default=env_int("RX_CONTROL_PORT", 29220))
@@ -1201,6 +1215,17 @@ def remote_pythonpath_for_decode(args: argparse.Namespace) -> str:
     return f"{project_root}/scripts:{project_root}"
 
 
+class RemoteDecodeWorkerTimeout(RuntimeError):
+    pass
+
+
+def remote_decode_request_timeout(args: argparse.Namespace, capture_timeout: float) -> float:
+    configured = float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0)
+    if configured > 0.0:
+        return configured
+    return max(120.0, float(capture_timeout))
+
+
 class RemoteAnalogDecodeWorker:
     def __init__(
         self,
@@ -1366,7 +1391,7 @@ class RemoteAnalogDecodeWorker:
             line = self._responses.get(timeout=timeout)
         except queue.Empty as exc:
             self.close(kill=True)
-            raise RuntimeError(f"remote decode worker timed out after {timeout:.1f}s") from exc
+            raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s") from exc
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(line, encoding="utf-8")
         try:
@@ -1399,6 +1424,31 @@ class RemoteAnalogDecodeWorker:
             self._stderr_handle.close()
         except OSError:
             pass
+
+
+def restart_remote_decode_worker_after_timeout(
+    args: argparse.Namespace,
+    target: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    if not bool(getattr(args, "remote_decode_restart_on_timeout", False)):
+        return False
+    old_worker = getattr(args, "remote_decode_worker", None)
+    if old_worker is not None:
+        try:
+            old_worker.close(kill=True)
+        except Exception:
+            pass
+    new_worker = RemoteAnalogDecodeWorker.start(
+        target,
+        args,
+        log_path,
+        control_socket=control_socket,
+    )
+    setattr(args, "remote_decode_worker", new_worker)
+    return True
 
 
 def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> list[str]:
@@ -2034,7 +2084,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     worker_proc = remote_decode_worker.decode(
                         remote_request,
                         image.image_dir / "remote_decode.log",
-                        timeout=max(120.0, capture_timeout),
+                        timeout=remote_decode_request_timeout(args, capture_timeout),
                     )
                     try:
                         worker_response = json.loads(str(worker_proc.stdout or "{}"))
@@ -2185,7 +2235,19 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     except Exception as exc:
         image.status = 1
         image.passed = False
-        image.error = str(exc)
+        error_text = str(exc)
+        if isinstance(exc, RemoteDecodeWorkerTimeout) and remote_target:
+            try:
+                restart_remote_decode_worker_after_timeout(
+                    args,
+                    remote_target,
+                    image.image_dir / "remote_decode_worker_restart.log",
+                    control_socket=ssh_control_socket,
+                )
+                error_text = f"{error_text}; remote decode worker restarted"
+            except Exception as restart_exc:
+                error_text = f"{error_text}; remote decode worker restart failed: {restart_exc}"
+        image.error = error_text
         image.records.append({
             "round": 0,
             "input": str(image.input_path),
@@ -2481,7 +2543,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             worker_proc = remote_decode_worker.decode(
                 remote_request,
                 image.image_dir / "remote_decode.log",
-                timeout=max(120.0, float(ctx["capture_timeout"])),
+                timeout=remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
             )
             try:
                 worker_response = json.loads(str(worker_proc.stdout or "{}"))
@@ -2612,6 +2674,16 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
     except Exception as exc:
         if decode_started > 0.0:
             decode_wall_sec = time.monotonic() - decode_started
+        if isinstance(exc, RemoteDecodeWorkerTimeout):
+            try:
+                restart_remote_decode_worker_after_timeout(
+                    args,
+                    str(ctx["remote_target"]),
+                    image.image_dir / "remote_decode_worker_restart.log",
+                    control_socket=ctx["ssh_control_socket"],
+                )
+            except Exception:
+                pass
         return _append_pipeline_error_record(
             image,
             exc,
@@ -3056,6 +3128,8 @@ def main() -> int:
             remote_decode_worker.ready_response if remote_decode_worker is not None else {}
         ),
         "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
+        "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
+        "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
         "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
         "remote_decoded_output_dirs": remote_decoded_dirs,
         "remote_received_latent_npz_files": remote_received_npz_files,

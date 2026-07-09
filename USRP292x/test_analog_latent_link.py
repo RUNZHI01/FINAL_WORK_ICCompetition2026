@@ -1916,10 +1916,12 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
     worker_requests: list[dict[str, object]] = []
+    worker_timeouts: list[float] = []
 
     class FakeWorker:
         def decode(self, request, log_path, *, timeout):
             worker_requests.append(dict(request))
+            worker_timeouts.append(float(timeout))
             log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
             return subprocess.CompletedProcess(
                 args=["decode-server"],
@@ -1936,6 +1938,7 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
         in_process_local_codec=True,
         rx_capture_mode="remote-decode",
         remote_decode_worker=FakeWorker(),
+        remote_decode_request_timeout_sec=2.5,
         remote_rx_ssh_target="user@board",
         remote_rx_run_root="/tmp/analog_runs",
         run_id="run42",
@@ -1989,6 +1992,182 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
     assert worker_requests[0]["rx_sc16"] == "/tmp/analog_runs/run42/image_0000/batch_rx.sc16"
     assert worker_requests[0]["sync_search_window_symbols"] == 4096
     assert worker_requests[0]["manifest_json"]["job_id"] == "case0"
+    assert worker_timeouts == [2.5]
+
+
+def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    closed: list[bool] = []
+    restarts: list[tuple[str, Path]] = []
+
+    class TimeoutWorker:
+        def decode(self, _request, _log_path, *, timeout):
+            raise analog_batch.RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s")
+
+        def close(self, *, kill=False):
+            closed.append(bool(kill))
+
+    class ReplacementWorker:
+        pass
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=TimeoutWorker(),
+        remote_decode_request_timeout_sec=1.0,
+        remote_decode_restart_on_timeout=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="skip",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_start(_cls, target, _args, log_path, *, control_socket=None):
+        del control_socket
+        restarts.append((target, log_path))
+        return ReplacementWorker()
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
+    monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", classmethod(fake_start))
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert "timed out" in result.error
+    assert closed == [True]
+    assert restarts and restarts[0][0] == "user@board"
+    assert isinstance(args.remote_decode_worker, ReplacementWorker)
+
+
+def test_pipeline_finalize_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):
+    image = analog_batch.ImageRecord(
+        index=7,
+        input_path=tmp_path / "case7.bin",
+        image_dir=tmp_path / "image_0007",
+    )
+    image.input_path.write_bytes(b"payload")
+    closed: list[bool] = []
+    restarts: list[tuple[str, Path]] = []
+
+    class TimeoutWorker:
+        def decode(self, _request, _log_path, *, timeout):
+            raise analog_batch.RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s")
+
+        def close(self, *, kill=False):
+            closed.append(bool(kill))
+
+    class ReplacementWorker:
+        pass
+
+    args = Namespace(
+        remote_decode_worker=TimeoutWorker(),
+        remote_decode_request_timeout_sec=1.0,
+        remote_decode_restart_on_timeout=True,
+        in_process_local_codec=True,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=False,
+        low_sync_retry_threshold=0.08,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+    ctx = {
+        "image": image,
+        "attempt_index": 0,
+        "max_attempts": 2,
+        "slot_index": 1,
+        "pipeline_depth": 2,
+        "started": time.monotonic() - 0.2,
+        "tx_sc16": tmp_path / "tx_analog.sc16",
+        "batch_rx": tmp_path / "batch_rx.sc16",
+        "manifest_path": tmp_path / "manifest.json",
+        "out_npz": tmp_path / "received_latent.npz",
+        "out_wire": tmp_path / "merged_round0.bin",
+        "decode_summary": tmp_path / "decode_summary.json",
+        "manifest": {"capture_nsamps": 107584, "job_id": "case7"},
+        "make_wall_sec": 0.01,
+        "tx_wall_sec": 0.02,
+        "rx_arm_wall_sec": 0.03,
+        "rx_capture_wall_sec": 0.10,
+        "rx_wait_wall_sec": 0.04,
+        "rx_pull_wall_sec": 0.0,
+        "merge_wall_sec": 0.0,
+        "remote_cleanup_wall_sec": 0.0,
+        "remote_cleanup_mode": "skip",
+        "remote_decode_result_mode": "remote-dir",
+        "remote_decoded_dir": "/home/user/cockpit_usrp_rx/run42_rx",
+        "remote_received_npz": "",
+        "remote_target": "user@board",
+        "ssh_control_socket": None,
+        "remote_run_dir": "/tmp/analog_runs/run42/image_0007",
+        "remote_batch_rx": "/tmp/analog_runs/run42/image_0007/batch_rx.sc16",
+        "remote_tx": "",
+        "remote_manifest": "/tmp/analog_runs/run42/image_0007/manifest.json",
+        "capture_timeout": 30.0,
+        "capture_completed_at": time.monotonic(),
+        "decode_queue_wall_sec": 0.0,
+        "slot_wait_wall_sec": 0.0,
+    }
+
+    def fake_start(_cls, target, _args, log_path, *, control_socket=None):
+        del control_socket
+        restarts.append((target, log_path))
+        return ReplacementWorker()
+
+    monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", classmethod(fake_start))
+
+    result = analog_batch._finalize_remote_decode_pipeline_attempt(args, ctx)
+
+    assert result.passed is False
+    assert "timed out" in result.error
+    assert closed == [True]
+    assert restarts and restarts[0][0] == "user@board"
+    assert isinstance(args.remote_decode_worker, ReplacementWorker)
 
 
 def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_local_pull(tmp_path, monkeypatch):
