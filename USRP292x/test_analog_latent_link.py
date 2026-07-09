@@ -1031,6 +1031,48 @@ def test_transport_metrics_break_out_remote_pull_and_cleanup_wall_time(tmp_path)
     assert abs(metrics["estimated_non_airtime_non_decode_non_merge_wall_sec_mean"] - 3.9) < 1e-9
 
 
+def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
+    image_a = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image_b = analog_batch.ImageRecord(
+        index=1,
+        input_path=tmp_path / "case1.bin",
+        image_dir=tmp_path / "image_0001",
+    )
+    image_a.records.append(
+        {
+            "tx_wall_sec": 0.010,
+            "rx_capture_wall_sec": 0.030,
+            "decode_wall_sec": 0.060,
+            "remote_dir_publish_wall_sec": 0.004,
+            "retry_wait_wall_sec": 0.0,
+            "total_wall_sec": 0.120,
+        }
+    )
+    image_b.records.append(
+        {
+            "tx_wall_sec": 0.020,
+            "rx_capture_wall_sec": 0.050,
+            "decode_wall_sec": 0.080,
+            "remote_dir_publish_wall_sec": 0.006,
+            "retry_wait_wall_sec": 0.020,
+            "total_wall_sec": 0.180,
+        }
+    )
+
+    benchmark = analog_batch.build_iq_stage_benchmark([image_a, image_b])
+
+    assert benchmark["tx_control_ms"]["median_ms"] == 15.0
+    assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
+    assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
+    assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
+    assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
+    assert benchmark["total_transport_ms"]["median_ms"] == 150.0
+
+
 def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
@@ -1555,6 +1597,8 @@ def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monk
 
     summary = json.loads((run_root / "remote-batch" / "batch_spool_summary.json").read_text(encoding="utf-8"))
     assert summary["passed_count"] == 2
+    assert summary["iq_stage_benchmark"]["remote_decode_ms"]["n"] == 2
+    assert summary["iq_stage_benchmark"]["total_transport_ms"]["n"] == 2
     assert master_starts == ["user@board"]
     assert worker_control_sockets == ["shared-socket"]
     assert len(master_terminated) == 1

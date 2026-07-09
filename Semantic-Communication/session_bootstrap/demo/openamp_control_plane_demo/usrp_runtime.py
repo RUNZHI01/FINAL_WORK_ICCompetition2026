@@ -1775,6 +1775,50 @@ def _transport_benchmark_from_iq_round_records(summary: dict[str, Any]) -> dict[
     }
 
 
+def _iq_stage_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    existing = summary.get("iq_stage_benchmark") if isinstance(summary, dict) else None
+    if isinstance(existing, dict) and existing:
+        return existing
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return None
+
+    field_map = (
+        ("tx_control_ms", "tx_wall_sec"),
+        ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("remote_decode_ms", "decode_wall_sec"),
+        ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
+        ("retry_wait_ms", "retry_wait_wall_sec"),
+        ("total_transport_ms", "total_wall_sec"),
+    )
+    stage_values: dict[str, list[float]] = {metric_name: [] for metric_name, _ in field_map}
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            for metric_name, record_field in field_map:
+                if record_field not in record:
+                    continue
+                try:
+                    value = float(record.get(record_field) or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                if value >= 0.0:
+                    stage_values[metric_name].append(value * 1000.0)
+
+    benchmark: dict[str, Any] = {}
+    for metric_name, values in stage_values.items():
+        metric = _metric_from_ms_values(values)
+        if metric is not None:
+            benchmark[metric_name] = metric
+    return benchmark or None
+
+
 def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
     record_benchmark = _transport_benchmark_from_iq_round_records(summary)
     if record_benchmark is not None:
@@ -2790,6 +2834,7 @@ class UsrpBatchSpoolJob:
             diagnostics["usrp_summary"] = summary
 
         transport_benchmark = _transport_benchmark_from_summary(summary)
+        iq_stage_benchmark = _iq_stage_benchmark_from_summary(summary)
         inference_benchmark = summary.get("benchmark") if isinstance(summary.get("benchmark"), dict) else None
         inference_pipeline = summary.get("pipeline") if isinstance(summary.get("pipeline"), dict) else {}
         runner_summary = {
@@ -2838,6 +2883,8 @@ class UsrpBatchSpoolJob:
         }
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             wrapper_summary["iq_radio_metrics"] = _aggregate_iq_radio_metrics(summary)
+            if iq_stage_benchmark is not None:
+                wrapper_summary["iq_stage_benchmark"] = iq_stage_benchmark
         if self._inference_summary:
             wrapper_summary["inference_engine"] = self._inference_engine
             wrapper_summary["inference_summary"] = self._inference_summary

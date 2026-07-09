@@ -105,6 +105,63 @@ def test_transport_benchmark_prefers_iq_round_medians_over_outlier_means() -> No
     assert benchmark["total_ms"]["mean_ms"] > benchmark["total_ms"]["median_ms"]
 
 
+def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
+    benchmark = usrp_runtime._iq_stage_benchmark_from_summary(
+        {
+            "images": [
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.010,
+                            "rx_capture_wall_sec": 0.030,
+                            "decode_wall_sec": 0.060,
+                            "remote_dir_publish_wall_sec": 0.004,
+                            "retry_wait_wall_sec": 0.0,
+                            "total_wall_sec": 0.120,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.020,
+                            "rx_capture_wall_sec": 0.040,
+                            "decode_wall_sec": 0.070,
+                            "remote_dir_publish_wall_sec": 0.005,
+                            "retry_wait_wall_sec": 0.0,
+                            "total_wall_sec": 0.140,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.070,
+                            "rx_capture_wall_sec": 0.050,
+                            "decode_wall_sec": 0.080,
+                            "remote_dir_publish_wall_sec": 0.006,
+                            "retry_wait_wall_sec": 0.020,
+                            "total_wall_sec": 0.240,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert benchmark is not None
+    assert benchmark["tx_control_ms"]["median_ms"] == 20.0
+    assert benchmark["tx_control_ms"]["p95_ms"] == 70.0
+    assert benchmark["rx_capture_ms"]["median_ms"] == 40.0
+    assert benchmark["remote_decode_ms"]["median_ms"] == 70.0
+    assert benchmark["remote_dir_publish_ms"]["mean_ms"] == 5.0
+    assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
+    assert benchmark["total_transport_ms"]["median_ms"] == 140.0
+
+
 def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
     access = usrp_runtime.BoardAccessConfig(
         host="demo-board",
@@ -1073,6 +1130,10 @@ class DashboardStateTest(unittest.TestCase):
                 "timings": {"payload_ms": 121.0, "total_ms": 130.0},
                 "wrapper_summary": {
                     "inference_engine": "tvm",
+                    "iq_stage_benchmark": {
+                        "tx_control_ms": {"n": 5, "median_ms": 18.0, "p95_ms": 29.0},
+                        "remote_decode_ms": {"n": 5, "median_ms": 64.0, "p95_ms": 91.0},
+                    },
                     "inference_summary": {
                         "status": "ok",
                         "processed_count": 5,
@@ -1085,6 +1146,10 @@ class DashboardStateTest(unittest.TestCase):
                 "live_attempt": {
                     "wrapper_summary": {
                         "inference_engine": "tvm",
+                        "iq_stage_benchmark": {
+                            "tx_control_ms": {"n": 5, "median_ms": 18.0, "p95_ms": 29.0},
+                            "remote_decode_ms": {"n": 5, "median_ms": 64.0, "p95_ms": 91.0},
+                        },
                         "inference_summary": {
                             "status": "ok",
                             "processed_count": 5,
@@ -1121,6 +1186,8 @@ class DashboardStateTest(unittest.TestCase):
 
         final_state = state.get_batch_state()
         self.assertEqual(final_state["engine"], "tvm")
+        self.assertEqual(final_state["iq_stage_benchmark"]["tx_control_ms"]["median_ms"], 18.0)
+        self.assertEqual(final_state["iq_stage_benchmark"]["remote_decode_ms"]["p95_ms"], 91.0)
         self.assertEqual(final_state["quality"]["psnr_db"], server.build_prerecorded_inference_result(0, "current")["quality"]["psnr_db"])
         self.assertEqual(status, 200)
         self.assertEqual(system_payload["recent_results"]["current"]["execution_mode"], "live")

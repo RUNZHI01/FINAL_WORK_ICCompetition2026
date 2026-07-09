@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import math
 import os
 import queue
 import shlex
@@ -1433,6 +1434,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         remote_decode_result_mode = "pull"
     remote_decoded_dir = remote_decoded_output_dir(args) if remote_decode_result_mode == "remote-dir" else ""
     remote_received_npz = ""
+    remote_dir_publish_wall_sec = 0.0
+    retry_wait_wall_sec = 0.0
 
     try:
         make_started = time.monotonic()
@@ -1622,6 +1625,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 # Pull only what the selected result mode needs locally. Persistent
                 # worker responses already carry the summary, avoiding another SSH
                 # transfer in the hot path.
+                publish_started = time.monotonic()
                 response_summary = worker_response.get("summary") if isinstance(worker_response, dict) else None
                 if remote_decode_result_mode == "remote-dir" and isinstance(response_summary, dict):
                     write_json(decode_summary, response_summary)
@@ -1643,6 +1647,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         control_socket=ssh_control_socket,
                         timeout=60,
                     )
+                if remote_decode_result_mode == "remote-dir":
+                    remote_dir_publish_wall_sec = time.monotonic() - publish_started
                 decode_wall_sec = time.monotonic() - decode_started
                 if remote_decode_result_mode == "remote-dir":
                     pulled_summary = read_json(decode_summary) if decode_summary.is_file() else {}
@@ -1737,6 +1743,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "rx_capture_wall_sec": rx_capture_wall_sec,
             "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
+            "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
+            "retry_wait_wall_sec": retry_wait_wall_sec,
             "merge_wall_sec": merge_wall_sec,
             "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
             "remote_cleanup_mode": remote_cleanup_mode,
@@ -1785,6 +1793,42 @@ def _mean(values: list[float]) -> float:
     return float(sum(values) / len(values)) if values else 0.0
 
 
+def _metric_from_ms_values(values: list[float]) -> dict[str, Any] | None:
+    numeric_values = sorted(float(value) for value in values if float(value) >= 0.0)
+    if not numeric_values:
+        return None
+    count = len(numeric_values)
+    mid = count // 2
+    if count % 2:
+        median = numeric_values[mid]
+    else:
+        median = (numeric_values[mid - 1] + numeric_values[mid]) / 2.0
+    p95_index = max(0, min(count - 1, math.ceil(0.95 * count) - 1))
+    return {
+        "n": count,
+        "min_ms": round(numeric_values[0], 2),
+        "max_ms": round(numeric_values[-1], 2),
+        "mean_ms": round(sum(numeric_values) / count, 2),
+        "median_ms": round(median, 2),
+        "p95_ms": round(numeric_values[p95_index], 2),
+    }
+
+
+def _record_ms_values(images: list[ImageRecord], field_name: str) -> list[float]:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            if field_name not in record:
+                continue
+            try:
+                value = float(record.get(field_name) or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if value >= 0.0:
+                values.append(value * 1000.0)
+    return values
+
+
 def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
     values: list[float] = []
     for image in images:
@@ -1797,6 +1841,23 @@ def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
             if tx_path.is_file():
                 values.append(float(tx_path.stat().st_size))
     return _mean(values)
+
+
+def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
+    fields = (
+        ("tx_control_ms", "tx_wall_sec"),
+        ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("remote_decode_ms", "decode_wall_sec"),
+        ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
+        ("retry_wait_ms", "retry_wait_wall_sec"),
+        ("total_transport_ms", "total_wall_sec"),
+    )
+    benchmark: dict[str, Any] = {}
+    for metric_name, record_field in fields:
+        metric = _metric_from_ms_values(_record_ms_values(images, record_field))
+        if metric is not None:
+            benchmark[metric_name] = metric
+    return benchmark
 
 
 def build_transport_metrics(images: list[ImageRecord]) -> dict[str, Any]:
@@ -1947,6 +2008,7 @@ def main() -> int:
         "remote_received_latent_npz_files": remote_received_npz_files,
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
+        "iq_stage_benchmark": build_iq_stage_benchmark(completed),
         "rate": float(args.rate),
         "sps": int(args.sps),
         "rx_post_quantize": bool(args.rx_post_quantize),

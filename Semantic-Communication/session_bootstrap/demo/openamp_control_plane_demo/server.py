@@ -7593,6 +7593,7 @@ class DashboardState:
                 inference_stage = stage_progress.get("inference") if isinstance(stage_progress.get("inference"), dict) else {}
                 inference_summary = wrapper_summary.get("inference_summary") if isinstance(wrapper_summary.get("inference_summary"), dict) else {}
                 transport_benchmark = wrapper_summary.get("transport_benchmark") if isinstance(wrapper_summary.get("transport_benchmark"), dict) else None
+                iq_stage_benchmark = wrapper_summary.get("iq_stage_benchmark") if isinstance(wrapper_summary.get("iq_stage_benchmark"), dict) else None
                 inference_benchmark = wrapper_summary.get("inference_benchmark") if isinstance(wrapper_summary.get("inference_benchmark"), dict) else None
                 tvm_summary = inference_summary or runner_summary or wrapper_summary
 
@@ -7655,6 +7656,7 @@ class DashboardState:
                         state["benchmark"] = inference_benchmark
                         state["inference_benchmark"] = inference_benchmark
                         state["transport_benchmark"] = transport_benchmark
+                        state["iq_stage_benchmark"] = iq_stage_benchmark
                         state["runner_summary"] = inference_summary or runner_summary
                         if is_live:
                             state["quality"] = self._build_prerecorded_payload_safe(image_index=0, variant="current").get("quality")
