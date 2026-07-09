@@ -1432,9 +1432,10 @@ def restart_remote_decode_worker_after_timeout(
     log_path: Path,
     *,
     control_socket: str | None = None,
-) -> bool:
+) -> float:
     if not bool(getattr(args, "remote_decode_restart_on_timeout", False)):
-        return False
+        return 0.0
+    started = time.monotonic()
     old_worker = getattr(args, "remote_decode_worker", None)
     if old_worker is not None:
         try:
@@ -1448,7 +1449,7 @@ def restart_remote_decode_worker_after_timeout(
         control_socket=control_socket,
     )
     setattr(args, "remote_decode_worker", new_worker)
-    return True
+    return time.monotonic() - started
 
 
 def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> list[str]:
@@ -2236,9 +2237,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         image.status = 1
         image.passed = False
         error_text = str(exc)
+        remote_decode_restart_wall_sec = 0.0
         if isinstance(exc, RemoteDecodeWorkerTimeout) and remote_target:
             try:
-                restart_remote_decode_worker_after_timeout(
+                remote_decode_restart_wall_sec = restart_remote_decode_worker_after_timeout(
                     args,
                     remote_target,
                     image.image_dir / "remote_decode_worker_restart.log",
@@ -2252,6 +2254,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "round": 0,
             "input": str(image.input_path),
             "error": image.error,
+            "remote_decode_restart_wall_sec": remote_decode_restart_wall_sec,
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
         })
@@ -2674,9 +2677,10 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
     except Exception as exc:
         if decode_started > 0.0:
             decode_wall_sec = time.monotonic() - decode_started
+        remote_decode_restart_wall_sec = 0.0
         if isinstance(exc, RemoteDecodeWorkerTimeout):
             try:
-                restart_remote_decode_worker_after_timeout(
+                remote_decode_restart_wall_sec = restart_remote_decode_worker_after_timeout(
                     args,
                     str(ctx["remote_target"]),
                     image.image_dir / "remote_decode_worker_restart.log",
@@ -2701,6 +2705,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 "rx_pull_wall_sec": float(ctx.get("rx_pull_wall_sec") or 0.0),
                 "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
                 "decode_wall_sec": decode_wall_sec,
+                "remote_decode_restart_wall_sec": remote_decode_restart_wall_sec,
                 "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
                 "retry_wait_wall_sec": 0.0,
                 "merge_wall_sec": float(ctx.get("merge_wall_sec") or 0.0),
@@ -2942,6 +2947,7 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
         ("remote_decode_queue_ms", "decode_queue_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_decode_reported_ms", "remote_decode_reported_wall_sec"),
+        ("remote_decode_restart_ms", "remote_decode_restart_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
         ("retry_wait_ms", "retry_wait_wall_sec"),
         ("total_transport_ms", "total_wall_sec"),

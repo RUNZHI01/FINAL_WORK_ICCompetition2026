@@ -119,6 +119,7 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                             "rx_wait_wall_sec": 0.017,
                             "decode_wall_sec": 0.060,
                             "remote_decode_reported_wall_sec": 0.041,
+                            "remote_decode_restart_wall_sec": 0.0,
                             "remote_dir_publish_wall_sec": 0.004,
                             "retry_wait_wall_sec": 0.0,
                             "total_wall_sec": 0.120,
@@ -135,6 +136,7 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                             "rx_wait_wall_sec": 0.026,
                             "decode_wall_sec": 0.070,
                             "remote_decode_reported_wall_sec": 0.042,
+                            "remote_decode_restart_wall_sec": 0.030,
                             "remote_dir_publish_wall_sec": 0.005,
                             "retry_wait_wall_sec": 0.0,
                             "total_wall_sec": 0.140,
@@ -151,6 +153,7 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                             "rx_wait_wall_sec": 0.031,
                             "decode_wall_sec": 0.080,
                             "remote_decode_reported_wall_sec": 0.043,
+                            "remote_decode_restart_wall_sec": 0.0,
                             "remote_dir_publish_wall_sec": 0.006,
                             "retry_wait_wall_sec": 0.020,
                             "total_wall_sec": 0.240,
@@ -169,6 +172,7 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
     assert benchmark["rx_wait_ms"]["median_ms"] == 26.0
     assert benchmark["remote_decode_ms"]["median_ms"] == 70.0
     assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
+    assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0
     assert benchmark["remote_dir_publish_ms"]["mean_ms"] == 5.0
     assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
     assert benchmark["total_transport_ms"]["median_ms"] == 140.0

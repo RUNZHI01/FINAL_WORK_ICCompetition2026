@@ -1869,6 +1869,7 @@ def _iq_stage_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any] 
         ("rx_wait_ms", "rx_wait_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_decode_reported_ms", "remote_decode_reported_wall_sec"),
+        ("remote_decode_restart_ms", "remote_decode_restart_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
         ("retry_wait_ms", "retry_wait_wall_sec"),
         ("total_transport_ms", "total_wall_sec"),
