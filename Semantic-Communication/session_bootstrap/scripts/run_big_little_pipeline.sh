@@ -50,6 +50,8 @@ Env:
     BIG_LITTLE_EXECUTION_MODE=pipeline|serial
     BIG_LITTLE_MOCK_INFER_MS=15
     BIG_LITTLE_MAX_INPUTS=300
+    BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC=0
+    BIG_LITTLE_INPUT_POLL_SEC=0.05
     BIG_LITTLE_SEED=123
     BIG_LITTLE_OUTPUT_PREFIX=big_little_pipeline
     BIG_LITTLE_REPORT_PREFIX=big_little_pipeline
@@ -392,6 +394,8 @@ DRY_RUN="${DRY_RUN_OVERRIDE:-${BIG_LITTLE_DRY_RUN:-0}}"
 EXECUTION_MODE_EFFECTIVE="${EXECUTION_MODE:-${BIG_LITTLE_EXECUTION_MODE:-pipeline}}"
 MOCK_INFER_MS="${BIG_LITTLE_MOCK_INFER_MS:-15}"
 MAX_INPUTS_EFFECTIVE="${MAX_INPUTS:-${BIG_LITTLE_MAX_INPUTS:-}}"
+INPUT_WAIT_TIMEOUT_SEC="${BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC:-0}"
+INPUT_POLL_SEC="${BIG_LITTLE_INPUT_POLL_SEC:-0.05}"
 SEED_EFFECTIVE="${SEED:-${BIG_LITTLE_SEED:-}}"
 OUTPUT_PREFIX="${BIG_LITTLE_OUTPUT_PREFIX:-big_little_pipeline}"
 REPORT_PREFIX="${BIG_LITTLE_REPORT_PREFIX:-big_little_pipeline}"
@@ -461,6 +465,8 @@ REAL_EXTRA_PYTHONPATH="${REMOTE_REAL_EXTRA_PYTHONPATH:-${REMOTE_TORCH_PYTHONPATH
   echo "backend=$BACKEND"
   echo "dry_run=$DRY_RUN"
   echo "max_inputs=${MAX_INPUTS_EFFECTIVE:-NA}"
+  echo "input_wait_timeout_sec=$INPUT_WAIT_TIMEOUT_SEC"
+  echo "input_poll_sec=$INPUT_POLL_SEC"
   echo "seed=${SEED_EFFECTIVE:-NA}"
 } >"$LOG_FILE"
 
@@ -477,7 +483,7 @@ SH
       REMOTE_TVM_PYTHON REMOTE_INPUT_DIR REAL_OUTPUT_DIR REAL_SNR REAL_BATCH VARIANT \
       REAL_ARTIFACT_PATH REAL_EXPECTED_SHA256 REAL_EXTRA_PYTHONPATH BIG_CORES LITTLE_CORES \
       BACKEND ALLOW_MISSING_AFFINITY INPUT_QUEUE_SIZE OUTPUT_QUEUE_SIZE DRY_RUN MOCK_INFER_MS \
-      MAX_INPUTS_EFFECTIVE SEED_EFFECTIVE EXECUTION_MODE_EFFECTIVE \
+      MAX_INPUTS_EFFECTIVE INPUT_WAIT_TIMEOUT_SEC INPUT_POLL_SEC SEED_EFFECTIVE EXECUTION_MODE_EFFECTIVE \
       TVM_RUNTIME_PRELOAD_PY TVM_TRANSPOSE_ADD6_PROXY_SO TVM_TRANSPOSE_ADD6_PROXY_FUNC \
       TVM_TRANSPOSE_ADD6_PROXY_REG; do
       emit_shell_assignment "$var_name"
@@ -502,6 +508,8 @@ output_queue_size="$OUTPUT_QUEUE_SIZE"
 dry_run="$DRY_RUN"
 mock_infer_ms="$MOCK_INFER_MS"
 max_inputs="$MAX_INPUTS_EFFECTIVE"
+input_wait_timeout_sec="$INPUT_WAIT_TIMEOUT_SEC"
+input_poll_sec="$INPUT_POLL_SEC"
 seed="$SEED_EFFECTIVE"
 execution_mode="$EXECUTION_MODE_EFFECTIVE"
 preload_py="${TVM_RUNTIME_PRELOAD_PY:-}"
@@ -571,6 +579,12 @@ if [[ "$dry_run" == "1" ]]; then
 fi
 if [[ -n "$mock_infer_ms" ]]; then
   extra_args+=(--mock-infer-ms "$mock_infer_ms")
+fi
+if [[ -n "$input_wait_timeout_sec" ]]; then
+  extra_args+=(--input-wait-timeout-sec "$input_wait_timeout_sec")
+fi
+if [[ -n "$input_poll_sec" ]]; then
+  extra_args+=(--input-poll-sec "$input_poll_sec")
 fi
 
 run_remote_python - \

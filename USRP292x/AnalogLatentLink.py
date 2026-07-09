@@ -70,6 +70,19 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def atomic_savez(path: Path, **items: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp.npz")
+    try:
+        np.savez(tmp_path, **items)
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -1335,8 +1348,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         npz_items = {"latent": latent_out}
     mark_timing("latent_reconstruct")
 
-    out_npz.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(out_npz, **npz_items)
+    atomic_savez(out_npz, **npz_items)
     mark_timing("write_npz")
 
     summary: dict[str, Any] = {

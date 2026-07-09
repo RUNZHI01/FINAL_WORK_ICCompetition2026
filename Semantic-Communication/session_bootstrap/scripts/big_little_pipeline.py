@@ -105,6 +105,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mock-infer-ms", type=float, default=15.0)
     parser.add_argument("--summary-json", default="")
     parser.add_argument("--summary-md", default="")
+    parser.add_argument(
+        "--input-wait-timeout-sec",
+        type=float,
+        default=float(os.environ.get("BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC", "0") or 0),
+    )
+    parser.add_argument(
+        "--input-poll-sec",
+        type=float,
+        default=float(os.environ.get("BIG_LITTLE_INPUT_POLL_SEC", "0.05") or 0.05),
+    )
     args = parser.parse_args()
     if args.max_inputs < 0:
         raise SystemExit(f"ERROR: --max-inputs must be >= 0 (got: {args.max_inputs})")
@@ -114,6 +124,10 @@ def parse_args() -> argparse.Namespace:
         raise SystemExit(f"ERROR: --output-queue-size must be > 0 (got: {args.output_queue_size})")
     if args.mock_infer_ms < 0:
         raise SystemExit(f"ERROR: --mock-infer-ms must be >= 0 (got: {args.mock_infer_ms})")
+    if args.input_wait_timeout_sec < 0:
+        raise SystemExit(f"ERROR: --input-wait-timeout-sec must be >= 0 (got: {args.input_wait_timeout_sec})")
+    if args.input_poll_sec <= 0:
+        raise SystemExit(f"ERROR: --input-poll-sec must be > 0 (got: {args.input_poll_sec})")
     return args
 
 
@@ -335,6 +349,37 @@ def collect_input_files(input_dir: Path, max_inputs: int) -> tuple[list[Path], i
     return unique_files, available_count
 
 
+def iter_input_files_dynamic(
+    *,
+    input_dir: Path,
+    max_inputs: int,
+    wait_timeout_sec: float = 0.0,
+    poll_sec: float = 0.05,
+):
+    max_inputs = max(0, int(max_inputs or 0))
+    wait_timeout_sec = max(0.0, float(wait_timeout_sec or 0.0))
+    poll_sec = max(0.001, float(poll_sec or 0.05))
+    deadline = time.monotonic() + wait_timeout_sec
+    seen: set[Path] = set()
+    yielded = 0
+    while True:
+        input_files, _available_count = collect_input_files(input_dir=input_dir, max_inputs=0)
+        for input_path in input_files:
+            resolved = input_path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield input_path
+            yielded += 1
+            if max_inputs and yielded >= max_inputs:
+                return
+        if not max_inputs:
+            return
+        if wait_timeout_sec <= 0.0 or time.monotonic() >= deadline:
+            return
+        time.sleep(poll_sec)
+
+
 def mock_infer(noisy: np.ndarray, sleep_ms: float) -> np.ndarray:
     if sleep_ms > 0:
         time.sleep(sleep_ms / 1000.0)
@@ -353,7 +398,11 @@ def mock_infer(noisy: np.ndarray, sleep_ms: float) -> np.ndarray:
 
 
 def preloader_worker(
-    input_files: list[str],
+    input_files: list[str] | None,
+    input_dir: str,
+    max_inputs: int,
+    input_wait_timeout_sec: float,
+    input_poll_sec: float,
     snr: float,
     seed: int | None,
     little_cores: list[int],
@@ -369,8 +418,17 @@ def preloader_worker(
         load_samples_ms: list[float] = []
         awgn_samples_ms: list[float] = []
         queued = 0
-        for index, raw_path in enumerate(input_files):
-            input_path = Path(raw_path)
+        if input_files is None:
+            input_iter = iter_input_files_dynamic(
+                input_dir=Path(input_dir),
+                max_inputs=max_inputs,
+                wait_timeout_sec=input_wait_timeout_sec,
+                poll_sec=input_poll_sec,
+            )
+        else:
+            input_iter = (Path(raw_path) for raw_path in input_files)
+        for index, input_path in enumerate(input_iter):
+            input_path = Path(input_path)
             base_name = input_path.stem.split("_latent")[0]
             load_t0 = time.perf_counter()
             latent = load_latent(input_path)
@@ -392,6 +450,9 @@ def preloader_worker(
         result.update(
             {
                 "queued_count": queued,
+                "available_input_count": queued,
+                "input_wait_timeout_sec": input_wait_timeout_sec,
+                "input_poll_sec": input_poll_sec,
                 "load_samples_ms": [round(value, 3) for value in load_samples_ms],
                 "awgn_samples_ms": [round(value, 3) for value in awgn_samples_ms],
                 "load_summary": summarize_samples(load_samples_ms),
@@ -848,7 +909,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     big_cores = parse_cpu_list(args.big_cores)
     little_cores = parse_cpu_list(args.little_cores)
     input_files, available_input_count = collect_input_files(input_dir=input_dir, max_inputs=args.max_inputs)
-    if not input_files:
+    dynamic_input = bool(args.input_wait_timeout_sec > 0.0 and args.max_inputs > 0)
+    if not input_files and not dynamic_input:
         raise SystemExit(f"ERROR: no supported latent files found in {input_dir}")
 
     expected_sha256 = args.expected_sha256.strip().lower()
@@ -862,7 +924,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "preloader": threading.Thread(
                 target=preloader_worker,
                 kwargs={
-                    "input_files": [str(path) for path in input_files],
+                    "input_files": None if dynamic_input else [str(path) for path in input_files],
+                    "input_dir": str(input_dir),
+                    "max_inputs": args.max_inputs,
+                    "input_wait_timeout_sec": args.input_wait_timeout_sec if dynamic_input else 0.0,
+                    "input_poll_sec": args.input_poll_sec,
                     "snr": args.snr,
                     "seed": args.seed,
                     "little_cores": little_cores,
@@ -896,7 +962,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                     "little_cores": little_cores,
                     "allow_missing_affinity": args.allow_missing_affinity,
                     "backend": args.backend,
-                    "expected_count": len(input_files),
+                    "expected_count": args.max_inputs if dynamic_input else len(input_files),
                     "output_queue": output_queue,
                     "stats_queue": stats_queue,
                 },
@@ -915,7 +981,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "preloader": mp.Process(
                 target=preloader_worker,
                 kwargs={
-                    "input_files": [str(path) for path in input_files],
+                    "input_files": None if dynamic_input else [str(path) for path in input_files],
+                    "input_dir": str(input_dir),
+                    "max_inputs": args.max_inputs,
+                    "input_wait_timeout_sec": args.input_wait_timeout_sec if dynamic_input else 0.0,
+                    "input_poll_sec": args.input_poll_sec,
                     "snr": args.snr,
                     "seed": args.seed,
                     "little_cores": little_cores,
@@ -949,7 +1019,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                     "little_cores": little_cores,
                     "allow_missing_affinity": args.allow_missing_affinity,
                     "backend": args.backend,
-                    "expected_count": len(input_files),
+                    "expected_count": args.max_inputs if dynamic_input else len(input_files),
                     "output_queue": output_queue,
                     "stats_queue": stats_queue,
                 },
@@ -971,6 +1041,12 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     reconstructions_dir = output_dir / "reconstructions"
     output_count = len(list(reconstructions_dir.glob("*")))
     processed_count = int(postprocessor.get("output_count", inferencer.get("processed_count", 0)) or 0)
+    queued_input_count = int(preloader.get("queued_count", len(input_files)) or 0)
+    final_available_input_count = max(
+        int(preloader.get("available_input_count", 0) or 0),
+        int(available_input_count or 0),
+        queued_input_count,
+    )
     total_wall_ms = (pipeline_ended_at - pipeline_started_at) * 1000.0
     images_per_sec = None if processed_count == 0 else round(processed_count / (total_wall_ms / 1000.0), 3)
     ms_per_image = None if processed_count == 0 else round(total_wall_ms / processed_count, 3)
@@ -991,8 +1067,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
         "output_dir": str(output_dir),
         "output_count": output_count,
         "processed_count": processed_count,
-        "input_count": len(input_files),
-        "available_input_count": available_input_count,
+        "input_count": queued_input_count,
+        "available_input_count": final_available_input_count,
         "load_ms": inferencer.get("load_ms"),
         "vm_init_ms": inferencer.get("vm_init_ms"),
         "run_samples_ms": inferencer.get("run_samples_ms", []),

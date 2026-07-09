@@ -1902,6 +1902,32 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env["BIG_LITTLE_OUTPUT_PREFIX"], "openamp3_usrp_123")
         self.assertEqual(env["BIG_LITTLE_REPORT_PREFIX"], "openamp3_usrp_123")
 
+    def test_usrp_tvm_stage_sets_big_little_input_wait_window(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides(
+            {
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
+            }
+        )
+        captured: dict[str, str] = {}
+
+        def fake_run_tvm(access, *, count, progress_callback):
+            captured.update(access.build_env())
+            progress_callback(count, count)
+            return {"status": "ok", "processed_count": count, "selected_input_count": count}
+
+        with patch.object(state, "_run_tvm_batch_with_access", side_effect=fake_run_tvm):
+            callback = state._run_tvm_after_usrp_stage(base_access, count=300)
+            result = callback(
+                {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-789_rx"},
+                lambda *_args: None,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC"], "300.0")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_POLL_SEC"], "0.05")
+
     def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         base_access = state._board_access.with_env_overrides(
@@ -4716,6 +4742,137 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(manifest["remote_dir"], "/home/user/cockpit_usrp_rx/cockpit_usrp_123_rx")
         self.assertEqual(manifest["decode_location"], "board")
         self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+
+    def test_usrp_iq_remote_decode_can_start_tvm_before_transport_completes(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        class ImmediateThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+                self._alive = False
+
+            def start(self) -> None:
+                self.target()
+
+            def join(self, timeout=None) -> None:
+                return None
+
+            def is_alive(self) -> bool:
+                return self._alive
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            captured: dict[str, object] = {}
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_IQ_STREAMING_TVM": "1",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_inference(remote_stage_manifest: dict[str, object], progress) -> dict[str, object]:
+                captured["remote_stage_manifest"] = dict(remote_stage_manifest)
+                progress(1, 3)
+                return {"status": "ok", "processed_count": 1, "selected_input_count": 3}
+
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=fake_inference,
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+            image_dir = job._run_dir / "image_0000"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("usrp_runtime.threading.Thread", ImmediateThread):
+                started = job._maybe_start_iq_streaming_inference()
+
+        self.assertTrue(started)
+        manifest = captured["remote_stage_manifest"]
+        self.assertEqual(manifest["remote_dir"], "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx")
+        self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+        self.assertEqual(job._inference_completed, 1)
+        self.assertEqual(job._inference_total, 3)
+
+    def test_usrp_iq_remote_decode_streaming_tvm_is_opt_in(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=lambda *_args: {"status": "ok"},
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+            image_dir = job._run_dir / "image_0000"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(job._maybe_start_iq_streaming_inference())
 
     def test_usrp_iq_remote_decode_refuses_control_plane_wire_restaging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

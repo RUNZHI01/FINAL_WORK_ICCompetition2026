@@ -176,6 +176,7 @@ INFERENCE_ENGINE_KEYS = ("OPENAMP_DEMO_USRP_INFERENCE_ENGINE", "USRP_INFERENCE_E
 INFERENCE_ENGINE_NONE = "none"
 INFERENCE_ENGINE_TVM = "tvm"
 INFERENCE_ENGINE_MNN = "mnn"
+IQ_STREAMING_TVM_KEYS = ("OPENAMP_IQ_STREAMING_TVM", "USRP_IQ_STREAMING_TVM")
 DEFAULT_RX_CONTROL_PORT = "29220"
 DEFAULT_TX_CONTROL_PORT = "29221"
 DEFAULT_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
@@ -2167,6 +2168,13 @@ class UsrpBatchSpoolJob:
         self._inference_completed = 0
         self._inference_total = self._expected_outputs
         self._inference_summary: dict[str, Any] | None = None
+        self._inference_thread: threading.Thread | None = None
+        self._inference_error = ""
+        self._inference_started = False
+        self._iq_streaming_tvm_enabled = _parse_bool(
+            _first_value(env_values, IQ_STREAMING_TVM_KEYS, "0"),
+            False,
+        )
         runner_path = _resolve_existing_path(_first_value(env_values, RUNNER_SCRIPT_KEYS)) or DEFAULT_RUNNER
         input_dir = _resolve_existing_path(_first_value(env_values, INPUT_DIR_KEYS)) or DEFAULT_INPUT_DIR
         input_file = _resolve_existing_path(_first_value(env_values, INPUT_FILE_KEYS)) or DEFAULT_INPUT_FILE
@@ -2809,6 +2817,68 @@ class UsrpBatchSpoolJob:
             self._inference_total = max(1, int(total))
             self._inference_completed = max(0, min(int(completed), self._inference_total))
 
+    def _run_inference_callback(self, remote_stage_manifest: dict[str, Any]) -> None:
+        try:
+            if self._inference_callback is None:
+                raise RuntimeError(f"未配置 {self._inference_engine.upper()} 推理回调")
+            inference_summary = self._inference_callback(
+                remote_stage_manifest,
+                self._set_inference_progress,
+            )
+            with self._lock:
+                self._inference_summary = dict(inference_summary or {})
+        except Exception as exc:
+            with self._lock:
+                self._inference_error = f"{type(exc).__name__}: {exc}"
+
+    def _maybe_start_iq_streaming_inference(self) -> bool:
+        if self._link_mode != LINK_MODE_IQ_DIRECT:
+            return False
+        if self._input_source_mode != "usrp":
+            return False
+        if self._inference_engine != INFERENCE_ENGINE_TVM:
+            return False
+        if self._inference_callback is None:
+            return False
+        if not self._iq_streaming_tvm_enabled:
+            return False
+        with self._lock:
+            if self._inference_started or self._inference_thread is not None:
+                return False
+            remote_decoded_output_dir = str(self._iq_remote_decoded_output_dir or "").strip().rstrip("/")
+            if not remote_decoded_output_dir and self._remote_usrp_rx_root:
+                remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root).rstrip('/')}/{self._run_id}_rx"
+        manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
+            self._run_dir,
+            remote_decoded_output_dir,
+        )
+        if manifest is None:
+            return False
+        thread = threading.Thread(
+            target=lambda: self._run_inference_callback(manifest),
+            daemon=True,
+        )
+        with self._lock:
+            if self._inference_started or self._inference_thread is not None:
+                return False
+            self._remote_stage_manifest = manifest
+            self._inference_started = True
+            self._inference_thread = thread
+        thread.start()
+        return True
+
+    def _inference_summary_or_raise(self, remote_stage_manifest: dict[str, Any]) -> dict[str, Any]:
+        if self._inference_thread is None:
+            self._run_inference_callback(remote_stage_manifest)
+        else:
+            self._inference_thread.join(timeout=max(30.0, self._timeout_sec))
+            if self._inference_thread.is_alive():
+                raise RuntimeError("IQ-direct TVM 早启动推理等待超时")
+        with self._lock:
+            if self._inference_error:
+                raise RuntimeError(self._inference_error)
+            return dict(self._inference_summary or {})
+
     def _shutdown_control_servers_after_transport(self) -> None:
         if not self._rx_control_host or not self._tx_control_host:
             return
@@ -3036,12 +3106,22 @@ class UsrpBatchSpoolJob:
 
     def _wait_for_completion(self) -> None:
         assert self._process is not None
+        rc = 0
+        deadline = time.monotonic() + self._timeout_sec
         try:
-            rc = self._process.wait(timeout=self._timeout_sec)
-        except subprocess.TimeoutExpired:
-            self._timed_out = True
-            self._process.kill()
-            rc = self._process.wait()
+            while True:
+                self._maybe_start_iq_streaming_inference()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._timed_out = True
+                    self._process.kill()
+                    rc = self._process.wait()
+                    break
+                try:
+                    rc = self._process.wait(timeout=min(0.1, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
         finally:
             self._log_handle.close()
 
@@ -3089,12 +3169,9 @@ class UsrpBatchSpoolJob:
                             access=self._access,
                         )
                 if self._inference_engine != INFERENCE_ENGINE_NONE:
-                    if self._inference_callback is None:
-                        raise RuntimeError(f"未配置 {self._inference_engine.upper()} 推理回调")
                     self._phase = "inference"
-                    inference_summary = self._inference_callback(
+                    inference_summary = self._inference_summary_or_raise(
                         self._remote_stage_manifest or {},
-                        self._set_inference_progress,
                     )
                     self._inference_summary = dict(inference_summary or {})
                     status_text = str(self._inference_summary.get("status") or "").lower()
@@ -3198,7 +3275,9 @@ class UsrpBatchSpoolJob:
             host_preprocess_total = self._host_preprocess_total
             host_preprocess_state = self._host_preprocess_state
             iq_remote_decoded_output_dir = self._iq_remote_decoded_output_dir
-        transport_done = phase in {"transport_shutdown", "board_decode", "inference"}
+        transport_done = phase in {"transport_shutdown", "board_decode"} or (
+            phase == "inference" and processed_count >= target_count
+        )
         host_preprocess_done = phase not in {"starting", "host_preprocess"} and host_preprocess_state == "completed"
         decoding = phase in {"transport_shutdown", "board_decode"}
         progress_label = (

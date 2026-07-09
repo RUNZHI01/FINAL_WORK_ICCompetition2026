@@ -209,3 +209,14 @@ def test_big_little_wrapper_intermediate_json_is_ascii_safe() -> None:
     )
 
     assert "json.dumps(payload, ensure_ascii=True)" in script
+
+
+def test_big_little_wrapper_passes_dynamic_input_wait_knobs() -> None:
+    script = (PROJECT_ROOT / "Semantic-Communication" / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "INPUT_WAIT_TIMEOUT_SEC=\"${BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC:-0}\"" in script
+    assert "INPUT_POLL_SEC=\"${BIG_LITTLE_INPUT_POLL_SEC:-0.05}\"" in script
+    assert "--input-wait-timeout-sec" in script
+    assert "--input-poll-sec" in script

@@ -6981,6 +6981,14 @@ class DashboardState:
     ) -> Any:
         def _callback(remote_stage_manifest: dict[str, Any], progress: Any) -> dict[str, Any]:
             access = self._usrp_stage_access(base_access, remote_stage_manifest, engine=INFERENCE_ENGINE_TVM)
+            env_values = access.build_env()
+            if not str(env_values.get("BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC") or "").strip():
+                access = access.with_env_overrides(
+                    {
+                        "BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC": str(max(60.0, float(max(1, count)))),
+                        "BIG_LITTLE_INPUT_POLL_SEC": str(env_values.get("BIG_LITTLE_INPUT_POLL_SEC") or "0.05"),
+                    }
+                )
             progress_callback_to_use = progress_callback or progress
             progress_callback_to_use(0, max(1, count))
             result = self._run_tvm_batch_with_access(

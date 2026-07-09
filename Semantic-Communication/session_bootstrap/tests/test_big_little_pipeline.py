@@ -18,6 +18,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
+import big_little_pipeline as pipeline  # noqa: E402
 
 PYTHON_RUNNER = SCRIPTS_DIR / "big_little_pipeline.py"
 WRAPPER_RUNNER = SCRIPTS_DIR / "run_big_little_pipeline.sh"
@@ -146,6 +147,34 @@ class BigLittlePipelineTest(unittest.TestCase):
             self.assertTrue(summary_json.is_file())
             self.assertTrue(summary_md.is_file())
             self.assertTrue((output_dir / "reconstructions").is_dir())
+
+    def test_dynamic_input_iterator_waits_for_late_npz(self) -> None:
+        import threading
+        import time
+
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
+            input_dir = Path(temp_dir_raw) / "inputs"
+            input_dir.mkdir()
+
+            def publish_late_input() -> None:
+                time.sleep(0.1)
+                np.savez(input_dir / "00000000.npz", latent=np.zeros((1, 4, 4, 4), dtype=np.float32))
+
+            producer = threading.Thread(target=publish_late_input)
+            producer.start()
+            try:
+                files = list(
+                    pipeline.iter_input_files_dynamic(
+                        input_dir=input_dir,
+                        max_inputs=1,
+                        wait_timeout_sec=2.0,
+                        poll_sec=0.02,
+                    )
+                )
+            finally:
+                producer.join(timeout=2.0)
+
+            self.assertEqual([path.name for path in files], ["00000000.npz"])
 
     def test_wrapper_local_env_dry_run_emits_report(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:

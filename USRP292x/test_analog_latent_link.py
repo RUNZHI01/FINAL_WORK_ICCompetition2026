@@ -118,6 +118,35 @@ def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
 
 
+def test_atomic_savez_publishes_final_npz_with_replace(tmp_path, monkeypatch):
+    final_npz = tmp_path / "received_latent.npz"
+    save_paths: list[Path] = []
+    replace_calls: list[tuple[Path, Path]] = []
+    real_replace = analog.os.replace
+
+    def fake_savez(path, **_items):
+        save_path = Path(path)
+        save_paths.append(save_path)
+        save_path.write_bytes(b"complete-npz")
+
+    def fake_replace(src, dst):
+        src_path = Path(src)
+        dst_path = Path(dst)
+        replace_calls.append((src_path, dst_path))
+        real_replace(src_path, dst_path)
+
+    monkeypatch.setattr(analog.np, "savez", fake_savez)
+    monkeypatch.setattr(analog.os, "replace", fake_replace)
+
+    analog.atomic_savez(final_npz, latent=np.zeros((1, 1, 1, 1), dtype=np.float32))
+
+    assert final_npz.read_bytes() == b"complete-npz"
+    assert save_paths and save_paths[0] != final_npz
+    assert save_paths[0].name.endswith(".tmp.npz")
+    assert replace_calls == [(save_paths[0], final_npz)]
+    assert not save_paths[0].exists()
+
+
 def test_find_sync_candidates_uses_fft_for_large_search_when_available():
     scipy_signal = analog.scipy_signal_module()
     rng = np.random.default_rng(125)
