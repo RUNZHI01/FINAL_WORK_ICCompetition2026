@@ -1672,6 +1672,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_capture_wall_sec": 0.030,
             "rx_wait_wall_sec": 0.017,
             "decode_wall_sec": 0.060,
+            "remote_decode_reported_wall_sec": 0.041,
             "decode_queue_wall_sec": 0.005,
             "remote_dir_publish_wall_sec": 0.004,
             "retry_wait_wall_sec": 0.0,
@@ -1685,6 +1686,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_capture_wall_sec": 0.050,
             "rx_wait_wall_sec": 0.025,
             "decode_wall_sec": 0.080,
+            "remote_decode_reported_wall_sec": 0.043,
             "decode_queue_wall_sec": 0.015,
             "remote_dir_publish_wall_sec": 0.006,
             "retry_wait_wall_sec": 0.020,
@@ -1699,6 +1701,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
     assert benchmark["rx_wait_ms"]["median_ms"] == 21.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
+    assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
     assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
     assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
     assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
