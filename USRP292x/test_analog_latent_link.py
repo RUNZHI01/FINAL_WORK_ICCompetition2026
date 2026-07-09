@@ -1328,7 +1328,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     image_a.records.append(
         {
             "tx_wall_sec": 0.010,
+            "rx_arm_wall_sec": 0.003,
             "rx_capture_wall_sec": 0.030,
+            "rx_wait_wall_sec": 0.017,
             "decode_wall_sec": 0.060,
             "decode_queue_wall_sec": 0.005,
             "remote_dir_publish_wall_sec": 0.004,
@@ -1339,7 +1341,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     image_b.records.append(
         {
             "tx_wall_sec": 0.020,
+            "rx_arm_wall_sec": 0.005,
             "rx_capture_wall_sec": 0.050,
+            "rx_wait_wall_sec": 0.025,
             "decode_wall_sec": 0.080,
             "decode_queue_wall_sec": 0.015,
             "remote_dir_publish_wall_sec": 0.006,
@@ -1351,7 +1355,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     benchmark = analog_batch.build_iq_stage_benchmark([image_a, image_b])
 
     assert benchmark["tx_control_ms"]["median_ms"] == 15.0
+    assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
+    assert benchmark["rx_wait_ms"]["median_ms"] == 21.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
     assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
     assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
@@ -1378,7 +1384,9 @@ def test_pipeline_error_record_preserves_stage_timings(tmp_path):
         stage_timings={
             "make_wall_sec": 0.010,
             "tx_wall_sec": 0.020,
+            "rx_arm_wall_sec": 0.012,
             "rx_capture_wall_sec": 0.090,
+            "rx_wait_wall_sec": 0.058,
             "decode_queue_wall_sec": 0.030,
             "decode_wall_sec": 0.110,
             "remote_dir_publish_wall_sec": 0.0,
@@ -1388,7 +1396,9 @@ def test_pipeline_error_record_preserves_stage_timings(tmp_path):
     record = image.records[0]
     assert record["attempt"] == 2
     assert record["error"] == "decode failed"
+    assert record["rx_arm_wall_sec"] == 0.012
     assert record["rx_capture_wall_sec"] == 0.090
+    assert record["rx_wait_wall_sec"] == 0.058
     assert record["decode_queue_wall_sec"] == 0.030
     assert record["decode_wall_sec"] == 0.110
 

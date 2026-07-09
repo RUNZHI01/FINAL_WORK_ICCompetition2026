@@ -114,7 +114,9 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                     "round_records": [
                         {
                             "tx_wall_sec": 0.010,
+                            "rx_arm_wall_sec": 0.003,
                             "rx_capture_wall_sec": 0.030,
+                            "rx_wait_wall_sec": 0.017,
                             "decode_wall_sec": 0.060,
                             "remote_dir_publish_wall_sec": 0.004,
                             "retry_wait_wall_sec": 0.0,
@@ -127,7 +129,9 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                     "round_records": [
                         {
                             "tx_wall_sec": 0.020,
+                            "rx_arm_wall_sec": 0.004,
                             "rx_capture_wall_sec": 0.040,
+                            "rx_wait_wall_sec": 0.026,
                             "decode_wall_sec": 0.070,
                             "remote_dir_publish_wall_sec": 0.005,
                             "retry_wait_wall_sec": 0.0,
@@ -140,7 +144,9 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
                     "round_records": [
                         {
                             "tx_wall_sec": 0.070,
+                            "rx_arm_wall_sec": 0.009,
                             "rx_capture_wall_sec": 0.050,
+                            "rx_wait_wall_sec": 0.031,
                             "decode_wall_sec": 0.080,
                             "remote_dir_publish_wall_sec": 0.006,
                             "retry_wait_wall_sec": 0.020,
@@ -155,7 +161,9 @@ def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
     assert benchmark is not None
     assert benchmark["tx_control_ms"]["median_ms"] == 20.0
     assert benchmark["tx_control_ms"]["p95_ms"] == 70.0
+    assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
     assert benchmark["rx_capture_ms"]["median_ms"] == 40.0
+    assert benchmark["rx_wait_ms"]["median_ms"] == 26.0
     assert benchmark["remote_decode_ms"]["median_ms"] == 70.0
     assert benchmark["remote_dir_publish_ms"]["mean_ms"] == 5.0
     assert benchmark["retry_wait_ms"]["max_ms"] == 20.0

@@ -1864,7 +1864,9 @@ def _iq_stage_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any] 
 
     field_map = (
         ("tx_control_ms", "tx_wall_sec"),
+        ("rx_arm_ms", "rx_arm_wall_sec"),
         ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("rx_wait_ms", "rx_wait_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
         ("retry_wait_ms", "retry_wait_wall_sec"),

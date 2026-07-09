@@ -1516,6 +1516,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     remote_received_npz = ""
     remote_dir_publish_wall_sec = 0.0
     retry_wait_wall_sec = 0.0
+    rx_arm_wall_sec = 0.0
+    rx_capture_wall_sec = 0.0
+    rx_wait_wall_sec = 0.0
+    tx_wall_sec = 0.0
 
     try:
         make_started = time.monotonic()
@@ -1544,8 +1548,6 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     )
             else:
                 shutil.copy2(tx_sc16, batch_rx)
-            rx_capture_wall_sec = 0.0
-            tx_wall_sec = 0.0
             decode_started = time.monotonic()
             if use_in_process_local_codec:
                 returncode = run_in_process_decode(
@@ -1609,6 +1611,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
 
             rx_started = time.monotonic()
             # Tell RX-side OtaRxPersistentServer to capture (rx_control_host points at RX)
+            rx_arm_started = time.monotonic()
             run_control(
                 args.rx_control_host,
                 args.rx_control_port,
@@ -1616,6 +1619,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 image.image_dir / "rx_capture.log",
                 capture_timeout,
             )
+            rx_arm_wall_sec = time.monotonic() - rx_arm_started
             time.sleep(max(0.0, float(args.tx_delay_sec)))
             tx_started = time.monotonic()
             # TX is always local — local OtaTxPersistentServer sends the locally-generated tx_sc16
@@ -1632,6 +1636,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 args.tx_timeout_sec,
             )
             tx_wall_sec = time.monotonic() - tx_started
+            rx_wait_started = time.monotonic()
             run_control(
                 args.rx_control_host,
                 args.rx_control_port,
@@ -1639,6 +1644,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 image.image_dir / "rx_wait.log",
                 capture_timeout,
             )
+            rx_wait_wall_sec = time.monotonic() - rx_wait_started
             rx_capture_wall_sec = time.monotonic() - rx_started
 
             if mode == "remote-pull":
@@ -1820,7 +1826,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "simulated_snr_db": float(args.sim_snr_db) if args.dry_run and simulated_channel_enabled(args) and args.sim_snr_db is not None else None,
             "make_wall_sec": make_wall_sec,
             "tx_wall_sec": tx_wall_sec,
+            "rx_arm_wall_sec": rx_arm_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
+            "rx_wait_wall_sec": rx_wait_wall_sec,
             "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
@@ -1957,6 +1965,7 @@ def _capture_remote_decode_pipeline_attempt(
     capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
 
     rx_started = time.monotonic()
+    rx_arm_started = time.monotonic()
     run_control(
         args.rx_control_host,
         args.rx_control_port,
@@ -1964,6 +1973,7 @@ def _capture_remote_decode_pipeline_attempt(
         image.image_dir / "rx_capture.log",
         capture_timeout,
     )
+    rx_arm_wall_sec = time.monotonic() - rx_arm_started
     time.sleep(max(0.0, float(args.tx_delay_sec)))
     tx_started = time.monotonic()
     tx_control_file = translate_tx_control_file_path(
@@ -1979,6 +1989,7 @@ def _capture_remote_decode_pipeline_attempt(
         args.tx_timeout_sec,
     )
     tx_wall_sec = time.monotonic() - tx_started
+    rx_wait_started = time.monotonic()
     run_control(
         args.rx_control_host,
         args.rx_control_port,
@@ -1986,6 +1997,7 @@ def _capture_remote_decode_pipeline_attempt(
         image.image_dir / "rx_wait.log",
         capture_timeout,
     )
+    rx_wait_wall_sec = time.monotonic() - rx_wait_started
     rx_capture_wall_sec = time.monotonic() - rx_started
     capture_completed_at = time.monotonic()
 
@@ -2005,7 +2017,9 @@ def _capture_remote_decode_pipeline_attempt(
         "manifest": manifest,
         "make_wall_sec": make_wall_sec,
         "tx_wall_sec": tx_wall_sec,
+        "rx_arm_wall_sec": rx_arm_wall_sec,
         "rx_capture_wall_sec": rx_capture_wall_sec,
+        "rx_wait_wall_sec": rx_wait_wall_sec,
         "rx_pull_wall_sec": 0.0,
         "merge_wall_sec": 0.0,
         "remote_cleanup_wall_sec": 0.0,
@@ -2180,7 +2194,9 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "simulated_snr_db": None,
             "make_wall_sec": float(ctx["make_wall_sec"]),
             "tx_wall_sec": float(ctx["tx_wall_sec"]),
+            "rx_arm_wall_sec": float(ctx["rx_arm_wall_sec"]),
             "rx_capture_wall_sec": float(ctx["rx_capture_wall_sec"]),
+            "rx_wait_wall_sec": float(ctx["rx_wait_wall_sec"]),
             "rx_pull_wall_sec": float(ctx["rx_pull_wall_sec"]),
             "decode_wall_sec": decode_wall_sec,
             "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
@@ -2209,7 +2225,9 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             stage_timings={
                 "make_wall_sec": float(ctx.get("make_wall_sec") or 0.0),
                 "tx_wall_sec": float(ctx.get("tx_wall_sec") or 0.0),
+                "rx_arm_wall_sec": float(ctx.get("rx_arm_wall_sec") or 0.0),
                 "rx_capture_wall_sec": float(ctx.get("rx_capture_wall_sec") or 0.0),
+                "rx_wait_wall_sec": float(ctx.get("rx_wait_wall_sec") or 0.0),
                 "rx_pull_wall_sec": float(ctx.get("rx_pull_wall_sec") or 0.0),
                 "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
                 "decode_wall_sec": decode_wall_sec,
@@ -2448,7 +2466,9 @@ def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
 def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     fields = (
         ("tx_control_ms", "tx_wall_sec"),
+        ("rx_arm_ms", "rx_arm_wall_sec"),
         ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("rx_wait_ms", "rx_wait_wall_sec"),
         ("remote_decode_queue_ms", "decode_queue_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
