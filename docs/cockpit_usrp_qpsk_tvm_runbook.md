@@ -81,6 +81,8 @@ These runs were started through the same backend path used by the cockpit deskto
 
 IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home/user/cockpit_usrp_rx/<run>_rx`, and TVM consumed that directory directly. In the recommended 2026-07-10 profile, inference stayed pending while transport advanced to `300/300`; TVM started only after IQ decode completed. The streaming TVM experiment did overlap transport and inference, but total wall worsened from `161.17 s` to `233.76 s`, so the overlap path is opt-in only. The QPSK run is now a stable fallback rather than a single-frame proof, but it is still about `16.3x` slower than the latest IQ direct median transport.
 
+2026-07-10 control diagnostics added `rx_arm_ms` and `rx_wait_ms` to the IQ stage benchmark. In `batch-1783629764-50`, transport median was `206.51 ms`, p95 `308.24 ms`, with `tx_control_ms` median `31.42`, `rx_arm_ms` median `35.27`, and `rx_wait_ms` median `30.75`. The opt-in `ANALOG_PRECONNECT_CONTROL=1` run `batch-1783631315-50` stayed all-pass and improved transport p95 to `290.16 ms`, but median stayed `207.08 ms`; keep it experimental rather than default.
+
 Compared with the older QPSK notes below, the QPSK path improved from tens of seconds per image to about 3 seconds per image:
 
 | QPSK evidence | Samples | Transport | TVM inference |
