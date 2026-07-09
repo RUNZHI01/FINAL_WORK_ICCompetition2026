@@ -12,7 +12,8 @@
 
 | 链路 | 批次 | 结果 | 传输指标 | TVM big.LITTLE |
 |---|---:|---:|---:|---:|
-| IQ 直传 | `batch-1783610422-300` | 300/300，fail 0 | median `202.54 ms`，p95 `598.89 ms`，RF airtime `9.58 ms` | median `241.21 ms` |
+| IQ 直传（推荐默认，TVM 不 overlap） | `batch-1783625337-300` | 300/300，fail 0，fallback 0 | median `189.10 ms`，p95 `642.66 ms`，RF airtime `9.58 ms` | median `242.16 ms`，p95 `244.89 ms` |
+| IQ 直传（streaming TVM 实验） | `batch-1783624303-300` | 300/300，fail 0，fallback 0 | median `338.90 ms`，p95 `694.20 ms` | median `248.29 ms`，p95 `322.37 ms` |
 | QPSK | `batch-1783610673-300` | 300/300，fail 0 | `2961.78 ms/image`，RF airtime mean `48.02 ms` | median `240.06 ms` |
 
 当前 IQ 链路事实：
@@ -21,11 +22,13 @@
 - TX/RX 是常驻服务：host TX `127.0.0.1:29221`，board RX `100.121.87.73:29220`；每张图只发控制命令，不重复拉起 USRP 进程。
 - decode 是板端常驻 worker：`AnalogLatentLink.py decode-server` 使用 `/home/user/venv/bin/python`，`ANALOG_DECODE_PIPELINE_WARMUP=1` 提前预热 FFT/import/decode 路径。
 - `remote-dir` 模式把 decoded latent 直接写到 `/home/user/cockpit_usrp_rx/<run>_rx`，TVM 直接消费该目录。
+- `ANALOG_PIPELINE_DEPTH=2` 已启用；IQ transport/decode 内部可以双缓冲，但 TVM 跨阶段 streaming 默认关闭。
+- `OPENAMP_IQ_STREAMING_TVM` / `USRP_IQ_STREAMING_TVM` 是 opt-in 实验开关。今天的 300 张实测显示 overlap 会让飞腾派解码和 TVM 抢 CPU/IO，默认路径应先完成 IQ transport/decode，再启动 TVM。
 - 性能跑时 crypto toggle 关闭；ML-KEM/auth 仍是控制面配置，security-on 性能需要单独测。
 
 剩余核心风险：
 
-- IQ 物理层还存在长尾：300 张里 23 张自动重试，最大 3 attempts；transport median 已低于 250 ms，但 p95 仍有 `598.89 ms`。
+- IQ 物理层还存在长尾：transport median 已低于 200 ms，但 p95 仍有 `642.66 ms`。
 - sync/RX 稳定性仍是第一优先级。`ANALOG_MIN_SYNC_METRIC=0.05` 和 `ANALOG_ROBUST_SYNC=0` 是当前低延迟 profile，不是最终 PHY 质量结论。
 - QPSK 已经从单张 proof 变成 300/300 可靠 fallback，但 `decode_command` 均值约 `2295.96 ms`，不能作为 250 ms 主链路。
 
