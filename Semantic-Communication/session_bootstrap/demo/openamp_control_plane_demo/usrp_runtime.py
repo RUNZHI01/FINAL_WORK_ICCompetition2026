@@ -122,6 +122,7 @@ ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
 ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
 ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
 ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC",)
@@ -2604,6 +2605,9 @@ class UsrpBatchSpoolJob:
             ])
         elif self._link_mode == LINK_MODE_IQ_DIRECT:
             args.extend(["--sync-search-window-symbols", str(DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS)])
+        pipeline_depth = _first_value(env_values, ANALOG_PIPELINE_DEPTH_KEYS)
+        if pipeline_depth:
+            args.extend(["--pipeline-depth", str(max(1, _parse_int(pipeline_depth, 1)))])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
         if scramble_key:

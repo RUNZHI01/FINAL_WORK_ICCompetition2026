@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import traceback
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -182,6 +183,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rx-tail-sec", type=float, default=env_float("ANALOG_RX_TAIL_SEC", 0.300))
     parser.add_argument("--rx-timeout-sec", type=float, default=env_float("BATCH_RX_TIMEOUT_SEC", 30.0))
     parser.add_argument("--tx-timeout-sec", type=float, default=env_float("BATCH_TX_TIMEOUT_SEC", 30.0))
+    parser.add_argument(
+        "--pipeline-depth",
+        type=int,
+        default=env_int("ANALOG_PIPELINE_DEPTH", 1),
+        help="Number of IQ remote-decode slots to keep in flight. Depth 1 preserves serial behavior.",
+    )
 
     parser.add_argument("--rate", type=float, default=env_float("RATE", 5_000_000.0))
     parser.add_argument("--sps", type=int, default=env_int("ANALOG_SPS", 4))
@@ -1775,6 +1782,493 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     return image
 
 
+def _append_pipeline_error_record(
+    image: ImageRecord,
+    exc: Exception,
+    *,
+    started: float,
+    attempt_index: int,
+    max_attempts: int,
+    slot_index: int,
+    pipeline_depth: int,
+) -> ImageRecord:
+    image.status = 1
+    image.passed = False
+    image.error = str(exc)
+    image.records.append({
+        "round": attempt_index,
+        "attempt": attempt_index + 1,
+        "max_attempts": max_attempts,
+        "input": str(image.input_path),
+        "error": image.error,
+        "pipeline_depth": pipeline_depth,
+        "pipeline_slot": slot_index,
+        "total_wall_sec": time.monotonic() - started,
+        "payload_is_bit_exact": False,
+    })
+    return image
+
+
+def _capture_remote_decode_pipeline_attempt(
+    args: argparse.Namespace,
+    image: ImageRecord,
+    *,
+    attempt_index: int,
+    max_attempts: int,
+    slot_index: int,
+    pipeline_depth: int,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    image.status = 0
+    image.passed = False
+    image.error = ""
+    image.image_dir.mkdir(parents=True, exist_ok=True)
+    tx_sc16 = image.image_dir / "tx_analog.sc16"
+    batch_rx = image.image_dir / "batch_rx.sc16"
+    manifest_path = image.image_dir / "manifest.json"
+    out_npz = image.image_dir / "received_latent.npz"
+    out_wire = image.image_dir / "merged_round0.bin"
+    decode_summary = image.image_dir / "decode_summary.json"
+
+    remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
+    if not remote_target:
+        raise RuntimeError("--rx-capture-mode=remote-decode requires --remote-rx-ssh-target")
+    ssh_control_socket = str(getattr(args, "ssh_control_socket", "") or "").strip() or None
+    use_in_process_local_codec = bool(getattr(args, "in_process_local_codec", False))
+    remote_cleanup_mode = str(
+        getattr(args, "remote_cleanup_mode", os.environ.get("ANALOG_REMOTE_CLEANUP_MODE", "sync")) or "sync"
+    ).strip().lower()
+    if remote_cleanup_mode not in {"sync", "async", "skip"}:
+        remote_cleanup_mode = "sync"
+    remote_decode_result_mode = str(
+        getattr(args, "remote_decode_result_mode", os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull")) or "pull"
+    ).strip().lower()
+    if remote_decode_result_mode not in {"pull", "remote-dir"}:
+        remote_decode_result_mode = "pull"
+    remote_decoded_dir = remote_decoded_output_dir(args) if remote_decode_result_mode == "remote-dir" else ""
+
+    make_started = time.monotonic()
+    if use_in_process_local_codec:
+        manifest = run_in_process_make(args, image, tx_sc16, manifest_path, image.image_dir / "make.log")
+    else:
+        run_command(analog_make_args(args, image, tx_sc16, manifest_path), image.image_dir / "make.log")
+        manifest = read_json(manifest_path)
+    make_wall_sec = time.monotonic() - make_started
+
+    remote_run_dir = build_remote_run_dir(args, image)
+    remote_batch_rx = f"{remote_run_dir}/batch_rx.sc16"
+    remote_manifest = f"{remote_run_dir}/manifest.json"
+    remote_decode_worker = getattr(args, "remote_decode_worker", None)
+    if remote_decode_worker is None:
+        push_file_to_remote(
+            remote_target,
+            manifest_path,
+            remote_manifest,
+            image.image_dir / "remote_push_manifest.log",
+            control_socket=ssh_control_socket,
+        )
+
+    capture_nsamps = int(manifest["capture_nsamps"])
+    capture_duration = max(
+        0.001,
+        float(args.tx_delay_sec) + (capture_nsamps / float(args.rate)) + float(args.rx_tail_sec),
+    )
+    capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
+
+    rx_started = time.monotonic()
+    run_control(
+        args.rx_control_host,
+        args.rx_control_port,
+        f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0",
+        image.image_dir / "rx_capture.log",
+        capture_timeout,
+    )
+    time.sleep(max(0.0, float(args.tx_delay_sec)))
+    tx_started = time.monotonic()
+    tx_control_file = translate_tx_control_file_path(
+        tx_sc16,
+        args.tx_file_path_prefix_from,
+        args.tx_file_path_prefix_to,
+    )
+    run_control(
+        args.tx_control_host,
+        args.tx_control_port,
+        f"SEND file={tx_control_file}",
+        image.image_dir / "tx_send.log",
+        args.tx_timeout_sec,
+    )
+    tx_wall_sec = time.monotonic() - tx_started
+    run_control(
+        args.rx_control_host,
+        args.rx_control_port,
+        f"WAIT timeout={capture_timeout:.6f}",
+        image.image_dir / "rx_wait.log",
+        capture_timeout,
+    )
+    rx_capture_wall_sec = time.monotonic() - rx_started
+
+    return {
+        "image": image,
+        "attempt_index": attempt_index,
+        "max_attempts": max_attempts,
+        "slot_index": slot_index,
+        "pipeline_depth": pipeline_depth,
+        "started": started,
+        "tx_sc16": tx_sc16,
+        "batch_rx": batch_rx,
+        "manifest_path": manifest_path,
+        "out_npz": out_npz,
+        "out_wire": out_wire,
+        "decode_summary": decode_summary,
+        "manifest": manifest,
+        "make_wall_sec": make_wall_sec,
+        "tx_wall_sec": tx_wall_sec,
+        "rx_capture_wall_sec": rx_capture_wall_sec,
+        "rx_pull_wall_sec": 0.0,
+        "merge_wall_sec": 0.0,
+        "remote_cleanup_wall_sec": 0.0,
+        "remote_cleanup_mode": remote_cleanup_mode,
+        "remote_decode_result_mode": remote_decode_result_mode,
+        "remote_decoded_dir": remote_decoded_dir,
+        "remote_received_npz": "",
+        "remote_target": remote_target,
+        "ssh_control_socket": ssh_control_socket,
+        "remote_run_dir": remote_run_dir,
+        "remote_batch_rx": remote_batch_rx,
+        "remote_tx": "",
+        "remote_manifest": remote_manifest,
+        "capture_timeout": capture_timeout,
+        "slot_wait_wall_sec": 0.0,
+    }
+
+
+def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict[str, Any]) -> ImageRecord:
+    image = ctx["image"]
+    started = float(ctx["started"])
+    decode_wall_sec = 0.0
+    remote_dir_publish_wall_sec = 0.0
+    remote_cleanup_wall_sec = 0.0
+    remote_received_npz = ""
+    remote_npz = ""
+    remote_wire = ""
+    remote_summary = ""
+    try:
+        decode_started = time.monotonic()
+        remote_decode_result_mode = str(ctx["remote_decode_result_mode"])
+        if remote_decode_result_mode == "remote-dir":
+            remote_npz = f"{ctx['remote_decoded_dir']}/{image.index:08d}.npz"
+            remote_wire = ""
+            remote_received_npz = remote_npz
+        else:
+            remote_npz = f"{ctx['remote_run_dir']}/received_latent.npz"
+            remote_wire = f"{ctx['remote_run_dir']}/merged_round0.bin"
+        remote_summary = f"{ctx['remote_run_dir']}/decode_summary.json"
+        remote_argv = remote_analog_decode_args(
+            args,
+            str(ctx["remote_batch_rx"]),
+            str(ctx["remote_manifest"]),
+            remote_npz,
+            remote_wire,
+            remote_summary,
+        )
+        remote_request = remote_analog_decode_request(
+            args,
+            str(ctx["remote_batch_rx"]),
+            str(ctx["remote_manifest"]),
+            remote_npz,
+            remote_wire,
+            remote_summary,
+        )
+        remote_decode_worker = getattr(args, "remote_decode_worker", None)
+        if remote_decode_worker is not None:
+            remote_request["manifest_json"] = ctx["manifest"]
+        worker_response: dict[str, Any] = {}
+        if remote_decode_worker is not None:
+            worker_proc = remote_decode_worker.decode(
+                remote_request,
+                image.image_dir / "remote_decode.log",
+                timeout=max(120.0, float(ctx["capture_timeout"])),
+            )
+            try:
+                worker_response = json.loads(str(worker_proc.stdout or "{}"))
+            except json.JSONDecodeError:
+                worker_response = {}
+        else:
+            run_remote_command(
+                str(ctx["remote_target"]),
+                remote_argv,
+                image.image_dir / "remote_decode.log",
+                control_socket=ctx["ssh_control_socket"],
+                timeout=max(120.0, float(ctx["capture_timeout"])),
+            )
+
+        publish_started = time.monotonic()
+        response_summary = worker_response.get("summary") if isinstance(worker_response, dict) else None
+        if remote_decode_result_mode == "remote-dir" and isinstance(response_summary, dict):
+            write_json(ctx["decode_summary"], response_summary)
+        else:
+            remote_outputs = (
+                {"decode_summary.json": ctx["decode_summary"]}
+                if remote_decode_result_mode == "remote-dir"
+                else {
+                    "received_latent.npz": ctx["out_npz"],
+                    "merged_round0.bin": ctx["out_wire"],
+                    "decode_summary.json": ctx["decode_summary"],
+                }
+            )
+            pull_files_from_remote_tar(
+                str(ctx["remote_target"]),
+                str(ctx["remote_run_dir"]),
+                remote_outputs,
+                image.image_dir / "remote_pull_outputs.log",
+                control_socket=ctx["ssh_control_socket"],
+                timeout=60,
+            )
+        if remote_decode_result_mode == "remote-dir":
+            remote_dir_publish_wall_sec = time.monotonic() - publish_started
+        decode_wall_sec = time.monotonic() - decode_started
+
+        if remote_decode_result_mode == "remote-dir":
+            pulled_summary = read_json(ctx["decode_summary"]) if ctx["decode_summary"].is_file() else {}
+            status_ok = str(pulled_summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+            image.status = 0 if (ctx["decode_summary"].is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))) else 1
+            image.passed = image.status == 0
+        else:
+            image.status = 0 if (ctx["out_wire"].is_file() and ctx["decode_summary"].is_file()) else 1
+            image.passed = ctx["out_wire"].is_file() and ctx["decode_summary"].is_file()
+        image.error = "" if image.passed else "remote decode completed but expected outputs are missing"
+
+        cleanup_started = time.monotonic()
+        if str(ctx["remote_cleanup_mode"]) != "skip":
+            remote_files = [path for path in (
+                str(ctx["remote_batch_rx"]),
+                str(ctx["remote_tx"]),
+                str(ctx["remote_manifest"]),
+                remote_npz if remote_decode_result_mode != "remote-dir" else "",
+                remote_wire if remote_decode_result_mode != "remote-dir" else "",
+                remote_summary,
+            ) if path]
+            if str(ctx["remote_cleanup_mode"]) == "async":
+                cleanup_remote_files_async(
+                    str(ctx["remote_target"]),
+                    remote_files,
+                    image.image_dir / "remote_cleanup_batch.log",
+                    control_socket=ctx["ssh_control_socket"],
+                )
+            else:
+                cleanup_remote_files(
+                    str(ctx["remote_target"]),
+                    remote_files,
+                    image.image_dir / "remote_cleanup_batch.log",
+                    control_socket=ctx["ssh_control_socket"],
+                )
+        remote_cleanup_wall_sec = time.monotonic() - cleanup_started
+
+        summary_data = read_json(ctx["decode_summary"]) if ctx["decode_summary"].is_file() else {}
+        image.records.append({
+            "round": int(ctx["attempt_index"]),
+            "attempt": int(ctx["attempt_index"]) + 1,
+            "max_attempts": int(ctx["max_attempts"]),
+            "input": str(image.input_path),
+            "tx_sc16": str(ctx["tx_sc16"]),
+            "batch_rx": str(ctx["batch_rx"]),
+            "manifest": str(ctx["manifest_path"]),
+            "merged_bin": str(ctx["out_wire"]),
+            "decode_summary": str(ctx["decode_summary"]),
+            "rx_capture_mode": "remote-decode",
+            "in_process_local_codec": bool(getattr(args, "in_process_local_codec", False)),
+            "remote_rx_ssh_target": str(ctx["remote_target"]) or None,
+            "remote_decode_result_mode": remote_decode_result_mode,
+            "remote_decoded_output_dir": str(ctx["remote_decoded_dir"]) or None,
+            "remote_received_latent_npz": remote_received_npz or None,
+            "waveform_samples": int(ctx["manifest"].get("tx_waveform_samples") or 0),
+            "capture_nsamps": int(ctx["manifest"].get("capture_nsamps") or 0),
+            "detected_airtime_ms": summary_data.get("detected_airtime_ms"),
+            "sync_success": summary_data.get("sync_success"),
+            "sync_search_mode": summary_data.get("sync_search_mode"),
+            "sync_metric": summary_data.get("sync_metric"),
+            "estimated_cfo_hz": summary_data.get("estimated_cfo_hz"),
+            "evm_rms": summary_data.get("evm_rms"),
+            "estimated_snr_db": summary_data.get("estimated_snr_db"),
+            "rx_clipping_ratio": summary_data.get("rx_clipping_ratio"),
+            "simulated_cfo_hz": None,
+            "simulated_snr_db": None,
+            "make_wall_sec": float(ctx["make_wall_sec"]),
+            "tx_wall_sec": float(ctx["tx_wall_sec"]),
+            "rx_capture_wall_sec": float(ctx["rx_capture_wall_sec"]),
+            "rx_pull_wall_sec": float(ctx["rx_pull_wall_sec"]),
+            "decode_wall_sec": decode_wall_sec,
+            "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
+            "retry_wait_wall_sec": 0.0,
+            "merge_wall_sec": float(ctx["merge_wall_sec"]),
+            "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
+            "remote_cleanup_mode": str(ctx["remote_cleanup_mode"]),
+            "pipeline_depth": int(ctx["pipeline_depth"]),
+            "pipeline_slot": int(ctx["slot_index"]),
+            "slot_wait_wall_sec": float(ctx.get("slot_wait_wall_sec") or 0.0),
+            "total_wall_sec": time.monotonic() - started,
+            "payload_is_bit_exact": False,
+        })
+    except Exception as exc:
+        return _append_pipeline_error_record(
+            image,
+            exc,
+            started=started,
+            attempt_index=int(ctx["attempt_index"]),
+            max_attempts=int(ctx["max_attempts"]),
+            slot_index=int(ctx["slot_index"]),
+            pipeline_depth=int(ctx["pipeline_depth"]),
+        )
+    return image
+
+
+def _process_images_remote_decode_pipeline(
+    args: argparse.Namespace,
+    images: list[ImageRecord],
+    *,
+    pipeline_depth: int,
+) -> tuple[list[ImageRecord], dict[str, Any]]:
+    depth = max(1, int(pipeline_depth))
+    max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
+    available_slots = list(range(depth))
+    ready_contexts: list[dict[str, Any]] = []
+    completed: list[ImageRecord] = []
+    next_image_index = 0
+    max_inflight = 0
+    slot_wait_wall_sec = 0.0
+    decode_future: tuple[dict[str, Any], Future[ImageRecord]] | None = None
+
+    def occupied_count() -> int:
+        return len(ready_contexts) + (1 if decode_future is not None else 0)
+
+    def update_max_inflight() -> None:
+        nonlocal max_inflight
+        max_inflight = max(max_inflight, occupied_count())
+
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="iq-remote-decode") as executor:
+        while next_image_index < len(images) or ready_contexts or decode_future is not None:
+            if decode_future is None:
+                if ready_contexts:
+                    ctx = ready_contexts.pop(0)
+                    decode_future = (ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, ctx))
+                    update_max_inflight()
+                elif next_image_index < len(images) and available_slots:
+                    slot_index = available_slots.pop(0)
+                    image = images[next_image_index]
+                    next_image_index += 1
+                    try:
+                        ctx = _capture_remote_decode_pipeline_attempt(
+                            args,
+                            image,
+                            attempt_index=0,
+                            max_attempts=max_attempts,
+                            slot_index=slot_index,
+                            pipeline_depth=depth,
+                        )
+                    except Exception as exc:
+                        completed.append(
+                            _append_pipeline_error_record(
+                                image,
+                                exc,
+                                started=time.monotonic(),
+                                attempt_index=0,
+                                max_attempts=max_attempts,
+                                slot_index=slot_index,
+                                pipeline_depth=depth,
+                            )
+                        )
+                        available_slots.append(slot_index)
+                        available_slots.sort()
+                        continue
+                    decode_future = (ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, ctx))
+                    update_max_inflight()
+                else:
+                    break
+
+            while next_image_index < len(images) and occupied_count() < depth and available_slots:
+                slot_index = available_slots.pop(0)
+                image = images[next_image_index]
+                next_image_index += 1
+                try:
+                    ctx = _capture_remote_decode_pipeline_attempt(
+                        args,
+                        image,
+                        attempt_index=0,
+                        max_attempts=max_attempts,
+                        slot_index=slot_index,
+                        pipeline_depth=depth,
+                    )
+                except Exception as exc:
+                    completed.append(
+                        _append_pipeline_error_record(
+                            image,
+                            exc,
+                            started=time.monotonic(),
+                            attempt_index=0,
+                            max_attempts=max_attempts,
+                            slot_index=slot_index,
+                            pipeline_depth=depth,
+                        )
+                    )
+                    available_slots.append(slot_index)
+                    available_slots.sort()
+                    continue
+                ready_contexts.append(ctx)
+                update_max_inflight()
+
+            if decode_future is None:
+                continue
+
+            ctx, future = decode_future
+            waiting_for_slot = next_image_index < len(images) and not available_slots
+            wait_started = time.monotonic()
+            result = future.result()
+            if waiting_for_slot:
+                slot_wait_wall_sec += time.monotonic() - wait_started
+            decode_future = None
+            slot_index = int(ctx["slot_index"])
+            attempt_index = int(ctx["attempt_index"])
+            if result.passed or attempt_index + 1 >= max_attempts:
+                completed.append(result)
+                available_slots.append(slot_index)
+                available_slots.sort()
+                continue
+
+            try:
+                retry_ctx = _capture_remote_decode_pipeline_attempt(
+                    args,
+                    result,
+                    attempt_index=attempt_index + 1,
+                    max_attempts=max_attempts,
+                    slot_index=slot_index,
+                    pipeline_depth=depth,
+                )
+            except Exception as exc:
+                completed.append(
+                    _append_pipeline_error_record(
+                        result,
+                        exc,
+                        started=time.monotonic(),
+                        attempt_index=attempt_index + 1,
+                        max_attempts=max_attempts,
+                        slot_index=slot_index,
+                        pipeline_depth=depth,
+                    )
+                )
+                available_slots.append(slot_index)
+                available_slots.sort()
+                continue
+            decode_future = (retry_ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, retry_ctx))
+            update_max_inflight()
+
+    completed.sort(key=lambda item: item.index)
+    return completed, {
+        "pipeline_depth": depth,
+        "max_inflight": max_inflight,
+        "slot_wait_wall_sec": slot_wait_wall_sec,
+    }
+
+
 def _record_float_values(images: list[ImageRecord], field_name: str) -> list[float]:
     values: list[float] = []
     for image in images:
@@ -1910,6 +2404,13 @@ def main() -> int:
 
     started = time.monotonic()
     completed: list[ImageRecord] = []
+    configured_pipeline_depth = max(1, int(getattr(args, "pipeline_depth", 1) or 1))
+    pipeline_stats: dict[str, Any] = {
+        "pipeline_depth": configured_pipeline_depth,
+        "pipeline_enabled": False,
+        "max_inflight": 0,
+        "slot_wait_wall_sec": 0.0,
+    }
     remote_decode_worker: RemoteAnalogDecodeWorker | None = None
     shared_ssh_master_proc: subprocess.Popen | None = None
     shared_ssh_control_socket: str | None = None
@@ -1937,20 +2438,40 @@ def main() -> int:
                 )
         setattr(args, "remote_decode_worker", remote_decode_worker)
         setattr(args, "ssh_control_socket", shared_ssh_control_socket or "")
-        for image in images:
-            max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
-            result = image
-            for attempt_index in range(max_attempts):
-                result = process_image(args, image)
-                if result.records:
-                    result.records[-1]["round"] = attempt_index
-                    result.records[-1]["attempt"] = attempt_index + 1
-                    result.records[-1]["max_attempts"] = max_attempts
-                if result.passed:
+        remote_decode_result_mode = str(
+            getattr(args, "remote_decode_result_mode", os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull")) or "pull"
+        ).strip().lower()
+        pipeline_enabled = (
+            configured_pipeline_depth > 1
+            and remote_mode == "remote-decode"
+            and not bool(getattr(args, "dry_run", False))
+            and remote_decode_worker is not None
+            and remote_decode_result_mode == "remote-dir"
+            and not bool(getattr(args, "stop_on_fail", False))
+        )
+        if pipeline_enabled:
+            completed, pipeline_stats = _process_images_remote_decode_pipeline(
+                args,
+                images,
+                pipeline_depth=configured_pipeline_depth,
+            )
+            pipeline_stats["pipeline_enabled"] = True
+        else:
+            for image in images:
+                max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
+                result = image
+                for attempt_index in range(max_attempts):
+                    result = process_image(args, image)
+                    if result.records:
+                        result.records[-1]["round"] = attempt_index
+                        result.records[-1]["attempt"] = attempt_index + 1
+                        result.records[-1]["max_attempts"] = max_attempts
+                    if result.passed:
+                        break
+                completed.append(result)
+                if args.stop_on_fail and not result.passed:
                     break
-            completed.append(result)
-            if args.stop_on_fail and not result.passed:
-                break
+            pipeline_stats["max_inflight"] = 1 if completed else 0
     finally:
         if remote_decode_worker is not None:
             remote_decode_worker.close()
@@ -2007,6 +2528,10 @@ def main() -> int:
         "remote_decoded_output_dirs": remote_decoded_dirs,
         "remote_received_latent_npz_files": remote_received_npz_files,
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
+        "pipeline_depth": int(pipeline_stats.get("pipeline_depth") or configured_pipeline_depth),
+        "pipeline_enabled": bool(pipeline_stats.get("pipeline_enabled")),
+        "max_inflight": int(pipeline_stats.get("max_inflight") or 0),
+        "slot_wait_ms": round(float(pipeline_stats.get("slot_wait_wall_sec") or 0.0) * 1000.0, 3),
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
         "iq_stage_benchmark": build_iq_stage_benchmark(completed),
         "rate": float(args.rate),

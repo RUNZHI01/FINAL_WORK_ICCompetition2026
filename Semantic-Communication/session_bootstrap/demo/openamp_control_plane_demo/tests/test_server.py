@@ -4544,6 +4544,7 @@ class ServerMainTest(unittest.TestCase):
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
                     "ANALOG_MIN_SYNC_METRIC": "0.25",
                     "ANALOG_ROBUST_SYNC": "1",
+                    "ANALOG_PIPELINE_DEPTH": "2",
                 },
                 source_summary="test",
             )
@@ -4571,6 +4572,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--min-sync-metric") + 1], "0.25")
         self.assertIn("--robust-sync", command)
         self.assertNotIn("--no-robust-sync", command)
+        self.assertIn("--pipeline-depth", command)
+        self.assertEqual(command[command.index("--pipeline-depth") + 1], "2")
 
     def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
         class FakeThread:
