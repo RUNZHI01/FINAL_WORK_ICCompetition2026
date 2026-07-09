@@ -9526,6 +9526,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_FALLBACK_SYNC_CANDIDATES", ""),
         ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", ""),
         ("ANALOG_RETRY_ON_BURST_MISS", ""),
+        ("ANALOG_RETRY_ON_LOW_SYNC", ""),
+        ("ANALOG_LOW_SYNC_RETRY_THRESHOLD", ""),
         ("ANALOG_REMOTE_DECODE_RESULT_MODE", ""),
         ("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
         ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC", ""),

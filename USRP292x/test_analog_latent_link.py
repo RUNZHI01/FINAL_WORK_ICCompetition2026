@@ -699,6 +699,98 @@ def test_decode_waveform_retry_on_burst_miss_skips_full_sync_search(tmp_path, mo
         )
 
 
+def test_decode_waveform_retry_on_low_sync_skips_payload_and_fallback(tmp_path, monkeypatch):
+    rng = np.random.default_rng(128)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            job_id="low-sync-retry",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=20_000,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    original_find_sync_candidates = analog.find_sync_candidates
+    observed_windows: list[int] = []
+
+    def fake_find_sync_candidates(*args, **kwargs):
+        window = int(kwargs.get("search_window_symbols", 0) or 0)
+        observed_windows.append(window)
+        if window == 4096:
+            raise AssertionError("low sync retry should skip fallback sync search")
+        candidates = original_find_sync_candidates(*args, **kwargs)
+        if window == 1024 and candidates:
+            lowered = dict(candidates[0])
+            lowered["sync_metric"] = 0.06
+            return [lowered]
+        return candidates
+
+    def reject_payload_recovery(*_args, **_kwargs):
+        raise AssertionError("low sync retry should skip payload recovery")
+
+    monkeypatch.setattr(analog, "find_sync_candidates", fake_find_sync_candidates)
+    monkeypatch.setattr(analog, "recover_payload_with_fixed_cfo", reject_payload_recovery)
+
+    with pytest.raises(RuntimeError, match="low sync metric .*retry threshold"):
+        analog.decode_waveform(
+            Namespace(
+                rx_sc16=str(tx_sc16),
+                manifest=str(manifest),
+                out_npz=str(out_npz),
+                out_wire="",
+                summary_json="",
+                sync_candidates=12,
+                min_sync_metric=0.05,
+                robust_sync=False,
+                robust_cfo_max_hz=8000.0,
+                robust_cfo_step_hz=500.0,
+                sync_search_center_symbol=-1,
+                sync_search_window_symbols=4096,
+                sync_profile="fast-first",
+                fast_sync_candidates=4,
+                fast_sync_search_window_symbols=1024,
+                fallback_sync_candidates=12,
+                fallback_sync_search_window_symbols=4096,
+                retry_on_burst_miss=False,
+                retry_on_low_sync=True,
+                low_sync_retry_threshold=0.08,
+                scramble_key="",
+                scramble_key_hex="",
+                scramble_context="",
+            )
+        )
+
+    assert 1024 in observed_windows
+    assert 4096 not in observed_windows
+    assert not out_npz.exists()
+
+
 def test_decimated_sc16_power_center_matches_full_scan(tmp_path):
     rng = np.random.default_rng(654)
     latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
@@ -1011,6 +1103,56 @@ def test_remote_analog_decode_request_carries_fast_first_sync_profile(monkeypatc
     assert request["fallback_sync_search_window_symbols"] == 4096
 
 
+def test_remote_analog_decode_request_enables_low_sync_retry_only_before_final_attempt(monkeypatch):
+    monkeypatch.setenv("REMOTE_USRP_PROJECT_ROOT", "/home/user")
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=True,
+        low_sync_retry_threshold=0.08,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        dry_run=False,
+    )
+
+    first_request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+        attempt_index=0,
+        max_attempts=2,
+    )
+    final_request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+        attempt_index=1,
+        max_attempts=2,
+    )
+
+    assert first_request["retry_on_low_sync"] is True
+    assert first_request["low_sync_retry_threshold"] == 0.08
+    assert final_request["retry_on_low_sync"] is False
+    assert final_request["low_sync_retry_threshold"] == 0.08
+
+
 def test_analog_decode_args_carries_fast_first_sync_profile():
     args = Namespace(
         sync_candidates=12,
@@ -1048,6 +1190,55 @@ def test_analog_decode_args_carries_fast_first_sync_profile():
     assert argv[argv.index("--fallback-sync-candidates") + 1] == "12"
     assert "--fallback-sync-search-window-symbols" in argv
     assert argv[argv.index("--fallback-sync-search-window-symbols") + 1] == "4096"
+
+
+def test_analog_decode_args_enables_low_sync_retry_only_before_final_attempt():
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=True,
+        low_sync_retry_threshold=0.08,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+
+    first_argv = analog_batch.analog_decode_args(
+        args,
+        Path("/tmp/run/batch_rx.sc16"),
+        Path("/tmp/run/manifest.json"),
+        Path("/tmp/run/received_latent.npz"),
+        Path("/tmp/run/merged_round0.bin"),
+        Path("/tmp/run/decode_summary.json"),
+        attempt_index=0,
+        max_attempts=2,
+    )
+    final_argv = analog_batch.analog_decode_args(
+        args,
+        Path("/tmp/run/batch_rx.sc16"),
+        Path("/tmp/run/manifest.json"),
+        Path("/tmp/run/received_latent.npz"),
+        Path("/tmp/run/merged_round0.bin"),
+        Path("/tmp/run/decode_summary.json"),
+        attempt_index=1,
+        max_attempts=2,
+    )
+
+    assert "--retry-on-low-sync" in first_argv
+    assert first_argv[first_argv.index("--low-sync-retry-threshold") + 1] == "0.08"
+    assert "--retry-on-low-sync" not in final_argv
+    assert "--low-sync-retry-threshold" in final_argv
+    assert final_argv[final_argv.index("--low-sync-retry-threshold") + 1] == "0.08"
 
 
 def test_cleanup_remote_file_treats_timeout_as_best_effort_failure(tmp_path, monkeypatch):
@@ -1952,6 +2143,69 @@ def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, mon
     assert summary["failed_count"] == 0
     assert summary["images"][0]["rounds"] == 2
     assert [record["round"] for record in summary["images"][0]["round_records"]] == [0, 1]
+
+
+def test_batch_runner_marks_decode_attempt_before_process_image(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=None,
+        pattern="*.bin",
+        count=1,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="attempt-run",
+        dry_run=True,
+        rx_capture_mode="local",
+        max_arq_rounds=1,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        rate=5_000_000.0,
+        sps=16,
+        rx_post_quantize=True,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.08,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+        retry_on_low_sync=True,
+        low_sync_retry_threshold=0.08,
+    )
+    seen_attempts: list[tuple[int, int, bool]] = []
+
+    def fake_process_image(_args, image):
+        index = int(getattr(_args, "current_decode_attempt_index", -1))
+        maximum = int(getattr(_args, "current_decode_max_attempts", -1))
+        enabled = analog_batch.low_sync_retry_enabled_for_attempt(_args)
+        seen_attempts.append((index, maximum, enabled))
+        image.status = 1 if index == 0 else 0
+        image.passed = index != 0
+        image.error = "" if image.passed else "low sync metric below retry threshold"
+        image.records.append({"round": 0, "error": image.error, "total_wall_sec": 0.1})
+        return image
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "load_inputs", lambda _args: [input_path])
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+
+    assert analog_batch.main() == 0
+
+    assert seen_attempts == [(0, 2, True), (1, 2, False)]
 
 
 def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monkeypatch):

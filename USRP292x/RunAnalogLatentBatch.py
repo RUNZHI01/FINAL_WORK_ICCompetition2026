@@ -266,6 +266,19 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("ANALOG_RETRY_ON_BURST_MISS", "0").strip().lower() in {"1", "true", "yes", "on"},
     )
     parser.add_argument("--no-retry-on-burst-miss", dest="retry_on_burst_miss", action="store_false")
+    parser.add_argument(
+        "--retry-on-low-sync",
+        dest="retry_on_low_sync",
+        action="store_true",
+        default=env_bool("ANALOG_RETRY_ON_LOW_SYNC", False),
+        help="Retry the capture instead of running slow fallback decode when fast sync metric is very low.",
+    )
+    parser.add_argument("--no-retry-on-low-sync", dest="retry_on_low_sync", action="store_false")
+    parser.add_argument(
+        "--low-sync-retry-threshold",
+        type=float,
+        default=env_float("ANALOG_LOW_SYNC_RETRY_THRESHOLD", 0.08),
+    )
     parser.add_argument("--min-sync-metric", type=float, default=env_float("ANALOG_MIN_SYNC_METRIC", 0.25))
     parser.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=os.environ.get("ANALOG_ROBUST_SYNC", "1") != "0")
     parser.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
@@ -296,7 +309,28 @@ def sync_profile_value(args: argparse.Namespace) -> str:
     return str(getattr(args, "sync_profile", "") or "").strip()
 
 
-def append_fast_first_sync_args(cmd: list[str], args: argparse.Namespace) -> None:
+def low_sync_retry_enabled_for_attempt(
+    args: argparse.Namespace,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
+) -> bool:
+    if not bool(getattr(args, "retry_on_low_sync", False)):
+        return False
+    if attempt_index is None:
+        attempt_index = int(getattr(args, "current_decode_attempt_index", 0) or 0)
+    if max_attempts is None:
+        max_attempts = int(getattr(args, "current_decode_max_attempts", 1) or 1)
+    return int(attempt_index) + 1 < max(1, int(max_attempts))
+
+
+def append_fast_first_sync_args(
+    cmd: list[str],
+    args: argparse.Namespace,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
+) -> None:
     sync_profile = sync_profile_value(args)
     if not sync_profile:
         return
@@ -313,9 +347,17 @@ def append_fast_first_sync_args(cmd: list[str], args: argparse.Namespace) -> Non
     ])
     if bool(getattr(args, "retry_on_burst_miss", False)):
         cmd.append("--retry-on-burst-miss")
+    cmd.extend(["--low-sync-retry-threshold", str(float(getattr(args, "low_sync_retry_threshold", 0.08) or 0.08))])
+    if low_sync_retry_enabled_for_attempt(args, attempt_index=attempt_index, max_attempts=max_attempts):
+        cmd.append("--retry-on-low-sync")
 
 
-def fast_first_sync_request_fields(args: argparse.Namespace) -> dict[str, Any]:
+def fast_first_sync_request_fields(
+    args: argparse.Namespace,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
+) -> dict[str, Any]:
     sync_profile = sync_profile_value(args)
     if not sync_profile:
         return {}
@@ -326,6 +368,12 @@ def fast_first_sync_request_fields(args: argparse.Namespace) -> dict[str, Any]:
         "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
         "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
         "retry_on_burst_miss": bool(getattr(args, "retry_on_burst_miss", False)),
+        "retry_on_low_sync": low_sync_retry_enabled_for_attempt(
+            args,
+            attempt_index=attempt_index,
+            max_attempts=max_attempts,
+        ),
+        "low_sync_retry_threshold": float(getattr(args, "low_sync_retry_threshold", 0.08) or 0.08),
     }
 
 
@@ -1206,6 +1254,8 @@ class RemoteAnalogDecodeWorker:
             f"ANALOG_FALLBACK_SYNC_CANDIDATES={int(getattr(args, 'fallback_sync_candidates', 12) or 12)}",
             f"ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'fallback_sync_search_window_symbols', 4096) or 4096)}",
             f"ANALOG_RETRY_ON_BURST_MISS={'1' if bool(getattr(args, 'retry_on_burst_miss', False)) else '0'}",
+            f"ANALOG_RETRY_ON_LOW_SYNC={'1' if bool(getattr(args, 'retry_on_low_sync', False)) else '0'}",
+            f"ANALOG_LOW_SYNC_RETRY_THRESHOLD={float(getattr(args, 'low_sync_retry_threshold', 0.08) or 0.08)}",
             f"ANALOG_MIN_SYNC_METRIC={float(getattr(args, 'min_sync_metric', 0.25) or 0.25)}",
             f"ANALOG_ROBUST_SYNC={'1' if bool(getattr(args, 'robust_sync', True)) else '0'}",
             f"ANALOG_ROBUST_CFO_MAX_HZ={float(getattr(args, 'robust_cfo_max_hz', 8000.0) or 8000.0)}",
@@ -1433,7 +1483,17 @@ def analog_make_namespace(args: argparse.Namespace, image: ImageRecord, tx_sc16:
     )
 
 
-def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path, out_npz: Path, out_wire: Path, summary: Path) -> list[str]:
+def analog_decode_args(
+    args: argparse.Namespace,
+    batch_rx: Path,
+    manifest: Path,
+    out_npz: Path,
+    out_wire: Path,
+    summary: Path,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
+) -> list[str]:
     cmd = [
         sys.executable,
         str(ANALOG_LINK),
@@ -1457,7 +1517,7 @@ def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path,
         "--robust-cfo-step-hz",
         str(args.robust_cfo_step_hz),
     ]
-    append_fast_first_sync_args(cmd, args)
+    append_fast_first_sync_args(cmd, args, attempt_index=attempt_index, max_attempts=max_attempts)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
     if args.scramble_key:
         cmd.extend(["--scramble-key", str(args.scramble_key)])
@@ -1475,6 +1535,9 @@ def remote_analog_decode_args(
     remote_npz: str,
     remote_wire: str,
     remote_summary: str,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
 ) -> list[str]:
     cmd = [
         "env",
@@ -1501,7 +1564,7 @@ def remote_analog_decode_args(
         "--robust-cfo-step-hz",
         str(args.robust_cfo_step_hz),
     ]
-    append_fast_first_sync_args(cmd, args)
+    append_fast_first_sync_args(cmd, args, attempt_index=attempt_index, max_attempts=max_attempts)
     append_sync_search_window_args(cmd, args)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
     if args.scramble_key:
@@ -1520,6 +1583,9 @@ def remote_analog_decode_request(
     remote_npz: str,
     remote_wire: str,
     remote_summary: str,
+    *,
+    attempt_index: int | None = None,
+    max_attempts: int | None = None,
 ) -> dict[str, Any]:
     request: dict[str, Any] = {
         "cmd": "decode",
@@ -1540,7 +1606,7 @@ def remote_analog_decode_request(
         "scramble_key_hex": str(getattr(args, "scramble_key_hex", "") or ""),
         "scramble_context": str(getattr(args, "scramble_context", "") or ""),
     }
-    request.update(fast_first_sync_request_fields(args))
+    request.update(fast_first_sync_request_fields(args, attempt_index=attempt_index, max_attempts=max_attempts))
     return request
 
 
@@ -1572,6 +1638,8 @@ def analog_decode_namespace(
         fallback_sync_candidates=int(getattr(args, "fallback_sync_candidates", 12) or 12),
         fallback_sync_search_window_symbols=int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
         retry_on_burst_miss=bool(getattr(args, "retry_on_burst_miss", False)),
+        retry_on_low_sync=low_sync_retry_enabled_for_attempt(args),
+        low_sync_retry_threshold=float(getattr(args, "low_sync_retry_threshold", 0.08) or 0.08),
         min_sync_metric=float(args.min_sync_metric),
         robust_sync=bool(args.robust_sync),
         robust_cfo_max_hz=float(args.robust_cfo_max_hz),
@@ -2391,6 +2459,8 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             remote_npz,
             remote_wire,
             remote_summary,
+            attempt_index=int(ctx["attempt_index"]),
+            max_attempts=int(ctx["max_attempts"]),
         )
         remote_request = remote_analog_decode_request(
             args,
@@ -2399,6 +2469,8 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             remote_npz,
             remote_wire,
             remote_summary,
+            attempt_index=int(ctx["attempt_index"]),
+            max_attempts=int(ctx["max_attempts"]),
         )
         remote_decode_worker = getattr(args, "remote_decode_worker", None)
         if remote_decode_worker is not None:
@@ -2914,6 +2986,8 @@ def main() -> int:
                 max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
                 result = image
                 for attempt_index in range(max_attempts):
+                    setattr(args, "current_decode_attempt_index", attempt_index)
+                    setattr(args, "current_decode_max_attempts", max_attempts)
                     result = process_image(args, image)
                     if result.records:
                         result.records[-1]["round"] = attempt_index
@@ -2921,6 +2995,8 @@ def main() -> int:
                         result.records[-1]["max_attempts"] = max_attempts
                     if result.passed:
                         break
+                setattr(args, "current_decode_attempt_index", 0)
+                setattr(args, "current_decode_max_attempts", 1)
                 completed.append(result)
                 if args.stop_on_fail and not result.passed:
                     break
@@ -3000,6 +3076,8 @@ def main() -> int:
         "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
         "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
         "retry_on_burst_miss": bool(getattr(args, "retry_on_burst_miss", False)),
+        "retry_on_low_sync": bool(getattr(args, "retry_on_low_sync", False)),
+        "low_sync_retry_threshold": float(getattr(args, "low_sync_retry_threshold", 0.08) or 0.08),
         "min_sync_metric": float(args.min_sync_metric),
         "robust_cfo_max_hz": float(args.robust_cfo_max_hz),
         "robust_cfo_step_hz": float(args.robust_cfo_step_hz),

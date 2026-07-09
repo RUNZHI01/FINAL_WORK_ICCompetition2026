@@ -56,6 +56,7 @@ DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
 DEFAULT_ROBUST_CFO_MAX_HZ = 8000.0
 DEFAULT_ROBUST_CFO_STEP_HZ = 500.0
 DEFAULT_MIN_SYNC_METRIC = 0.25
+DEFAULT_LOW_SYNC_RETRY_THRESHOLD = 0.08
 DEFAULT_SYNC_POWER_DECIMATION = 8
 SAMPLE_BYTES = 4
 EPS = 1.0e-12
@@ -233,6 +234,11 @@ def warm_decode_pipeline() -> dict[str, Any]:
                 DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS,
             ),
             retry_on_burst_miss=_env_bool("ANALOG_RETRY_ON_BURST_MISS", False),
+            retry_on_low_sync=_env_bool("ANALOG_RETRY_ON_LOW_SYNC", False),
+            low_sync_retry_threshold=_env_float(
+                "ANALOG_LOW_SYNC_RETRY_THRESHOLD",
+                DEFAULT_LOW_SYNC_RETRY_THRESHOLD,
+            ),
             min_sync_metric=_env_float("ANALOG_MIN_SYNC_METRIC", DEFAULT_MIN_SYNC_METRIC),
             robust_sync=_env_bool("ANALOG_ROBUST_SYNC", True),
             robust_cfo_max_hz=_env_float("ANALOG_ROBUST_CFO_MAX_HZ", DEFAULT_ROBUST_CFO_MAX_HZ),
@@ -1188,6 +1194,11 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     )
     min_sync_metric = float(getattr(args, "min_sync_metric", DEFAULT_MIN_SYNC_METRIC))
     retry_on_burst_miss = bool(getattr(args, "retry_on_burst_miss", False))
+    retry_on_low_sync = bool(getattr(args, "retry_on_low_sync", False))
+    low_sync_retry_threshold = float(
+        getattr(args, "low_sync_retry_threshold", DEFAULT_LOW_SYNC_RETRY_THRESHOLD)
+        or DEFAULT_LOW_SYNC_RETRY_THRESHOLD
+    )
     robust_enabled = bool(getattr(args, "robust_sync", True))
     raw_search_center = int(getattr(args, "sync_search_center_symbol", -1))
     search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
@@ -1290,6 +1301,9 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             super().__init__(message)
             self.metrics = metrics
 
+    class LowSyncRetryRequest(RuntimeError):
+        pass
+
     def run_sync_attempt(
         *,
         pass_name: str,
@@ -1318,6 +1332,17 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             sync0 = initial_candidates[0]
             initial_count = int(len(initial_candidates))
             initial_metric = float(sync0["sync_metric"])
+            if (
+                retry_on_low_sync
+                and sync_profile == "fast-first"
+                and pass_name == "fast"
+                and low_sync_retry_threshold > 0.0
+                and initial_metric < low_sync_retry_threshold
+            ):
+                raise LowSyncRetryRequest(
+                    f"low sync metric {initial_metric:.6f} below retry threshold "
+                    f"{low_sync_retry_threshold:.6f}; retrying capture before fallback sync"
+                )
             cfo_started = time.perf_counter()
             estimated_cfo_hz, cfo_method = estimate_cfo_from_known_pilot(
                 sync0["sym_stream"],
@@ -1416,6 +1441,8 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
                 "sync_debug": sync_debug,
                 "sync_search_mode": sync_search_mode,
             }
+        except LowSyncRetryRequest:
+            raise
         except RuntimeError as exc:
             elapsed_ms = float((time.perf_counter() - attempt_started) * 1000.0)
             raise SyncAttemptError(
@@ -1664,6 +1691,10 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
             request.get("fallback_sync_search_window_symbols", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS)
         ),
         retry_on_burst_miss=bool(request.get("retry_on_burst_miss", False)),
+        retry_on_low_sync=bool(request.get("retry_on_low_sync", False)),
+        low_sync_retry_threshold=float(
+            request.get("low_sync_retry_threshold", DEFAULT_LOW_SYNC_RETRY_THRESHOLD)
+        ),
         min_sync_metric=float(request.get("min_sync_metric", DEFAULT_MIN_SYNC_METRIC)),
         robust_sync=bool(request.get("robust_sync", True)),
         robust_cfo_max_hz=float(request.get("robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
@@ -1953,6 +1984,18 @@ def parse_args() -> argparse.Namespace:
         default=_env_bool("ANALOG_RETRY_ON_BURST_MISS", False),
     )
     decode.add_argument("--no-retry-on-burst-miss", dest="retry_on_burst_miss", action="store_false")
+    decode.add_argument(
+        "--retry-on-low-sync",
+        dest="retry_on_low_sync",
+        action="store_true",
+        default=_env_bool("ANALOG_RETRY_ON_LOW_SYNC", False),
+    )
+    decode.add_argument("--no-retry-on-low-sync", dest="retry_on_low_sync", action="store_false")
+    decode.add_argument(
+        "--low-sync-retry-threshold",
+        type=float,
+        default=_env_float("ANALOG_LOW_SYNC_RETRY_THRESHOLD", DEFAULT_LOW_SYNC_RETRY_THRESHOLD),
+    )
     decode.add_argument("--min-sync-metric", type=float, default=DEFAULT_MIN_SYNC_METRIC)
     decode.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=True)
     decode.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
