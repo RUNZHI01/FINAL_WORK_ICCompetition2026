@@ -71,9 +71,9 @@ DEFAULT_RUN_ROOT = REPO_ROOT / "USRP292x" / "qpsk_batch_spool_arq_runs"
 DEFAULT_ANALOG_RUN_ROOT = REPO_ROOT / "USRP292x" / "analog_latent_runs"
 LINK_MODE_QPSK = "qpsk"
 LINK_MODE_IQ_DIRECT = "iq-direct"
-DEFAULT_IQ_DIRECT_SPS = 16
-DEFAULT_IQ_DIRECT_AMPLITUDE = 24000
-DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.08
+DEFAULT_IQ_DIRECT_SPS = 2
+DEFAULT_IQ_DIRECT_AMPLITUDE = 6000
+DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.05
 DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
 DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
@@ -2203,7 +2203,7 @@ class UsrpBatchSpoolJob:
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             command.extend([
                 "--max-arq-rounds",
-                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 1))),
             ])
             command.extend(self._build_analog_link_args(env_values))
             remote_decode_result_mode = str(

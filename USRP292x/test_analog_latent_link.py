@@ -315,7 +315,7 @@ def test_find_sync_candidates_respects_symbol_search_window():
     assert candidates[0]["sync_start"] == 260
 
 
-def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path):
+def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path, monkeypatch):
     rng = np.random.default_rng(321)
     latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
     input_path = tmp_path / "latent.npz"
@@ -359,6 +359,11 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path):
     tx_raw = np.fromfile(tx_sc16, dtype=np.int16)
     np.concatenate([prefix, tx_raw, suffix]).astype(np.int16).tofile(rx_sc16)
 
+    def reject_full_sc16_to_complex(*_args, **_kwargs):
+        raise AssertionError("windowed decode should crop raw sc16 before complex conversion")
+
+    monkeypatch.setattr(analog, "sc16_to_complex", reject_full_sc16_to_complex)
+
     result = analog.decode_waveform(
         Namespace(
             rx_sc16=str(rx_sc16),
@@ -381,11 +386,78 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path):
 
     assert result["sync_success"] is True
     assert result["sync_search_window_enabled"] is True
+    assert result["sync_search_raw_sc16_crop_enabled"] is True
+    assert result["sync_search_power_decimation"] >= 2
     assert result["sync_search_center_source"] == "burst_power"
     assert result["sync_search_cropped_samples"] < result["sync_search_original_samples"]
     with np.load(out_npz) as payload:
         recovered = payload["latent"]
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
+
+
+def test_decimated_sc16_power_center_matches_full_scan(tmp_path):
+    rng = np.random.default_rng(654)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    rx_sc16 = tmp_path / "rx_analog.sc16"
+    manifest_path = tmp_path / "manifest.json"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest_path),
+            job_id="decimated-power",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=256,
+            tail_guard_samples=256,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=256,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+    tx_raw = np.fromfile(tx_sc16, dtype=np.int16)
+    np.concatenate([np.zeros(10000, dtype=np.int16), tx_raw, np.zeros(8000, dtype=np.int16)]).tofile(rx_sc16)
+    manifest = analog.read_json(manifest_path)
+    raw, _clip = analog.read_sc16_raw(rx_sc16)
+    dc = analog.estimate_dc_from_sc16_raw(raw, int(manifest["zero_guard_samples"]), int(manifest["sc16_amplitude"]))
+
+    full_center, _full_metrics = analog.estimate_sync_center_from_sc16_power(
+        raw,
+        manifest,
+        sps=int(manifest["sps"]),
+        amplitude=int(manifest["sc16_amplitude"]),
+        dc=dc,
+        decimation=1,
+    )
+    fast_center, fast_metrics = analog.estimate_sync_center_from_sc16_power(
+        raw,
+        manifest,
+        sps=int(manifest["sps"]),
+        amplitude=int(manifest["sc16_amplitude"]),
+        dc=dc,
+        decimation=8,
+    )
+
+    assert full_center is not None
+    assert fast_center is not None
+    assert abs(fast_center - full_center) <= 8
+    assert fast_metrics["sync_search_power_decimation"] == 8
 
 
 def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):

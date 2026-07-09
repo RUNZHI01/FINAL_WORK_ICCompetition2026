@@ -59,8 +59,29 @@ if (-not $env:JSCC_LINK_MODE) {
 if (-not $env:ANALOG_REMOTE_DECODE_RESULT_MODE) {
     $env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"
 }
+if (-not $env:ANALOG_SPS) {
+    $env:ANALOG_SPS = "2"
+}
+if (-not $env:ANALOG_AMPLITUDE) {
+    $env:ANALOG_AMPLITUDE = "6000"
+}
+if (-not $env:ANALOG_RX_TAIL_SEC) {
+    $env:ANALOG_RX_TAIL_SEC = "0.05"
+}
+if (-not $env:PERSISTENT_RX_TX_DELAY) {
+    $env:PERSISTENT_RX_TX_DELAY = "0"
+}
+if (-not $env:ANALOG_MIN_SYNC_METRIC) {
+    $env:ANALOG_MIN_SYNC_METRIC = "0.05"
+}
+if (-not $env:ANALOG_ROBUST_SYNC) {
+    $env:ANALOG_ROBUST_SYNC = "0"
+}
+if (-not $env:ANALOG_REMOTE_CLEANUP_MODE) {
+    $env:ANALOG_REMOTE_CLEANUP_MODE = "skip"
+}
 if (-not $env:USRP_MAX_ARQ_ROUNDS) {
-    $env:USRP_MAX_ARQ_ROUNDS = "2"
+    $env:USRP_MAX_ARQ_ROUNDS = "1"
 }
 if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
     $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"

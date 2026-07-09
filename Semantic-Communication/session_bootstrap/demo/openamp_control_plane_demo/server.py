@@ -9372,9 +9372,13 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         # ── IQ 直传模式开关 + AnalogLatentLink 参数透传 ──
         ("JSCC_LINK_MODE", ""),
         ("ANALOG_SPS", ""),
+        ("ANALOG_AMPLITUDE", ""),
         ("ANALOG_RRC_BETA", ""),
         ("ANALOG_RRC_SPAN", ""),
         ("AMPLITUDE", ""),
+        ("ANALOG_RX_TAIL_SEC", ""),
+        ("PERSISTENT_RX_TX_DELAY", ""),
+        ("ANALOG_REMOTE_CLEANUP_MODE", ""),
         ("ANALOG_ZERO_GUARD_SAMPLES", ""),
         ("ANALOG_TAIL_GUARD_SAMPLES", ""),
         ("ANALOG_CFO_PILOT_SYMBOLS", ""),

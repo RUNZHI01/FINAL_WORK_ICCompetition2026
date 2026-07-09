@@ -51,6 +51,7 @@ DEFAULT_SYNC_CANDIDATES = 12
 DEFAULT_ROBUST_CFO_MAX_HZ = 8000.0
 DEFAULT_ROBUST_CFO_STEP_HZ = 500.0
 DEFAULT_MIN_SYNC_METRIC = 0.25
+DEFAULT_SYNC_POWER_DECIMATION = 8
 SAMPLE_BYTES = 4
 EPS = 1.0e-12
 SCRAMBLING_MODE = "keyed-permutation-sign-v1"
@@ -285,14 +286,56 @@ def write_sc16(path: Path, interleaved: np.ndarray) -> None:
     interleaved.astype(np.int16, copy=False).tofile(path)
 
 
-def sc16_to_complex(path: Path, amplitude: int) -> tuple[np.ndarray, float]:
+def read_sc16_raw(path: Path) -> tuple[np.ndarray, float]:
     raw = np.fromfile(path, dtype=np.int16)
     if raw.size % 2:
         raise ValueError(f"sc16 file has odd int16 count: {path}")
     clipping_ratio = float(np.mean((np.abs(raw[0::2]) >= 32767) | (np.abs(raw[1::2]) >= 32767))) if raw.size else 0.0
-    complex_rx = raw[0::2].astype(np.float32) + 1j * raw[1::2].astype(np.float32)
-    return (complex_rx / np.float32(amplitude)).astype(np.complex64), clipping_ratio
+    return raw, clipping_ratio
 
+
+def sc16_raw_to_complex(
+    raw: np.ndarray,
+    amplitude: int,
+    *,
+    sample_start: int = 0,
+    sample_end: int | None = None,
+    dc: complex = 0.0j,
+) -> np.ndarray:
+    total_samples = int(raw.size // 2)
+    start = max(0, min(int(sample_start), total_samples))
+    end = total_samples if sample_end is None else max(start, min(int(sample_end), total_samples))
+    raw_slice = raw[start * 2:end * 2]
+    complex_rx = raw_slice[0::2].astype(np.float32) + 1j * raw_slice[1::2].astype(np.float32)
+    rx = (complex_rx / np.float32(amplitude)).astype(np.complex64)
+    if abs(dc) > 0.0:
+        rx = (rx - np.complex64(dc)).astype(np.complex64)
+    return rx
+
+
+def estimate_dc_from_sc16_raw(raw: np.ndarray, sample_count: int, amplitude: int) -> complex:
+    count = min(max(int(sample_count), 1), int(raw.size // 2))
+    if count <= 0:
+        return complex(0.0, 0.0)
+    window = raw[:count * 2]
+    return complex(float(np.mean(window[0::2])) / float(amplitude), float(np.mean(window[1::2])) / float(amplitude))
+
+
+def sc16_to_complex(path: Path, amplitude: int) -> tuple[np.ndarray, float]:
+    raw, clipping_ratio = read_sc16_raw(path)
+    complex_rx = sc16_raw_to_complex(raw, amplitude)
+    return complex_rx, clipping_ratio
+
+
+def sc16_power(raw: np.ndarray, amplitude: int, *, dc: complex = 0.0j, decimation: int = 1) -> np.ndarray:
+    step = max(1, int(decimation))
+    pairs = raw.reshape(-1, 2)[::step]
+    i = pairs[:, 0].astype(np.float32) / np.float32(amplitude)
+    q = pairs[:, 1].astype(np.float32) / np.float32(amplitude)
+    if abs(dc) > 0.0:
+        i = i - np.float32(np.real(dc))
+        q = q - np.float32(np.imag(dc))
+    return (i * i + q * q).astype(np.float32, copy=False)
 
 def matched_filter(rx: np.ndarray, taps: np.ndarray) -> np.ndarray:
     return np.convolve(rx, np.conj(taps[::-1]), mode="same").astype(np.complex64)
@@ -399,21 +442,19 @@ def find_sync(mf: np.ndarray, sync: np.ndarray, sps: int, manifest: dict[str, An
     return candidates[0]
 
 
-def crop_rx_for_sync_window(
-    rx: np.ndarray,
+def sync_window_sample_range(
+    total_samples: int,
     manifest: dict[str, Any],
     taps: np.ndarray,
     *,
     search_center_symbol: int | None,
     search_window_symbols: int,
     sps: int,
-) -> tuple[np.ndarray, int, dict[str, Any]]:
+) -> tuple[int, int, int, dict[str, Any]] | None:
     if search_center_symbol is None or int(search_window_symbols) <= 0:
-        return rx, 0, {
-            "sync_search_window_enabled": False,
-        }
+        return None
 
-    total_symbols = int(math.ceil(float(rx.size) / float(max(int(sps), 1))))
+    total_symbols = int(math.ceil(float(total_samples) / float(max(int(sps), 1))))
     half_window = max(1, int(search_window_symbols)) // 2
     center = max(0, int(search_center_symbol))
     search_start = max(0, center - half_window)
@@ -427,31 +468,60 @@ def crop_rx_for_sync_window(
     tap_margin = int(max(taps.size, 1))
     sample_start = max(0, crop_start_symbol * int(sps) - tap_margin)
     sample_start -= sample_start % max(int(sps), 1)
-    sample_end = min(int(rx.size), crop_end_symbol * int(sps) + tap_margin)
+    sample_end = min(int(total_samples), crop_end_symbol * int(sps) + tap_margin)
     if sample_end <= sample_start:
-        return rx, 0, {
-            "sync_search_window_enabled": False,
-            "sync_search_window_error": "empty crop",
-        }
+        return None
 
     symbol_offset = int(sample_start // max(int(sps), 1))
-    return rx[sample_start:sample_end].astype(np.complex64, copy=False), symbol_offset, {
+    return sample_start, sample_end, symbol_offset, {
         "sync_search_window_enabled": True,
         "sync_search_center_symbol": int(center),
         "sync_search_center_source": "manual",
         "sync_search_window_symbols": int(search_window_symbols),
         "sync_search_crop_start_symbol": int(symbol_offset),
         "sync_search_crop_end_symbol": int(math.ceil(float(sample_end) / float(max(int(sps), 1)))),
-        "sync_search_original_samples": int(rx.size),
+        "sync_search_original_samples": int(total_samples),
         "sync_search_cropped_samples": int(sample_end - sample_start),
     }
 
 
-def estimate_sync_center_from_burst_power(rx: np.ndarray, manifest: dict[str, Any], *, sps: int) -> tuple[int | None, dict[str, Any]]:
-    if rx.size == 0:
+def crop_rx_for_sync_window(
+    rx: np.ndarray,
+    manifest: dict[str, Any],
+    taps: np.ndarray,
+    *,
+    search_center_symbol: int | None,
+    search_window_symbols: int,
+    sps: int,
+) -> tuple[np.ndarray, int, dict[str, Any]]:
+    crop = sync_window_sample_range(
+        int(rx.size),
+        manifest,
+        taps,
+        search_center_symbol=search_center_symbol,
+        search_window_symbols=search_window_symbols,
+        sps=sps,
+    )
+    if crop is None:
+        return rx, 0, {
+            "sync_search_window_enabled": False,
+        }
+    sample_start, sample_end, symbol_offset, metrics = crop
+    return rx[sample_start:sample_end].astype(np.complex64, copy=False), symbol_offset, metrics
+
+
+def estimate_sync_center_from_power(
+    power: np.ndarray,
+    manifest: dict[str, Any],
+    *,
+    sps: int,
+    sample_decimation: int = 1,
+) -> tuple[int | None, dict[str, Any]]:
+    decimation = max(1, int(sample_decimation))
+    if power.size == 0:
         return None, {"sync_search_center_source": "none", "sync_search_center_error": "empty rx"}
-    window = max(64, int(sps) * 32)
-    power = np.square(np.abs(np.asarray(rx, dtype=np.complex64))).astype(np.float32, copy=False)
+    window_samples = max(64, int(sps) * 32)
+    window = max(1, int(math.ceil(float(window_samples) / float(decimation))))
     if power.size < window:
         return None, {"sync_search_center_source": "none", "sync_search_center_error": "rx shorter than power window"}
     cumsum = np.concatenate([np.zeros(1, dtype=np.float64), np.cumsum(power, dtype=np.float64)])
@@ -472,7 +542,7 @@ def estimate_sync_center_from_burst_power(rx: np.ndarray, manifest: dict[str, An
             "sync_search_burst_power_floor": floor,
             "sync_search_burst_power_threshold": threshold,
         }
-    active_start_sample = max(0, int(active[0]) - window // 2)
+    active_start_sample = max(0, int(active[0]) * decimation - window_samples // 2)
     center = active_start_sample // max(int(sps), 1) + 2 * int(manifest.get("cfo_pilot_symbols") or 0)
     return int(center), {
         "sync_search_center_source": "burst_power",
@@ -480,7 +550,31 @@ def estimate_sync_center_from_burst_power(rx: np.ndarray, manifest: dict[str, An
         "sync_search_burst_power_peak": peak,
         "sync_search_burst_power_floor": floor,
         "sync_search_burst_power_threshold": threshold,
+        "sync_search_power_decimation": int(decimation),
     }
+
+
+def estimate_sync_center_from_burst_power(rx: np.ndarray, manifest: dict[str, Any], *, sps: int) -> tuple[int | None, dict[str, Any]]:
+    power = np.square(np.abs(np.asarray(rx, dtype=np.complex64))).astype(np.float32, copy=False)
+    return estimate_sync_center_from_power(power, manifest, sps=sps, sample_decimation=1)
+
+
+def estimate_sync_center_from_sc16_power(
+    raw: np.ndarray,
+    manifest: dict[str, Any],
+    *,
+    sps: int,
+    amplitude: int,
+    dc: complex,
+    decimation: int = DEFAULT_SYNC_POWER_DECIMATION,
+) -> tuple[int | None, dict[str, Any]]:
+    step = max(1, int(decimation))
+    return estimate_sync_center_from_power(
+        sc16_power(raw, amplitude, dc=dc, decimation=step),
+        manifest,
+        sps=sps,
+        sample_decimation=step,
+    )
 
 
 def estimate_cfo_from_repeated_pilot(sym_stream: np.ndarray, sync_start: int, cfo_len: int, rate: float, sps: int) -> float:
@@ -926,14 +1020,6 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     taps = rrc_taps(float(manifest["rrc_beta"]), int(manifest["rrc_span"]), sps)
     mark_timing("setup")
 
-    rx, rx_clipping_ratio = sc16_to_complex(rx_sc16, amp)
-    if rx.size == 0:
-        raise RuntimeError(f"empty RX sc16 file: {rx_sc16}")
-    mark_timing("read_sc16")
-    dc_window = rx[:min(max(zero_guard, 1), rx.size)]
-    dc = complex(np.mean(dc_window))
-    rx_dc = (rx - np.complex64(dc)).astype(np.complex64)
-
     max_candidates = int(getattr(args, "sync_candidates", DEFAULT_SYNC_CANDIDATES))
     min_sync_metric = float(getattr(args, "min_sync_metric", DEFAULT_MIN_SYNC_METRIC))
     robust_enabled = bool(getattr(args, "robust_sync", True))
@@ -941,16 +1027,68 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
     search_center_symbol = raw_search_center if raw_search_center >= 0 and search_window_symbols > 0 else None
     center_metrics: dict[str, Any] = {}
-    if search_center_symbol is None and search_window_symbols > 0:
-        search_center_symbol, center_metrics = estimate_sync_center_from_burst_power(rx_dc, manifest, sps=sps)
-    rx_search, sync_symbol_offset, crop_metrics = crop_rx_for_sync_window(
-        rx_dc,
-        manifest,
-        taps,
-        search_center_symbol=search_center_symbol,
-        search_window_symbols=search_window_symbols,
-        sps=sps,
-    )
+    rx_search: np.ndarray | None = None
+    sync_symbol_offset = 0
+    crop_metrics: dict[str, Any] = {}
+    dc = complex(0.0, 0.0)
+
+    raw_sc16: np.ndarray | None = None
+    rx_clipping_ratio = 0.0
+    if search_window_symbols > 0:
+        raw_sc16, rx_clipping_ratio = read_sc16_raw(rx_sc16)
+        if raw_sc16.size == 0:
+            raise RuntimeError(f"empty RX sc16 file: {rx_sc16}")
+        mark_timing("read_sc16")
+        dc = estimate_dc_from_sc16_raw(raw_sc16, zero_guard, amp)
+        if search_center_symbol is None:
+            search_center_symbol, center_metrics = estimate_sync_center_from_sc16_power(
+                raw_sc16,
+                manifest,
+                sps=sps,
+                amplitude=amp,
+                dc=dc,
+            )
+        crop = sync_window_sample_range(
+            int(raw_sc16.size // 2),
+            manifest,
+            taps,
+            search_center_symbol=search_center_symbol,
+            search_window_symbols=search_window_symbols,
+            sps=sps,
+        )
+        if crop is not None:
+            sample_start, sample_end, sync_symbol_offset, crop_metrics = crop
+            rx_search = sc16_raw_to_complex(
+                raw_sc16,
+                amp,
+                sample_start=sample_start,
+                sample_end=sample_end,
+                dc=dc,
+            )
+            crop_metrics["sync_search_raw_sc16_crop_enabled"] = True
+
+    if rx_search is None:
+        if raw_sc16 is None:
+            rx, rx_clipping_ratio = sc16_to_complex(rx_sc16, amp)
+            if rx.size == 0:
+                raise RuntimeError(f"empty RX sc16 file: {rx_sc16}")
+            mark_timing("read_sc16")
+        else:
+            rx = sc16_raw_to_complex(raw_sc16, amp)
+        dc_window = rx[:min(max(zero_guard, 1), rx.size)]
+        dc = complex(np.mean(dc_window))
+        rx_dc = (rx - np.complex64(dc)).astype(np.complex64)
+        if search_center_symbol is None and search_window_symbols > 0:
+            search_center_symbol, center_metrics = estimate_sync_center_from_burst_power(rx_dc, manifest, sps=sps)
+        rx_search, sync_symbol_offset, crop_metrics = crop_rx_for_sync_window(
+            rx_dc,
+            manifest,
+            taps,
+            search_center_symbol=search_center_symbol,
+            search_window_symbols=search_window_symbols,
+            sps=sps,
+        )
+        crop_metrics["sync_search_raw_sc16_crop_enabled"] = False
     if center_metrics:
         crop_metrics.update(center_metrics)
     mark_timing("dc_and_crop")
