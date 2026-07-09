@@ -4,6 +4,31 @@
 
 本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)，PHY 层设计原理见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`JSCC_TRAN_HANDOFF.md`](./JSCC_TRAN_HANDOFF.md)。
 
+## 当前 live 状态（2026-07-10）
+
+2026-07-07 的远端状态核对已经过期。板端现在已同步 IQ 直传所需的 `/home/user/USRP292x/AnalogLatentLink.py`，并通过 `/home/user/venv/bin/python -m py_compile`。cockpit 的默认 USRP 数据面已经切到 `JSCC_LINK_MODE=iq-direct`，QPSK 保留为可靠 fallback。
+
+最新 cockpit desktop 按钮路径验证：
+
+| 链路 | 批次 | 结果 | 传输指标 | TVM big.LITTLE |
+|---|---:|---:|---:|---:|
+| IQ 直传 | `batch-1783610422-300` | 300/300，fail 0 | median `202.54 ms`，p95 `598.89 ms`，RF airtime `9.58 ms` | median `241.21 ms` |
+| QPSK | `batch-1783610673-300` | 300/300，fail 0 | `2961.78 ms/image`，RF airtime mean `48.02 ms` | median `240.06 ms` |
+
+当前 IQ 链路事实：
+
+- 数据面不经过 Tailscale：Tailscale 只承载 cockpit API、SSH、TX/RX control、日志/状态。
+- TX/RX 是常驻服务：host TX `127.0.0.1:29221`，board RX `100.121.87.73:29220`；每张图只发控制命令，不重复拉起 USRP 进程。
+- decode 是板端常驻 worker：`AnalogLatentLink.py decode-server` 使用 `/home/user/venv/bin/python`，`ANALOG_DECODE_PIPELINE_WARMUP=1` 提前预热 FFT/import/decode 路径。
+- `remote-dir` 模式把 decoded latent 直接写到 `/home/user/cockpit_usrp_rx/<run>_rx`，TVM 直接消费该目录。
+- 性能跑时 crypto toggle 关闭；ML-KEM/auth 仍是控制面配置，security-on 性能需要单独测。
+
+剩余核心风险：
+
+- IQ 物理层还存在长尾：300 张里 23 张自动重试，最大 3 attempts；transport median 已低于 250 ms，但 p95 仍有 `598.89 ms`。
+- sync/RX 稳定性仍是第一优先级。`ANALOG_MIN_SYNC_METRIC=0.05` 和 `ANALOG_ROBUST_SYNC=0` 是当前低延迟 profile，不是最终 PHY 质量结论。
+- QPSK 已经从单张 proof 变成 300/300 可靠 fallback，但 `decode_command` 均值约 `2295.96 ms`，不能作为 250 ms 主链路。
+
 ## 安全信道当前状态（2026-07-08）
 
 ML-KEM + SM2 + ML-DSA 控制面 **已端到端打通**，与 IQ 直传数据面相互独立：

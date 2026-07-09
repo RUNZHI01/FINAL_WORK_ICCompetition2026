@@ -23,17 +23,19 @@ $env:REMOTE_USRP_PROJECT_ROOT="/home/user"
 $env:REMOTE_USRP_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:JSCC_LINK_MODE="iq-direct"
-$env:ANALOG_SPS="16"
-$env:ANALOG_AMPLITUDE="24000"
-$env:ANALOG_RX_TAIL_SEC="0.12"
-$env:ANALOG_REMOTE_CLEANUP_MODE="async"
+$env:ANALOG_SPS="2"
+$env:ANALOG_AMPLITUDE="6000"
+$env:ANALOG_RX_TAIL_SEC="0.05"
+$env:ANALOG_REMOTE_CLEANUP_MODE="skip"
 $env:ANALOG_REMOTE_DECODE_WORKER="1"
 $env:ANALOG_REMOTE_DECODE_RESULT_MODE="remote-dir"
 $env:ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC="90"
+$env:ANALOG_DECODE_PIPELINE_WARMUP="1"
 $env:ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
-$env:ANALOG_MIN_SYNC_METRIC="0.08"
+$env:ANALOG_MIN_SYNC_METRIC="0.05"
 $env:ANALOG_ROBUST_SYNC="0"
 $env:USRP_MAX_ARQ_ROUNDS="2"
+$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="0"
 $env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
 $env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
 $env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
@@ -57,8 +59,51 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
   -Body '{"host":"100.121.87.73","user":"user","password":"user","port":"22","transport_mode":"usrp","remote_usrp_rx_dir":"/home/user/cockpit_usrp_rx","jscc_link_mode":"iq-direct"}'
 ```
 
+## Latest 300-Image Cockpit Evidence
+
+These runs were started through the same backend path used by the cockpit desktop test button: `POST /api/session/board-access` to select the link mode, then `POST /api/run-inference-batch` with `{"count":300,"allow_preflight_degraded":true}`. ML-KEM/auth was configured on the board but the crypto toggle was off for the performance run.
+
+| Link | Batch | Result | Transport metric | RF airtime | Decode / merge | TVM big.LITTLE |
+|---|---:|---:|---:|---:|---:|---:|
+| IQ direct | `batch-1783610422-300` | 300/300, fail 0 | median `202.54 ms`, mean `311.21 ms`, p95 `598.89 ms` | `9.58 ms` | decode median `63.96 ms` | median `241.21 ms`, p95 `243.76 ms` |
+| QPSK | `batch-1783610673-300` | 300/300, fail 0 | `2961.78 ms/image` | mean `48.02 ms` | decode command mean `2295.96 ms`, merge mean `14.23 ms` | median `240.06 ms`, p95 `242.88 ms` |
+
+IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-1783610422_rx`, and TVM consumed that directory directly. The IQ run had 23 images that needed a retry, with max attempts 3; all passed. The QPSK run is now a stable fallback rather than a single-frame proof, but it is still about `14.6x` slower than IQ direct on transport.
+
+Compared with the older QPSK notes below, the QPSK path improved from tens of seconds per image to about 3 seconds per image:
+
+| QPSK evidence | Samples | Transport | TVM inference |
+|---|---:|---:|---:|
+| `batch-1783545491-1` | 1 | `79.46 s/image` | raw log `438.42 ms` |
+| `batch-1783548059-1` | 1 | `21.98 s/image` | `284.345 ms` |
+| `batch-1783549789-1` | 1 | `48.64 s/image` | `281.527 ms` |
+| `batch-1783610673-300` | 300 | `2.962 s/image` | median `240.06 ms` |
+
+## IQ Direct Current Flow
+
+1. Cockpit stores the board session with `transport_mode=usrp`, `jscc_link_mode=iq-direct`, and `remote_usrp_rx_dir=/home/user/cockpit_usrp_rx`.
+2. The test button calls `/api/run-inference-batch`; the backend prepares the same 300 latent inputs and starts the transport stage before TVM.
+3. `usrp_runtime.py` selects `USRP292x/RunAnalogLatentBatch.py` instead of the QPSK runner. Host-side TX runs in Docker; board-side RX runs under the board user environment.
+4. The data plane is USRP RF only. Tailscale is used for cockpit API, SSH setup, TX/RX control sockets, and status/log collection, not for raw IQ payload movement.
+5. For each latent, `AnalogLatentLink.py` maps float latent values to complex I/Q symbols, applies RRC shaping, writes sc16, and sends it through the persistent host TX server at `127.0.0.1:29221`.
+6. The board RX server at `100.121.87.73:29220` captures sc16 into `/tmp/usrp292x_remote_runs/...`. The RX/TX servers stay up across images; per image only sends `CAPTURE`, `SEND`, and `WAIT` style control operations.
+7. A persistent board-side decode worker runs `/home/user/venv/bin/python /home/user/USRP292x/AnalogLatentLink.py decode-server`. `ANALOG_DECODE_PIPELINE_WARMUP=1` moves FFT/import/decode cold start out of the per-image timing path.
+8. In `remote-dir` mode the board decode worker writes `000000xx.npz` directly into `/home/user/cockpit_usrp_rx/<run>_rx`. The cockpit host does not pull the raw sc16 or re-upload decoded latents for TVM.
+9. The TVM big.LITTLE wrapper consumes that board-side RX directory. The inferencer is pinned to big core `[2]`, pre/post stages to little cores `[0,1]`; artifact SHA matches `bf255cd4...`.
+10. Cockpit displays transport and reconstruction separately. Transport median comes from IQ raw round records; TVM median comes from the big.LITTLE run summary.
+
+## IQ Direct Current Blockers
+
+- RF/RX outliers remain. Median transport is `202.54 ms`, but p95 is `598.89 ms` and one image hit `10850.06 ms`. The 23/300 retry count shows the chain is usable but not yet clean.
+- Sync quality is still the main physical-layer risk. Lowering `ANALOG_MIN_SYNC_METRIC` to `0.05` avoids expensive robust CFO fallback on marginal but decodable captures; it does not solve weak RF captures.
+- Decode still costs real time. The warmed board worker brought decode median to `63.96 ms`, but p95 is `132.91 ms`. A compiled decode path or a smaller search window can help after RF reliability improves.
+- Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
+- The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
+- The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.
+
 ## Verified Milestones
 
+- 2026-07-10 cockpit button-equivalent 300-image validation: IQ direct `batch-1783610422-300` completed 300/300 with transport median `202.54 ms`, TVM median `241.21 ms`, remote-dir board decode, and no fallback. QPSK `batch-1783610673-300` completed 300/300 with transport `2961.78 ms/image`, TVM median `240.06 ms`, and no fallback.
 - 2026-07-09 IQ direct keeps the same persistent USRP control plane as QPSK: board RX stays on `100.121.87.73:29220`, host TX stays on `127.0.0.1:29221`, and each frame sends only `CAPTURE/SEND/WAIT` to those servers. Remote-decode now avoids uploading the unused `tx_analog.sc16`, pulls `received_latent.npz`, `merged_round0.bin`, and `decode_summary.json` in one tar stream, and removes all remote per-frame artifacts with one batched cleanup command.
 - 2026-07-09 Windows SSH helper now supports `OPENAMP_SSH_RUNNER=paramiko`. The same board `user/user` login succeeds through Paramiko while Git Bash OpenSSH/sshpass fails with `Permission denied`; `resolve_bash_executable()` now finds Scoop Git Bash through `git --exec-path` and avoids WSL `bash.exe`. This fixes big.LITTLE TVM wrapper uploads on the Windows cockpit path without moving USRP IQ/QPSK data through Tailscale.
 - 2026-07-09 IQ remote-decode can keep one board-side Python decoder alive with `ANALOG_REMOTE_DECODE_WORKER=1` (default in the Docker cockpit wrapper). Per frame now sends a JSON decode request to `AnalogLatentLink.py decode-server` instead of starting a fresh board Python process. Live run `usrp-1783566831` created a single `remote_decode_worker.log`; `image_0000/remote_decode.log` returned `status=ok`, sync metric `0.8910`, and `sync_search_window_enabled=true`. The following frame failed sync at about `0.084`, matching current physical IQ quality fluctuation rather than process startup overhead.
