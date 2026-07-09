@@ -49,9 +49,12 @@ $env:OPENAMP_TVM_BATCH_EXIT_GRACE_SEC="0.5"
 $env:MLKEM_AUTH_ENABLED="0"
 Remove-Item Env:OPENAMP_IQ_STREAMING_TVM -ErrorAction SilentlyContinue
 Remove-Item Env:USRP_IQ_STREAMING_TVM -ErrorAction SilentlyContinue
+Remove-Item Env:ANALOG_PRECONNECT_CONTROL -ErrorAction SilentlyContinue
+Remove-Item Env:ANALOG_RX_SESSION_CONTROL -ErrorAction SilentlyContinue
+Remove-Item Env:ANALOG_RETRY_ON_BURST_MISS -ErrorAction SilentlyContinue
 ```
 
-TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`：TVM 与 IQ decode 的跨阶段 overlap 已实测会抢板端资源，只保留给实验。
+TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`、`ANALOG_PRECONNECT_CONTROL`、`ANALOG_RX_SESSION_CONTROL` 或 `ANALOG_RETRY_ON_BURST_MISS`：这些路径已有实测数据，只保留给定向实验。
 
 ## Start Cockpit Backend
 
@@ -83,6 +86,8 @@ IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home
 
 2026-07-10 control diagnostics added `rx_arm_ms` and `rx_wait_ms` to the IQ stage benchmark. In `batch-1783629764-50`, transport median was `206.51 ms`, p95 `308.24 ms`, with `tx_control_ms` median `31.42`, `rx_arm_ms` median `35.27`, and `rx_wait_ms` median `30.75`. The opt-in `ANALOG_PRECONNECT_CONTROL=1` run `batch-1783631315-50` stayed all-pass and improved transport p95 to `290.16 ms`, but median stayed `207.08 ms`; keep it experimental rather than default.
 
+The opt-in `ANALOG_RX_SESSION_CONTROL=1` run `batch-1783632169-50` also stayed all-pass, but it worsened transport to median `287.71 ms`, p95 `462.23 ms`, and max `1138.94 ms`. The C++ RX/TX persistent servers can now accept multiple commands on one connection, but the recommended cockpit profile must leave this env unset.
+
 Compared with the older QPSK notes below, the QPSK path improved from tens of seconds per image to about 3 seconds per image:
 
 | QPSK evidence | Samples | Transport | TVM inference |
@@ -113,6 +118,7 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 - Sync quality is still the main physical-layer risk. Lowering `ANALOG_MIN_SYNC_METRIC` to `0.05` avoids expensive robust CFO fallback on marginal but decodable captures; it does not solve weak RF captures.
 - Decode still costs real time. The warmed board worker is now around `62.96 ms` median in the recommended run, with fast sync median `21.07 ms`; rare decode/RX stalls still drive the max tail.
 - `ANALOG_RETRY_ON_BURST_MISS=1` is an opt-in experiment, not the default. In 50-image testing it removed slow low-burst fallback decode (`decode max 674.28 -> 197.08 ms`) and improved transport median (`283.31 -> 199.90 ms`), but p95 worsened (`326.58 -> 783.40 ms`) because RX capture had separate long-tail stalls.
+- `ANALOG_PRECONNECT_CONTROL=1` and `ANALOG_RX_SESSION_CONTROL=1` are also opt-in diagnostics. Preconnect improved TX control time but not transport median. RX same-session control increased median and p95, so do not use it for the default 300-image run.
 - Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
 - The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
 - The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.

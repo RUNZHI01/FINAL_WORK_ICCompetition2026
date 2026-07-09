@@ -418,30 +418,37 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            try {
-                const std::string line = read_line(client);
-                const std::string cmd = command_name(line);
-                const auto kv = parse_kv(line);
-
-                if (cmd == "PING") {
-                    send_line(client, "OK pong=1");
-                } else if (cmd == "STATUS") {
-                    send_line(client, format_snapshot("OK", tx.status()));
-                } else if (cmd == "SEND") {
-                    const auto file_it = kv.find("file");
-                    if (file_it == kv.end() || file_it->second.empty()) {
-                        throw std::runtime_error("SEND requires file=<path>");
+            bool keep_client = true;
+            while (running && keep_client) {
+                try {
+                    const std::string line = read_line(client);
+                    if (line.empty()) {
+                        break;
                     }
-                    const Snapshot snap = tx.send_file(file_it->second);
-                    send_line(client, format_snapshot(snap.ok ? "OK" : "ERR", snap));
-                } else if (cmd == "QUIT") {
-                    send_line(client, "OK bye=1");
-                    running = false;
-                } else {
-                    throw std::runtime_error("unknown command: " + cmd);
+                    const std::string cmd = command_name(line);
+                    const auto kv = parse_kv(line);
+
+                    if (cmd == "PING") {
+                        send_line(client, "OK pong=1");
+                    } else if (cmd == "STATUS") {
+                        send_line(client, format_snapshot("OK", tx.status()));
+                    } else if (cmd == "SEND") {
+                        const auto file_it = kv.find("file");
+                        if (file_it == kv.end() || file_it->second.empty()) {
+                            throw std::runtime_error("SEND requires file=<path>");
+                        }
+                        const Snapshot snap = tx.send_file(file_it->second);
+                        send_line(client, format_snapshot(snap.ok ? "OK" : "ERR", snap));
+                    } else if (cmd == "QUIT") {
+                        send_line(client, "OK bye=1");
+                        running = false;
+                        keep_client = false;
+                    } else {
+                        throw std::runtime_error("unknown command: " + cmd);
+                    }
+                } catch (const std::exception& ex) {
+                    send_line(client, std::string("ERR error=") + sanitize_value(ex.what()));
                 }
-            } catch (const std::exception& ex) {
-                send_line(client, std::string("ERR error=") + sanitize_value(ex.what()));
             }
             ::close(client);
         }

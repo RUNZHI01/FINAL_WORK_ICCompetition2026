@@ -9506,6 +9506,7 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("PERSISTENT_RX_TX_DELAY", ""),
         ("ANALOG_REMOTE_CLEANUP_MODE", ""),
         ("ANALOG_PRECONNECT_CONTROL", ""),
+        ("ANALOG_RX_SESSION_CONTROL", ""),
         ("ANALOG_ZERO_GUARD_SAMPLES", ""),
         ("ANALOG_TAIL_GUARD_SAMPLES", ""),
         ("ANALOG_CFO_PILOT_SYMBOLS", ""),
