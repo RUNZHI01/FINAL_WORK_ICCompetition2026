@@ -125,6 +125,7 @@ from usrp_runtime import (
     ensure_usrp_control_servers_started,
     inspect_usrp_control_servers,
     launch_local_usrp_reconstruction_job,
+    resolve_shutdown_after_transport,
     shutdown_usrp_control_servers_now,
 )
 
@@ -1404,10 +1405,7 @@ def _usrp_control_status_placeholder(
         _first_env_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"),
         True,
     )
-    shutdown_after_transport = _env_bool_value(
-        _first_env_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"),
-        True,
-    )
+    shutdown_after_transport = resolve_shutdown_after_transport(env_values)
     return {
         "status": status,
         "stale": True,

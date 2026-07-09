@@ -22,6 +22,7 @@ from typing import Any, Callable
 from board_access import (
     BoardAccessConfig,
     current_input_source_mode,
+    current_jscc_link_mode,
     input_source_mode_label,
 )
 
@@ -322,6 +323,15 @@ def _parse_bool(raw_value: str, default: bool = False) -> bool:
     if text in {"0", "false", "no", "off"}:
         return False
     return default
+
+
+def _default_shutdown_after_transport(env_values: dict[str, str]) -> bool:
+    return current_jscc_link_mode(env_values) != LINK_MODE_IQ_DIRECT
+
+
+def resolve_shutdown_after_transport(env_values: dict[str, str]) -> bool:
+    default = _default_shutdown_after_transport(env_values)
+    return _parse_bool(_first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS), default)
 
 
 def _read_log_tail(path: Path, *, max_lines: int = 40) -> str:
@@ -687,7 +697,7 @@ def _usrp_control_server_params(access: BoardAccessConfig, env_values: dict[str,
     remote_run_root = _first_value(env_values, REMOTE_RX_RUN_ROOT_KEYS, DEFAULT_REMOTE_RX_RUN_ROOT)
     remote_project_root = _remote_usrp_project_root(env_values)
     auto_start = _parse_bool(_first_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"), True)
-    shutdown_after_transport = _parse_bool(_first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"), True)
+    shutdown_after_transport = resolve_shutdown_after_transport(env_values)
     return {
         "rx_host": rx_host,
         "rx_port": rx_port,
@@ -1931,10 +1941,7 @@ class UsrpBatchSpoolJob:
         self._rx_control_port = DEFAULT_RX_CONTROL_PORT
         self._tx_control_host = ""
         self._tx_control_port = DEFAULT_TX_CONTROL_PORT
-        self._shutdown_after_transport = _parse_bool(
-            _first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"),
-            True,
-        )
+        self._shutdown_after_transport = resolve_shutdown_after_transport(env_values)
         self._phase = "starting"
         self._host_preprocess_completed = 0
         self._host_preprocess_total = self._expected_outputs
@@ -2203,7 +2210,7 @@ class UsrpBatchSpoolJob:
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             command.extend([
                 "--max-arq-rounds",
-                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 1))),
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
             ])
             command.extend(self._build_analog_link_args(env_values))
             remote_decode_result_mode = str(

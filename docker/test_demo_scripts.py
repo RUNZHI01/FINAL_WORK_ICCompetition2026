@@ -32,7 +32,8 @@ def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     assert 'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"' in script
     assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"' in script
     assert 'ANALOG_REMOTE_DECODE_WORKER="${ANALOG_REMOTE_DECODE_WORKER:-1}"' in script
-    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-1}"' in script
+    assert 'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"' in script
+    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-2}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 
@@ -70,6 +71,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC",
         "ANALOG_MIN_SYNC_METRIC",
         "ANALOG_ROBUST_SYNC",
+        "OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT",
+        "USRP_SHUTDOWN_CONTROL_AFTER_TRANSPORT",
         "USRP_MAX_ARQ_ROUNDS",
         "MLKEM_USRP_MAX_ARQ_ROUNDS",
         "MLKEM_TRANSPORT_MODE",
@@ -118,7 +121,8 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"',
         'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"',
         'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"',
-        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-1}"',
+        'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"',
+        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-2}"',
         'OPENAMP_TVM_BATCH_RUNNER="${OPENAMP_TVM_BATCH_RUNNER:-biglittle}"',
     )
     powershell_defaults = (
@@ -144,7 +148,8 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_MIN_SYNC_METRIC = "0.05"',
         '$env:ANALOG_ROBUST_SYNC = "0"',
         '$env:ANALOG_REMOTE_CLEANUP_MODE = "skip"',
-        '$env:USRP_MAX_ARQ_ROUNDS = "1"',
+        '$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"',
+        '$env:USRP_MAX_ARQ_ROUNDS = "2"',
         '$env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"',
     )
 

@@ -80,8 +80,11 @@ if (-not $env:ANALOG_ROBUST_SYNC) {
 if (-not $env:ANALOG_REMOTE_CLEANUP_MODE) {
     $env:ANALOG_REMOTE_CLEANUP_MODE = "skip"
 }
+if (-not $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT) {
+    $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"
+}
 if (-not $env:USRP_MAX_ARQ_ROUNDS) {
-    $env:USRP_MAX_ARQ_ROUNDS = "1"
+    $env:USRP_MAX_ARQ_ROUNDS = "2"
 }
 if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
     $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"

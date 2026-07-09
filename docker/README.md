@@ -47,9 +47,9 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=paramiko`、`OPENAMP_USRP_TX_RUNNER=docker`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_RX_TAIL_SEC=0.05`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_ROBUST_SYNC=0`、`USRP_MAX_ARQ_ROUNDS=1`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
+`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=paramiko`、`OPENAMP_USRP_TX_RUNNER=docker`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_RX_TAIL_SEC=0.05`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_ROBUST_SYNC=0`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
 
-名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。USRP 数据面应由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不能把 IQ/latent 主数据绕到 Tailscale 文件传输。默认 `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 会在板端解码后再取结果，避免把原始 IQ 捕获文件拉回控制面。快速 IQ profile 使用 `ANALOG_REMOTE_CLEANUP_MODE=skip`，演示后可清理板端 `/tmp/usrp292x_remote_runs`。
+名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。USRP 数据面应由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不能把 IQ/latent 主数据绕到 Tailscale 文件传输。默认 `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 会在板端解码后再取结果，避免把原始 IQ 捕获文件拉回控制面。快速 IQ profile 使用 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0` 保持 TX/RX 常驻，并使用 `ANALOG_REMOTE_CLEANUP_MODE=skip`；演示后可清理板端 `/tmp/usrp292x_remote_runs`。
 
 切 USRP/IQ 现场链路时，同一入口会转发 USRP 相关环境变量，例如：
 
@@ -64,7 +64,8 @@ $env:ANALOG_RX_TAIL_SEC="0.05"
 $env:ANALOG_MIN_SYNC_METRIC="0.05"
 $env:ANALOG_ROBUST_SYNC="0"
 $env:ANALOG_REMOTE_CLEANUP_MODE="skip"
-$env:USRP_MAX_ARQ_ROUNDS="1"
+$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="0"
+$env:USRP_MAX_ARQ_ROUNDS="2"
 .\docker\run-demo-tailscale.ps1
 ```
 
