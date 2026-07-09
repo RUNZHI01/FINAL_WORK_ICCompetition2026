@@ -77,9 +77,16 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def atomic_savez(path: Path, **items: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp.npz")
+    if path.suffix.lower() == ".npy":
+        if "latent" not in items:
+            raise KeyError("latent")
+        tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp.npy")
+        save = lambda target: np.save(target, np.asarray(items["latent"], dtype=np.float32))
+    else:
+        tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp.npz")
+        save = lambda target: np.savez(target, **items)
     try:
-        np.savez(tmp_path, **items)
+        save(tmp_path)
         os.replace(tmp_path, path)
     finally:
         try:

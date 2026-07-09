@@ -149,6 +149,43 @@ def test_atomic_savez_publishes_final_npz_with_replace(tmp_path, monkeypatch):
     assert not save_paths[0].exists()
 
 
+def test_atomic_savez_can_publish_latent_npy_with_replace(tmp_path, monkeypatch):
+    final_npy = tmp_path / "received_latent.npy"
+    latent = np.arange(12, dtype=np.float32).reshape(1, 3, 2, 2)
+    replace_calls: list[tuple[Path, Path]] = []
+    real_replace = analog.os.replace
+
+    def fake_replace(src, dst):
+        src_path = Path(src)
+        dst_path = Path(dst)
+        replace_calls.append((src_path, dst_path))
+        real_replace(src_path, dst_path)
+
+    monkeypatch.setattr(analog.os, "replace", fake_replace)
+
+    analog.atomic_savez(final_npy, latent=latent)
+
+    np.testing.assert_array_equal(np.load(final_npy), latent)
+    assert replace_calls and replace_calls[0][1] == final_npy
+    assert replace_calls[0][0].name.endswith(".tmp.npy")
+    assert not replace_calls[0][0].exists()
+
+
+def test_remote_decoded_output_path_honors_configured_format():
+    args = Namespace(remote_decoded_format="npy")
+
+    assert (
+        analog_batch.remote_decoded_output_path(args, "/home/user/cockpit_usrp_rx/run42_rx", 7)
+        == "/home/user/cockpit_usrp_rx/run42_rx/00000007.npy"
+    )
+
+    args.remote_decoded_format = "bad"
+    assert (
+        analog_batch.remote_decoded_output_path(args, "/home/user/cockpit_usrp_rx/run42_rx", 7)
+        == "/home/user/cockpit_usrp_rx/run42_rx/00000007.npz"
+    )
+
+
 def test_find_sync_candidates_uses_fft_for_large_search_when_available():
     scipy_signal = analog.scipy_signal_module()
     rng = np.random.default_rng(125)

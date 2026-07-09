@@ -65,6 +65,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_AMPLITUDE",
         "ANALOG_RX_TAIL_SEC",
         "ANALOG_RX_POST_QUANTIZE",
+        "ANALOG_REMOTE_DECODED_FORMAT",
         "PERSISTENT_RX_TX_DELAY",
         "ANALOG_REMOTE_CLEANUP_MODE",
         "ANALOG_REMOTE_DECODE_WORKER",

@@ -131,6 +131,7 @@ ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
+ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
 ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC",)
 ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC",)
 ANALOG_SCRAMBLE_KEY_KEYS = ("ANALOG_SCRAMBLE_KEY",)
@@ -2598,6 +2599,10 @@ class UsrpBatchSpoolJob:
                 args.append("--rx-post-quantize")
             else:
                 args.append("--no-rx-post-quantize")
+
+        remote_decoded_format = _first_value(env_values, ANALOG_REMOTE_DECODED_FORMAT_KEYS).strip().lower()
+        if remote_decoded_format in {"npz", "npy"}:
+            args.extend(["--remote-decoded-format", remote_decoded_format])
 
         sync_profile = _first_value(env_values, ANALOG_SYNC_PROFILE_KEYS).strip()
         if sync_profile:

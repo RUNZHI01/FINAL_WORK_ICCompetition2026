@@ -165,6 +165,12 @@ def parse_args() -> argparse.Namespace:
         help="Board-side flat directory for --remote-decode-result-mode=remote-dir decoded latent .npz files.",
     )
     parser.add_argument(
+        "--remote-decoded-format",
+        choices=("npz", "npy"),
+        default=os.environ.get("ANALOG_REMOTE_DECODED_FORMAT", "npz"),
+        help="Board-side file format for --remote-decode-result-mode=remote-dir decoded latent files.",
+    )
+    parser.add_argument(
         "--remote-decode-request-timeout-sec",
         type=float,
         default=env_float("ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC", 0.0),
@@ -1668,6 +1674,15 @@ def remote_decoded_output_dir(args: argparse.Namespace) -> str:
     return f"{str(getattr(args, 'remote_rx_run_root', '/tmp/usrp292x_remote_runs')).rstrip('/')}/{args.run_id}_rx"
 
 
+def remote_decoded_format(args: argparse.Namespace) -> str:
+    configured = str(getattr(args, "remote_decoded_format", "npz") or "npz").strip().lower()
+    return configured if configured in {"npz", "npy"} else "npz"
+
+
+def remote_decoded_output_path(args: argparse.Namespace, remote_decoded_dir: str, image_index: int) -> str:
+    return f"{str(remote_decoded_dir).rstrip('/')}/{int(image_index):08d}.{remote_decoded_format(args)}"
+
+
 def analog_decode_namespace(
     args: argparse.Namespace,
     batch_rx: Path,
@@ -2054,7 +2069,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             if mode == "remote-decode":
                 # Run AnalogLatentLink.py decode on the remote host, then pull results back.
                 if remote_decode_result_mode == "remote-dir":
-                    remote_npz = f"{remote_decoded_dir}/{image.index:08d}.npz"
+                    remote_npz = remote_decoded_output_path(args, remote_decoded_dir, image.index)
                     remote_wire = ""
                     remote_received_npz = remote_npz
                 else:
@@ -2524,7 +2539,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
         decode_started = time.monotonic()
         remote_decode_result_mode = str(ctx["remote_decode_result_mode"])
         if remote_decode_result_mode == "remote-dir":
-            remote_npz = f"{ctx['remote_decoded_dir']}/{image.index:08d}.npz"
+            remote_npz = remote_decoded_output_path(args, str(ctx["remote_decoded_dir"]), image.index)
             remote_wire = ""
             remote_received_npz = remote_npz
         else:

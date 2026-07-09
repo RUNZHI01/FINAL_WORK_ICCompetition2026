@@ -27,6 +27,9 @@ $env:ANALOG_SPS="2"
 $env:ANALOG_AMPLITUDE="6000"
 $env:ANALOG_RX_TAIL_SEC="0.05"
 $env:ANALOG_RX_POST_QUANTIZE="0"
+# Optional write-path experiment only; not the recommended default yet.
+# $env:ANALOG_REMOTE_DECODED_FORMAT="npy"
+# Use board access remote_usrp_rx_dir="/dev/shm/cockpit_usrp_rx" to test tmpfs.
 $env:ANALOG_REMOTE_CLEANUP_MODE="skip"
 $env:ANALOG_REMOTE_DECODE_WORKER="1"
 $env:ANALOG_REMOTE_DECODE_RESULT_MODE="remote-dir"
@@ -101,6 +104,8 @@ The opt-in decode-worker timeout path adds `ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT
 
 The recommended IQ profile now sets `ANALOG_RX_POST_QUANTIZE=0`. Batch `batch-1783638234-300` stayed 300/300 with TVM median `241.28 ms`, p95 `244.10 ms`, PSNR `37.0445`, SSIM `0.97494`, transport median `186.83 ms`, p95 `351.67 ms`, and max `6368.37 ms`. This avoids writing unused `quant/scale/zero_point` arrays to the remote-dir `.npz`; the TVM loader consumes the `latent` array directly.
 
+`ANALOG_REMOTE_DECODED_FORMAT=npy` is now an opt-in write-path experiment. On `/home/user/cockpit_usrp_rx`, `batch-1783640049-300` stayed 300/300 with TVM median `241.49 ms`, p95 `248.64 ms`, transport median `189.19 ms`, and p95 `383.88 ms`; `.npy` publish p95 was `1.64 ms`, but one board filesystem stall still made write max `3337.46 ms`. Moving only the decoded latent directory to tmpfs with board access `remote_usrp_rx_dir=/dev/shm/cockpit_usrp_rx` removed that write stall: `batch-1783640401-300` had write median `0.827 ms`, p95 `1.54 ms`, max `3.43 ms`, and TVM p95 `244.97 ms`. It is not the default because RF/RX stalls and no-sync retries still pushed transport p95 to `1013.67 ms` in that long run.
+
 Compared with the older QPSK notes below, the QPSK path improved from tens of seconds per image to about 3 seconds per image:
 
 | QPSK evidence | Samples | Transport | TVM inference |
@@ -136,6 +141,7 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 - `ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC` and `ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT=1` are opt-in diagnostics for decode-worker stalls. The 300-image run stayed all-pass, but p95 worsened because restart time and RX stalls still affected the queue.
 - `ANALOG_PIPELINE_DEPTH=1` and shorter RX tail are not default optimizations. Depth 1 lowers p95 but hurts batch throughput; tail `0.04`/`0.02` reduces sync margin and either causes retries or failures.
 - `ANALOG_RX_POST_QUANTIZE=0` is the default IQ direct profile. It preserves the `latent` array consumed by TVM while avoiding extra diagnostic arrays in the remote-dir `.npz`.
+- `ANALOG_REMOTE_DECODED_FORMAT=npy` and tmpfs decoded output are useful diagnostics for board write stalls, not a full latency fix. They prove publish I/O can be kept near 1 ms, while the remaining p95 failures come from RX arm/wait, no-sync retries, and decode queue propagation.
 - Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
 - The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
 - The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.
@@ -144,6 +150,7 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 
 - 2026-07-10 IQ direct fast-first recommended profile: `batch-1783626884-300`, 300/300, fallback 0, transport median `182.28 ms`, transport p95 `372.96 ms`, RF airtime `9.58 ms`, RX capture median `97.23 ms`, board decode median `62.96 ms`, TVM median `242.41 ms`, TVM p95 `245.77 ms`, total cockpit batch wall `157.12 s`. All 300 decode summaries used `sync_pass=1`; fast sync median `21.07 ms`, p95 `61.51 ms`.
 - 2026-07-10 IQ direct post-quantize-off profile: `batch-1783638234-300`, 300/300, fallback 0, transport median `186.83 ms`, p95 `351.67 ms`, max `6368.37 ms`, TVM median `241.28 ms`, TVM p95 `244.10 ms`, quality PSNR `37.0445`, SSIM `0.97494`. This is the recommended profile when using the Docker/cockpit defaults after this update.
+- 2026-07-10 IQ direct `.npy` remote-dir diagnostics: `/home/user/cockpit_usrp_rx` run `batch-1783640049-300` stayed 300/300 with transport median `189.19 ms`, p95 `383.88 ms`, TVM median `241.49 ms`, p95 `248.64 ms`, and `.npy` write p95 `1.64 ms`. tmpfs run `batch-1783640401-300` stayed 300/300 with write max `3.43 ms` and TVM p95 `244.97 ms`, but transport p95 worsened to `1013.67 ms` because RX/no-sync stalls dominated.
 - 2026-07-10 decode-worker and pipeline diagnostics: timeout/restart `batch-1783635568-300` stayed 300/300 but worsened p95 to `865.77 ms`; depth-1 `batch-1783636039-300` stayed 300/300 with p95 `318.43 ms` but wall `104.43 s`; RX tail `0.02` failed `28/50`, and tail `0.04` stayed 50/50 but worsened p95 to `1169.05 ms`. Recommended cockpit remains tail `0.05`, depth `2`, timeout unset.
 - 2026-07-10 burst-miss retry diagnostic: `batch-1783628596-50`, 50/50, fallback 0, `ANALOG_RETRY_ON_BURST_MISS=1`, transport median `199.90 ms`, p95 `783.40 ms`, decode max `197.08 ms`, `remote_decode_queue_ms` median `0.05 ms`, p95 `48.91 ms`. Compared with `batch-1783627996-50` without the guard, decode max improved but RX capture p95 worsened, so keep the guard opt-in.
 - 2026-07-10 IQ direct previous sequential-sync profile after a clean restart: `batch-1783625337-300`, 300/300, fallback 0, transport median `189.10 ms`, transport p95 `642.66 ms`, RF airtime `9.58 ms`, RX capture median `97.40 ms`, board decode median `68.47 ms`, TVM median `242.16 ms`, TVM p95 `244.89 ms`, total cockpit batch wall `161.17 s`. Polling showed inference remained `0/300 pending` until transport was `300/300 completed`; this was the recommended default before fast-first sync.
