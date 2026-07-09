@@ -53,6 +53,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
 
 ## Verified Milestones
 
+- 2026-07-09 IQ direct keeps the same persistent USRP control plane as QPSK: board RX stays on `100.121.87.73:29220`, host TX stays on `127.0.0.1:29221`, and each frame sends only `CAPTURE/SEND/WAIT` to those servers. Remote-decode now avoids uploading the unused `tx_analog.sc16`, pulls `received_latent.npz`, `merged_round0.bin`, and `decode_summary.json` in one tar stream, and removes all remote per-frame artifacts with one batched cleanup command.
 - 2026-07-09 live cockpit restart: after a clean backend/control restart, `OPENAMP_SSH_RUNNER=docker` reliably auto-started RX `100.121.87.73:29220` and TX `127.0.0.1:29221`. IQ remote-decode asset sync reported `status=current`, and the remote decode command used `/home/user/venv/bin/python`.
 - IQ direct remote-decode now uses board-side decode with `ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS=4096`. Live run `usrp-1783563177` completed the first frame with `frame_complete=true`, sync metric `0.8929`, RX capture `0.383 s`, TX send `0.055 s`, and `sync_search_window_enabled=true`. This proves the long-capture 37 s decode failure mode is removed; remaining latency is dominated by per-frame SSH/docker setup, remote file staging, and Python decode startup.
 - Prerecorded TVM big.LITTLE path: `openamp3_handwritten_mean4_v7_big_little_current_20260709_052201.json`, 300/300, median 243.30 ms, mean 252.91 ms, p95 311.88 ms. This is the 250 ms reproduction reference.

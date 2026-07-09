@@ -567,7 +567,7 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
     )
     pushed: list[str] = []
     pulled: list[str] = []
-    cleaned: list[str] = []
+    cleaned_batches: list[list[str]] = []
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
@@ -591,7 +591,10 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
         local_path.write_bytes(b"rx")
 
     def fake_cleanup_remote_file(_target, remote_path, _log_path, **_kwargs):
-        cleaned.append(remote_path)
+        raise AssertionError(f"remote-pull should batch cleanup, got {remote_path}")
+
+    def fake_cleanup_remote_files(_target, remote_paths, _log_path, **_kwargs):
+        cleaned_batches.append(list(remote_paths))
         return True
 
     def fake_run_control(_host, _port, line, _log_path, _timeout):
@@ -604,6 +607,7 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
     monkeypatch.setattr(analog_batch, "push_file_to_remote", fake_push_file_to_remote)
     monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
     monkeypatch.setattr(analog_batch, "cleanup_remote_file", fake_cleanup_remote_file)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files", fake_cleanup_remote_files)
     monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     result = analog_batch.process_image(args, image)
@@ -611,7 +615,7 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
     assert result.passed is True
     assert pushed == []
     assert pulled == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
-    assert cleaned == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+    assert cleaned_batches == [["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]]
     record = result.records[0]
     assert record["rx_pull_wall_sec"] >= 0.0
     assert record["remote_cleanup_wall_sec"] >= 0.0
@@ -665,7 +669,7 @@ def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatc
         tx_control_host="127.0.0.1",
         tx_control_port=29221,
     )
-    async_cleaned: list[str] = []
+    async_cleaned_batches: list[list[str]] = []
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
@@ -682,7 +686,10 @@ def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatc
         raise AssertionError("async cleanup must not call blocking cleanup")
 
     def fake_cleanup_remote_file_async(_target, remote_path, _log_path, **_kwargs):
-        async_cleaned.append(remote_path)
+        raise AssertionError(f"async cleanup should batch paths, got {remote_path}")
+
+    def fake_cleanup_remote_files_async(_target, remote_paths, _log_path, **_kwargs):
+        async_cleaned_batches.append(list(remote_paths))
         return True
 
     def fake_pull_file_from_remote(_target, _remote_path, local_path, _log_path, **_kwargs):
@@ -697,16 +704,17 @@ def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatc
     monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
     monkeypatch.setattr(analog_batch, "cleanup_remote_file", fake_cleanup_remote_file)
     monkeypatch.setattr(analog_batch, "cleanup_remote_file_async", fake_cleanup_remote_file_async, raising=False)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files_async", fake_cleanup_remote_files_async)
     monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     result = analog_batch.process_image(args, image)
 
     assert result.passed is True
-    assert async_cleaned == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+    assert async_cleaned_batches == [["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]]
     assert result.records[0]["remote_cleanup_mode"] == "async"
 
 
-def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_path, monkeypatch):
+def test_process_image_remote_decode_batches_remote_file_operations(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
@@ -739,7 +747,8 @@ def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_pa
     )
     remote_commands: list[list[str]] = []
     pushed: list[str] = []
-    pulled: list[str] = []
+    pulled_batches: list[tuple[str, list[str]]] = []
+    cleaned_batches: list[list[str]] = []
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
@@ -754,12 +763,17 @@ def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_pa
     def fake_push_file_to_remote(_target, _local_path, remote_path, _log_path, **_kwargs):
         pushed.append(remote_path)
 
-    def fake_pull_file_from_remote(_target, remote_path, local_path, _log_path, **_kwargs):
-        pulled.append(remote_path)
-        if local_path.name == "decode_summary.json":
-            local_path.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
-        else:
-            local_path.write_bytes(b"payload")
+    def fake_pull_files_from_remote_tar(_target, remote_dir, remote_to_local, _log_path, **_kwargs):
+        pulled_batches.append((remote_dir, list(remote_to_local)))
+        for remote_name, local_path in remote_to_local.items():
+            if remote_name == "decode_summary.json":
+                local_path.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+            else:
+                local_path.write_bytes(b"payload")
+
+    def fake_cleanup_remote_files(_target, remote_paths, _log_path, **_kwargs):
+        cleaned_batches.append(list(remote_paths))
+        return True
 
     def fake_run_control(_host, _port, line, _log_path, _timeout):
         return f"OK {line}"
@@ -768,24 +782,32 @@ def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_pa
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
     monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
     monkeypatch.setattr(analog_batch, "push_file_to_remote", fake_push_file_to_remote)
-    monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
-    monkeypatch.setattr(analog_batch, "cleanup_remote_file", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(analog_batch, "pull_file_from_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("remote-decode should batch result pulls")))
+    monkeypatch.setattr(analog_batch, "pull_files_from_remote_tar", fake_pull_files_from_remote_tar, raising=False)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("remote-decode should batch cleanup")))
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file_async", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("remote-decode should batch cleanup")))
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files", fake_cleanup_remote_files, raising=False)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files_async", fake_cleanup_remote_files, raising=False)
     monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     result = analog_batch.process_image(args, image)
 
     assert result.passed is True
-    assert remote_commands[0] == ["mkdir", "-p", "/tmp/analog_runs/run42/image_0000"]
-    assert pushed == [
-        "/tmp/analog_runs/run42/image_0000/tx_analog.sc16",
-        "/tmp/analog_runs/run42/image_0000/manifest.json",
+    assert not any(command[:2] == ["mkdir", "-p"] for command in remote_commands)
+    assert pushed == ["/tmp/analog_runs/run42/image_0000/manifest.json"]
+    assert pulled_batches == [
+        (
+            "/tmp/analog_runs/run42/image_0000",
+            ["received_latent.npz", "merged_round0.bin", "decode_summary.json"],
+        )
     ]
-    assert "/tmp/analog_runs/run42/image_0000/batch_rx.sc16" not in pulled
-    assert pulled[-3:] == [
+    assert cleaned_batches == [[
+        "/tmp/analog_runs/run42/image_0000/batch_rx.sc16",
+        "/tmp/analog_runs/run42/image_0000/manifest.json",
         "/tmp/analog_runs/run42/image_0000/received_latent.npz",
         "/tmp/analog_runs/run42/image_0000/merged_round0.bin",
         "/tmp/analog_runs/run42/image_0000/decode_summary.json",
-    ]
+    ]]
 
 
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):

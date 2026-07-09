@@ -12,6 +12,7 @@ image_*/merged_round*.bin without knowing the PHY changed.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import shlex
@@ -19,6 +20,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -535,6 +537,15 @@ def push_file_to_remote(
         if proc.returncode != 0:
             raise RuntimeError(f"remote file push failed ({proc.returncode}): {' '.join(cmd)}")
         return
+    remote_parent = str(PurePosixPath(remote_path).parent)
+    if remote_parent and remote_parent != ".":
+        run_remote_command(
+            target,
+            ["mkdir", "-p", remote_parent],
+            log_path.with_name(f"{log_path.stem}_mkdir.log"),
+            control_socket=control_socket,
+            timeout=timeout,
+        )
     cmd = _scp_base_args(timeout=timeout, control_socket=control_socket)
     cmd += [str(local_path), _remote_path(target, remote_path)]
     _run_external(cmd, log_path, check=True, timeout=timeout + 5)
@@ -580,6 +591,54 @@ def pull_file_from_remote(
         raise RuntimeError(f"remote pull succeeded but local file missing: {local_path}")
 
 
+def pull_files_from_remote_tar(
+    target: str,
+    remote_dir: str,
+    remote_to_local: dict[str, Path],
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    timeout: int = 60,
+) -> None:
+    if not remote_to_local:
+        return
+    for local_path in remote_to_local.values():
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+    remote_names = list(remote_to_local)
+    remote_cmd = (
+        f"cd {shlex.quote(remote_dir)} && "
+        f"tar czf - {' '.join(shlex.quote(name) for name in remote_names)}"
+    )
+    full = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [target, remote_cmd]
+    proc = subprocess.run(
+        full,
+        cwd=PROJECT_ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        check=False,
+        timeout=timeout + 5,
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text((proc.stderr or b"").decode("utf-8", errors="replace"), encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"remote tar pull failed ({proc.returncode}): {' '.join(full)}\n"
+            f"{(proc.stderr or b'').decode('utf-8', errors='replace')}"
+        )
+    with tarfile.open(fileobj=io.BytesIO(proc.stdout or b""), mode="r:gz") as archive:
+        members = {PurePosixPath(member.name).name: member for member in archive.getmembers() if member.isfile()}
+        missing = [name for name in remote_names if name not in members]
+        if missing:
+            raise RuntimeError(f"remote tar pull missing files: {', '.join(missing)}")
+        for remote_name, local_path in remote_to_local.items():
+            extracted = archive.extractfile(members[remote_name])
+            if extracted is None:
+                raise RuntimeError(f"remote tar member is not readable: {remote_name}")
+            local_path.write_bytes(extracted.read())
+
+
 def run_remote_command(
     target: str,
     remote_argv: list[str],
@@ -623,6 +682,57 @@ def cleanup_remote_file_async(
         return False
     remote_cmd = "bash -lc " + shlex.quote(f"rm -f {shlex.quote(remote_path)}")
     full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with log_path.open("wb") as log_handle:
+            subprocess.Popen(
+                full,
+                cwd=PROJECT_ROOT,
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                shell=False,
+            )
+        return True
+    except OSError as exc:
+        log_path.write_text(str(exc), encoding="utf-8")
+        return False
+
+
+def _remote_cleanup_command(remote_paths: list[str]) -> str:
+    return "bash -lc " + shlex.quote("rm -f -- " + " ".join(shlex.quote(path) for path in remote_paths if path))
+
+
+def cleanup_remote_files(
+    target: str,
+    remote_paths: list[str],
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    paths = [path for path in remote_paths if path]
+    if not paths:
+        return False
+    full = _ssh_base_args(control_socket=control_socket) + [target, _remote_cleanup_command(paths)]
+    try:
+        _run_external(full, log_path, check=True, timeout=15.0)
+        return True
+    except (RuntimeError, subprocess.TimeoutExpired):
+        return False
+
+
+def cleanup_remote_files_async(
+    target: str,
+    remote_paths: list[str],
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    paths = [path for path in remote_paths if path]
+    if not paths:
+        return False
+    full = _ssh_base_args(control_socket=control_socket) + [target, _remote_cleanup_command(paths)]
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with log_path.open("wb") as log_handle:
@@ -1093,21 +1203,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             if mode in ("remote-pull", "remote-decode"):
                 remote_run_dir = build_remote_run_dir(args, image)
                 remote_batch_rx = f"{remote_run_dir}/batch_rx.sc16"
-                remote_tx = f"{remote_run_dir}/tx_analog.sc16" if mode == "remote-decode" else ""
+                remote_tx = ""
                 remote_manifest = f"{remote_run_dir}/manifest.json" if mode == "remote-decode" else ""
                 if mode == "remote-decode":
-                    run_remote_command(
-                        remote_target,
-                        ["mkdir", "-p", remote_run_dir],
-                        image.image_dir / "remote_mkdir.log",
-                        control_socket=ssh_control_socket,
-                        timeout=20.0,
-                    )
-                    push_file_to_remote(
-                        remote_target, tx_sc16, remote_tx,
-                        image.image_dir / "remote_push_tx.log",
-                        control_socket=ssh_control_socket,
-                    )
                     push_file_to_remote(
                         remote_target, manifest_path, remote_manifest,
                         image.image_dir / "remote_push_manifest.log",
@@ -1184,23 +1282,17 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     timeout=max(120.0, capture_timeout),
                 )
                 # Pull npz/wire/summary back to local image_dir paths
-                pull_file_from_remote(
-                    remote_target, remote_npz, out_npz,
-                    image.image_dir / "remote_pull_npz.log",
+                pull_files_from_remote_tar(
+                    remote_target,
+                    remote_run_dir,
+                    {
+                        "received_latent.npz": out_npz,
+                        "merged_round0.bin": out_wire,
+                        "decode_summary.json": decode_summary,
+                    },
+                    image.image_dir / "remote_pull_outputs.log",
                     control_socket=ssh_control_socket,
                     timeout=60,
-                )
-                pull_file_from_remote(
-                    remote_target, remote_wire, out_wire,
-                    image.image_dir / "remote_pull_wire.log",
-                    control_socket=ssh_control_socket,
-                    timeout=60,
-                )
-                pull_file_from_remote(
-                    remote_target, remote_summary, decode_summary,
-                    image.image_dir / "remote_pull_summary.log",
-                    control_socket=ssh_control_socket,
-                    timeout=30,
                 )
                 decode_wall_sec = time.monotonic() - decode_started
                 image.status = 0 if (out_wire.is_file() and decode_summary.is_file()) else 1
@@ -1236,19 +1328,26 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             if mode in ("remote-pull", "remote-decode"):
                 cleanup_started = time.monotonic()
                 if remote_cleanup_mode != "skip":
-                    cleanup_fn = cleanup_remote_file_async if remote_cleanup_mode == "async" else cleanup_remote_file
-                    for remote_file in (
+                    remote_files = [path for path in (
                         remote_batch_rx, remote_tx, remote_manifest,
                         remote_npz if mode == "remote-decode" else "",
                         remote_wire if mode == "remote-decode" else "",
                         remote_summary if mode == "remote-decode" else "",
-                    ):
-                        if remote_file:
-                            cleanup_fn(
-                                remote_target, remote_file,
-                                image.image_dir / f"remote_cleanup_{PurePosixPath(remote_file).name}.log",
-                                control_socket=ssh_control_socket,
-                            )
+                    ) if path]
+                    if remote_cleanup_mode == "async":
+                        cleanup_remote_files_async(
+                            remote_target,
+                            remote_files,
+                            image.image_dir / "remote_cleanup_batch.log",
+                            control_socket=ssh_control_socket,
+                        )
+                    else:
+                        cleanup_remote_files(
+                            remote_target,
+                            remote_files,
+                            image.image_dir / "remote_cleanup_batch.log",
+                            control_socket=ssh_control_socket,
+                        )
                 remote_cleanup_wall_sec = time.monotonic() - cleanup_started
 
         summary_data = read_json(decode_summary) if decode_summary.is_file() else {}
