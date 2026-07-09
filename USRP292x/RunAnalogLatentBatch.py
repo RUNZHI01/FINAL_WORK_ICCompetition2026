@@ -219,7 +219,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sim-dc-real", type=float, default=env_float("ANALOG_SIM_DC_REAL", 0.0))
     parser.add_argument("--sim-dc-imag", type=float, default=env_float("ANALOG_SIM_DC_IMAG", 0.0))
     parser.add_argument("--sim-seed", type=int, default=env_int("ANALOG_SIM_SEED", 1))
+    parser.add_argument("--sync-profile", default=os.environ.get("ANALOG_SYNC_PROFILE", ""))
     parser.add_argument("--sync-candidates", type=int, default=env_int("ANALOG_SYNC_CANDIDATES", 12))
+    parser.add_argument("--fast-sync-candidates", type=int, default=env_int("ANALOG_FAST_SYNC_CANDIDATES", 4))
+    parser.add_argument(
+        "--fast-sync-search-window-symbols",
+        type=int,
+        default=env_int("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS", 1024),
+    )
+    parser.add_argument("--fallback-sync-candidates", type=int, default=env_int("ANALOG_FALLBACK_SYNC_CANDIDATES", 12))
+    parser.add_argument(
+        "--fallback-sync-search-window-symbols",
+        type=int,
+        default=env_int("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", 4096),
+    )
     parser.add_argument("--min-sync-metric", type=float, default=env_float("ANALOG_MIN_SYNC_METRIC", 0.25))
     parser.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=os.environ.get("ANALOG_ROBUST_SYNC", "1") != "0")
     parser.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
@@ -244,6 +257,40 @@ def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> 
     if window_symbols <= 0 or bool(getattr(args, "dry_run", False)):
         return
     cmd.extend(["--sync-search-window-symbols", str(window_symbols)])
+
+
+def sync_profile_value(args: argparse.Namespace) -> str:
+    return str(getattr(args, "sync_profile", "") or "").strip()
+
+
+def append_fast_first_sync_args(cmd: list[str], args: argparse.Namespace) -> None:
+    sync_profile = sync_profile_value(args)
+    if not sync_profile:
+        return
+    cmd.extend(["--sync-profile", sync_profile])
+    cmd.extend(["--fast-sync-candidates", str(int(getattr(args, "fast_sync_candidates", 4) or 4))])
+    cmd.extend([
+        "--fast-sync-search-window-symbols",
+        str(int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024)),
+    ])
+    cmd.extend(["--fallback-sync-candidates", str(int(getattr(args, "fallback_sync_candidates", 12) or 12))])
+    cmd.extend([
+        "--fallback-sync-search-window-symbols",
+        str(int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096)),
+    ])
+
+
+def fast_first_sync_request_fields(args: argparse.Namespace) -> dict[str, Any]:
+    sync_profile = sync_profile_value(args)
+    if not sync_profile:
+        return {}
+    return {
+        "sync_profile": sync_profile,
+        "fast_sync_candidates": int(getattr(args, "fast_sync_candidates", 4) or 4),
+        "fast_sync_search_window_symbols": int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
+        "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
+        "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
+    }
 
 
 def _validate_rx_capture_config(args: argparse.Namespace) -> None:
@@ -916,7 +963,12 @@ class RemoteAnalogDecodeWorker:
             f"ANALOG_MID_PILOT_SYMBOLS={int(getattr(args, 'mid_pilot_symbols', 128) or 128)}",
             f"ANALOG_CAPTURE_MARGIN_SAMPLES={int(getattr(args, 'capture_margin_samples', 20000) or 20000)}",
             f"ANALOG_RX_POST_QUANTIZE={'1' if bool(getattr(args, 'rx_post_quantize', True)) else '0'}",
+            f"ANALOG_SYNC_PROFILE={sync_profile_value(args)}",
             f"ANALOG_SYNC_CANDIDATES={int(getattr(args, 'sync_candidates', 12) or 12)}",
+            f"ANALOG_FAST_SYNC_CANDIDATES={int(getattr(args, 'fast_sync_candidates', 4) or 4)}",
+            f"ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'fast_sync_search_window_symbols', 1024) or 1024)}",
+            f"ANALOG_FALLBACK_SYNC_CANDIDATES={int(getattr(args, 'fallback_sync_candidates', 12) or 12)}",
+            f"ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'fallback_sync_search_window_symbols', 4096) or 4096)}",
             f"ANALOG_MIN_SYNC_METRIC={float(getattr(args, 'min_sync_metric', 0.25) or 0.25)}",
             f"ANALOG_ROBUST_SYNC={'1' if bool(getattr(args, 'robust_sync', True)) else '0'}",
             f"ANALOG_ROBUST_CFO_MAX_HZ={float(getattr(args, 'robust_cfo_max_hz', 8000.0) or 8000.0)}",
@@ -1168,6 +1220,7 @@ def analog_decode_args(args: argparse.Namespace, batch_rx: Path, manifest: Path,
         "--robust-cfo-step-hz",
         str(args.robust_cfo_step_hz),
     ]
+    append_fast_first_sync_args(cmd, args)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
     if args.scramble_key:
         cmd.extend(["--scramble-key", str(args.scramble_key)])
@@ -1211,6 +1264,7 @@ def remote_analog_decode_args(
         "--robust-cfo-step-hz",
         str(args.robust_cfo_step_hz),
     ]
+    append_fast_first_sync_args(cmd, args)
     append_sync_search_window_args(cmd, args)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
     if args.scramble_key:
@@ -1249,6 +1303,7 @@ def remote_analog_decode_request(
         "scramble_key_hex": str(getattr(args, "scramble_key_hex", "") or ""),
         "scramble_context": str(getattr(args, "scramble_context", "") or ""),
     }
+    request.update(fast_first_sync_request_fields(args))
     return request
 
 
@@ -1273,7 +1328,12 @@ def analog_decode_namespace(
         out_npz=str(out_npz),
         out_wire=str(out_wire),
         summary_json=str(summary),
+        sync_profile=sync_profile_value(args),
         sync_candidates=int(args.sync_candidates),
+        fast_sync_candidates=int(getattr(args, "fast_sync_candidates", 4) or 4),
+        fast_sync_search_window_symbols=int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
+        fallback_sync_candidates=int(getattr(args, "fallback_sync_candidates", 12) or 12),
+        fallback_sync_search_window_symbols=int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
         min_sync_metric=float(args.min_sync_metric),
         robust_sync=bool(args.robust_sync),
         robust_cfo_max_hz=float(args.robust_cfo_max_hz),
@@ -2539,7 +2599,12 @@ def main() -> int:
         "sps": int(args.sps),
         "rx_post_quantize": bool(args.rx_post_quantize),
         "robust_sync": bool(args.robust_sync),
+        "sync_profile": sync_profile_value(args),
         "sync_candidates": int(args.sync_candidates),
+        "fast_sync_candidates": int(getattr(args, "fast_sync_candidates", 4) or 4),
+        "fast_sync_search_window_symbols": int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
+        "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
+        "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
         "min_sync_metric": float(args.min_sync_metric),
         "robust_cfo_max_hz": float(args.robust_cfo_max_hz),
         "robust_cfo_step_hz": float(args.robust_cfo_step_hz),

@@ -4426,6 +4426,11 @@ class ServerMainTest(unittest.TestCase):
                     "JSCC_LINK_MODE": "iq-direct",
                     "OPENAMP_DEMO_REMOTE_DECODE_PYTHON": "/home/user/venv/bin/python",
                     "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "ANALOG_SYNC_PROFILE": "fast-first",
+                    "ANALOG_FAST_SYNC_CANDIDATES": "4",
+                    "ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS": "1024",
+                    "ANALOG_FALLBACK_SYNC_CANDIDATES": "12",
+                    "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS": "4096",
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
                 },
                 source_summary="test",
@@ -4467,6 +4472,16 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--sync-search-window-symbols") + 1], "4096")
         self.assertIn("--min-sync-metric", command)
         self.assertEqual(command[command.index("--min-sync-metric") + 1], "0.05")
+        self.assertIn("--sync-profile", command)
+        self.assertEqual(command[command.index("--sync-profile") + 1], "fast-first")
+        self.assertIn("--fast-sync-candidates", command)
+        self.assertEqual(command[command.index("--fast-sync-candidates") + 1], "4")
+        self.assertIn("--fast-sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--fast-sync-search-window-symbols") + 1], "1024")
+        self.assertIn("--fallback-sync-candidates", command)
+        self.assertEqual(command[command.index("--fallback-sync-candidates") + 1], "12")
+        self.assertIn("--fallback-sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--fallback-sync-search-window-symbols") + 1], "4096")
         self.assertIn("--no-robust-sync", command)
         self.assertFalse(job._shutdown_after_transport)
         self.assertEqual(job._runner_env["REMOTE_USRP_PROJECT_ROOT"], "/home/user")

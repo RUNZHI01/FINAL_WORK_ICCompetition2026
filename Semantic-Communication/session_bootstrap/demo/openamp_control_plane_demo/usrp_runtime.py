@@ -120,7 +120,12 @@ ANALOG_ROBUST_SYNC_KEYS = ("ANALOG_ROBUST_SYNC",)
 ANALOG_MIN_SYNC_METRIC_KEYS = ("ANALOG_MIN_SYNC_METRIC",)
 ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
 ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
+ANALOG_SYNC_PROFILE_KEYS = ("ANALOG_SYNC_PROFILE",)
 ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
+ANALOG_FAST_SYNC_CANDIDATES_KEYS = ("ANALOG_FAST_SYNC_CANDIDATES",)
+ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS = ("ANALOG_FALLBACK_SYNC_CANDIDATES",)
+ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
@@ -2589,6 +2594,21 @@ class UsrpBatchSpoolJob:
             else:
                 args.append("--no-rx-post-quantize")
 
+        sync_profile = _first_value(env_values, ANALOG_SYNC_PROFILE_KEYS).strip()
+        if sync_profile:
+            args.extend(["--sync-profile", sync_profile])
+        fast_sync_candidates = _first_value(env_values, ANALOG_FAST_SYNC_CANDIDATES_KEYS)
+        if fast_sync_candidates:
+            args.extend(["--fast-sync-candidates", str(_parse_int(fast_sync_candidates, 4))])
+        fast_sync_window = _first_value(env_values, ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if fast_sync_window:
+            args.extend(["--fast-sync-search-window-symbols", str(_parse_int(fast_sync_window, 1024))])
+        fallback_sync_candidates = _first_value(env_values, ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS)
+        if fallback_sync_candidates:
+            args.extend(["--fallback-sync-candidates", str(_parse_int(fallback_sync_candidates, 12))])
+        fallback_sync_window = _first_value(env_values, ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if fallback_sync_window:
+            args.extend(["--fallback-sync-search-window-symbols", str(_parse_int(fallback_sync_window, 4096))])
         sync_candidates = _first_value(env_values, ANALOG_SYNC_CANDIDATES_KEYS)
         if sync_candidates:
             args.extend(["--sync-candidates", str(_parse_int(sync_candidates, 12))])

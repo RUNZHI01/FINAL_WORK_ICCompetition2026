@@ -530,6 +530,96 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path, monkeypa
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
 
 
+def test_decode_waveform_fast_first_falls_back_and_records_pass_metrics(tmp_path, monkeypatch):
+    rng = np.random.default_rng(126)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    summary_json = tmp_path / "decode_summary.json"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            job_id="fast-first-fallback",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=20_000,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    original_find_sync_candidates = analog.find_sync_candidates
+    observed_windows: list[int] = []
+
+    def fake_find_sync_candidates(*args, **kwargs):
+        window = int(kwargs.get("search_window_symbols", 0) or 0)
+        observed_windows.append(window)
+        candidates = original_find_sync_candidates(*args, **kwargs)
+        if window == 1024 and candidates:
+            lowered = dict(candidates[0])
+            lowered["sync_metric"] = 0.05
+            return [lowered]
+        return candidates
+
+    monkeypatch.setattr(analog, "find_sync_candidates", fake_find_sync_candidates)
+
+    result = analog.decode_waveform(
+        Namespace(
+            rx_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            out_npz=str(out_npz),
+            out_wire="",
+            summary_json=str(summary_json),
+            sync_candidates=12,
+            min_sync_metric=0.25,
+            robust_sync=False,
+            robust_cfo_max_hz=8000.0,
+            robust_cfo_step_hz=500.0,
+            sync_search_center_symbol=-1,
+            sync_search_window_symbols=4096,
+            sync_profile="fast-first",
+            fast_sync_candidates=4,
+            fast_sync_search_window_symbols=1024,
+            fallback_sync_candidates=12,
+            fallback_sync_search_window_symbols=4096,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    assert 1024 in observed_windows
+    assert 4096 in observed_windows
+    assert result["sync_profile"] == "fast-first"
+    assert result["sync_pass"] == 2
+    assert result["fast_sync_metric"] == 0.05
+    assert result["fallback_sync_metric"] == result["selected_sync_metric"]
+    assert result["fallback_sync_metric"] >= 0.25
+    assert result["fast_sync_ms"] >= 0.0
+    assert result["fallback_sync_ms"] >= 0.0
+    assert out_npz.is_file()
+
+
 def test_decimated_sc16_power_center_matches_full_scan(tmp_path):
     rng = np.random.default_rng(654)
     latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
@@ -804,6 +894,81 @@ def test_remote_analog_decode_args_sets_pythonpath_for_board_layout(monkeypatch)
     assert argv.count("--sync-search-window-symbols") == 1
     window_index = argv.index("--sync-search-window-symbols") + 1
     assert argv[window_index] == "4096"
+
+
+def test_remote_analog_decode_request_carries_fast_first_sync_profile(monkeypatch):
+    monkeypatch.setenv("REMOTE_USRP_PROJECT_ROOT", "/home/user")
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        dry_run=False,
+    )
+
+    request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+    )
+
+    assert request["sync_profile"] == "fast-first"
+    assert request["fast_sync_candidates"] == 4
+    assert request["fast_sync_search_window_symbols"] == 1024
+    assert request["fallback_sync_candidates"] == 12
+    assert request["fallback_sync_search_window_symbols"] == 4096
+
+
+def test_analog_decode_args_carries_fast_first_sync_profile():
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+
+    argv = analog_batch.analog_decode_args(
+        args,
+        Path("/tmp/run/batch_rx.sc16"),
+        Path("/tmp/run/manifest.json"),
+        Path("/tmp/run/received_latent.npz"),
+        Path("/tmp/run/merged_round0.bin"),
+        Path("/tmp/run/decode_summary.json"),
+    )
+
+    assert "--sync-profile" in argv
+    assert argv[argv.index("--sync-profile") + 1] == "fast-first"
+    assert "--fast-sync-candidates" in argv
+    assert argv[argv.index("--fast-sync-candidates") + 1] == "4"
+    assert "--fast-sync-search-window-symbols" in argv
+    assert argv[argv.index("--fast-sync-search-window-symbols") + 1] == "1024"
+    assert "--fallback-sync-candidates" in argv
+    assert argv[argv.index("--fallback-sync-candidates") + 1] == "12"
+    assert "--fallback-sync-search-window-symbols" in argv
+    assert argv[argv.index("--fallback-sync-search-window-symbols") + 1] == "4096"
 
 
 def test_cleanup_remote_file_treats_timeout_as_best_effort_failure(tmp_path, monkeypatch):

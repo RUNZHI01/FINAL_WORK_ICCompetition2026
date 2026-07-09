@@ -49,6 +49,10 @@ DEFAULT_DATA_BLOCK_SYMBOLS = 4096
 DEFAULT_MID_PILOT_SYMBOLS = 128
 DEFAULT_CAPTURE_MARGIN_SAMPLES = 20_000
 DEFAULT_SYNC_CANDIDATES = 12
+DEFAULT_FAST_SYNC_CANDIDATES = 4
+DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS = 1024
+DEFAULT_FALLBACK_SYNC_CANDIDATES = 12
+DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
 DEFAULT_ROBUST_CFO_MAX_HZ = 8000.0
 DEFAULT_ROBUST_CFO_STEP_HZ = 500.0
 DEFAULT_MIN_SYNC_METRIC = 0.25
@@ -216,7 +220,18 @@ def warm_decode_pipeline() -> dict[str, Any]:
             out_npz=str(out_npz),
             out_wire="",
             summary_json=str(summary_path),
+            sync_profile=os.environ.get("ANALOG_SYNC_PROFILE", ""),
             sync_candidates=_env_int("ANALOG_SYNC_CANDIDATES", DEFAULT_SYNC_CANDIDATES),
+            fast_sync_candidates=_env_int("ANALOG_FAST_SYNC_CANDIDATES", DEFAULT_FAST_SYNC_CANDIDATES),
+            fast_sync_search_window_symbols=_env_int(
+                "ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS",
+                DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS,
+            ),
+            fallback_sync_candidates=_env_int("ANALOG_FALLBACK_SYNC_CANDIDATES", DEFAULT_FALLBACK_SYNC_CANDIDATES),
+            fallback_sync_search_window_symbols=_env_int(
+                "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",
+                DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS,
+            ),
             min_sync_metric=_env_float("ANALOG_MIN_SYNC_METRIC", DEFAULT_MIN_SYNC_METRIC),
             robust_sync=_env_bool("ANALOG_ROBUST_SYNC", True),
             robust_cfo_max_hz=_env_float("ANALOG_ROBUST_CFO_MAX_HZ", DEFAULT_ROBUST_CFO_MAX_HZ),
@@ -1151,11 +1166,35 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     taps = rrc_taps(float(manifest["rrc_beta"]), int(manifest["rrc_span"]), sps)
     mark_timing("setup")
 
+    sync_profile = str(getattr(args, "sync_profile", "") or "").strip().lower()
+    if sync_profile in {"", "default", "normal"}:
+        sync_profile = ""
+    if sync_profile not in {"", "fast-first"}:
+        raise RuntimeError(f"unsupported sync profile: {sync_profile}")
     max_candidates = int(getattr(args, "sync_candidates", DEFAULT_SYNC_CANDIDATES))
+    fast_sync_candidates = int(getattr(args, "fast_sync_candidates", DEFAULT_FAST_SYNC_CANDIDATES) or DEFAULT_FAST_SYNC_CANDIDATES)
+    fast_sync_search_window_symbols = int(
+        getattr(args, "fast_sync_search_window_symbols", DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS)
+        or DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS
+    )
+    fallback_sync_candidates = int(
+        getattr(args, "fallback_sync_candidates", DEFAULT_FALLBACK_SYNC_CANDIDATES)
+        or DEFAULT_FALLBACK_SYNC_CANDIDATES
+    )
+    fallback_sync_search_window_symbols = int(
+        getattr(args, "fallback_sync_search_window_symbols", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS)
+        or DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS
+    )
     min_sync_metric = float(getattr(args, "min_sync_metric", DEFAULT_MIN_SYNC_METRIC))
     robust_enabled = bool(getattr(args, "robust_sync", True))
     raw_search_center = int(getattr(args, "sync_search_center_symbol", -1))
     search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
+    if sync_profile == "fast-first":
+        search_window_symbols = max(
+            search_window_symbols,
+            fast_sync_search_window_symbols,
+            fallback_sync_search_window_symbols,
+        )
     search_center_symbol = raw_search_center if raw_search_center >= 0 and search_window_symbols > 0 else None
     center_metrics: dict[str, Any] = {}
     rx_search: np.ndarray | None = None
@@ -1229,97 +1268,208 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         else None
     )
     mf0 = matched_filter(rx_search, taps)
-    initial_candidates = find_sync_candidates(
-        mf0,
-        sync,
-        sps,
-        max_candidates=max_candidates,
-        manifest=manifest,
-        search_center_symbol=local_search_center,
-        search_window_symbols=search_window_symbols,
-    )
-    if not initial_candidates:
-        raise RuntimeError("initial sync search failed")
-    sync0 = initial_candidates[0]
-    mark_timing("initial_sync")
-    estimated_cfo_hz, cfo_method = estimate_cfo_from_known_pilot(
-        sync0["sym_stream"],
-        int(sync0["sync_start"]),
-        cfo_len,
-        rate,
-        sps,
-        int(manifest["cfo_seed"]),
-    )
-    if abs(estimated_cfo_hz) < 5.0:
-        estimated_cfo_hz = 0.0
-    mark_timing("cfo_estimate")
 
-    sync_search_mode = "normal"
-    sync_debug: dict[str, Any] = {
-        "sync_search_mode": sync_search_mode,
-        "initial_sync_candidate_count": int(len(initial_candidates)),
-    }
-    try:
-        payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
-            rx_search,
-            taps,
-            sync,
-            manifest,
-            cfo_hz=estimated_cfo_hz,
-            rate=rate,
-            sps=sps,
-            max_candidates=max_candidates,
-            min_sync_metric=min_sync_metric,
-            search_center_symbol=local_search_center,
-            search_window_symbols=search_window_symbols,
-        )
-    except RuntimeError as normal_exc:
-        recovered_after_cfo_reject = False
-        if abs(estimated_cfo_hz) >= 5.0 and float(sync0["sync_metric"]) >= min_sync_metric:
+    class SyncAttemptError(RuntimeError):
+        def __init__(self, message: str, metrics: dict[str, Any]) -> None:
+            super().__init__(message)
+            self.metrics = metrics
+
+    def run_sync_attempt(
+        *,
+        pass_name: str,
+        pass_candidates: int,
+        pass_window_symbols: int,
+    ) -> dict[str, Any]:
+        attempt_started = time.perf_counter()
+        initial_ms = 0.0
+        cfo_ms = 0.0
+        initial_metric: float | None = None
+        initial_count = 0
+        try:
+            initial_started = time.perf_counter()
+            initial_candidates = find_sync_candidates(
+                mf0,
+                sync,
+                sps,
+                max_candidates=pass_candidates,
+                manifest=manifest,
+                search_center_symbol=local_search_center,
+                search_window_symbols=pass_window_symbols,
+            )
+            initial_ms = float((time.perf_counter() - initial_started) * 1000.0)
+            if not initial_candidates:
+                raise RuntimeError("initial sync search failed")
+            sync0 = initial_candidates[0]
+            initial_count = int(len(initial_candidates))
+            initial_metric = float(sync0["sync_metric"])
+            cfo_started = time.perf_counter()
+            estimated_cfo_hz, cfo_method = estimate_cfo_from_known_pilot(
+                sync0["sym_stream"],
+                int(sync0["sync_start"]),
+                cfo_len,
+                rate,
+                sps,
+                int(manifest["cfo_seed"]),
+            )
+            if abs(estimated_cfo_hz) < 5.0:
+                estimated_cfo_hz = 0.0
+            cfo_ms = float((time.perf_counter() - cfo_started) * 1000.0)
+
+            sync_search_mode = "normal"
+            sync_debug: dict[str, Any] = {
+                "sync_search_mode": sync_search_mode,
+                "initial_sync_candidate_count": initial_count,
+            }
             try:
                 payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
                     rx_search,
                     taps,
                     sync,
                     manifest,
-                    cfo_hz=0.0,
+                    cfo_hz=estimated_cfo_hz,
                     rate=rate,
                     sps=sps,
-                    max_candidates=max_candidates,
+                    max_candidates=pass_candidates,
                     min_sync_metric=min_sync_metric,
                     search_center_symbol=local_search_center,
-                    search_window_symbols=search_window_symbols,
+                    search_window_symbols=pass_window_symbols,
                 )
-                sync_debug["rejected_cfo_hz"] = float(estimated_cfo_hz)
-                sync_debug["rejected_cfo_error"] = str(normal_exc)
-                estimated_cfo_hz = 0.0
-                cfo_method = f"{cfo_method}/rejected"
-                sync_search_mode = "normal-cfo-rejected"
-                sync_debug["sync_search_mode"] = sync_search_mode
-            except RuntimeError:
-                pass
-            else:
-                recovered_after_cfo_reject = True
-        if not recovered_after_cfo_reject and not robust_enabled:
-            raise
-        if not recovered_after_cfo_reject and robust_enabled:
-            payload_symbols, payload_metrics, sync_final, estimated_cfo_hz, cfo_method, sync_debug = robust_cfo_grid_recover(
-                rx_search,
-                taps,
-                sync,
-                manifest,
-                rate=rate,
-                sps=sps,
-                max_candidates=max_candidates,
-                min_sync_metric=min_sync_metric,
-                cfo_max_hz=float(getattr(args, "robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
-                cfo_step_hz=float(getattr(args, "robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
-                search_center_symbol=local_search_center,
-                search_window_symbols=search_window_symbols,
+            except RuntimeError as normal_exc:
+                recovered_after_cfo_reject = False
+                if abs(estimated_cfo_hz) >= 5.0 and float(sync0["sync_metric"]) >= min_sync_metric:
+                    try:
+                        payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
+                            rx_search,
+                            taps,
+                            sync,
+                            manifest,
+                            cfo_hz=0.0,
+                            rate=rate,
+                            sps=sps,
+                            max_candidates=pass_candidates,
+                            min_sync_metric=min_sync_metric,
+                            search_center_symbol=local_search_center,
+                            search_window_symbols=pass_window_symbols,
+                        )
+                        sync_debug["rejected_cfo_hz"] = float(estimated_cfo_hz)
+                        sync_debug["rejected_cfo_error"] = str(normal_exc)
+                        estimated_cfo_hz = 0.0
+                        cfo_method = f"{cfo_method}/rejected"
+                        sync_search_mode = "normal-cfo-rejected"
+                        sync_debug["sync_search_mode"] = sync_search_mode
+                    except RuntimeError:
+                        pass
+                    else:
+                        recovered_after_cfo_reject = True
+                if not recovered_after_cfo_reject and not robust_enabled:
+                    raise
+                if not recovered_after_cfo_reject and robust_enabled:
+                    payload_symbols, payload_metrics, sync_final, estimated_cfo_hz, cfo_method, sync_debug = robust_cfo_grid_recover(
+                        rx_search,
+                        taps,
+                        sync,
+                        manifest,
+                        rate=rate,
+                        sps=sps,
+                        max_candidates=pass_candidates,
+                        min_sync_metric=min_sync_metric,
+                        cfo_max_hz=float(getattr(args, "robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
+                        cfo_step_hz=float(getattr(args, "robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
+                        search_center_symbol=local_search_center,
+                        search_window_symbols=pass_window_symbols,
+                    )
+                    sync_debug["normal_sync_error"] = str(normal_exc)
+                    sync_search_mode = str(sync_debug["sync_search_mode"])
+            elapsed_ms = float((time.perf_counter() - attempt_started) * 1000.0)
+            return {
+                "pass_name": pass_name,
+                "pass_candidates": int(pass_candidates),
+                "pass_window_symbols": int(pass_window_symbols),
+                "elapsed_ms": elapsed_ms,
+                "initial_sync_ms": initial_ms,
+                "cfo_estimate_ms": cfo_ms,
+                "payload_recovery_ms": max(0.0, elapsed_ms - initial_ms - cfo_ms),
+                "initial_sync_metric": initial_metric,
+                "sync_metric": float(sync_final["sync_metric"]),
+                "sync0": sync0,
+                "payload_symbols": payload_symbols,
+                "payload_metrics": payload_metrics,
+                "sync_final": sync_final,
+                "estimated_cfo_hz": estimated_cfo_hz,
+                "cfo_method": cfo_method,
+                "sync_debug": sync_debug,
+                "sync_search_mode": sync_search_mode,
+            }
+        except RuntimeError as exc:
+            elapsed_ms = float((time.perf_counter() - attempt_started) * 1000.0)
+            raise SyncAttemptError(
+                str(exc),
+                {
+                    "pass_name": pass_name,
+                    "pass_candidates": int(pass_candidates),
+                    "pass_window_symbols": int(pass_window_symbols),
+                    "elapsed_ms": elapsed_ms,
+                    "initial_sync_ms": initial_ms,
+                    "cfo_estimate_ms": cfo_ms,
+                    "initial_sync_metric": initial_metric,
+                    "initial_sync_candidate_count": initial_count,
+                    "error": str(exc),
+                },
+            ) from exc
+
+    sync_pass_summary: dict[str, Any] = {}
+    if sync_profile == "fast-first":
+        try:
+            selected_attempt = run_sync_attempt(
+                pass_name="fast",
+                pass_candidates=fast_sync_candidates,
+                pass_window_symbols=fast_sync_search_window_symbols,
             )
-            sync_debug["normal_sync_error"] = str(normal_exc)
-            sync_search_mode = str(sync_debug["sync_search_mode"])
-    mark_timing("payload_recovery")
+            sync_pass_summary.update({
+                "sync_profile": "fast-first",
+                "sync_pass": 1,
+                "fast_sync_metric": float(selected_attempt["sync_metric"]),
+                "fallback_sync_metric": None,
+                "selected_sync_metric": float(selected_attempt["sync_metric"]),
+                "fast_sync_ms": round(float(selected_attempt["elapsed_ms"]), 3),
+                "fallback_sync_ms": 0.0,
+            })
+        except SyncAttemptError as fast_exc:
+            fallback_attempt = run_sync_attempt(
+                pass_name="fallback",
+                pass_candidates=fallback_sync_candidates,
+                pass_window_symbols=fallback_sync_search_window_symbols,
+            )
+            selected_attempt = fallback_attempt
+            sync_pass_summary.update({
+                "sync_profile": "fast-first",
+                "sync_pass": 2,
+                "fast_sync_metric": fast_exc.metrics.get("initial_sync_metric"),
+                "fallback_sync_metric": float(fallback_attempt["sync_metric"]),
+                "selected_sync_metric": float(fallback_attempt["sync_metric"]),
+                "fast_sync_ms": round(float(fast_exc.metrics["elapsed_ms"]), 3),
+                "fallback_sync_ms": round(float(fallback_attempt["elapsed_ms"]), 3),
+                "fast_sync_error": str(fast_exc),
+            })
+    else:
+        selected_attempt = run_sync_attempt(
+            pass_name="default",
+            pass_candidates=max_candidates,
+            pass_window_symbols=search_window_symbols,
+        )
+
+    sync0 = selected_attempt["sync0"]
+    payload_symbols = selected_attempt["payload_symbols"]
+    payload_metrics = selected_attempt["payload_metrics"]
+    sync_final = selected_attempt["sync_final"]
+    estimated_cfo_hz = float(selected_attempt["estimated_cfo_hz"])
+    cfo_method = str(selected_attempt["cfo_method"])
+    sync_debug = dict(selected_attempt["sync_debug"])
+    sync_search_mode = str(selected_attempt["sync_search_mode"])
+    decode_timing_ms["initial_sync"] = round(float(selected_attempt["initial_sync_ms"]), 3)
+    decode_timing_ms["cfo_estimate"] = round(float(selected_attempt["cfo_estimate_ms"]), 3)
+    decode_timing_ms["payload_recovery"] = round(float(selected_attempt["payload_recovery_ms"]), 3)
+    timing_last = time.perf_counter()
     if sync_symbol_offset:
         payload_metrics["data_start_symbol_local"] = int(payload_metrics.get("data_start_symbol", 0))
         payload_metrics["data_end_symbol_local"] = int(payload_metrics.get("data_end_symbol", 0))
@@ -1389,6 +1539,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     }
     summary.update(crop_metrics)
     summary.update(sync_debug)
+    summary.update(sync_pass_summary)
     summary.update(payload_metrics)
     summary.update(scrambling_metrics)
     summary.update(symbol_quality_metrics(reference_symbols, payload_symbols[:n_complex]))
@@ -1486,7 +1637,16 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
         out_npz=str(request["out_npz"]),
         out_wire=str(request.get("out_wire") or ""),
         summary_json=str(request.get("summary_json") or ""),
+        sync_profile=str(request.get("sync_profile") or ""),
         sync_candidates=int(request.get("sync_candidates", DEFAULT_SYNC_CANDIDATES)),
+        fast_sync_candidates=int(request.get("fast_sync_candidates", DEFAULT_FAST_SYNC_CANDIDATES)),
+        fast_sync_search_window_symbols=int(
+            request.get("fast_sync_search_window_symbols", DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS)
+        ),
+        fallback_sync_candidates=int(request.get("fallback_sync_candidates", DEFAULT_FALLBACK_SYNC_CANDIDATES)),
+        fallback_sync_search_window_symbols=int(
+            request.get("fallback_sync_search_window_symbols", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS)
+        ),
         min_sync_metric=float(request.get("min_sync_metric", DEFAULT_MIN_SYNC_METRIC)),
         robust_sync=bool(request.get("robust_sync", True)),
         robust_cfo_max_hz=float(request.get("robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
@@ -1747,7 +1907,28 @@ def parse_args() -> argparse.Namespace:
     decode.add_argument("--out-npz", required=True)
     decode.add_argument("--out-wire", default="")
     decode.add_argument("--summary-json", default="")
-    decode.add_argument("--sync-candidates", type=int, default=DEFAULT_SYNC_CANDIDATES)
+    decode.add_argument("--sync-profile", default=os.environ.get("ANALOG_SYNC_PROFILE", ""))
+    decode.add_argument("--sync-candidates", type=int, default=_env_int("ANALOG_SYNC_CANDIDATES", DEFAULT_SYNC_CANDIDATES))
+    decode.add_argument(
+        "--fast-sync-candidates",
+        type=int,
+        default=_env_int("ANALOG_FAST_SYNC_CANDIDATES", DEFAULT_FAST_SYNC_CANDIDATES),
+    )
+    decode.add_argument(
+        "--fast-sync-search-window-symbols",
+        type=int,
+        default=_env_int("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS", DEFAULT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS),
+    )
+    decode.add_argument(
+        "--fallback-sync-candidates",
+        type=int,
+        default=_env_int("ANALOG_FALLBACK_SYNC_CANDIDATES", DEFAULT_FALLBACK_SYNC_CANDIDATES),
+    )
+    decode.add_argument(
+        "--fallback-sync-search-window-symbols",
+        type=int,
+        default=_env_int("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS),
+    )
     decode.add_argument("--min-sync-metric", type=float, default=DEFAULT_MIN_SYNC_METRIC)
     decode.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=True)
     decode.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
