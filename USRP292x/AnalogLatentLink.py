@@ -232,6 +232,7 @@ def warm_decode_pipeline() -> dict[str, Any]:
                 "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",
                 DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS,
             ),
+            retry_on_burst_miss=_env_bool("ANALOG_RETRY_ON_BURST_MISS", False),
             min_sync_metric=_env_float("ANALOG_MIN_SYNC_METRIC", DEFAULT_MIN_SYNC_METRIC),
             robust_sync=_env_bool("ANALOG_ROBUST_SYNC", True),
             robust_cfo_max_hz=_env_float("ANALOG_ROBUST_CFO_MAX_HZ", DEFAULT_ROBUST_CFO_MAX_HZ),
@@ -1186,6 +1187,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         or DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS
     )
     min_sync_metric = float(getattr(args, "min_sync_metric", DEFAULT_MIN_SYNC_METRIC))
+    retry_on_burst_miss = bool(getattr(args, "retry_on_burst_miss", False))
     robust_enabled = bool(getattr(args, "robust_sync", True))
     raw_search_center = int(getattr(args, "sync_search_center_symbol", -1))
     search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
@@ -1218,6 +1220,13 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
                 amplitude=amp,
                 dc=dc,
             )
+            if (
+                retry_on_burst_miss
+                and sync_profile == "fast-first"
+                and search_center_symbol is None
+                and str(center_metrics.get("sync_search_center_error") or "") == "burst threshold not crossed"
+            ):
+                raise RuntimeError("burst threshold not crossed; retrying capture before full sync search")
         crop = sync_window_sample_range(
             int(raw_sc16.size // 2),
             manifest,
@@ -1250,6 +1259,13 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         rx_dc = (rx - np.complex64(dc)).astype(np.complex64)
         if search_center_symbol is None and search_window_symbols > 0:
             search_center_symbol, center_metrics = estimate_sync_center_from_burst_power(rx_dc, manifest, sps=sps)
+            if (
+                retry_on_burst_miss
+                and sync_profile == "fast-first"
+                and search_center_symbol is None
+                and str(center_metrics.get("sync_search_center_error") or "") == "burst threshold not crossed"
+            ):
+                raise RuntimeError("burst threshold not crossed; retrying capture before full sync search")
         rx_search, sync_symbol_offset, crop_metrics = crop_rx_for_sync_window(
             rx_dc,
             manifest,
@@ -1647,6 +1663,7 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
         fallback_sync_search_window_symbols=int(
             request.get("fallback_sync_search_window_symbols", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS)
         ),
+        retry_on_burst_miss=bool(request.get("retry_on_burst_miss", False)),
         min_sync_metric=float(request.get("min_sync_metric", DEFAULT_MIN_SYNC_METRIC)),
         robust_sync=bool(request.get("robust_sync", True)),
         robust_cfo_max_hz=float(request.get("robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
@@ -1929,6 +1946,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=_env_int("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", DEFAULT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS),
     )
+    decode.add_argument(
+        "--retry-on-burst-miss",
+        dest="retry_on_burst_miss",
+        action="store_true",
+        default=_env_bool("ANALOG_RETRY_ON_BURST_MISS", False),
+    )
+    decode.add_argument("--no-retry-on-burst-miss", dest="retry_on_burst_miss", action="store_false")
     decode.add_argument("--min-sync-metric", type=float, default=DEFAULT_MIN_SYNC_METRIC)
     decode.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=True)
     decode.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")

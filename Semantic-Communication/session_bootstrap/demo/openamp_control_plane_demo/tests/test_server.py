@@ -4431,6 +4431,7 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS": "1024",
                     "ANALOG_FALLBACK_SYNC_CANDIDATES": "12",
                     "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS": "4096",
+                    "ANALOG_RETRY_ON_BURST_MISS": "1",
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
                 },
                 source_summary="test",
@@ -4482,6 +4483,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--fallback-sync-candidates") + 1], "12")
         self.assertIn("--fallback-sync-search-window-symbols", command)
         self.assertEqual(command[command.index("--fallback-sync-search-window-symbols") + 1], "4096")
+        self.assertIn("--retry-on-burst-miss", command)
         self.assertIn("--no-robust-sync", command)
         self.assertFalse(job._shutdown_after_transport)
         self.assertEqual(job._runner_env["REMOTE_USRP_PROJECT_ROOT"], "/home/user")

@@ -126,6 +126,7 @@ ANALOG_FAST_SYNC_CANDIDATES_KEYS = ("ANALOG_FAST_SYNC_CANDIDATES",)
 ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS = ("ANALOG_FALLBACK_SYNC_CANDIDATES",)
 ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_RETRY_ON_BURST_MISS_KEYS = ("ANALOG_RETRY_ON_BURST_MISS",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
@@ -2609,6 +2610,13 @@ class UsrpBatchSpoolJob:
         fallback_sync_window = _first_value(env_values, ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
         if fallback_sync_window:
             args.extend(["--fallback-sync-search-window-symbols", str(_parse_int(fallback_sync_window, 4096))])
+        retry_on_burst_miss_raw = _first_value(env_values, ANALOG_RETRY_ON_BURST_MISS_KEYS)
+        if retry_on_burst_miss_raw:
+            args.append(
+                "--retry-on-burst-miss"
+                if _parse_bool(retry_on_burst_miss_raw, False)
+                else "--no-retry-on-burst-miss"
+            )
         sync_candidates = _first_value(env_values, ANALOG_SYNC_CANDIDATES_KEYS)
         if sync_candidates:
             args.extend(["--sync-candidates", str(_parse_int(sync_candidates, 12))])

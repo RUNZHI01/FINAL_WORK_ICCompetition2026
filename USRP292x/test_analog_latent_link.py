@@ -5,10 +5,12 @@ import json
 import subprocess
 import sys
 import threading
+import time
 from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 
@@ -618,6 +620,83 @@ def test_decode_waveform_fast_first_falls_back_and_records_pass_metrics(tmp_path
     assert result["fast_sync_ms"] >= 0.0
     assert result["fallback_sync_ms"] >= 0.0
     assert out_npz.is_file()
+
+
+def test_decode_waveform_retry_on_burst_miss_skips_full_sync_search(tmp_path, monkeypatch):
+    rng = np.random.default_rng(127)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            job_id="burst-miss",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=20_000,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    def fake_burst_miss(*_args, **_kwargs):
+        return None, {
+            "sync_search_center_source": "none",
+            "sync_search_center_error": "burst threshold not crossed",
+        }
+
+    def reject_sync_search(*_args, **_kwargs):
+        raise AssertionError("burst miss retry should skip sync search")
+
+    monkeypatch.setattr(analog, "estimate_sync_center_from_sc16_power", fake_burst_miss)
+    monkeypatch.setattr(analog, "find_sync_candidates", reject_sync_search)
+
+    with pytest.raises(RuntimeError, match="burst threshold not crossed"):
+        analog.decode_waveform(
+            Namespace(
+                rx_sc16=str(tx_sc16),
+                manifest=str(manifest),
+                out_npz=str(out_npz),
+                out_wire="",
+                summary_json="",
+                sync_candidates=12,
+                min_sync_metric=0.25,
+                robust_sync=False,
+                robust_cfo_max_hz=8000.0,
+                robust_cfo_step_hz=500.0,
+                sync_search_center_symbol=-1,
+                sync_search_window_symbols=4096,
+                sync_profile="fast-first",
+                fast_sync_candidates=4,
+                fast_sync_search_window_symbols=1024,
+                fallback_sync_candidates=12,
+                fallback_sync_search_window_symbols=4096,
+                retry_on_burst_miss=True,
+                scramble_key="",
+                scramble_key_hex="",
+                scramble_context="",
+            )
+        )
 
 
 def test_decimated_sc16_power_center_matches_full_scan(tmp_path):
@@ -1251,6 +1330,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "tx_wall_sec": 0.010,
             "rx_capture_wall_sec": 0.030,
             "decode_wall_sec": 0.060,
+            "decode_queue_wall_sec": 0.005,
             "remote_dir_publish_wall_sec": 0.004,
             "retry_wait_wall_sec": 0.0,
             "total_wall_sec": 0.120,
@@ -1261,6 +1341,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "tx_wall_sec": 0.020,
             "rx_capture_wall_sec": 0.050,
             "decode_wall_sec": 0.080,
+            "decode_queue_wall_sec": 0.015,
             "remote_dir_publish_wall_sec": 0.006,
             "retry_wait_wall_sec": 0.020,
             "total_wall_sec": 0.180,
@@ -1272,9 +1353,44 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["tx_control_ms"]["median_ms"] == 15.0
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
+    assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
     assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
     assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
     assert benchmark["total_transport_ms"]["median_ms"] == 150.0
+
+
+def test_pipeline_error_record_preserves_stage_timings(tmp_path):
+    image = analog_batch.ImageRecord(
+        index=3,
+        input_path=tmp_path / "case3.bin",
+        image_dir=tmp_path / "image_0003",
+    )
+    started = time.monotonic() - 0.25
+
+    analog_batch._append_pipeline_error_record(
+        image,
+        RuntimeError("decode failed"),
+        started=started,
+        attempt_index=1,
+        max_attempts=3,
+        slot_index=0,
+        pipeline_depth=2,
+        stage_timings={
+            "make_wall_sec": 0.010,
+            "tx_wall_sec": 0.020,
+            "rx_capture_wall_sec": 0.090,
+            "decode_queue_wall_sec": 0.030,
+            "decode_wall_sec": 0.110,
+            "remote_dir_publish_wall_sec": 0.0,
+        },
+    )
+
+    record = image.records[0]
+    assert record["attempt"] == 2
+    assert record["error"] == "decode failed"
+    assert record["rx_capture_wall_sec"] == 0.090
+    assert record["decode_queue_wall_sec"] == 0.030
+    assert record["decode_wall_sec"] == 0.110
 
 
 def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatch):

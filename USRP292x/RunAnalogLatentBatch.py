@@ -233,6 +233,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=env_int("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", 4096),
     )
+    parser.add_argument(
+        "--retry-on-burst-miss",
+        dest="retry_on_burst_miss",
+        action="store_true",
+        default=os.environ.get("ANALOG_RETRY_ON_BURST_MISS", "0").strip().lower() in {"1", "true", "yes", "on"},
+    )
+    parser.add_argument("--no-retry-on-burst-miss", dest="retry_on_burst_miss", action="store_false")
     parser.add_argument("--min-sync-metric", type=float, default=env_float("ANALOG_MIN_SYNC_METRIC", 0.25))
     parser.add_argument("--robust-sync", dest="robust_sync", action="store_true", default=os.environ.get("ANALOG_ROBUST_SYNC", "1") != "0")
     parser.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
@@ -278,6 +285,8 @@ def append_fast_first_sync_args(cmd: list[str], args: argparse.Namespace) -> Non
         "--fallback-sync-search-window-symbols",
         str(int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096)),
     ])
+    if bool(getattr(args, "retry_on_burst_miss", False)):
+        cmd.append("--retry-on-burst-miss")
 
 
 def fast_first_sync_request_fields(args: argparse.Namespace) -> dict[str, Any]:
@@ -290,6 +299,7 @@ def fast_first_sync_request_fields(args: argparse.Namespace) -> dict[str, Any]:
         "fast_sync_search_window_symbols": int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
         "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
         "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
+        "retry_on_burst_miss": bool(getattr(args, "retry_on_burst_miss", False)),
     }
 
 
@@ -969,6 +979,7 @@ class RemoteAnalogDecodeWorker:
             f"ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'fast_sync_search_window_symbols', 1024) or 1024)}",
             f"ANALOG_FALLBACK_SYNC_CANDIDATES={int(getattr(args, 'fallback_sync_candidates', 12) or 12)}",
             f"ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'fallback_sync_search_window_symbols', 4096) or 4096)}",
+            f"ANALOG_RETRY_ON_BURST_MISS={'1' if bool(getattr(args, 'retry_on_burst_miss', False)) else '0'}",
             f"ANALOG_MIN_SYNC_METRIC={float(getattr(args, 'min_sync_metric', 0.25) or 0.25)}",
             f"ANALOG_ROBUST_SYNC={'1' if bool(getattr(args, 'robust_sync', True)) else '0'}",
             f"ANALOG_ROBUST_CFO_MAX_HZ={float(getattr(args, 'robust_cfo_max_hz', 8000.0) or 8000.0)}",
@@ -1334,6 +1345,7 @@ def analog_decode_namespace(
         fast_sync_search_window_symbols=int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
         fallback_sync_candidates=int(getattr(args, "fallback_sync_candidates", 12) or 12),
         fallback_sync_search_window_symbols=int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
+        retry_on_burst_miss=bool(getattr(args, "retry_on_burst_miss", False)),
         min_sync_metric=float(args.min_sync_metric),
         robust_sync=bool(args.robust_sync),
         robust_cfo_max_hz=float(args.robust_cfo_max_hz),
@@ -1852,11 +1864,12 @@ def _append_pipeline_error_record(
     max_attempts: int,
     slot_index: int,
     pipeline_depth: int,
+    stage_timings: dict[str, float] | None = None,
 ) -> ImageRecord:
     image.status = 1
     image.passed = False
     image.error = str(exc)
-    image.records.append({
+    record: dict[str, Any] = {
         "round": attempt_index,
         "attempt": attempt_index + 1,
         "max_attempts": max_attempts,
@@ -1866,7 +1879,14 @@ def _append_pipeline_error_record(
         "pipeline_slot": slot_index,
         "total_wall_sec": time.monotonic() - started,
         "payload_is_bit_exact": False,
-    })
+    }
+    if stage_timings:
+        for key, value in stage_timings.items():
+            try:
+                record[key] = float(value)
+            except (TypeError, ValueError):
+                continue
+    image.records.append(record)
     return image
 
 
@@ -1967,6 +1987,7 @@ def _capture_remote_decode_pipeline_attempt(
         capture_timeout,
     )
     rx_capture_wall_sec = time.monotonic() - rx_started
+    capture_completed_at = time.monotonic()
 
     return {
         "image": image,
@@ -1999,6 +2020,8 @@ def _capture_remote_decode_pipeline_attempt(
         "remote_tx": "",
         "remote_manifest": remote_manifest,
         "capture_timeout": capture_timeout,
+        "capture_completed_at": capture_completed_at,
+        "decode_queue_wall_sec": 0.0,
         "slot_wait_wall_sec": 0.0,
     }
 
@@ -2013,6 +2036,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
     remote_npz = ""
     remote_wire = ""
     remote_summary = ""
+    decode_started = 0.0
     try:
         decode_started = time.monotonic()
         remote_decode_result_mode = str(ctx["remote_decode_result_mode"])
@@ -2159,6 +2183,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "rx_capture_wall_sec": float(ctx["rx_capture_wall_sec"]),
             "rx_pull_wall_sec": float(ctx["rx_pull_wall_sec"]),
             "decode_wall_sec": decode_wall_sec,
+            "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": 0.0,
             "merge_wall_sec": float(ctx["merge_wall_sec"]),
@@ -2171,6 +2196,8 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "payload_is_bit_exact": False,
         })
     except Exception as exc:
+        if decode_started > 0.0:
+            decode_wall_sec = time.monotonic() - decode_started
         return _append_pipeline_error_record(
             image,
             exc,
@@ -2179,6 +2206,19 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             max_attempts=int(ctx["max_attempts"]),
             slot_index=int(ctx["slot_index"]),
             pipeline_depth=int(ctx["pipeline_depth"]),
+            stage_timings={
+                "make_wall_sec": float(ctx.get("make_wall_sec") or 0.0),
+                "tx_wall_sec": float(ctx.get("tx_wall_sec") or 0.0),
+                "rx_capture_wall_sec": float(ctx.get("rx_capture_wall_sec") or 0.0),
+                "rx_pull_wall_sec": float(ctx.get("rx_pull_wall_sec") or 0.0),
+                "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
+                "decode_wall_sec": decode_wall_sec,
+                "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
+                "retry_wait_wall_sec": 0.0,
+                "merge_wall_sec": float(ctx.get("merge_wall_sec") or 0.0),
+                "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
+                "slot_wait_wall_sec": float(ctx.get("slot_wait_wall_sec") or 0.0),
+            },
         )
     return image
 
@@ -2206,11 +2246,16 @@ def _process_images_remote_decode_pipeline(
         nonlocal max_inflight
         max_inflight = max(max_inflight, occupied_count())
 
+    def mark_decode_queue(ctx: dict[str, Any]) -> None:
+        captured_at = float(ctx.get("capture_completed_at") or time.monotonic())
+        ctx["decode_queue_wall_sec"] = max(0.0, time.monotonic() - captured_at)
+
     with ThreadPoolExecutor(max_workers=1, thread_name_prefix="iq-remote-decode") as executor:
         while next_image_index < len(images) or ready_contexts or decode_future is not None:
             if decode_future is None:
                 if ready_contexts:
                     ctx = ready_contexts.pop(0)
+                    mark_decode_queue(ctx)
                     decode_future = (ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, ctx))
                     update_max_inflight()
                 elif next_image_index < len(images) and available_slots:
@@ -2241,6 +2286,7 @@ def _process_images_remote_decode_pipeline(
                         available_slots.append(slot_index)
                         available_slots.sort()
                         continue
+                    mark_decode_queue(ctx)
                     decode_future = (ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, ctx))
                     update_max_inflight()
                 else:
@@ -2319,6 +2365,7 @@ def _process_images_remote_decode_pipeline(
                 available_slots.append(slot_index)
                 available_slots.sort()
                 continue
+            mark_decode_queue(retry_ctx)
             decode_future = (retry_ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, retry_ctx))
             update_max_inflight()
 
@@ -2402,6 +2449,7 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     fields = (
         ("tx_control_ms", "tx_wall_sec"),
         ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("remote_decode_queue_ms", "decode_queue_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
         ("retry_wait_ms", "retry_wait_wall_sec"),
@@ -2605,6 +2653,7 @@ def main() -> int:
         "fast_sync_search_window_symbols": int(getattr(args, "fast_sync_search_window_symbols", 1024) or 1024),
         "fallback_sync_candidates": int(getattr(args, "fallback_sync_candidates", 12) or 12),
         "fallback_sync_search_window_symbols": int(getattr(args, "fallback_sync_search_window_symbols", 4096) or 4096),
+        "retry_on_burst_miss": bool(getattr(args, "retry_on_burst_miss", False)),
         "min_sync_metric": float(args.min_sync_metric),
         "robust_cfo_max_hz": float(args.robust_cfo_max_hz),
         "robust_cfo_step_hz": float(args.robust_cfo_step_hz),
