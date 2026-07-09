@@ -169,9 +169,8 @@ SHUTDOWN_AFTER_TRANSPORT_KEYS = (
 REMOTE_DECODE_PYTHON_KEYS = (
     "OPENAMP_DEMO_REMOTE_DECODE_PYTHON",
     "REMOTE_USRP_DECODE_PYTHON",
-    "REMOTE_TVM_PYTHON",
-    "MLKEM_REMOTE_PYTHON",
 )
+DEFAULT_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"
 REMOTE_DECODE_BIN_KEYS = ("REMOTE_DECODE_BIN", "USRP_REMOTE_DECODE_BIN")
 INFERENCE_ENGINE_KEYS = ("OPENAMP_DEMO_USRP_INFERENCE_ENGINE", "USRP_INFERENCE_ENGINE")
 INFERENCE_ENGINE_NONE = "none"
@@ -2142,7 +2141,11 @@ class UsrpBatchSpoolJob:
         self._input_source_mode = current_input_source_mode(env_values)
         self._input_source_label = input_source_mode_label(self._input_source_mode)
         self._remote_usrp_rx_root = _first_value(env_values, REMOTE_USRP_RX_ROOT_KEYS)
-        self._remote_decode_python = _first_value(env_values, REMOTE_DECODE_PYTHON_KEYS, "python3")
+        self._remote_decode_python = _first_value(
+            env_values,
+            REMOTE_DECODE_PYTHON_KEYS,
+            DEFAULT_REMOTE_DECODE_PYTHON,
+        )
         self._iq_remote_decoded_output_dir = ""
         self._prepared_input_manifest: dict[str, Any] | None = None
         self._wire_stage_manifest: dict[str, Any] | None = None
@@ -2492,9 +2495,12 @@ class UsrpBatchSpoolJob:
         env["PYTHONUNBUFFERED"] = "1"
         env.setdefault("REMOTE_USRP_PROJECT_ROOT", remote_project_root)
         env.setdefault("USRP_REMOTE_PROJECT_ROOT", remote_project_root)
-        remote_decode_python = _first_value(env_values, REMOTE_DECODE_PYTHON_KEYS)
-        if remote_decode_python:
-            env.setdefault("REMOTE_DECODE_PYTHON", remote_decode_python)
+        remote_decode_python = _first_value(
+            env_values,
+            REMOTE_DECODE_PYTHON_KEYS,
+            DEFAULT_REMOTE_DECODE_PYTHON,
+        )
+        env["REMOTE_DECODE_PYTHON"] = remote_decode_python
         if access.password:
             env.setdefault("SSHPASS", access.password)
 

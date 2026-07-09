@@ -392,6 +392,15 @@ def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, mon
     worker.close()
 
 
+def test_remote_python_for_decode_rejects_tvm_composite_env(monkeypatch):
+    monkeypatch.setenv(
+        "REMOTE_DECODE_PYTHON",
+        "env OMP_NUM_THREADS=3 /home/user/anaconda3/envs/tvm310_safe/bin/python",
+    )
+
+    assert analog_batch.remote_python_for_decode(Namespace()) == "/home/user/venv/bin/python"
+
+
 def test_find_sync_candidates_respects_symbol_search_window():
     sps = 4
     sync = analog.make_pilot_symbols(32, 1002)
@@ -758,7 +767,7 @@ def test_remote_analog_decode_args_sets_pythonpath_for_board_layout(monkeypatch)
     assert argv[:4] == [
         "env",
         "PYTHONPATH=/home/user/scripts:/home/user",
-        "python3",
+        "/home/user/venv/bin/python",
         "/home/user/USRP292x/AnalogLatentLink.py",
     ]
     assert "--sync-search-center-symbol" not in argv

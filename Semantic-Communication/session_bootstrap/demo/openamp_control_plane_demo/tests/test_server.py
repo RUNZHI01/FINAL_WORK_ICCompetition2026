@@ -4477,6 +4477,7 @@ class ServerMainTest(unittest.TestCase):
                     "JSCC_LINK_MODE": "iq-direct",
                     "OPENAMP_USRP_TX_RUNNER": "docker",
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                    "REMOTE_TVM_PYTHON": "env OMP_NUM_THREADS=3 /home/user/anaconda3/envs/tvm310_safe/bin/python",
                 },
                 source_summary="test",
             )
@@ -4513,6 +4514,7 @@ class ServerMainTest(unittest.TestCase):
             command[command.index("--remote-decoded-output-dir") + 1],
             f"/home/user/cockpit_usrp_rx/{job._run_id}_rx",
         )
+        self.assertEqual(job._runner_env["REMOTE_DECODE_PYTHON"], "/home/user/venv/bin/python")
 
     def test_usrp_iq_direct_runner_respects_explicit_sync_overrides(self) -> None:
         class FakeThread:

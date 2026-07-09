@@ -836,12 +836,13 @@ def build_remote_run_dir(args: argparse.Namespace, image: ImageRecord) -> str:
 def remote_python_for_decode(args: argparse.Namespace) -> str:
     """Pick the Python interpreter for remote AnalogLatentLink decode.
 
-    Order: REMOTE_DECODE_PYTHON env → /usr/bin/python3 → python3.
+    Keep this as a single executable path. TVM-style composite values such as
+    "env FOO=1 /path/python" are command fragments, not argv[0] here.
     """
     py = os.environ.get("REMOTE_DECODE_PYTHON", "").strip()
-    if py:
+    if py and not py.startswith("-") and len(shlex.split(py)) == 1:
         return py
-    return "python3"
+    return "/home/user/venv/bin/python"
 
 
 def remote_analog_link_path(args: argparse.Namespace) -> str:
