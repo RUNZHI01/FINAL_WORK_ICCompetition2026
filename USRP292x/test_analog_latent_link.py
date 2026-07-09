@@ -193,6 +193,63 @@ def test_decode_server_reuses_process_for_json_decode_command(tmp_path):
     assert summary.is_file()
 
 
+def test_decode_server_request_can_write_inline_manifest_json(tmp_path):
+    manifest_path = tmp_path / "remote" / "image_0000" / "manifest.json"
+    request = {
+        "rx_sc16": "/tmp/run/image_0000/batch_rx.sc16",
+        "manifest": str(manifest_path),
+        "manifest_json": {
+            "version": 1,
+            "phy": "analog-latent-iq",
+            "capture_nsamps": 1234,
+        },
+        "out_npz": "/tmp/run/image_0000/received_latent.npz",
+        "out_wire": "",
+        "summary_json": "/tmp/run/image_0000/decode_summary.json",
+    }
+
+    namespace = analog.decode_namespace_from_request(request)
+
+    assert namespace.manifest == str(manifest_path)
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["capture_nsamps"] == 1234
+
+
+def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
+    writes: list[str] = []
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            text.encode("ascii")
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+        returncode = None
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+    responses.put(json.dumps({"status": "ok"}))
+    worker = analog_batch.RemoteAnalogDecodeWorker(FakeProc(), FakeHandle(), responses, None)
+
+    worker.decode(
+        {"manifest_json": {"source_path": "E:/Main/Career/集创赛/input.bin"}},
+        tmp_path / "remote_decode.log",
+        timeout=1.0,
+    )
+
+    assert writes
+    assert "\\u96c6\\u521b\\u8d5b" in writes[0]
+
+
 def test_find_sync_candidates_respects_symbol_search_window():
     sps = 4
     sync = analog.make_pilot_symbols(32, 1002)
@@ -592,7 +649,7 @@ def test_process_image_wait_command_uses_rx_timeout_budget(tmp_path, monkeypatch
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
-        manifest = {"capture_nsamps": 107584}
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
@@ -649,7 +706,7 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
-        manifest = {"capture_nsamps": 107584}
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
@@ -932,7 +989,7 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
-        manifest = {"capture_nsamps": 107584}
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
@@ -946,7 +1003,7 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
     monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
     monkeypatch.setattr(analog_batch, "run_remote_command", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("persistent worker should handle remote decode")))
-    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
     monkeypatch.setattr(analog_batch, "pull_files_from_remote_tar", fake_pull_files_from_remote_tar)
     monkeypatch.setattr(analog_batch, "cleanup_remote_files", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
@@ -957,6 +1014,159 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
     assert worker_requests
     assert worker_requests[0]["rx_sc16"] == "/tmp/analog_runs/run42/image_0000/batch_rx.sc16"
     assert worker_requests[0]["sync_search_window_symbols"] == 4096
+    assert worker_requests[0]["manifest_json"]["job_id"] == "case0"
+
+
+def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_local_pull(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    worker_requests: list[dict[str, object]] = []
+    pulled: list[dict[str, Path]] = []
+    cleaned: list[list[str]] = []
+
+    class FakeWorker:
+        def decode(self, request, log_path, *, timeout):
+            worker_requests.append(dict(request))
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout="", stderr="")
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=FakeWorker(),
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="sync",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_pull_files_from_remote_tar(_target, _remote_dir, remote_to_local, _log_path, **_kwargs):
+        pulled.append(dict(remote_to_local))
+        assert list(remote_to_local) == ["decode_summary.json"]
+        remote_to_local["decode_summary.json"].write_text(
+            json.dumps({"status": "ok", "frame_complete": True, "sync_success": True}),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
+    monkeypatch.setattr(analog_batch, "pull_files_from_remote_tar", fake_pull_files_from_remote_tar)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files", lambda _target, paths, *_args, **_kwargs: cleaned.append(list(paths)) or True)
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert worker_requests[0]["out_npz"] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
+    assert worker_requests[0]["out_wire"] == ""
+    assert worker_requests[0]["manifest_json"]["job_id"] == "case0"
+    assert pulled and list(pulled[0]) == ["decode_summary.json"]
+    assert not (image.image_dir / "received_latent.npz").exists()
+    assert not (image.image_dir / "merged_round0.bin").exists()
+    assert result.records[0]["remote_decoded_output_dir"] == "/home/user/cockpit_usrp_rx/run42_rx"
+    assert result.records[0]["remote_received_latent_npz"] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
+    assert cleaned and "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz" not in cleaned[0]
+
+
+def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=None,
+        pattern="*.bin",
+        count=1,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="retry-run",
+        dry_run=True,
+        rx_capture_mode="local",
+        max_arq_rounds=1,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        rate=5_000_000.0,
+        sps=16,
+        rx_post_quantize=True,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.08,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    calls = 0
+
+    def fake_process_image(_args, image):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            image.status = 1
+            image.passed = False
+            image.error = "sync metric below threshold"
+            image.records.append({"round": 0, "error": image.error, "total_wall_sec": 1.0})
+        else:
+            image.status = 0
+            image.passed = True
+            image.error = ""
+            image.records.append({"round": 0, "sync_metric": 0.92, "total_wall_sec": 0.5})
+        return image
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "load_inputs", lambda _args: [input_path])
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "retry-run" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert calls == 2
+    assert summary["passed_count"] == 1
+    assert summary["failed_count"] == 0
+    assert summary["images"][0]["rounds"] == 2
+    assert [record["round"] for record in summary["images"][0]["round_records"]] == [0, 1]
 
 
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):

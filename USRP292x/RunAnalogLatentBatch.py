@@ -150,6 +150,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--remote-rx-ssh-target", default=os.environ.get("REMOTE_RX_SSH_TARGET", ""))
     parser.add_argument("--remote-rx-run-root", default=os.environ.get("REMOTE_RX_RUN_ROOT", "/tmp/usrp292x_remote_runs"))
     parser.add_argument("--remote-decode-bin", default=os.environ.get("REMOTE_DECODE_BIN", ""))
+    parser.add_argument(
+        "--remote-decode-result-mode",
+        choices=("pull", "remote-dir"),
+        default=os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull"),
+        help="pull all remote decode outputs locally, or publish decoded latent files on the board and pull only summaries.",
+    )
+    parser.add_argument(
+        "--remote-decoded-output-dir",
+        default=os.environ.get("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
+        help="Board-side flat directory for --remote-decode-result-mode=remote-dir decoded latent .npz files.",
+    )
 
     parser.add_argument("--rx-control-host", default=os.environ.get("RX_CONTROL_HOST", "127.0.0.1"))
     parser.add_argument("--rx-control-port", type=int, default=env_int("RX_CONTROL_PORT", 29220))
@@ -870,7 +881,7 @@ class RemoteAnalogDecodeWorker:
             raise RuntimeError(f"remote decode worker exited with status {self.proc.returncode}")
         if self.proc.stdin is None:
             raise RuntimeError("remote decode worker stdin is closed")
-        self.proc.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
+        self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
         self.proc.stdin.flush()
         try:
             line = self._responses.get(timeout=timeout)
@@ -1101,6 +1112,13 @@ def remote_analog_decode_request(
     return request
 
 
+def remote_decoded_output_dir(args: argparse.Namespace) -> str:
+    configured = str(getattr(args, "remote_decoded_output_dir", "") or "").strip().rstrip("/")
+    if configured:
+        return configured
+    return f"{str(getattr(args, 'remote_rx_run_root', '/tmp/usrp292x_remote_runs')).rstrip('/')}/{args.run_id}_rx"
+
+
 def analog_decode_namespace(
     args: argparse.Namespace,
     batch_rx: Path,
@@ -1253,6 +1271,9 @@ def run_in_process_decode(
 
 def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     started = time.monotonic()
+    image.status = 0
+    image.passed = False
+    image.error = ""
     image.image_dir.mkdir(parents=True, exist_ok=True)
     tx_sc16 = image.image_dir / "tx_analog.sc16"
     batch_rx = image.image_dir / "batch_rx.sc16"
@@ -1273,6 +1294,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     ).strip().lower()
     if remote_cleanup_mode not in {"sync", "async", "skip"}:
         remote_cleanup_mode = "sync"
+    remote_decode_result_mode = str(
+        getattr(args, "remote_decode_result_mode", os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull")) or "pull"
+    ).strip().lower()
+    if remote_decode_result_mode not in {"pull", "remote-dir"}:
+        remote_decode_result_mode = "pull"
+    remote_decoded_dir = remote_decoded_output_dir(args) if remote_decode_result_mode == "remote-dir" else ""
+    remote_received_npz = ""
 
     try:
         make_started = time.monotonic()
@@ -1353,7 +1381,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 remote_batch_rx = f"{remote_run_dir}/batch_rx.sc16"
                 remote_tx = ""
                 remote_manifest = f"{remote_run_dir}/manifest.json" if mode == "remote-decode" else ""
-                if mode == "remote-decode":
+                remote_decode_worker = getattr(args, "remote_decode_worker", None)
+                if mode == "remote-decode" and remote_decode_worker is None:
                     push_file_to_remote(
                         remote_target, manifest_path, remote_manifest,
                         image.image_dir / "remote_push_manifest.log",
@@ -1409,8 +1438,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             decode_started = time.monotonic()
             if mode == "remote-decode":
                 # Run AnalogLatentLink.py decode on the remote host, then pull results back.
-                remote_npz = f"{remote_run_dir}/received_latent.npz"
-                remote_wire = f"{remote_run_dir}/merged_round0.bin"
+                if remote_decode_result_mode == "remote-dir":
+                    remote_npz = f"{remote_decoded_dir}/{image.index:08d}.npz"
+                    remote_wire = ""
+                    remote_received_npz = remote_npz
+                else:
+                    remote_npz = f"{remote_run_dir}/received_latent.npz"
+                    remote_wire = f"{remote_run_dir}/merged_round0.bin"
                 remote_summary = f"{remote_run_dir}/decode_summary.json"
                 remote_argv = remote_analog_decode_args(
                     args,
@@ -1428,9 +1462,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     remote_wire,
                     remote_summary,
                 )
+                remote_decode_worker = getattr(args, "remote_decode_worker", None)
+                if remote_decode_worker is not None:
+                    remote_request["manifest_json"] = manifest
                 # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
                 # happens at capture time, not decode time. Remote decode reads what was captured.
-                remote_decode_worker = getattr(args, "remote_decode_worker", None)
                 if remote_decode_worker is not None:
                     remote_decode_worker.decode(
                         remote_request,
@@ -1445,22 +1481,33 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         control_socket=ssh_control_socket,
                         timeout=max(120.0, capture_timeout),
                     )
-                # Pull npz/wire/summary back to local image_dir paths
-                pull_files_from_remote_tar(
-                    remote_target,
-                    remote_run_dir,
-                    {
+                # Pull only what the selected result mode needs locally.
+                remote_outputs = (
+                    {"decode_summary.json": decode_summary}
+                    if remote_decode_result_mode == "remote-dir"
+                    else {
                         "received_latent.npz": out_npz,
                         "merged_round0.bin": out_wire,
                         "decode_summary.json": decode_summary,
-                    },
+                    }
+                )
+                pull_files_from_remote_tar(
+                    remote_target,
+                    remote_run_dir,
+                    remote_outputs,
                     image.image_dir / "remote_pull_outputs.log",
                     control_socket=ssh_control_socket,
                     timeout=60,
                 )
                 decode_wall_sec = time.monotonic() - decode_started
-                image.status = 0 if (out_wire.is_file() and decode_summary.is_file()) else 1
-                image.passed = out_wire.is_file() and decode_summary.is_file()
+                if remote_decode_result_mode == "remote-dir":
+                    pulled_summary = read_json(decode_summary) if decode_summary.is_file() else {}
+                    status_ok = str(pulled_summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+                    image.status = 0 if (decode_summary.is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))) else 1
+                    image.passed = image.status == 0
+                else:
+                    image.status = 0 if (out_wire.is_file() and decode_summary.is_file()) else 1
+                    image.passed = out_wire.is_file() and decode_summary.is_file()
                 if not image.passed:
                     image.error = "remote decode completed but expected outputs are missing"
             else:
@@ -1494,8 +1541,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 if remote_cleanup_mode != "skip":
                     remote_files = [path for path in (
                         remote_batch_rx, remote_tx, remote_manifest,
-                        remote_npz if mode == "remote-decode" else "",
-                        remote_wire if mode == "remote-decode" else "",
+                        remote_npz if mode == "remote-decode" and remote_decode_result_mode != "remote-dir" else "",
+                        remote_wire if mode == "remote-decode" and remote_decode_result_mode != "remote-dir" else "",
                         remote_summary if mode == "remote-decode" else "",
                     ) if path]
                     if remote_cleanup_mode == "async":
@@ -1526,6 +1573,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "rx_capture_mode": str(args.rx_capture_mode),
             "in_process_local_codec": use_in_process_local_codec,
             "remote_rx_ssh_target": remote_target or None,
+            "remote_decode_result_mode": remote_decode_result_mode if str(args.rx_capture_mode) == "remote-decode" else None,
+            "remote_decoded_output_dir": remote_decoded_dir or None,
+            "remote_received_latent_npz": remote_received_npz or None,
             "waveform_samples": int(manifest.get("tx_waveform_samples") or 0),
             "capture_nsamps": int(manifest.get("capture_nsamps") or 0),
             "detected_airtime_ms": summary_data.get("detected_airtime_ms"),
@@ -1671,7 +1721,16 @@ def main() -> int:
     setattr(args, "remote_decode_worker", remote_decode_worker)
     try:
         for image in images:
-            result = process_image(args, image)
+            max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
+            result = image
+            for attempt_index in range(max_attempts):
+                result = process_image(args, image)
+                if result.records:
+                    result.records[-1]["round"] = attempt_index
+                    result.records[-1]["attempt"] = attempt_index + 1
+                    result.records[-1]["max_attempts"] = max_attempts
+                if result.passed:
+                    break
             completed.append(result)
             if args.stop_on_fail and not result.passed:
                 break
@@ -1680,6 +1739,18 @@ def main() -> int:
             remote_decode_worker.close()
     passed_count = sum(1 for image in completed if image.passed)
     failed_count = sum(1 for image in completed if not image.passed)
+    remote_decoded_dirs = sorted({
+        str(record.get("remote_decoded_output_dir") or "")
+        for image in completed
+        for record in image.records
+        if str(record.get("remote_decoded_output_dir") or "").strip()
+    })
+    remote_received_npz_files = [
+        str(record.get("remote_received_latent_npz") or "")
+        for image in completed
+        for record in image.records
+        if str(record.get("remote_received_latent_npz") or "").strip()
+    ]
 
     summary = {
         "version": 1,
@@ -1699,6 +1770,10 @@ def main() -> int:
         "dry_run": bool(args.dry_run),
         "in_process_local_codec": bool(getattr(args, "in_process_local_codec", False)),
         "remote_decode_worker_enabled": remote_decode_worker is not None,
+        "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
+        "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
+        "remote_decoded_output_dirs": remote_decoded_dirs,
+        "remote_received_latent_npz_files": remote_received_npz_files,
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
         "rate": float(args.rate),

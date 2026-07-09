@@ -1129,6 +1129,16 @@ def simulate_channel(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace:
+    manifest_json = request.get("manifest_json")
+    if manifest_json is not None:
+        manifest_path = Path(str(request["manifest"]))
+        if isinstance(manifest_json, str):
+            manifest_payload = json.loads(manifest_json)
+        else:
+            manifest_payload = manifest_json
+        if not isinstance(manifest_payload, dict):
+            raise RuntimeError("manifest_json must be a JSON object")
+        write_json(manifest_path, manifest_payload)
     return argparse.Namespace(
         rx_sc16=str(request["rx_sc16"]),
         manifest=str(request["manifest"]),

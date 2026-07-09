@@ -73,6 +73,8 @@ LINK_MODE_QPSK = "qpsk"
 LINK_MODE_IQ_DIRECT = "iq-direct"
 DEFAULT_IQ_DIRECT_SPS = 16
 DEFAULT_IQ_DIRECT_AMPLITUDE = 24000
+DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.08
+DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
@@ -117,6 +119,10 @@ ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
 ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
 ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
+ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
+ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC",)
+ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC",)
 ANALOG_SCRAMBLE_KEY_KEYS = ("ANALOG_SCRAMBLE_KEY",)
 ANALOG_SCRAMBLE_KEY_HEX_KEYS = ("ANALOG_SCRAMBLE_KEY_HEX",)
 ANALOG_SCRAMBLE_CONTEXT_KEYS = ("ANALOG_SCRAMBLE_CONTEXT",)
@@ -194,6 +200,8 @@ CHILD_PROCESS_ENV = {
     "NUMEXPR_NUM_THREADS": "1",
     "VECLIB_MAXIMUM_THREADS": "1",
 }
+
+_IQ_DECODE_ASSET_SYNC_CACHE: dict[tuple[str, str, str, str, tuple[tuple[str, str], ...]], dict[str, Any]] = {}
 
 BOARD_DECODE_SCRIPT = r'''#!/usr/bin/env python3
 from __future__ import annotations
@@ -1383,10 +1391,52 @@ def _sync_and_decode_wire_blobs_on_remote(
     }
 
 
+def _iq_remote_decode_stage_manifest_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    if str(summary.get("remote_decode_result_mode") or "").strip().lower() != "remote-dir":
+        return None
+    remote_dir = str(summary.get("remote_decoded_output_dir") or "").strip().rstrip("/")
+    if not remote_dir:
+        return None
+    remote_files = [
+        str(path or "").strip()
+        for path in summary.get("remote_received_latent_npz_files", [])
+        if str(path or "").strip()
+    ]
+    if not remote_files:
+        images = summary.get("images") if isinstance(summary.get("images"), list) else []
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            records = image.get("round_records") if isinstance(image.get("round_records"), list) else []
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                remote_npz = str(record.get("remote_received_latent_npz") or "").strip()
+                if remote_npz:
+                    remote_files.append(remote_npz)
+    remote_root = remote_dir.rsplit("/", 1)[0] if "/" in remote_dir else remote_dir
+    return {
+        "remote_root": remote_root,
+        "remote_dir": remote_dir,
+        "remote_wire_dir": "",
+        "decode_location": "board",
+        "remote_python": "",
+        "uploaded_bytes": 0,
+        "decode_manifest": {
+            "status": "ok",
+            "source": "iq_remote_decode",
+            "decoded_count": len(remote_files),
+            "files": remote_files,
+        },
+    }
+
+
 def _sync_iq_decode_assets_on_remote(
     access: BoardAccessConfig,
     *,
     remote_project_root: str,
+    probe_timeout_sec: float = 15.0,
+    upload_timeout_sec: float = 90.0,
 ) -> dict[str, Any]:
     if not access.connection_ready:
         raise RuntimeError("板端连接信息不完整，无法同步 IQ remote-decode 资产")
@@ -1403,13 +1453,30 @@ def _sync_iq_decode_assets_on_remote(
         f"{remote_root}/{arcname}": hashlib.sha256(local_path.read_bytes()).hexdigest()
         for local_path, arcname in assets
     }
+    cache_key = (
+        access.host,
+        access.user,
+        str(access.port or "22"),
+        remote_root,
+        tuple(sorted(local_hashes.items())),
+    )
+    cached = _IQ_DECODE_ASSET_SYNC_CACHE.get(cache_key)
+    if cached is not None:
+        result = dict(cached)
+        result["status"] = "cached"
+        result["cached_from_status"] = cached.get("status")
+        result["uploaded_bytes"] = 0
+        return result
+
+    probe_timeout = max(1.0, float(probe_timeout_sec or 15.0))
+    upload_timeout = max(1.0, float(upload_timeout_sec or 90.0))
     probe_command = (
         "if command -v sha256sum >/dev/null 2>&1; then "
         + "sha256sum "
         + " ".join(shlex.quote(path) for path in local_hashes)
         + " 2>/dev/null || true; fi"
     )
-    probe_result = _run_remote_command(access, probe_command, timeout=15.0)
+    probe_result = _run_remote_command(access, probe_command, timeout=probe_timeout)
     if probe_result.returncode == 0:
         remote_hashes: dict[str, str] = {}
         for line in probe_result.stdout.decode("utf-8", errors="ignore").splitlines():
@@ -1417,12 +1484,14 @@ def _sync_iq_decode_assets_on_remote(
             if len(parts) == 2:
                 remote_hashes[parts[1].strip()] = parts[0].strip().lower()
         if local_hashes and all(remote_hashes.get(path) == digest for path, digest in local_hashes.items()):
-            return {
+            result = {
                 "status": "current",
                 "remote_project_root": remote_root,
                 "uploaded_bytes": 0,
                 "files": [arcname for _, arcname in assets],
             }
+            _IQ_DECODE_ASSET_SYNC_CACHE[cache_key] = dict(result)
+            return result
 
     payload_buffer = io.BytesIO()
     with tarfile.open(fileobj=payload_buffer, mode="w:gz") as archive:
@@ -1436,7 +1505,7 @@ def _sync_iq_decode_assets_on_remote(
         f"tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_root)}; "
         f"rm -f {shlex.quote(remote_tar_path)}"
     )
-    ssh_result = _run_remote_command(access, upload_command, timeout=30.0, input_data=payload)
+    ssh_result = _run_remote_command(access, upload_command, timeout=upload_timeout, input_data=payload)
     if ssh_result.returncode != 0:
         detail = (
             ssh_result.stderr.decode("utf-8", errors="ignore").strip()
@@ -1444,12 +1513,14 @@ def _sync_iq_decode_assets_on_remote(
             or f"ssh rc={ssh_result.returncode}"
         )
         raise RuntimeError(f"IQ remote-decode 资产上传/解包失败: {detail}")
-    return {
+    result = {
         "status": "uploaded",
         "remote_project_root": remote_root,
         "uploaded_bytes": len(payload),
         "files": [arcname for _, arcname in assets],
     }
+    _IQ_DECODE_ASSET_SYNC_CACHE[cache_key] = dict(result)
+    return result
 
 
 def _normalize_inference_engine(raw_value: str) -> str:
@@ -1958,10 +2029,20 @@ class UsrpBatchSpoolJob:
             )
             iq_decode_asset_sync: dict[str, Any] | None = None
             if self._link_mode == LINK_MODE_IQ_DIRECT and rx_capture_mode == "remote-decode":
+                asset_probe_timeout = _parse_float(
+                    _first_value(env_values, ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS),
+                    15.0,
+                )
+                asset_sync_timeout = _parse_float(
+                    _first_value(env_values, ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_KEYS),
+                    90.0,
+                )
                 try:
                     iq_decode_asset_sync = _sync_iq_decode_assets_on_remote(
                         access,
                         remote_project_root=remote_project_root,
+                        probe_timeout_sec=max(1.0, asset_probe_timeout),
+                        upload_timeout_sec=max(1.0, asset_sync_timeout),
                     )
                 except Exception as exc:
                     self._final_snapshot = self._build_terminal_snapshot(
@@ -2080,7 +2161,29 @@ class UsrpBatchSpoolJob:
             command.append("--stop-on-fail")
 
         if self._link_mode == LINK_MODE_IQ_DIRECT:
+            command.extend([
+                "--max-arq-rounds",
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
+            ])
             command.extend(self._build_analog_link_args(env_values))
+            remote_decode_result_mode = str(
+                _first_value(env_values, ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS) or ""
+            ).strip().lower()
+            if (
+                not remote_decode_result_mode
+                and str(rx_capture_mode or "").strip().lower() == "remote-decode"
+                and self._inference_engine != INFERENCE_ENGINE_NONE
+            ):
+                remote_decode_result_mode = "remote-dir"
+            if remote_decode_result_mode:
+                command.extend(["--remote-decode-result-mode", remote_decode_result_mode])
+            if remote_decode_result_mode == "remote-dir":
+                remote_decoded_output_dir = str(
+                    _first_value(env_values, ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS) or ""
+                ).strip().rstrip("/")
+                if not remote_decoded_output_dir:
+                    remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root or '').rstrip('/')}/{self._run_id}_rx"
+                command.extend(["--remote-decoded-output-dir", remote_decoded_output_dir])
             tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
             tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
             if _tx_server_uses_docker(env_values):
@@ -2218,12 +2321,16 @@ class UsrpBatchSpoolJob:
         min_sync_metric = _first_value(env_values, ANALOG_MIN_SYNC_METRIC_KEYS)
         if min_sync_metric:
             args.extend(["--min-sync-metric", str(_parse_float(min_sync_metric, 0.25))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--min-sync-metric", str(DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC)])
         robust_sync_raw = _first_value(env_values, ANALOG_ROBUST_SYNC_KEYS)
         if robust_sync_raw:
             if _parse_bool(robust_sync_raw, True):
                 args.append("--robust-sync")
             else:
                 args.append("--no-robust-sync")
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.append("--robust-sync" if DEFAULT_IQ_DIRECT_ROBUST_SYNC else "--no-robust-sync")
         robust_cfo_max = _first_value(env_values, ANALOG_ROBUST_CFO_MAX_HZ_KEYS)
         if robust_cfo_max:
             args.extend(["--robust-cfo-max-hz", str(_parse_float(robust_cfo_max, 8000.0))])
@@ -2682,19 +2789,25 @@ class UsrpBatchSpoolJob:
                 self._phase = "transport_shutdown"
                 self._shutdown_control_servers_after_transport()
                 if self._input_source_mode == "usrp":
-                    self._phase = "board_decode"
-                    wire_stage_dir = self._run_dir / "board_wire_decode_stage"
-                    self._wire_stage_manifest = _stage_merged_wire_blobs_for_remote_decode(
-                        self._run_dir,
-                        wire_stage_dir,
+                    self._remote_stage_manifest = (
+                        _iq_remote_decode_stage_manifest_from_summary(summary)
+                        if self._link_mode == LINK_MODE_IQ_DIRECT
+                        else None
                     )
-                    self._remote_stage_manifest = _sync_and_decode_wire_blobs_on_remote(
-                        local_stage_dir=wire_stage_dir,
-                        remote_root=self._remote_usrp_rx_root,
-                        remote_subdir=f"{self._run_dir.name}_rx",
-                        remote_python=self._remote_decode_python,
-                        access=self._access,
-                    )
+                    if self._remote_stage_manifest is None:
+                        self._phase = "board_decode"
+                        wire_stage_dir = self._run_dir / "board_wire_decode_stage"
+                        self._wire_stage_manifest = _stage_merged_wire_blobs_for_remote_decode(
+                            self._run_dir,
+                            wire_stage_dir,
+                        )
+                        self._remote_stage_manifest = _sync_and_decode_wire_blobs_on_remote(
+                            local_stage_dir=wire_stage_dir,
+                            remote_root=self._remote_usrp_rx_root,
+                            remote_subdir=f"{self._run_dir.name}_rx",
+                            remote_python=self._remote_decode_python,
+                            access=self._access,
+                        )
                 if self._inference_engine != INFERENCE_ENGINE_NONE:
                     if self._inference_callback is None:
                         raise RuntimeError(f"未配置 {self._inference_engine.upper()} 推理回调")

@@ -28,7 +28,12 @@ $env:ANALOG_AMPLITUDE="24000"
 $env:ANALOG_RX_TAIL_SEC="0.12"
 $env:ANALOG_REMOTE_CLEANUP_MODE="async"
 $env:ANALOG_REMOTE_DECODE_WORKER="1"
+$env:ANALOG_REMOTE_DECODE_RESULT_MODE="remote-dir"
+$env:ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC="90"
 $env:ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
+$env:ANALOG_MIN_SYNC_METRIC="0.08"
+$env:ANALOG_ROBUST_SYNC="0"
+$env:USRP_MAX_ARQ_ROUNDS="2"
 $env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
 $env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
 $env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
@@ -56,6 +61,10 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
 
 - 2026-07-09 IQ direct keeps the same persistent USRP control plane as QPSK: board RX stays on `100.121.87.73:29220`, host TX stays on `127.0.0.1:29221`, and each frame sends only `CAPTURE/SEND/WAIT` to those servers. Remote-decode now avoids uploading the unused `tx_analog.sc16`, pulls `received_latent.npz`, `merged_round0.bin`, and `decode_summary.json` in one tar stream, and removes all remote per-frame artifacts with one batched cleanup command.
 - 2026-07-09 IQ remote-decode can keep one board-side Python decoder alive with `ANALOG_REMOTE_DECODE_WORKER=1` (default in the Docker cockpit wrapper). Per frame now sends a JSON decode request to `AnalogLatentLink.py decode-server` instead of starting a fresh board Python process. Live run `usrp-1783566831` created a single `remote_decode_worker.log`; `image_0000/remote_decode.log` returned `status=ok`, sync metric `0.8910`, and `sync_search_window_enabled=true`. The following frame failed sync at about `0.084`, matching current physical IQ quality fluctuation rather than process startup overhead.
+- 2026-07-09 IQ remote-decode supports `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` for cockpit + TVM runs. The board-side decoder publishes flat latent files such as `/home/user/cockpit_usrp_rx/<run>_rx/00000000.npz`; cockpit then passes that directory directly to TVM instead of pulling `received_latent.npz`/`merged_round0.bin` back to Windows and uploading them to the board again. IQ decoder asset sync is cached per cockpit backend process; the default upload timeout is 90 s because the measured Windows + Docker SSH binary stdin path took about 31 s for the 19 KB asset tar.
+- 2026-07-09 IQ remote-decode worker mode now sends `manifest_json` through the persistent `AnalogLatentLink.py decode-server` request instead of launching a per-frame Docker SSH command to upload `manifest.json`. `OtaRxPersistentServer` creates capture parent directories, so the hot path keeps persistent RX/TX plus the persistent board decode worker.
+- 2026-07-09 IQ direct defaults now use `ANALOG_MIN_SYNC_METRIC=0.08` and `ANALOG_ROBUST_SYNC=0` unless explicitly overridden. Re-decoding live capture `cockpit_usrp_usrp-1783571012` showed the three frames that failed at the old `0.25` threshold can decode at about 4.1-7.5 s instead of burning 70-80 s in robust CFO grid search. This is a latency guard, not a final PHY-quality fix.
+- 2026-07-09 IQ direct now passes `USRP_MAX_ARQ_ROUNDS=2` into `RunAnalogLatentBatch.py`; for IQ this means re-capturing the same latent over USRP OTA after a sync/decode miss, not running QPSK packet ARQ. The big.LITTLE wrapper also uploads its transient runner through `ssh_with_password.sh`, so Windows bare `scp` no longer breaks TVM parsing. Verified cockpit end-to-end run `batch-1783572523-5`: transport 5/5, TVM 5/5, remote input `/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-1783572523_rx`, TVM mean `251.22 ms`, median `246.72 ms`, PSNR `37.0445`, SSIM `0.97494`.
 - 2026-07-09 live cockpit restart: after a clean backend/control restart, `OPENAMP_SSH_RUNNER=docker` reliably auto-started RX `100.121.87.73:29220` and TX `127.0.0.1:29221`. IQ remote-decode asset sync reported `status=current`, and the remote decode command used `/home/user/venv/bin/python`.
 - IQ direct remote-decode now uses board-side decode with `ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS=4096`. Live run `usrp-1783563177` completed the first frame with `frame_complete=true`, sync metric `0.8929`, RX capture `0.383 s`, TX send `0.055 s`, and `sync_search_window_enabled=true`. This proves the long-capture 37 s decode failure mode is removed; remaining latency is dominated by per-frame SSH/docker setup, remote file staging, and Python decode startup.
 - Prerecorded TVM big.LITTLE path: `openamp3_handwritten_mean4_v7_big_little_current_20260709_052201.json`, 300/300, median 243.30 ms, mean 252.91 ms, p95 311.88 ms. This is the 250 ms reproduction reference.

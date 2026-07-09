@@ -598,22 +598,14 @@ SH
   if [[ "$REMOTE_MODE" == "ssh" ]]; then
     local REMOTE_RUNNER_SCRIPT
     REMOTE_RUNNER_SCRIPT="/tmp/openamp_big_little_runner_${RUN_ID}_$$.sh"
-    if ! command -v sshpass >/dev/null 2>&1; then
-      echo "ERROR: sshpass is required to upload the big.LITTLE runner script in SSH mode." >&2
-      rm -f "$runner_script"
-      return 127
-    fi
     set +e
-    SSHPASS="$REMOTE_PASS" sshpass -e scp \
-      -q \
-      -o StrictHostKeyChecking=no \
-      -o UserKnownHostsFile=/dev/null \
-      -o BatchMode=no \
-      -o LogLevel=ERROR \
-      -o PreferredAuthentications=password,keyboard-interactive \
-      -P "${REMOTE_SSH_PORT:-22}" \
-      "$runner_script" \
-      "$REMOTE_USER@$REMOTE_HOST:$REMOTE_RUNNER_SCRIPT"
+    bash "$SCRIPT_DIR/ssh_with_password.sh" \
+      --host "$REMOTE_HOST" \
+      --user "$REMOTE_USER" \
+      --pass "$REMOTE_PASS" \
+      --port "${REMOTE_SSH_PORT:-22}" \
+      -- \
+      "umask 077; cat > '$REMOTE_RUNNER_SCRIPT'" <"$runner_script"
     rc=$?
     if [[ "$rc" -ne 0 ]]; then
       set -e

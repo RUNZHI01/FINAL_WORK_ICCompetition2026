@@ -37,12 +37,13 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class LegacyCompatRunnerContractTest(unittest.TestCase):
-    def test_big_little_ssh_mode_uploads_runner_script_without_stdin(self) -> None:
+    def test_big_little_ssh_mode_uploads_runner_script_through_ssh_helper(self) -> None:
         script = BIG_LITTLE_RUNNER.read_text(encoding="utf-8")
 
-        self.assertIn("scp", script)
         self.assertIn("REMOTE_RUNNER_SCRIPT", script)
-        self.assertNotIn('bash -s \\\n      <"$runner_script"', script)
+        self.assertIn('"$SCRIPT_DIR/ssh_with_password.sh"', script)
+        self.assertIn("cat > '$REMOTE_RUNNER_SCRIPT'", script)
+        self.assertNotIn("sshpass -e scp", script)
 
     def test_local_runner_emits_json_summary_after_legacy_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
