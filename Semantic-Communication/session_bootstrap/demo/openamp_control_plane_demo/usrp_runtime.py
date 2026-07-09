@@ -116,6 +116,7 @@ ANALOG_MIN_SYNC_METRIC_KEYS = ("ANALOG_MIN_SYNC_METRIC",)
 ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
 ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
 ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
+ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_SCRAMBLE_KEY_KEYS = ("ANALOG_SCRAMBLE_KEY",)
 ANALOG_SCRAMBLE_KEY_HEX_KEYS = ("ANALOG_SCRAMBLE_KEY_HEX",)
 ANALOG_SCRAMBLE_CONTEXT_KEYS = ("ANALOG_SCRAMBLE_CONTEXT",)
@@ -471,7 +472,13 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
     return {"status": "started", "pid": proc.pid, "log_path": str(log_path)}
 
 
-def _run_remote_command(access: BoardAccessConfig, command: str, *, timeout: float = 20.0) -> subprocess.CompletedProcess[bytes]:
+def _run_remote_command(
+    access: BoardAccessConfig,
+    command: str,
+    *,
+    timeout: float = 20.0,
+    input_data: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     cmd = [
         resolve_bash_executable(),
         str(SSH_HELPER),
@@ -487,13 +494,18 @@ def _run_remote_command(access: BoardAccessConfig, command: str, *, timeout: flo
         command,
     ]
     try:
-        return subprocess.run(
-            cmd,
-            capture_output=True,
-            cwd=REPO_ROOT,
-            timeout=timeout,
-            check=False,
-        )
+        run_kwargs: dict[str, Any] = {
+            "cwd": REPO_ROOT,
+            "timeout": timeout,
+            "check": False,
+        }
+        if input_data is None:
+            run_kwargs["capture_output"] = True
+        else:
+            run_kwargs["input"] = input_data
+            run_kwargs["stdout"] = subprocess.PIPE
+            run_kwargs["stderr"] = subprocess.PIPE
+        return subprocess.run(cmd, **run_kwargs)
     except subprocess.TimeoutExpired as exc:
         stdout = exc.stdout if isinstance(exc.stdout, bytes) else str(exc.stdout or "").encode("utf-8", errors="replace")
         stderr = exc.stderr if isinstance(exc.stderr, bytes) else str(exc.stderr or "").encode("utf-8", errors="replace")
@@ -1371,6 +1383,75 @@ def _sync_and_decode_wire_blobs_on_remote(
     }
 
 
+def _sync_iq_decode_assets_on_remote(
+    access: BoardAccessConfig,
+    *,
+    remote_project_root: str,
+) -> dict[str, Any]:
+    if not access.connection_ready:
+        raise RuntimeError("板端连接信息不完整，无法同步 IQ remote-decode 资产")
+    remote_root = str(remote_project_root or "").strip().rstrip("/") or DEFAULT_REMOTE_USRP_PROJECT_ROOT
+    assets = (
+        (REPO_ROOT / "USRP292x" / "AnalogLatentLink.py", "USRP292x/AnalogLatentLink.py"),
+        (ROOT_SCRIPTS / "latent_transport.py", "scripts/latent_transport.py"),
+    )
+    missing = [str(path) for path, _ in assets if not path.is_file()]
+    if missing:
+        raise RuntimeError(f"IQ remote-decode 本地资产缺失: {', '.join(missing)}")
+
+    local_hashes = {
+        f"{remote_root}/{arcname}": hashlib.sha256(local_path.read_bytes()).hexdigest()
+        for local_path, arcname in assets
+    }
+    probe_command = (
+        "if command -v sha256sum >/dev/null 2>&1; then "
+        + "sha256sum "
+        + " ".join(shlex.quote(path) for path in local_hashes)
+        + " 2>/dev/null || true; fi"
+    )
+    probe_result = _run_remote_command(access, probe_command, timeout=15.0)
+    if probe_result.returncode == 0:
+        remote_hashes: dict[str, str] = {}
+        for line in probe_result.stdout.decode("utf-8", errors="ignore").splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2:
+                remote_hashes[parts[1].strip()] = parts[0].strip().lower()
+        if local_hashes and all(remote_hashes.get(path) == digest for path, digest in local_hashes.items()):
+            return {
+                "status": "current",
+                "remote_project_root": remote_root,
+                "uploaded_bytes": 0,
+                "files": [arcname for _, arcname in assets],
+            }
+
+    payload_buffer = io.BytesIO()
+    with tarfile.open(fileobj=payload_buffer, mode="w:gz") as archive:
+        for local_path, arcname in assets:
+            archive.add(local_path, arcname=arcname)
+    payload = payload_buffer.getvalue()
+    remote_tar_path = f"/tmp/cockpit_iq_decode_assets_{os.getpid()}_{int(time.time() * 1000)}.tar.gz"
+    upload_command = (
+        f"set -e; mkdir -p {shlex.quote(remote_root)}; "
+        f"cat > {shlex.quote(remote_tar_path)}; "
+        f"tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_root)}; "
+        f"rm -f {shlex.quote(remote_tar_path)}"
+    )
+    ssh_result = _run_remote_command(access, upload_command, timeout=30.0, input_data=payload)
+    if ssh_result.returncode != 0:
+        detail = (
+            ssh_result.stderr.decode("utf-8", errors="ignore").strip()
+            or ssh_result.stdout.decode("utf-8", errors="ignore").strip()
+            or f"ssh rc={ssh_result.returncode}"
+        )
+        raise RuntimeError(f"IQ remote-decode 资产上传/解包失败: {detail}")
+    return {
+        "status": "uploaded",
+        "remote_project_root": remote_root,
+        "uploaded_bytes": len(payload),
+        "files": [arcname for _, arcname in assets],
+    }
+
+
 def _normalize_inference_engine(raw_value: str) -> str:
     value = str(raw_value or "").strip().lower()
     if not value:
@@ -1593,6 +1674,31 @@ def _count_processed_from_results(results: list[dict[str, Any]]) -> int:
         if rounds > 0 or merge_summary:
             processed += 1
     return processed
+
+
+def _count_progress_from_image_dirs(run_dir: Path) -> dict[str, int]:
+    processed = 0
+    passed = 0
+    try:
+        image_dirs = sorted(path for path in run_dir.glob("image_*") if path.is_dir())
+    except OSError:
+        return {"processed": 0, "pass_count": 0}
+
+    for image_dir in image_dirs:
+        summary_path = image_dir / "decode_summary.json"
+        if not summary_path.is_file():
+            continue
+        processed += 1
+        summary = _safe_read_json(summary_path)
+        status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+        has_payload = (
+            (image_dir / "received_latent.npz").is_file()
+            or (image_dir / "merged_round0.bin").is_file()
+            or bool(summary.get("frame_complete"))
+        )
+        if status_ok and has_payload:
+            passed += 1
+    return {"processed": processed, "pass_count": passed}
 
 
 def _parse_progress_from_log(log_path: Path, *, fallback_target: int) -> dict[str, int]:
@@ -1838,7 +1944,7 @@ class UsrpBatchSpoolJob:
             self._tx_control_host = tx_host
             self._tx_control_port = tx_port
             if rx_host == access.host:
-                default_rx_capture_mode = "remote-pull" if self._link_mode == LINK_MODE_IQ_DIRECT else "remote-decode"
+                default_rx_capture_mode = "remote-decode"
             else:
                 default_rx_capture_mode = "local"
             rx_capture_mode = _first_value(env_values, RX_CAPTURE_MODE_KEYS, default_rx_capture_mode)
@@ -1850,6 +1956,20 @@ class UsrpBatchSpoolJob:
                 REMOTE_DECODE_BIN_KEYS,
                 f"{remote_project_root.rstrip('/')}/USRP292x/QpskFileDecode",
             )
+            iq_decode_asset_sync: dict[str, Any] | None = None
+            if self._link_mode == LINK_MODE_IQ_DIRECT and rx_capture_mode == "remote-decode":
+                try:
+                    iq_decode_asset_sync = _sync_iq_decode_assets_on_remote(
+                        access,
+                        remote_project_root=remote_project_root,
+                    )
+                except Exception as exc:
+                    self._final_snapshot = self._build_terminal_snapshot(
+                        status="config_error",
+                        status_category="config_error",
+                        message=f"IQ remote-decode 资产同步失败: {exc}",
+                    )
+                    return
             auto_start_control = _parse_bool(_first_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"), True)
             control_ready, control_diagnostics = _ensure_usrp_control_servers(
                 access,
@@ -1864,6 +1984,8 @@ class UsrpBatchSpoolJob:
                 log_dir=REPO_ROOT / "USRP292x" / "server_logs",
             )
             self._control_server_diagnostics = control_diagnostics
+            if iq_decode_asset_sync is not None:
+                self._control_server_diagnostics["iq_decode_asset_sync"] = iq_decode_asset_sync
             if not control_ready:
                 rx_response = str(control_diagnostics.get("rx_control", {}).get("final_response") or "")
                 tx_response = str(control_diagnostics.get("tx_control", {}).get("final_response") or "")
@@ -2007,6 +2129,9 @@ class UsrpBatchSpoolJob:
         env["PYTHONUNBUFFERED"] = "1"
         env.setdefault("REMOTE_USRP_PROJECT_ROOT", remote_project_root)
         env.setdefault("USRP_REMOTE_PROJECT_ROOT", remote_project_root)
+        remote_decode_python = _first_value(env_values, REMOTE_DECODE_PYTHON_KEYS)
+        if remote_decode_python:
+            env.setdefault("REMOTE_DECODE_PYTHON", remote_decode_python)
         if access.password:
             env.setdefault("SSHPASS", access.password)
 
@@ -2105,6 +2230,11 @@ class UsrpBatchSpoolJob:
         robust_cfo_step = _first_value(env_values, ANALOG_ROBUST_CFO_STEP_HZ_KEYS)
         if robust_cfo_step:
             args.extend(["--robust-cfo-step-hz", str(_parse_float(robust_cfo_step, 500.0))])
+        sync_search_window = _first_value(env_values, ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if sync_search_window:
+            args.extend(["--sync-search-window-symbols", str(_parse_int(sync_search_window, 4096))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--sync-search-window-symbols", "4096"])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
         if scramble_key:
@@ -2663,6 +2793,9 @@ class UsrpBatchSpoolJob:
         log_progress = _parse_progress_from_log(self._log_path, fallback_target=target_count)
         processed_count = max(processed_count, int(log_progress.get("processed") or 0))
         pass_count = max(pass_count, int(log_progress.get("pass_count") or 0))
+        image_dir_progress = _count_progress_from_image_dirs(self._run_dir)
+        processed_count = max(processed_count, int(image_dir_progress.get("processed") or 0))
+        pass_count = max(pass_count, int(image_dir_progress.get("pass_count") or 0))
         percent = int(round((processed_count / target_count) * 100)) if target_count > 0 else 0
         with self._lock:
             phase = self._phase

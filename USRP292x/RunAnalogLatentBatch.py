@@ -194,10 +194,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
     parser.add_argument("--robust-cfo-max-hz", type=float, default=env_float("ANALOG_ROBUST_CFO_MAX_HZ", 8000.0))
     parser.add_argument("--robust-cfo-step-hz", type=float, default=env_float("ANALOG_ROBUST_CFO_STEP_HZ", 500.0))
+    parser.add_argument("--sync-search-window-symbols", type=int, default=env_int("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS", 4096))
     args = parser.parse_args()
     if args.count < 1:
         raise RuntimeError("--count must be positive")
     return args
+
+
+def sync_search_center_symbol(args: argparse.Namespace) -> int:
+    delay_symbols = int(round(float(getattr(args, "tx_delay_sec", 0.0)) * float(args.rate) / float(args.sps)))
+    guard_symbols = int(getattr(args, "zero_guard_samples", 0)) // max(int(args.sps), 1)
+    cfo_symbols = 2 * int(getattr(args, "cfo_pilot_symbols", 0))
+    return max(0, delay_symbols + guard_symbols + cfo_symbols)
+
+
+def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
+    window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
+    if window_symbols <= 0 or bool(getattr(args, "dry_run", False)):
+        return
+    cmd.extend(["--sync-search-window-symbols", str(window_symbols)])
 
 
 def _validate_rx_capture_config(args: argparse.Namespace) -> None:
@@ -817,6 +832,7 @@ def remote_analog_decode_args(
         "--robust-cfo-step-hz",
         str(args.robust_cfo_step_hz),
     ]
+    append_sync_search_window_args(cmd, args)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
     if args.scramble_key:
         cmd.extend(["--scramble-key", str(args.scramble_key)])
@@ -846,6 +862,10 @@ def analog_decode_namespace(
         robust_sync=bool(args.robust_sync),
         robust_cfo_max_hz=float(args.robust_cfo_max_hz),
         robust_cfo_step_hz=float(args.robust_cfo_step_hz),
+        sync_search_center_symbol=-1,
+        sync_search_window_symbols=0
+        if bool(getattr(args, "dry_run", False))
+        else int(getattr(args, "sync_search_window_symbols", 0) or 0),
         scramble_key=str(getattr(args, "scramble_key", "") or ""),
         scramble_key_hex=str(getattr(args, "scramble_key_hex", "") or ""),
         scramble_context=str(getattr(args, "scramble_context", "") or ""),

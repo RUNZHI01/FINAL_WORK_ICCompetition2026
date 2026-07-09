@@ -115,6 +115,99 @@ def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
 
 
+def test_find_sync_candidates_respects_symbol_search_window():
+    sps = 4
+    sync = analog.make_pilot_symbols(32, 1002)
+    mf = np.zeros(500 * sps, dtype=np.complex64)
+    mf[80 * sps:(80 + sync.size) * sps:sps] = (4.0 * sync).astype(np.complex64)
+    mf[260 * sps:(260 + sync.size) * sps:sps] = sync
+
+    candidates = analog.find_sync_candidates(
+        mf,
+        sync,
+        sps,
+        max_candidates=1,
+        search_center_symbol=260,
+        search_window_symbols=64,
+    )
+
+    assert candidates
+    assert candidates[0]["sync_start"] == 260
+
+
+def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path):
+    rng = np.random.default_rng(321)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    rx_sc16 = tmp_path / "rx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    out_wire = tmp_path / "merged_round0.bin"
+    summary = tmp_path / "decode_summary.json"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            job_id="windowed",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=256,
+            tail_guard_samples=256,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=256,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+    prefix = np.zeros(12000, dtype=np.int16)
+    suffix = np.zeros(8000, dtype=np.int16)
+    tx_raw = np.fromfile(tx_sc16, dtype=np.int16)
+    np.concatenate([prefix, tx_raw, suffix]).astype(np.int16).tofile(rx_sc16)
+
+    result = analog.decode_waveform(
+        Namespace(
+            rx_sc16=str(rx_sc16),
+            manifest=str(manifest),
+            out_npz=str(out_npz),
+            out_wire=str(out_wire),
+            summary_json=str(summary),
+            sync_candidates=12,
+            min_sync_metric=0.25,
+            robust_sync=True,
+            robust_cfo_max_hz=8000.0,
+            robust_cfo_step_hz=500.0,
+            sync_search_center_symbol=-1,
+            sync_search_window_symbols=256,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    assert result["sync_success"] is True
+    assert result["sync_search_window_enabled"] is True
+    assert result["sync_search_center_source"] == "burst_power"
+    assert result["sync_search_cropped_samples"] < result["sync_search_original_samples"]
+    with np.load(out_npz) as payload:
+        recovered = payload["latent"]
+    assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
+
+
 def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):
     latent = np.linspace(-0.5, 0.5, num=1 * 4 * 4 * 4, dtype=np.float32).reshape(1, 4, 4, 4)
     input_dir = tmp_path / "inputs"
@@ -294,6 +387,12 @@ def test_remote_analog_decode_args_sets_pythonpath_for_board_layout(monkeypatch)
         scramble_key="",
         scramble_key_hex="",
         scramble_context="",
+        tx_delay_sec=0.010,
+        rate=5_000_000.0,
+        sps=16,
+        zero_guard_samples=4096,
+        cfo_pilot_symbols=1024,
+        sync_search_window_symbols=4096,
     )
 
     argv = analog_batch.remote_analog_decode_args(
@@ -311,6 +410,11 @@ def test_remote_analog_decode_args_sets_pythonpath_for_board_layout(monkeypatch)
         "python3",
         "/home/user/USRP292x/AnalogLatentLink.py",
     ]
+    assert "--sync-search-center-symbol" not in argv
+    assert "--sync-search-window-symbols" in argv
+    assert argv.count("--sync-search-window-symbols") == 1
+    window_index = argv.index("--sync-search-window-symbols") + 1
+    assert argv[window_index] == "4096"
 
 
 def test_cleanup_remote_file_treats_timeout_as_best_effort_failure(tmp_path, monkeypatch):

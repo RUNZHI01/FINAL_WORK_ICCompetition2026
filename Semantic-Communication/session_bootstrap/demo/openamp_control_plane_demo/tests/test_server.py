@@ -3784,6 +3784,49 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(summary["pending_count"], 260)
         self.assertFalse(summary["all_pass"])
 
+    def test_usrp_snapshot_counts_completed_image_dirs_before_summary_exists(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=3)
+
+            for index in (0, 1):
+                image_dir = job._run_dir / f"image_{index:04d}"
+                image_dir.mkdir(parents=True)
+                (image_dir / "decode_summary.json").write_text('{"status":"ok"}', encoding="utf-8")
+                (image_dir / "received_latent.npz").write_bytes(b"npz")
+
+            with job._lock:
+                job._phase = "transport"
+                job._host_preprocess_completed = 3
+                job._host_preprocess_state = "completed"
+
+            snapshot = job.snapshot()
+
+        self.assertEqual(snapshot["progress"]["count_label"], "2 / 3")
+        self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 2)
+
     def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             fake_proc = Mock(pid=4242)
@@ -3884,6 +3927,7 @@ class ServerMainTest(unittest.TestCase):
                 patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
                 patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
                 patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
                 patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
                 patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
             ):
@@ -3942,7 +3986,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(calls[0][1]["env"]["SSHPASS"], "demo-pass")
         self.assertEqual(payload["decode_manifest"]["decoded_count"], 1)
 
-    def test_usrp_iq_direct_runner_command_maps_tx_paths_for_docker(self) -> None:
+    def test_usrp_iq_direct_runner_command_defaults_to_remote_decode(self) -> None:
         class FakeThread:
             def __init__(self, *, target, daemon=False):
                 self.target = target
@@ -3967,6 +4011,7 @@ class ServerMainTest(unittest.TestCase):
                     "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
                     "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
                     "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_DEMO_REMOTE_DECODE_PYTHON": "/home/user/venv/bin/python",
                     "OPENAMP_USRP_TX_RUNNER": "docker",
                     "USRP_RUN_ROOT": str(temp_dir / "runs"),
                 },
@@ -3983,6 +4028,7 @@ class ServerMainTest(unittest.TestCase):
                 patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
                 patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
                 patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
                 patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
                 patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
             ):
@@ -3996,12 +4042,144 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--tx-file-path-prefix-to", command)
         self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
         self.assertIn("--rx-capture-mode", command)
-        self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-pull")
+        self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-decode")
         self.assertIn("--sps", command)
         self.assertEqual(command[command.index("--sps") + 1], "16")
         self.assertIn("--amp", command)
         self.assertEqual(command[command.index("--amp") + 1], "24000")
+        self.assertIn("--sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--sync-search-window-symbols") + 1], "4096")
         self.assertEqual(job._runner_env["REMOTE_USRP_PROJECT_ROOT"], "/home/user")
+        self.assertEqual(job._runner_env["REMOTE_DECODE_PYTHON"], "/home/user/venv/bin/python")
+        sync_decode_assets.assert_called_once()
+        _, sync_kwargs = sync_decode_assets.call_args
+        self.assertEqual(sync_kwargs["remote_project_root"], "/home/user")
+
+    def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "RX_CAPTURE_MODE": "remote-pull",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+
+        command = job._runner_command
+        self.assertIn("--rx-capture-mode", command)
+        self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-pull")
+        sync_decode_assets.assert_not_called()
+
+    def test_sync_iq_decode_assets_skips_upload_when_remote_hashes_match(self) -> None:
+        import hashlib
+
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        asset_pairs = (
+            (usrp_runtime.REPO_ROOT / "USRP292x" / "AnalogLatentLink.py", "/home/user/USRP292x/AnalogLatentLink.py"),
+            (usrp_runtime.ROOT_SCRIPTS / "latent_transport.py", "/home/user/scripts/latent_transport.py"),
+        )
+        stdout = "".join(
+            f"{hashlib.sha256(local_path.read_bytes()).hexdigest()}  {remote_path}\n"
+            for local_path, remote_path in asset_pairs
+        ).encode("utf-8")
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **_kwargs):
+            calls.append(list(cmd))
+            if "scp" in cmd:
+                raise AssertionError("matching remote IQ assets should not be uploaded")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=stdout, stderr=b"")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            result = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+
+        self.assertEqual(result["status"], "current")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], usrp_runtime.resolve_bash_executable())
+        self.assertEqual(calls[0][1], str(usrp_runtime.SSH_HELPER))
+        self.assertIn("sha256sum", calls[0][-1])
+
+    def test_sync_iq_decode_assets_uploads_tar_through_ssh_helper(self) -> None:
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append((list(cmd), dict(kwargs)))
+            self.assertNotIn("scp", cmd)
+            if len(calls) == 1:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+            self.assertGreater(len(kwargs.get("input") or b""), 0)
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            result = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+
+        self.assertEqual(result["status"], "uploaded")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][0][0], usrp_runtime.resolve_bash_executable())
+        self.assertEqual(calls[1][0][1], str(usrp_runtime.SSH_HELPER))
+        self.assertIn("tar xzf", calls[1][0][-1])
 
     def test_main_builds_server_and_serves_without_startup_probe(self) -> None:
         args = Namespace(

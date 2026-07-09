@@ -285,6 +285,8 @@ def find_sync_candidates(
     *,
     max_candidates: int = DEFAULT_SYNC_CANDIDATES,
     manifest: dict[str, Any] | None = None,
+    search_center_symbol: int | None = None,
+    search_window_symbols: int = 0,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     sync_energy = float(np.vdot(sync, sync).real)
@@ -295,7 +297,17 @@ def find_sync_candidates(
         stream = mf[phase:: int(sps)]
         if stream.size < sync.size:
             continue
-        corr = np.abs(np.correlate(stream, sync, mode="valid"))
+        valid_count = int(stream.size - sync.size + 1)
+        search_start = 0
+        search_end = valid_count
+        if search_center_symbol is not None and int(search_window_symbols) > 0:
+            half_window = max(1, int(search_window_symbols)) // 2
+            search_start = max(0, int(search_center_symbol) - half_window)
+            search_end = min(valid_count, int(search_center_symbol) + half_window + 1)
+            if search_end <= search_start:
+                continue
+        search_stream = stream[search_start:search_end + sync.size - 1]
+        corr = np.abs(np.correlate(search_stream, sync, mode="valid"))
         if corr.size == 0:
             continue
         take = min(max(1, int(max_candidates)), int(corr.size))
@@ -304,16 +316,19 @@ def find_sync_candidates(
         else:
             top_indices = np.argpartition(corr, -take)[-take:]
         for raw_idx in top_indices:
-            idx = int(raw_idx)
+            corr_idx = int(raw_idx)
+            idx = corr_idx + search_start
             window = stream[idx:idx + sync.size]
             rx_energy = float(np.vdot(window, window).real)
-            metric = float(corr[idx] / math.sqrt(max(rx_energy * sync_energy, EPS)))
+            metric = float(corr[corr_idx] / math.sqrt(max(rx_energy * sync_energy, EPS)))
             candidate = {
                 "phase": int(phase),
                 "sync_start": idx,
                 "sync_metric": metric,
-                "sync_corr": float(corr[idx]),
+                "sync_corr": float(corr[corr_idx]),
                 "sym_stream": stream,
+                "search_start_symbol": int(search_start),
+                "search_end_symbol": int(search_end),
             }
             candidates.append(annotate_sync_candidate(candidate, manifest))
 
@@ -333,6 +348,90 @@ def find_sync(mf: np.ndarray, sync: np.ndarray, sps: int, manifest: dict[str, An
     if not candidates:
         raise RuntimeError("sync search failed: capture shorter than sync pilot")
     return candidates[0]
+
+
+def crop_rx_for_sync_window(
+    rx: np.ndarray,
+    manifest: dict[str, Any],
+    taps: np.ndarray,
+    *,
+    search_center_symbol: int | None,
+    search_window_symbols: int,
+    sps: int,
+) -> tuple[np.ndarray, int, dict[str, Any]]:
+    if search_center_symbol is None or int(search_window_symbols) <= 0:
+        return rx, 0, {
+            "sync_search_window_enabled": False,
+        }
+
+    total_symbols = int(math.ceil(float(rx.size) / float(max(int(sps), 1))))
+    half_window = max(1, int(search_window_symbols)) // 2
+    center = max(0, int(search_center_symbol))
+    search_start = max(0, center - half_window)
+    search_end = min(total_symbols, center + half_window + 1)
+    cfo_len = int(manifest.get("cfo_pilot_symbols") or 0)
+    pre_symbols = max(2 * cfo_len + 256, 256)
+    post_symbols = max(expected_symbols_after_sync(manifest) + 256, 256)
+    crop_start_symbol = max(0, search_start - pre_symbols)
+    crop_end_symbol = min(total_symbols, search_end + post_symbols)
+
+    tap_margin = int(max(taps.size, 1))
+    sample_start = max(0, crop_start_symbol * int(sps) - tap_margin)
+    sample_start -= sample_start % max(int(sps), 1)
+    sample_end = min(int(rx.size), crop_end_symbol * int(sps) + tap_margin)
+    if sample_end <= sample_start:
+        return rx, 0, {
+            "sync_search_window_enabled": False,
+            "sync_search_window_error": "empty crop",
+        }
+
+    symbol_offset = int(sample_start // max(int(sps), 1))
+    return rx[sample_start:sample_end].astype(np.complex64, copy=False), symbol_offset, {
+        "sync_search_window_enabled": True,
+        "sync_search_center_symbol": int(center),
+        "sync_search_center_source": "manual",
+        "sync_search_window_symbols": int(search_window_symbols),
+        "sync_search_crop_start_symbol": int(symbol_offset),
+        "sync_search_crop_end_symbol": int(math.ceil(float(sample_end) / float(max(int(sps), 1)))),
+        "sync_search_original_samples": int(rx.size),
+        "sync_search_cropped_samples": int(sample_end - sample_start),
+    }
+
+
+def estimate_sync_center_from_burst_power(rx: np.ndarray, manifest: dict[str, Any], *, sps: int) -> tuple[int | None, dict[str, Any]]:
+    if rx.size == 0:
+        return None, {"sync_search_center_source": "none", "sync_search_center_error": "empty rx"}
+    window = max(64, int(sps) * 32)
+    power = np.square(np.abs(np.asarray(rx, dtype=np.complex64))).astype(np.float32, copy=False)
+    if power.size < window:
+        return None, {"sync_search_center_source": "none", "sync_search_center_error": "rx shorter than power window"}
+    cumsum = np.concatenate([np.zeros(1, dtype=np.float64), np.cumsum(power, dtype=np.float64)])
+    smooth = (cumsum[window:] - cumsum[:-window]) / float(window)
+    if smooth.size == 0:
+        return None, {"sync_search_center_source": "none", "sync_search_center_error": "empty power envelope"}
+    peak = float(np.max(smooth))
+    if peak <= EPS:
+        return None, {"sync_search_center_source": "none", "sync_search_center_error": "zero power envelope"}
+    floor = float(np.median(smooth))
+    threshold = max(peak * 0.05, floor * 8.0)
+    active = np.flatnonzero(smooth >= threshold)
+    if active.size == 0:
+        return None, {
+            "sync_search_center_source": "none",
+            "sync_search_center_error": "burst threshold not crossed",
+            "sync_search_burst_power_peak": peak,
+            "sync_search_burst_power_floor": floor,
+            "sync_search_burst_power_threshold": threshold,
+        }
+    active_start_sample = max(0, int(active[0]) - window // 2)
+    center = active_start_sample // max(int(sps), 1) + 2 * int(manifest.get("cfo_pilot_symbols") or 0)
+    return int(center), {
+        "sync_search_center_source": "burst_power",
+        "sync_search_burst_start_sample": int(active_start_sample),
+        "sync_search_burst_power_peak": peak,
+        "sync_search_burst_power_floor": floor,
+        "sync_search_burst_power_threshold": threshold,
+    }
 
 
 def estimate_cfo_from_repeated_pilot(sym_stream: np.ndarray, sync_start: int, cfo_len: int, rate: float, sps: int) -> float:
@@ -777,13 +876,36 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     max_candidates = int(getattr(args, "sync_candidates", DEFAULT_SYNC_CANDIDATES))
     min_sync_metric = float(getattr(args, "min_sync_metric", DEFAULT_MIN_SYNC_METRIC))
     robust_enabled = bool(getattr(args, "robust_sync", True))
-    mf0 = matched_filter(rx_dc, taps)
+    raw_search_center = int(getattr(args, "sync_search_center_symbol", -1))
+    search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
+    search_center_symbol = raw_search_center if raw_search_center >= 0 and search_window_symbols > 0 else None
+    center_metrics: dict[str, Any] = {}
+    if search_center_symbol is None and search_window_symbols > 0:
+        search_center_symbol, center_metrics = estimate_sync_center_from_burst_power(rx_dc, manifest, sps=sps)
+    rx_search, sync_symbol_offset, crop_metrics = crop_rx_for_sync_window(
+        rx_dc,
+        manifest,
+        taps,
+        search_center_symbol=search_center_symbol,
+        search_window_symbols=search_window_symbols,
+        sps=sps,
+    )
+    if center_metrics:
+        crop_metrics.update(center_metrics)
+    local_search_center = (
+        max(0, int(search_center_symbol) - int(sync_symbol_offset))
+        if search_center_symbol is not None
+        else None
+    )
+    mf0 = matched_filter(rx_search, taps)
     initial_candidates = find_sync_candidates(
         mf0,
         sync,
         sps,
         max_candidates=max_candidates,
         manifest=manifest,
+        search_center_symbol=local_search_center,
+        search_window_symbols=search_window_symbols,
     )
     if not initial_candidates:
         raise RuntimeError("initial sync search failed")
@@ -806,7 +928,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     }
     try:
         payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
-            rx_dc,
+            rx_search,
             taps,
             sync,
             manifest,
@@ -815,13 +937,15 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             sps=sps,
             max_candidates=max_candidates,
             min_sync_metric=min_sync_metric,
+            search_center_symbol=local_search_center,
+            search_window_symbols=search_window_symbols,
         )
     except RuntimeError as normal_exc:
         recovered_after_cfo_reject = False
         if abs(estimated_cfo_hz) >= 5.0 and float(sync0["sync_metric"]) >= min_sync_metric:
             try:
                 payload_symbols, payload_metrics, sync_final = recover_payload_with_fixed_cfo(
-                    rx_dc,
+                    rx_search,
                     taps,
                     sync,
                     manifest,
@@ -830,6 +954,8 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
                     sps=sps,
                     max_candidates=max_candidates,
                     min_sync_metric=min_sync_metric,
+                    search_center_symbol=local_search_center,
+                    search_window_symbols=search_window_symbols,
                 )
                 sync_debug["rejected_cfo_hz"] = float(estimated_cfo_hz)
                 sync_debug["rejected_cfo_error"] = str(normal_exc)
@@ -845,7 +971,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             raise
         if not recovered_after_cfo_reject and robust_enabled:
             payload_symbols, payload_metrics, sync_final, estimated_cfo_hz, cfo_method, sync_debug = robust_cfo_grid_recover(
-                rx_dc,
+                rx_search,
                 taps,
                 sync,
                 manifest,
@@ -855,9 +981,16 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
                 min_sync_metric=min_sync_metric,
                 cfo_max_hz=float(getattr(args, "robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
                 cfo_step_hz=float(getattr(args, "robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
+                search_center_symbol=local_search_center,
+                search_window_symbols=search_window_symbols,
             )
             sync_debug["normal_sync_error"] = str(normal_exc)
             sync_search_mode = str(sync_debug["sync_search_mode"])
+    if sync_symbol_offset:
+        payload_metrics["data_start_symbol_local"] = int(payload_metrics.get("data_start_symbol", 0))
+        payload_metrics["data_end_symbol_local"] = int(payload_metrics.get("data_end_symbol", 0))
+        payload_metrics["data_start_symbol"] = int(payload_metrics.get("data_start_symbol", 0)) + int(sync_symbol_offset)
+        payload_metrics["data_end_symbol"] = int(payload_metrics.get("data_end_symbol", 0)) + int(sync_symbol_offset)
     n_complex = int(manifest["n_complex"])
     if payload_symbols.size < n_complex:
         raise RuntimeError(f"recovered {payload_symbols.size} symbols, expected {n_complex}")
@@ -894,7 +1027,9 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "sample_rate": rate,
         "sps": sps,
         "sync_phase": int(sync_final["phase"]),
-        "sync_start_symbol": int(sync_final["sync_start"]),
+        "sync_start_symbol": int(sync_final["sync_start"]) + int(sync_symbol_offset),
+        "sync_start_symbol_local": int(sync_final["sync_start"]),
+        "sync_symbol_offset": int(sync_symbol_offset),
         "sync_metric": float(sync_final["sync_metric"]),
         "initial_sync_metric": float(sync0["sync_metric"]),
         "estimated_cfo_hz": float(estimated_cfo_hz),
@@ -916,6 +1051,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "latent_shape": list(latent_out.shape),
         "detected_airtime_ms": float(1000.0 * int(manifest["tx_waveform_samples"]) / rate),
     }
+    summary.update(crop_metrics)
     summary.update(sync_debug)
     summary.update(payload_metrics)
     summary.update(scrambling_metrics)
@@ -1002,6 +1138,8 @@ def recover_payload_with_fixed_cfo(
     sps: int,
     max_candidates: int,
     min_sync_metric: float,
+    search_center_symbol: int | None = None,
+    search_window_symbols: int = 0,
 ) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
     rx_corr = correct_cfo(rx_dc, cfo_hz, rate)
     mf = matched_filter(rx_corr, taps)
@@ -1011,6 +1149,8 @@ def recover_payload_with_fixed_cfo(
         sps,
         max_candidates=max_candidates,
         manifest=manifest,
+        search_center_symbol=search_center_symbol,
+        search_window_symbols=search_window_symbols,
     )
     if not candidates:
         raise RuntimeError("sync search failed after CFO correction")
@@ -1068,6 +1208,8 @@ def robust_cfo_grid_recover(
     min_sync_metric: float,
     cfo_max_hz: float,
     cfo_step_hz: float,
+    search_center_symbol: int | None = None,
+    search_window_symbols: int = 0,
 ) -> tuple[np.ndarray, dict[str, Any], dict[str, Any], float, str, dict[str, Any]]:
     cfo_len = int(manifest["cfo_pilot_symbols"])
     cfo_seed = int(manifest["cfo_seed"])
@@ -1082,6 +1224,8 @@ def robust_cfo_grid_recover(
             sps,
             max_candidates=max(2, min(max_candidates, 4)),
             manifest=manifest,
+            search_center_symbol=search_center_symbol,
+            search_window_symbols=search_window_symbols,
         )
         for candidate in candidates:
             if not bool(candidate.get("frame_complete", True)):
@@ -1121,6 +1265,8 @@ def robust_cfo_grid_recover(
                 sps=sps,
                 max_candidates=max_candidates,
                 min_sync_metric=min_sync_metric,
+                search_center_symbol=search_center_symbol,
+                search_window_symbols=search_window_symbols,
             )
             payload_metrics.update({
                 "robust_probe_count": int(len(probes)),
@@ -1192,6 +1338,8 @@ def parse_args() -> argparse.Namespace:
     decode.add_argument("--no-robust-sync", dest="robust_sync", action="store_false")
     decode.add_argument("--robust-cfo-max-hz", type=float, default=DEFAULT_ROBUST_CFO_MAX_HZ)
     decode.add_argument("--robust-cfo-step-hz", type=float, default=DEFAULT_ROBUST_CFO_STEP_HZ)
+    decode.add_argument("--sync-search-center-symbol", type=int, default=-1)
+    decode.add_argument("--sync-search-window-symbols", type=int, default=0)
     add_scrambling_args(decode)
 
     simulate = sub.add_parser("simulate-channel")

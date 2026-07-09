@@ -7,7 +7,8 @@
 ```powershell
 $env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
 $env:GIT_BASH=$env:OPENAMP_BASH
-$env:OPENAMP_SSH_RUNNER="local"
+$env:OPENAMP_SSH_RUNNER="docker"
+$env:OPENAMP_SSH_DOCKER_IMAGE="iccomp-usrp-tx:latest"
 $env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER="1"
 $env:OPENAMP_USRP_TX_RUNNER="docker"
 $env:OPENAMP_USRP_TX_DOCKER_IMAGE="iccomp-usrp-tx:latest"
@@ -17,6 +18,8 @@ $env:REMOTE_USER="user"
 $env:REMOTE_PASS="user"
 $env:REMOTE_SSH_PORT="22"
 $env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
+$env:REMOTE_RX_RUN_ROOT="/tmp/usrp292x_remote_runs"
+$env:REMOTE_USRP_PROJECT_ROOT="/home/user"
 $env:REMOTE_USRP_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON="/home/user/venv/bin/python"
 $env:JSCC_LINK_MODE="iq-direct"
@@ -24,6 +27,7 @@ $env:ANALOG_SPS="16"
 $env:ANALOG_AMPLITUDE="24000"
 $env:ANALOG_RX_TAIL_SEC="0.12"
 $env:ANALOG_REMOTE_CLEANUP_MODE="async"
+$env:ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
 $env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
 $env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
 $env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
@@ -31,7 +35,7 @@ $env:OPENAMP_TVM_BATCH_EXIT_GRACE_SEC="0.5"
 $env:MLKEM_AUTH_ENABLED="0"
 ```
 
-TX bash/USRP 发送在 Docker 中运行；Windows 到板端 SSH 使用本机 `sshpass`，因为 Docker 容器通常拿不到 Tailscale 路由。板端 decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。
+TX bash/USRP 发送在 Docker 中运行；Windows 到板端 SSH 也优先走 `OPENAMP_SSH_RUNNER=docker`，避免 Git Bash/OpenSSH 子进程卡住。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。
 
 ## Start Cockpit Backend
 
@@ -49,6 +53,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
 
 ## Verified Milestones
 
+- 2026-07-09 live cockpit restart: after a clean backend/control restart, `OPENAMP_SSH_RUNNER=docker` reliably auto-started RX `100.121.87.73:29220` and TX `127.0.0.1:29221`. IQ remote-decode asset sync reported `status=current`, and the remote decode command used `/home/user/venv/bin/python`.
+- IQ direct remote-decode now uses board-side decode with `ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS=4096`. Live run `usrp-1783563177` completed the first frame with `frame_complete=true`, sync metric `0.8929`, RX capture `0.383 s`, TX send `0.055 s`, and `sync_search_window_enabled=true`. This proves the long-capture 37 s decode failure mode is removed; remaining latency is dominated by per-frame SSH/docker setup, remote file staging, and Python decode startup.
 - Prerecorded TVM big.LITTLE path: `openamp3_handwritten_mean4_v7_big_little_current_20260709_052201.json`, 300/300, median 243.30 ms, mean 252.91 ms, p95 311.88 ms. This is the 250 ms reproduction reference.
 - Cockpit USRP/IQ-direct + TVM big.LITTLE path after status-poll isolation: `batch-1783557824-1`, 1/1 success, fallback 0; TVM inference `262.916 ms`, artifact SHA matched, inferencer on big core `[2]`, pre/post on little cores `[0,1]`, PSNR `37.0445`, SSIM `0.97494`. The current cockpit `/api/batch-state` updates Compare/result state for this run.
 - Status polling no longer starts remote SSH refreshes while the session is in USRP transport mode. After loading this fix, repeated `/api/system-status` calls returned about `200-274 ms` and reported telemetry/USRP/position probes as `deferred`.
