@@ -27,6 +27,7 @@ def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     assert 'ANALOG_SPS="${ANALOG_SPS:-2}"' in script
     assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-6000}"' in script
     assert 'ANALOG_RX_TAIL_SEC="${ANALOG_RX_TAIL_SEC:-0.05}"' in script
+    assert 'ANALOG_RX_POST_QUANTIZE="${ANALOG_RX_POST_QUANTIZE:-0}"' in script
     assert 'PERSISTENT_RX_TX_DELAY="${PERSISTENT_RX_TX_DELAY:-0}"' in script
     assert 'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"' in script
     assert 'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"' in script
@@ -63,6 +64,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_SPS",
         "ANALOG_AMPLITUDE",
         "ANALOG_RX_TAIL_SEC",
+        "ANALOG_RX_POST_QUANTIZE",
         "PERSISTENT_RX_TX_DELAY",
         "ANALOG_REMOTE_CLEANUP_MODE",
         "ANALOG_REMOTE_DECODE_WORKER",
