@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SESSION_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_DIR="$(cd "$SESSION_DIR/.." && pwd)"
 PYTHON_RUNNER_SOURCE="$SCRIPT_DIR/big_little_pipeline.py"
+LOCAL_BASH="${BASH:-bash}"
 
 usage() {
   cat <<'EOF'
@@ -117,27 +118,25 @@ python_command_supports_modules() {
   local candidate="$1"
   shift
   [[ -z "$candidate" ]] && return 1
-  local probe_script
+  local probe_code
   local cmd
   local module
   local rc=0
-  probe_script="$(mktemp)"
-  cat >"$probe_script" <<'PY'
+  read -r -d '' probe_code <<'PY' || true
 import importlib
 import sys
 
 for name in sys.argv[1:]:
     importlib.import_module(name)
 PY
-  cmd="$candidate $(printf '%q' "$probe_script")"
+  cmd="$candidate -c $(printf '%q' "$probe_code")"
   for module in "$@"; do
     cmd+=" $(printf '%q' "$module")"
   done
   set +e
-  bash -lc "$cmd" >/dev/null 2>&1
+  "$LOCAL_BASH" -lc "$cmd" >/dev/null 2>&1
   rc=$?
   set -e
-  rm -f "$probe_script"
   return "$rc"
 }
 
@@ -236,7 +235,7 @@ if pipeline.get("errors"):
 
 report_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(json.dumps(payload, ensure_ascii=False))
+print(json.dumps(payload, ensure_ascii=True))
 PY
 }
 
@@ -542,7 +541,7 @@ run_remote_python() {
     cmd+=" $(printf '%q' "$arg")"
   done
   set +e
-  bash -c "$cmd" <"$stdin_payload"
+  "${BASH:-bash}" -c "$cmd" <"$stdin_payload"
   rc=$?
   set -e
   rm -f "$stdin_payload"
@@ -599,7 +598,7 @@ SH
     local REMOTE_RUNNER_SCRIPT
     REMOTE_RUNNER_SCRIPT="/tmp/openamp_big_little_runner_${RUN_ID}_$$.sh"
     set +e
-    bash "$SCRIPT_DIR/ssh_with_password.sh" \
+    "$LOCAL_BASH" "$SCRIPT_DIR/ssh_with_password.sh" \
       --host "$REMOTE_HOST" \
       --user "$REMOTE_USER" \
       --pass "$REMOTE_PASS" \
@@ -612,13 +611,13 @@ SH
       rm -f "$runner_script"
       return "$rc"
     fi
-    bash "$SCRIPT_DIR/ssh_with_password.sh" \
+    "$LOCAL_BASH" "$SCRIPT_DIR/ssh_with_password.sh" \
       --host "$REMOTE_HOST" \
       --user "$REMOTE_USER" \
       --pass "$REMOTE_PASS" \
       --port "${REMOTE_SSH_PORT:-22}" \
       -- \
-      "set -e; chmod 700 '$REMOTE_RUNNER_SCRIPT'; set +e; bash '$REMOTE_RUNNER_SCRIPT'; rc=\$?; rm -f '$REMOTE_RUNNER_SCRIPT'; exit \$rc"
+      "set -e; chmod 700 '$REMOTE_RUNNER_SCRIPT'; set +e; bash '$REMOTE_RUNNER_SCRIPT'; rc=\$?; rm -f '$REMOTE_RUNNER_SCRIPT'; exit \$rc" < /dev/null
     rc=$?
     set -e
     rm -f "$runner_script"
@@ -626,7 +625,7 @@ SH
   fi
 
   set +e
-  bash "$runner_script"
+  "$LOCAL_BASH" "$runner_script"
   rc=$?
   set -e
   rm -f "$runner_script"

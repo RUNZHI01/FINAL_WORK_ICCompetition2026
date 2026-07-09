@@ -109,10 +109,46 @@ def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
 
     assert summary_data["sync_success"] is True
     assert summary_data["payload_is_bit_exact"] is False
+    assert summary_data["decode_total_ms"] >= 0.0
+    assert "initial_sync" in summary_data["decode_timing_ms"]
     assert manifest_data["payload_is_bit_exact"] is False
     assert recovered.shape == latent.shape
     assert out_wire.is_file()
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
+
+
+def test_find_sync_candidates_uses_fft_for_large_search_when_available():
+    scipy_signal = analog.scipy_signal_module()
+    rng = np.random.default_rng(125)
+    sync = (
+        rng.standard_normal(1024).astype(np.float32)
+        + 1j * rng.standard_normal(1024).astype(np.float32)
+    ).astype(np.complex64)
+    sps = 4
+    phase = 2
+    sync_start = 700
+    stream = (
+        0.01 * rng.standard_normal(2400).astype(np.float32)
+        + 1j * 0.01 * rng.standard_normal(2400).astype(np.float32)
+    ).astype(np.complex64)
+    stream[sync_start:sync_start + sync.size] += sync
+    mf = np.zeros(stream.size * sps, dtype=np.complex64)
+    mf[phase::sps] = stream
+
+    candidates = analog.find_sync_candidates(
+        mf,
+        sync,
+        sps,
+        max_candidates=1,
+        search_center_symbol=sync_start,
+        search_window_symbols=1024,
+    )
+
+    assert candidates
+    assert candidates[0]["phase"] == phase
+    assert abs(candidates[0]["sync_start"] - sync_start) <= 1
+    expected_method = "scipy-fft" if scipy_signal is not None else "numpy-direct"
+    assert candidates[0]["sync_correlation_method"] == expected_method
 
 
 def test_decode_server_reuses_process_for_json_decode_command(tmp_path):
@@ -185,8 +221,10 @@ def test_decode_server_reuses_process_for_json_decode_command(tmp_path):
 
     assert proc.returncode == 0, stderr
     responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
-    assert responses[0]["status"] == "ok"
-    assert responses[0]["summary_json"] == str(summary)
+    assert responses[0]["status"] == "ready"
+    assert responses[1]["status"] == "ok"
+    assert responses[1]["summary_json"] == str(summary)
+    assert responses[1]["summary"]["sync_success"] is True
     assert responses[-1]["status"] == "bye"
     assert out_npz.is_file()
     assert out_wire.is_file()
@@ -238,7 +276,14 @@ def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
 
     responses: "queue.Queue[str]" = analog_batch.queue.Queue()
     responses.put(json.dumps({"status": "ok"}))
-    worker = analog_batch.RemoteAnalogDecodeWorker(FakeProc(), FakeHandle(), responses, None)
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        {"status": "ready"},
+        0.0,
+    )
 
     worker.decode(
         {"manifest_json": {"source_path": "E:/Main/Career/集创赛/input.bin"}},
@@ -472,6 +517,7 @@ def test_ssh_base_args_uses_docker_runner_when_requested(monkeypatch):
 
     assert args[:6] == ["docker", "run", "--rm", "-i", "-e", "SSHPASS"]
     assert "iccomp-usrp-tx:latest" in args
+    assert "LogLevel=ERROR" in args
     assert args[-4:] == ["-o", "ConnectTimeout=30", "-o", "PreferredAuthentications=password,keyboard-interactive"]
 
 
@@ -484,6 +530,7 @@ def test_ssh_base_args_uses_stable_password_options_for_local_runner(monkeypatch
     assert args[:3] == ["sshpass", "-e", "ssh"]
     assert "StrictHostKeyChecking=no" in args
     assert "UserKnownHostsFile=/dev/null" in args
+    assert "LogLevel=ERROR" in args
     assert "BatchMode=no" in args
     assert "ConnectTimeout=30" in args
     assert "PreferredAuthentications=password,keyboard-interactive" in args
@@ -565,6 +612,42 @@ def test_cleanup_remote_file_treats_timeout_as_best_effort_failure(tmp_path, mon
     )
 
     assert ok is False
+
+
+def test_run_external_timeout_kills_windows_process_tree(tmp_path, monkeypatch):
+    class HangingPopen:
+        pid = 23456
+        returncode = None
+
+        def __init__(self, command, **_kwargs):
+            self.args = command
+
+        def wait(self, timeout=None):
+            raise subprocess.TimeoutExpired(self.args, timeout)
+
+        def kill(self):
+            self.returncode = -9
+
+    taskkill_calls: list[list[str]] = []
+
+    def fake_taskkill(command, **_kwargs):
+        taskkill_calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(analog_batch.os, "name", "nt")
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", HangingPopen)
+    monkeypatch.setattr(analog_batch.subprocess, "run", fake_taskkill)
+
+    try:
+        analog_batch._run_external(["ssh", "demo"], tmp_path / "external.log", timeout=1.0)
+    except RuntimeError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("_run_external should raise for checked timeout")
+
+    assert "command failed (124)" in message
+    assert "TimeoutExpired: command timed out after 1.0s" in (tmp_path / "external.log").read_text(encoding="utf-8")
+    assert taskkill_calls == [["taskkill", "/F", "/T", "/PID", "23456"]]
 
 
 def test_push_file_to_remote_uses_ssh_stdin_with_docker_runner(tmp_path, monkeypatch):
@@ -955,7 +1038,15 @@ def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_p
         def decode(self, request, log_path, *, timeout):
             worker_requests.append(dict(request))
             log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
-            return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout="", stderr="")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {"status": "ok", "frame_complete": True, "sync_success": True},
+                }),
+                stderr="",
+            )
 
     args = Namespace(
         dry_run=False,
@@ -1029,7 +1120,15 @@ def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_l
         def decode(self, request, log_path, *, timeout):
             worker_requests.append(dict(request))
             log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
-            return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout="", stderr="")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {"status": "ok", "frame_complete": True, "sync_success": True},
+                }),
+                stderr="",
+            )
 
     args = Namespace(
         dry_run=False,
@@ -1072,11 +1171,7 @@ def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_l
 
     def fake_pull_files_from_remote_tar(_target, _remote_dir, remote_to_local, _log_path, **_kwargs):
         pulled.append(dict(remote_to_local))
-        assert list(remote_to_local) == ["decode_summary.json"]
-        remote_to_local["decode_summary.json"].write_text(
-            json.dumps({"status": "ok", "frame_complete": True, "sync_success": True}),
-            encoding="utf-8",
-        )
+        raise AssertionError("worker remote-dir mode should use inline summary instead of tar pull")
 
     monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
@@ -1091,7 +1186,8 @@ def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_l
     assert worker_requests[0]["out_npz"] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
     assert worker_requests[0]["out_wire"] == ""
     assert worker_requests[0]["manifest_json"]["job_id"] == "case0"
-    assert pulled and list(pulled[0]) == ["decode_summary.json"]
+    assert not pulled
+    assert json.loads((image.image_dir / "decode_summary.json").read_text(encoding="utf-8"))["sync_success"] is True
     assert not (image.image_dir / "received_latent.npz").exists()
     assert not (image.image_dir / "merged_round0.bin").exists()
     assert result.records[0]["remote_decoded_output_dir"] == "/home/user/cockpit_usrp_rx/run42_rx"

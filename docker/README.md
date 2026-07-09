@@ -75,13 +75,12 @@ MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 
 这一路用于恢复 cockpit desktop 下的 handwritten TVM + big.LITTLE 300 张测速口径。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`；报告位于 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
 
-如果不走 Docker cockpit、而是在 Windows 原生后端里临时调试，请不要调用 WSL 的 `bash.exe`。使用 Git Bash，并让密码 SSH helper 走 Docker runner：
+如果不走 Docker cockpit、而是在 Windows 原生后端里临时调试，请不要调用 WSL 的 `bash.exe`。使用 Git Bash，并让密码 SSH helper 走 Paramiko runner：
 
 ```powershell
 $env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
 $env:GIT_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
-$env:OPENAMP_SSH_RUNNER="docker"
-$env:OPENAMP_SSH_DOCKER_IMAGE="iccomp-usrp-tx:latest"
+$env:OPENAMP_SSH_RUNNER="paramiko"
 ```
 
 旧 WSLg 入口仍保留给已有 WSLg 环境使用；当前 Windows 现场不要走这条路径：

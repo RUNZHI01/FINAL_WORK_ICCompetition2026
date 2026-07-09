@@ -14,9 +14,31 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "session_bootstrap" / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
+
 PYTHON_RUNNER = SCRIPTS_DIR / "big_little_pipeline.py"
 WRAPPER_RUNNER = SCRIPTS_DIR / "run_big_little_pipeline.sh"
 COMPARE_RUNNER = SCRIPTS_DIR / "run_big_little_compare.sh"
+BASH = resolve_bash_executable()
+UTF8_ENV = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+
+
+def bash_path(path: str | Path) -> str:
+    if os.name != "nt":
+        return str(path)
+    completed = subprocess.run(
+        [BASH, "-lc", 'cygpath -u "$1"', "cygpath", str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return completed.stdout.strip()
+
 
 FAKE_REMOTE_CAPTURE = """=== BIG_LITTLE_LSCPU BEGIN ===
 Architecture:                         aarch64
@@ -59,6 +81,16 @@ def write_mock_artifact(path: Path) -> None:
 
 
 class BigLittlePipelineTest(unittest.TestCase):
+    def test_wrapper_remote_execute_closes_stdin_for_password_helper(self) -> None:
+        script = WRAPPER_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn('"umask 077; cat > \'$REMOTE_RUNNER_SCRIPT\'" <"$runner_script"', script)
+        self.assertIn(
+            '"set -e; chmod 700 \'$REMOTE_RUNNER_SCRIPT\'; set +e; bash \'$REMOTE_RUNNER_SCRIPT\'; '
+            'rc=\\$?; rm -f \'$REMOTE_RUNNER_SCRIPT\'; exit \\$rc" < /dev/null',
+            script,
+        )
+
     def test_python_runner_dry_run_writes_summary_outputs(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)
@@ -129,14 +161,14 @@ class BigLittlePipelineTest(unittest.TestCase):
             env_file.write_text(
                 "\n".join(
                     [
-                        f"LOG_DIR={shlex.quote(str(log_dir))}",
-                        f"REPORT_DIR={shlex.quote(str(report_dir))}",
+                        f"LOG_DIR={shlex.quote(bash_path(log_dir))}",
+                        f"REPORT_DIR={shlex.quote(bash_path(report_dir))}",
                         "REMOTE_MODE=local",
                         "REMOTE_TVM_PYTHON=/usr/bin/python3",
-                        f"REMOTE_LOCAL_PYTHON_CANDIDATES={shlex.quote(sys.executable)}",
-                        f"REMOTE_INPUT_DIR={shlex.quote(str(input_dir))}",
-                        f"REMOTE_OUTPUT_BASE={shlex.quote(str(output_base))}",
-                        f"REMOTE_CURRENT_ARTIFACT={shlex.quote(str(artifact_path))}",
+                        f"REMOTE_LOCAL_PYTHON_CANDIDATES={shlex.quote(bash_path(sys.executable))}",
+                        f"REMOTE_INPUT_DIR={shlex.quote(bash_path(input_dir))}",
+                        f"REMOTE_OUTPUT_BASE={shlex.quote(bash_path(output_base))}",
+                        f"REMOTE_CURRENT_ARTIFACT={shlex.quote(bash_path(artifact_path))}",
                         "REMOTE_SNR_CURRENT=12",
                         "REMOTE_BATCH_CURRENT=1",
                         "BIG_LITTLE_BIG_CORES=0",
@@ -158,10 +190,10 @@ class BigLittlePipelineTest(unittest.TestCase):
 
             completed = subprocess.run(
                 [
-                    "bash",
-                    str(WRAPPER_RUNNER),
+                    BASH,
+                    bash_path(WRAPPER_RUNNER),
                     "--env",
-                    str(env_file),
+                    bash_path(env_file),
                     "--variant",
                     "current",
                     "--run-id",
@@ -172,6 +204,9 @@ class BigLittlePipelineTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=UTF8_ENV,
             )
 
             payload = parse_last_json(completed.stdout)
@@ -184,8 +219,12 @@ class BigLittlePipelineTest(unittest.TestCase):
             log_file = log_dir / "unit_big_little_wrapper.log"
             self.assertTrue(report_json.is_file())
             self.assertTrue(report_md.is_file())
-            self.assertIn(f"resolved_remote_tvm_python={sys.executable}", log_file.read_text(encoding="utf-8"))
+            self.assertIn(
+                f"resolved_remote_tvm_python={bash_path(sys.executable)}",
+                log_file.read_text(encoding="utf-8"),
+            )
 
+    @unittest.skipUnless(COMPARE_RUNNER.is_file(), "run_big_little_compare.sh is not present")
     def test_compare_wrapper_local_mock_uses_serial_dry_run_fallback(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)
@@ -200,14 +239,14 @@ class BigLittlePipelineTest(unittest.TestCase):
             env_file.write_text(
                 "\n".join(
                     [
-                        f"LOG_DIR={shlex.quote(str(log_dir))}",
-                        f"REPORT_DIR={shlex.quote(str(report_dir))}",
+                        f"LOG_DIR={shlex.quote(bash_path(log_dir))}",
+                        f"REPORT_DIR={shlex.quote(bash_path(report_dir))}",
                         "REMOTE_MODE=local",
                         "REMOTE_TVM_PYTHON=/usr/bin/python3",
-                        f"REMOTE_LOCAL_PYTHON_CANDIDATES={shlex.quote(sys.executable)}",
-                        f"REMOTE_INPUT_DIR={shlex.quote(str(input_dir))}",
-                        f"REMOTE_OUTPUT_BASE={shlex.quote(str(output_base))}",
-                        f"REMOTE_CURRENT_ARTIFACT={shlex.quote(str(artifact_path))}",
+                        f"REMOTE_LOCAL_PYTHON_CANDIDATES={shlex.quote(bash_path(sys.executable))}",
+                        f"REMOTE_INPUT_DIR={shlex.quote(bash_path(input_dir))}",
+                        f"REMOTE_OUTPUT_BASE={shlex.quote(bash_path(output_base))}",
+                        f"REMOTE_CURRENT_ARTIFACT={shlex.quote(bash_path(artifact_path))}",
                         "REMOTE_SNR_CURRENT=12",
                         "REMOTE_BATCH_CURRENT=1",
                         "BIG_LITTLE_BIG_CORES=0",
@@ -227,10 +266,10 @@ class BigLittlePipelineTest(unittest.TestCase):
 
             completed = subprocess.run(
                 [
-                    "bash",
-                    str(COMPARE_RUNNER),
+                    BASH,
+                    bash_path(COMPARE_RUNNER),
                     "--env",
-                    str(env_file),
+                    bash_path(env_file),
                     "--run-id",
                     "unit_big_little_compare",
                     "--allow-overwrite",
@@ -239,6 +278,9 @@ class BigLittlePipelineTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=UTF8_ENV,
             )
 
             payload = parse_last_json(completed.stdout)
@@ -251,6 +293,7 @@ class BigLittlePipelineTest(unittest.TestCase):
             self.assertEqual(payload["board_state"]["capture_status"], "skipped")
             self.assertEqual(payload["board_state"]["capture_reason"], "REMOTE_MODE is not ssh")
 
+    @unittest.skipUnless(COMPARE_RUNNER.is_file(), "run_big_little_compare.sh is not present")
     def test_compare_wrapper_ssh_capture_records_board_state(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)
@@ -272,8 +315,8 @@ class BigLittlePipelineTest(unittest.TestCase):
             env_file.write_text(
                 "\n".join(
                     [
-                        f"LOG_DIR={shlex.quote(str(log_dir))}",
-                        f"REPORT_DIR={shlex.quote(str(report_dir))}",
+                        f"LOG_DIR={shlex.quote(bash_path(log_dir))}",
+                        f"REPORT_DIR={shlex.quote(bash_path(report_dir))}",
                         "REMOTE_MODE=ssh",
                         "REMOTE_HOST=fake-board",
                         "REMOTE_USER=fake-user",
@@ -291,10 +334,10 @@ class BigLittlePipelineTest(unittest.TestCase):
             pipeline_cmd = f"printf '%s\\n' {shlex.quote(json.dumps(pipeline_payload))}"
             completed = subprocess.run(
                 [
-                    "bash",
-                    str(COMPARE_RUNNER),
+                    BASH,
+                    bash_path(COMPARE_RUNNER),
                     "--env",
-                    str(env_file),
+                    bash_path(env_file),
                     "--run-id",
                     "unit_big_little_compare_remote_capture",
                     "--allow-overwrite",
@@ -307,8 +350,10 @@ class BigLittlePipelineTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 env={
-                    **os.environ,
+                    **UTF8_ENV,
                     "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
                 },
             )

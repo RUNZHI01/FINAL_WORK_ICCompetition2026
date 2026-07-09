@@ -22,6 +22,7 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import traceback
@@ -386,6 +387,8 @@ def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list
             "-o",
             "UserKnownHostsFile=/dev/null",
             "-o",
+            "LogLevel=ERROR",
+            "-o",
             "BatchMode=no",
             "-o",
             f"ConnectTimeout={timeout}",
@@ -403,6 +406,8 @@ def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list
             "-o",
             "UserKnownHostsFile=/dev/null",
             "-o",
+            "LogLevel=ERROR",
+            "-o",
             "BatchMode=no",
             "-o",
             f"ConnectTimeout={timeout}",
@@ -418,6 +423,8 @@ def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list
             "StrictHostKeyChecking=no",
             "-o",
             "UserKnownHostsFile=/dev/null",
+            "-o",
+            "LogLevel=ERROR",
             "-o",
             f"ConnectTimeout={timeout}",
         ]
@@ -438,6 +445,8 @@ def _scp_base_args(timeout: int = 10, control_socket: str | None = None) -> list
             "-o",
             "UserKnownHostsFile=/dev/null",
             "-o",
+            "LogLevel=ERROR",
+            "-o",
             "BatchMode=no",
             "-o",
             f"ConnectTimeout={timeout}",
@@ -453,6 +462,8 @@ def _scp_base_args(timeout: int = 10, control_socket: str | None = None) -> list
             "StrictHostKeyChecking=no",
             "-o",
             "UserKnownHostsFile=/dev/null",
+            "-o",
+            "LogLevel=ERROR",
             "-o",
             f"ConnectTimeout={timeout}",
         ]
@@ -507,16 +518,53 @@ def _ssh_start_control_master(target: str) -> subprocess.Popen | None:
 
 def _run_external(cmd: list[str], log_path: Path, *, check: bool = True, timeout: float = 60.0) -> subprocess.CompletedProcess[str]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        cmd,
-        cwd=PROJECT_ROOT,
-        env=os.environ.copy(),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-        timeout=timeout,
-    )
+    stdout_path: Path | None = None
+    proc: subprocess.Popen[Any] | None = None
+    timed_out = False
+    try:
+        with tempfile.NamedTemporaryFile("w+", encoding="utf-8", errors="replace", delete=False) as stdout_file:
+            stdout_path = Path(stdout_file.name)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=PROJECT_ROOT,
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                shell=False,
+            )
+            try:
+                returncode = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                try:
+                    if os.name == "nt":
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(getattr(proc, "pid", ""))],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            check=False,
+                        )
+                    else:
+                        proc.kill()
+                except Exception:
+                    pass
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+                returncode = 124
+        stdout = stdout_path.read_text(encoding="utf-8", errors="replace") if stdout_path.exists() else ""
+    finally:
+        if stdout_path is not None:
+            try:
+                stdout_path.unlink()
+            except OSError:
+                pass
+    if timed_out:
+        stdout = (stdout + f"\nTimeoutExpired: command timed out after {timeout:.1f}s\n").lstrip()
+    proc = subprocess.CompletedProcess(cmd, int(returncode or 0), stdout=stdout, stderr="")
     log_path.write_text(proc.stdout, encoding="utf-8")
     if check and proc.returncode != 0:
         raise RuntimeError(
@@ -820,11 +868,15 @@ class RemoteAnalogDecodeWorker:
         stderr_handle: Any,
         response_queue: queue.Queue[str],
         reader_thread: threading.Thread,
+        ready_response: dict[str, Any],
+        startup_wall_sec: float,
     ) -> None:
         self.proc = proc
         self._stderr_handle = stderr_handle
         self._responses = response_queue
         self._reader_thread = reader_thread
+        self.ready_response = ready_response
+        self.startup_wall_sec = startup_wall_sec
 
     @classmethod
     def start(
@@ -835,6 +887,7 @@ class RemoteAnalogDecodeWorker:
         *,
         control_socket: str | None = None,
     ) -> "RemoteAnalogDecodeWorker":
+        startup_started = time.monotonic()
         remote_argv = [
             "env",
             f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
@@ -868,7 +921,55 @@ class RemoteAnalogDecodeWorker:
 
         reader_thread = threading.Thread(target=reader, daemon=True)
         reader_thread.start()
-        return cls(proc, stderr_handle, responses, reader_thread)
+        timeout = float(os.environ.get("ANALOG_REMOTE_DECODE_WORKER_START_TIMEOUT_SEC", "120") or "120")
+        deadline = time.monotonic() + timeout
+        ready_line = ""
+        while time.monotonic() < deadline:
+            remaining = max(0.1, deadline - time.monotonic())
+            try:
+                candidate_line = responses.get(timeout=remaining)
+            except queue.Empty as exc:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                stderr_handle.close()
+                raise RuntimeError(f"remote decode worker did not become ready after {timeout:.1f}s") from exc
+            if candidate_line.strip():
+                ready_line = candidate_line
+                break
+            if proc.poll() is not None:
+                stderr_handle.close()
+                raise RuntimeError(f"remote decode worker exited before ready with status {proc.returncode}")
+        if not ready_line:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            stderr_handle.close()
+            raise RuntimeError(f"remote decode worker did not become ready after {timeout:.1f}s")
+        startup_wall_sec = time.monotonic() - startup_started
+        try:
+            ready_response = json.loads(ready_line)
+        except json.JSONDecodeError as exc:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            stderr_handle.close()
+            raise RuntimeError(f"remote decode worker returned invalid ready line: {ready_line.strip()}") from exc
+        if str(ready_response.get("status") or "").lower() != "ready":
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            stderr_handle.close()
+            raise RuntimeError(f"remote decode worker did not return ready status: {ready_line.strip()}")
+        return cls(proc, stderr_handle, responses, reader_thread, ready_response, startup_wall_sec)
 
     def decode(
         self,
@@ -1467,12 +1568,17 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     remote_request["manifest_json"] = manifest
                 # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
                 # happens at capture time, not decode time. Remote decode reads what was captured.
+                worker_response: dict[str, Any] = {}
                 if remote_decode_worker is not None:
-                    remote_decode_worker.decode(
+                    worker_proc = remote_decode_worker.decode(
                         remote_request,
                         image.image_dir / "remote_decode.log",
                         timeout=max(120.0, capture_timeout),
                     )
+                    try:
+                        worker_response = json.loads(str(worker_proc.stdout or "{}"))
+                    except json.JSONDecodeError:
+                        worker_response = {}
                 else:
                     run_remote_command(
                         remote_target,
@@ -1481,24 +1587,30 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         control_socket=ssh_control_socket,
                         timeout=max(120.0, capture_timeout),
                     )
-                # Pull only what the selected result mode needs locally.
-                remote_outputs = (
-                    {"decode_summary.json": decode_summary}
-                    if remote_decode_result_mode == "remote-dir"
-                    else {
-                        "received_latent.npz": out_npz,
-                        "merged_round0.bin": out_wire,
-                        "decode_summary.json": decode_summary,
-                    }
-                )
-                pull_files_from_remote_tar(
-                    remote_target,
-                    remote_run_dir,
-                    remote_outputs,
-                    image.image_dir / "remote_pull_outputs.log",
-                    control_socket=ssh_control_socket,
-                    timeout=60,
-                )
+                # Pull only what the selected result mode needs locally. Persistent
+                # worker responses already carry the summary, avoiding another SSH
+                # transfer in the hot path.
+                response_summary = worker_response.get("summary") if isinstance(worker_response, dict) else None
+                if remote_decode_result_mode == "remote-dir" and isinstance(response_summary, dict):
+                    write_json(decode_summary, response_summary)
+                else:
+                    remote_outputs = (
+                        {"decode_summary.json": decode_summary}
+                        if remote_decode_result_mode == "remote-dir"
+                        else {
+                            "received_latent.npz": out_npz,
+                            "merged_round0.bin": out_wire,
+                            "decode_summary.json": decode_summary,
+                        }
+                    )
+                    pull_files_from_remote_tar(
+                        remote_target,
+                        remote_run_dir,
+                        remote_outputs,
+                        image.image_dir / "remote_pull_outputs.log",
+                        control_socket=ssh_control_socket,
+                        timeout=60,
+                    )
                 decode_wall_sec = time.monotonic() - decode_started
                 if remote_decode_result_mode == "remote-dir":
                     pulled_summary = read_json(decode_summary) if decode_summary.is_file() else {}
@@ -1770,6 +1882,12 @@ def main() -> int:
         "dry_run": bool(args.dry_run),
         "in_process_local_codec": bool(getattr(args, "in_process_local_codec", False)),
         "remote_decode_worker_enabled": remote_decode_worker is not None,
+        "remote_decode_worker_startup_wall_sec": (
+            float(remote_decode_worker.startup_wall_sec) if remote_decode_worker is not None else 0.0
+        ),
+        "remote_decode_worker_ready": (
+            remote_decode_worker.ready_response if remote_decode_worker is not None else {}
+        ),
         "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
         "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
         "remote_decoded_output_dirs": remote_decoded_dirs,

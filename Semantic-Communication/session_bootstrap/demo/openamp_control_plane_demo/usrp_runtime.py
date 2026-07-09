@@ -75,6 +75,7 @@ DEFAULT_IQ_DIRECT_SPS = 16
 DEFAULT_IQ_DIRECT_AMPLITUDE = 24000
 DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.08
 DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
+DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
@@ -501,25 +502,64 @@ def _run_remote_command(
         "--",
         command,
     ]
+    env = os.environ.copy()
+    env.setdefault("OPENAMP_SSH_TIMEOUT_SEC", str(max(1.0, timeout)))
+    stdout_path: Path | None = None
+    stderr_path: Path | None = None
+    proc: subprocess.Popen[bytes] | None = None
     try:
-        run_kwargs: dict[str, Any] = {
-            "cwd": REPO_ROOT,
-            "timeout": timeout,
-            "check": False,
-        }
-        if input_data is None:
-            run_kwargs["capture_output"] = True
-        else:
-            run_kwargs["input"] = input_data
-            run_kwargs["stdout"] = subprocess.PIPE
-            run_kwargs["stderr"] = subprocess.PIPE
-        return subprocess.run(cmd, **run_kwargs)
+        with tempfile.NamedTemporaryFile(delete=False) as stdout_file, tempfile.NamedTemporaryFile(delete=False) as stderr_file:
+            stdout_path = Path(stdout_file.name)
+            stderr_path = Path(stderr_file.name)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=REPO_ROOT,
+                stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                env=env,
+            )
+            if input_data is not None and proc.stdin is not None:
+                try:
+                    proc.stdin.write(input_data)
+                    proc.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+            returncode = proc.wait(timeout=timeout)
+        stdout = stdout_path.read_bytes() if stdout_path is not None and stdout_path.exists() else b""
+        stderr = stderr_path.read_bytes() if stderr_path is not None and stderr_path.exists() else b""
+        return subprocess.CompletedProcess(cmd, int(returncode or 0), stdout=stdout, stderr=stderr)
     except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout if isinstance(exc.stdout, bytes) else str(exc.stdout or "").encode("utf-8", errors="replace")
-        stderr = exc.stderr if isinstance(exc.stderr, bytes) else str(exc.stderr or "").encode("utf-8", errors="replace")
+        try:
+            if os.name == "nt" and proc is not None:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(getattr(proc, "pid", ""))],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            elif proc is not None:
+                proc.kill()
+        except Exception:
+            pass
+        try:
+            if proc is not None:
+                proc.wait(timeout=5)
+        except Exception:
+            pass
+        stdout = stdout_path.read_bytes() if stdout_path is not None and stdout_path.exists() else b""
+        stderr = stderr_path.read_bytes() if stderr_path is not None and stderr_path.exists() else b""
         detail = f"TimeoutExpired: remote command timed out after {timeout:.1f}s".encode("utf-8")
         stderr = (stderr + b"\n" + detail).strip()
         return subprocess.CompletedProcess(cmd, 124, stdout=stdout, stderr=stderr)
+    finally:
+        for path in (stdout_path, stderr_path):
+            if path is None:
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
 
 def _start_remote_rx_server(
@@ -2339,9 +2379,12 @@ class UsrpBatchSpoolJob:
             args.extend(["--robust-cfo-step-hz", str(_parse_float(robust_cfo_step, 500.0))])
         sync_search_window = _first_value(env_values, ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
         if sync_search_window:
-            args.extend(["--sync-search-window-symbols", str(_parse_int(sync_search_window, 4096))])
+            args.extend([
+                "--sync-search-window-symbols",
+                str(_parse_int(sync_search_window, DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS)),
+            ])
         elif self._link_mode == LINK_MODE_IQ_DIRECT:
-            args.extend(["--sync-search-window-symbols", "4096"])
+            args.extend(["--sync-search-window-symbols", str(DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS)])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
         if scramble_key:

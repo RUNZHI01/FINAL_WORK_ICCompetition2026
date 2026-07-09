@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -74,6 +75,40 @@ def build_signed_bundle(temp_dir: Path, *, variant: str) -> tuple[Path, Path]:
 
 
 class OpenAMPControlWrapperTest(unittest.TestCase):
+    def test_resolve_bash_executable_uses_git_exec_path_before_wsl_bash(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            temp_dir = Path(temp_dir_raw)
+            git_shim = temp_dir / "shims" / "git.exe"
+            git_exec_path = temp_dir / "apps" / "git" / "current" / "mingw64" / "libexec" / "git-core"
+            git_bash = temp_dir / "apps" / "git" / "current" / "usr" / "bin" / "bash.exe"
+            git_shim.parent.mkdir(parents=True)
+            git_exec_path.mkdir(parents=True)
+            git_bash.parent.mkdir(parents=True)
+            git_shim.write_text("", encoding="utf-8")
+            git_bash.write_text("", encoding="utf-8")
+
+            def fake_which(name: str) -> str | None:
+                if name == "git":
+                    return str(git_shim)
+                if name == "bash":
+                    return r"C:\Windows\system32\bash.exe"
+                return None
+
+            completed = subprocess.CompletedProcess(
+                [str(git_shim), "--exec-path"],
+                0,
+                stdout=str(git_exec_path) + "\n",
+                stderr="",
+            )
+
+            with (
+                patch.dict(os.environ, {"OPENAMP_BASH": "", "GIT_BASH": "", "BASH": ""}, clear=False),
+                patch("openamp_control_wrapper.os.name", "nt"),
+                patch("openamp_control_wrapper.shutil.which", side_effect=fake_which),
+                patch("openamp_control_wrapper.subprocess.run", return_value=completed),
+            ):
+                self.assertEqual(openamp_control_wrapper.resolve_bash_executable(), str(git_bash))
+
     def assert_signed_wrapper_trace(self, *, variant: str) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

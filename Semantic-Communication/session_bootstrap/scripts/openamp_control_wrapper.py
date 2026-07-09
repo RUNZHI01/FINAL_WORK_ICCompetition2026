@@ -75,15 +75,51 @@ LINK_HEALTH_PROFILES = {
 BASH_ENV_KEYS = ("OPENAMP_BASH", "GIT_BASH", "BASH")
 
 
+def _is_windows_wsl_bash(path: str) -> bool:
+    text = str(path or "").replace("/", "\\").lower()
+    return text.endswith("\\windows\\system32\\bash.exe") or "\\appdata\\local\\microsoft\\windowsapps\\bash.exe" in text
+
+
+def _git_bash_candidates_from_exec_path(git_exe: str) -> list[Path]:
+    try:
+        proc = subprocess.run(
+            [git_exe, "--exec-path"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:
+        return []
+    raw = proc.stdout.strip()
+    if not raw:
+        return []
+    exec_path = Path(raw).resolve()
+    candidates: list[Path] = []
+    for root in (exec_path, *exec_path.parents):
+        candidates.extend(
+            [
+                root / "usr" / "bin" / "bash.exe",
+                root / "bin" / "bash.exe",
+            ]
+        )
+    return candidates
+
+
 def resolve_bash_executable() -> str:
     for key in BASH_ENV_KEYS:
         raw = str(os.environ.get(key, "") or "").strip()
-        if raw and Path(raw).is_file():
+        if raw and Path(raw).is_file() and not _is_windows_wsl_bash(raw):
             return raw
 
     if os.name == "nt":
         git_exe = shutil.which("git")
         if git_exe:
+            for candidate in _git_bash_candidates_from_exec_path(git_exe):
+                if candidate.is_file():
+                    return str(candidate)
             git_root = Path(git_exe).resolve().parents[1]
             for candidate in (
                 git_root / "usr" / "bin" / "bash.exe",
@@ -99,7 +135,10 @@ def resolve_bash_executable() -> str:
             if candidate.is_file():
                 return str(candidate)
 
-    return shutil.which("bash") or "bash"
+    bash = shutil.which("bash")
+    if bash and not (os.name == "nt" and _is_windows_wsl_bash(bash)):
+        return bash
+    return "bash"
 
 
 def terminate_process(process: subprocess.Popen[Any]) -> int:

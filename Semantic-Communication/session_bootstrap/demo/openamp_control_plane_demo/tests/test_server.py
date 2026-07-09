@@ -48,6 +48,48 @@ def test_transport_benchmark_exposes_iq_remote_pull_and_cleanup_metrics() -> Non
     assert benchmark["other_wall_ms"]["mean_ms"] == 3900.0
 
 
+def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
+    access = usrp_runtime.BoardAccessConfig(
+        host="demo-board",
+        user="user",
+        password="user",
+        port="22",
+        env_file=None,
+        env_values={},
+        source_summary="test",
+    )
+
+    class HangingPopen:
+        pid = 12345
+        returncode = None
+
+        def __init__(self, command, **_kwargs):  # type: ignore[no-untyped-def]
+            self.args = command
+
+        def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+            raise subprocess.TimeoutExpired(self.args, timeout)
+
+        def poll(self):  # type: ignore[no-untyped-def]
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    with (
+        patch("usrp_runtime.os.name", "nt"),
+        patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+        patch("usrp_runtime.subprocess.Popen", side_effect=HangingPopen),
+        patch("usrp_runtime.subprocess.run") as run_mock,
+    ):
+        result = usrp_runtime._run_remote_command(access, "sleep 999", timeout=1.0)
+
+    assert result.returncode == 124
+    assert b"TimeoutExpired: remote command timed out after 1.0s" in result.stderr
+    run_mock.assert_called_once()
+    assert run_mock.call_args.args[0][:4] == ["taskkill", "/F", "/T", "/PID"]
+    assert run_mock.call_args.args[0][4] == "12345"
+
+
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
     return {
         "requested_at": requested_at,
@@ -3879,9 +3921,27 @@ class ServerMainTest(unittest.TestCase):
             env_values={},
             source_summary="test",
         )
-        timeout = subprocess.TimeoutExpired(["ssh"], 20.0, output=b"partial", stderr=b"timeout")
 
-        with patch("usrp_runtime.subprocess.run", side_effect=timeout):
+        class TimeoutPopen:
+            pid = 2222
+            returncode = None
+
+            def __init__(self, command, **_kwargs):  # type: ignore[no-untyped-def]
+                self.args = command
+                self.killed = False
+
+            def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+                raise subprocess.TimeoutExpired(self.args, timeout)
+
+            def kill(self) -> None:
+                self.killed = True
+                self.returncode = -9
+
+        with (
+            patch("usrp_runtime.os.name", "posix"),
+            patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+            patch("usrp_runtime.subprocess.Popen", side_effect=TimeoutPopen),
+        ):
             result = usrp_runtime._run_remote_command(access, "echo ok", timeout=20.0)
 
         self.assertEqual(result.returncode, 124)

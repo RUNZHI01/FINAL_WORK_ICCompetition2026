@@ -14,6 +14,7 @@ import json
 import math
 import os
 import sys
+import time
 import traceback
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,9 @@ DEFAULT_MIN_SYNC_METRIC = 0.25
 SAMPLE_BYTES = 4
 EPS = 1.0e-12
 SCRAMBLING_MODE = "keyed-permutation-sign-v1"
+SYNC_FFT_CORRELATE_MIN_VALID = 512
+_SCIPY_SIGNAL: Any | None = None
+_SCIPY_SIGNAL_IMPORT_ATTEMPTED = False
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -66,6 +70,49 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def scipy_signal_module() -> Any | None:
+    global _SCIPY_SIGNAL, _SCIPY_SIGNAL_IMPORT_ATTEMPTED
+    if not _SCIPY_SIGNAL_IMPORT_ATTEMPTED:
+        _SCIPY_SIGNAL_IMPORT_ATTEMPTED = True
+        try:
+            from scipy import signal as scipy_signal  # type: ignore
+
+            _SCIPY_SIGNAL = scipy_signal
+        except Exception:
+            _SCIPY_SIGNAL = None
+    return _SCIPY_SIGNAL
+
+
+def sync_correlation(search_stream: np.ndarray, sync: np.ndarray) -> tuple[np.ndarray, str]:
+    valid_count = int(search_stream.size - sync.size + 1)
+    if valid_count >= SYNC_FFT_CORRELATE_MIN_VALID:
+        scipy_signal = scipy_signal_module()
+        if scipy_signal is not None:
+            corr = scipy_signal.correlate(
+                np.ascontiguousarray(search_stream),
+                np.ascontiguousarray(sync),
+                mode="valid",
+                method="fft",
+            )
+            return np.abs(corr).astype(np.float32, copy=False), "scipy-fft"
+    return np.abs(np.correlate(search_stream, sync, mode="valid")).astype(np.float32, copy=False), "numpy-direct"
+
+
+def warm_sync_correlation() -> dict[str, Any]:
+    raw_enabled = str(os.environ.get("ANALOG_SYNC_FFT_WARMUP", "1")).strip().lower()
+    if raw_enabled in {"0", "false", "no", "off"}:
+        return {"sync_fft_warmup_enabled": False}
+    t0 = time.perf_counter()
+    sync = np.ones(1024, dtype=np.complex64)
+    search_stream = np.ones(4096 + sync.size - 1, dtype=np.complex64)
+    _corr, method = sync_correlation(search_stream, sync)
+    return {
+        "sync_fft_warmup_enabled": True,
+        "sync_fft_warmup_method": method,
+        "sync_fft_warmup_ms": round(float((time.perf_counter() - t0) * 1000.0), 3),
+    }
 
 
 def ensure_batched_float32(array: np.ndarray) -> np.ndarray:
@@ -305,10 +352,10 @@ def find_sync_candidates(
             half_window = max(1, int(search_window_symbols)) // 2
             search_start = max(0, int(search_center_symbol) - half_window)
             search_end = min(valid_count, int(search_center_symbol) + half_window + 1)
-            if search_end <= search_start:
-                continue
+        if search_end <= search_start:
+            continue
         search_stream = stream[search_start:search_end + sync.size - 1]
-        corr = np.abs(np.correlate(search_stream, sync, mode="valid"))
+        corr, corr_method = sync_correlation(search_stream, sync)
         if corr.size == 0:
             continue
         take = min(max(1, int(max_candidates)), int(corr.size))
@@ -327,6 +374,7 @@ def find_sync_candidates(
                 "sync_start": idx,
                 "sync_metric": metric,
                 "sync_corr": float(corr[corr_idx]),
+                "sync_correlation_method": corr_method,
                 "sym_stream": stream,
                 "search_start_symbol": int(search_start),
                 "search_end_symbol": int(search_end),
@@ -853,6 +901,16 @@ def make_waveform(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
+    decode_start = time.perf_counter()
+    timing_last = decode_start
+    decode_timing_ms: dict[str, float] = {}
+
+    def mark_timing(name: str) -> None:
+        nonlocal timing_last
+        now = time.perf_counter()
+        decode_timing_ms[name] = float((now - timing_last) * 1000.0)
+        timing_last = now
+
     rx_sc16 = Path(args.rx_sc16)
     manifest = read_json(Path(args.manifest))
     out_npz = Path(args.out_npz)
@@ -866,10 +924,12 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     sync = make_pilot_symbols(int(manifest["sync_pilot_symbols"]), int(manifest["sync_seed"]))
     cfo_len = int(manifest["cfo_pilot_symbols"])
     taps = rrc_taps(float(manifest["rrc_beta"]), int(manifest["rrc_span"]), sps)
+    mark_timing("setup")
 
     rx, rx_clipping_ratio = sc16_to_complex(rx_sc16, amp)
     if rx.size == 0:
         raise RuntimeError(f"empty RX sc16 file: {rx_sc16}")
+    mark_timing("read_sc16")
     dc_window = rx[:min(max(zero_guard, 1), rx.size)]
     dc = complex(np.mean(dc_window))
     rx_dc = (rx - np.complex64(dc)).astype(np.complex64)
@@ -893,6 +953,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     )
     if center_metrics:
         crop_metrics.update(center_metrics)
+    mark_timing("dc_and_crop")
     local_search_center = (
         max(0, int(search_center_symbol) - int(sync_symbol_offset))
         if search_center_symbol is not None
@@ -911,6 +972,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     if not initial_candidates:
         raise RuntimeError("initial sync search failed")
     sync0 = initial_candidates[0]
+    mark_timing("initial_sync")
     estimated_cfo_hz, cfo_method = estimate_cfo_from_known_pilot(
         sync0["sym_stream"],
         int(sync0["sync_start"]),
@@ -921,6 +983,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     )
     if abs(estimated_cfo_hz) < 5.0:
         estimated_cfo_hz = 0.0
+    mark_timing("cfo_estimate")
 
     sync_search_mode = "normal"
     sync_debug: dict[str, Any] = {
@@ -987,6 +1050,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
             )
             sync_debug["normal_sync_error"] = str(normal_exc)
             sync_search_mode = str(sync_debug["sync_search_mode"])
+    mark_timing("payload_recovery")
     if sync_symbol_offset:
         payload_metrics["data_start_symbol_local"] = int(payload_metrics.get("data_start_symbol", 0))
         payload_metrics["data_end_symbol_local"] = int(payload_metrics.get("data_end_symbol", 0))
@@ -1013,9 +1077,11 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     else:
         latent_out = latent_hat.astype(np.float32, copy=False)
         npz_items = {"latent": latent_out}
+    mark_timing("latent_reconstruct")
 
     out_npz.parent.mkdir(parents=True, exist_ok=True)
     np.savez(out_npz, **npz_items)
+    mark_timing("write_npz")
 
     summary: dict[str, Any] = {
         "status": "ok",
@@ -1033,6 +1099,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "sync_symbol_offset": int(sync_symbol_offset),
         "sync_metric": float(sync_final["sync_metric"]),
         "initial_sync_metric": float(sync0["sync_metric"]),
+        "sync_correlation_method": str(sync_final.get("sync_correlation_method") or ""),
         "estimated_cfo_hz": float(estimated_cfo_hz),
         "cfo_estimator": cfo_method,
         "sync_search_mode": sync_search_mode,
@@ -1058,10 +1125,16 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     summary.update(scrambling_metrics)
     summary.update(symbol_quality_metrics(reference_symbols, payload_symbols[:n_complex]))
     summary.update(latent_mse_metric(reference_latent, latent_out))
+    mark_timing("summary_metrics")
+    summary["decode_timing_ms"] = {key: round(value, 3) for key, value in decode_timing_ms.items()}
+    summary["decode_total_ms"] = round(float((time.perf_counter() - decode_start) * 1000.0), 3)
 
     if out_wire is not None:
         out_wire.parent.mkdir(parents=True, exist_ok=True)
         out_wire.write_bytes(pack_received_wire_blob(latent_out, manifest, summary))
+        mark_timing("write_wire")
+        summary["decode_timing_ms"] = {key: round(value, 3) for key, value in decode_timing_ms.items()}
+        summary["decode_total_ms"] = round(float((time.perf_counter() - decode_start) * 1000.0), 3)
     if summary_path is not None:
         write_json(summary_path, summary)
     return summary
@@ -1159,6 +1232,15 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
 
 
 def run_decode_server() -> int:
+    ready_payload = {"status": "ready"}
+    try:
+        ready_payload.update(warm_sync_correlation())
+    except Exception as exc:
+        ready_payload.update({
+            "sync_fft_warmup_enabled": False,
+            "sync_fft_warmup_error": str(exc),
+        })
+    print(json.dumps(ready_payload, ensure_ascii=False), flush=True)
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -1183,6 +1265,7 @@ def run_decode_server() -> int:
                 "summary_json": args.summary_json,
                 "sync_metric": summary["sync_metric"],
                 "estimated_cfo_hz": summary["estimated_cfo_hz"],
+                "summary": summary,
             }, ensure_ascii=False), flush=True)
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
