@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import sys
 import time
 import traceback
@@ -114,6 +115,123 @@ def warm_sync_correlation() -> dict[str, Any]:
         "sync_fft_warmup_method": method,
         "sync_fft_warmup_ms": round(float((time.perf_counter() - t0) * 1000.0), 3),
     }
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = str(os.environ.get(name, "")).strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = str(os.environ.get(name, "")).strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = str(os.environ.get(name, "")).strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _decode_warmup_shape() -> tuple[int, ...]:
+    raw = str(os.environ.get("ANALOG_DECODE_WARMUP_SHAPE", "1,32,32,32")).strip()
+    try:
+        shape = tuple(int(part.strip()) for part in raw.split(",") if part.strip())
+    except ValueError:
+        shape = (1, 32, 32, 32)
+    if len(shape) not in {3, 4} or any(dim <= 0 for dim in shape):
+        return (1, 32, 32, 32)
+    return shape
+
+
+def warm_decode_pipeline() -> dict[str, Any]:
+    raw_enabled = str(os.environ.get("ANALOG_DECODE_PIPELINE_WARMUP", "0")).strip().lower()
+    if raw_enabled in {"", "0", "false", "no", "off"}:
+        return {"decode_pipeline_warmup_enabled": False}
+    started = time.perf_counter()
+    shape = _decode_warmup_shape()
+    work_dir = Path(os.environ.get("ANALOG_DECODE_WARMUP_DIR", f"/tmp/analog_decode_warmup_{os.getpid()}"))
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+        input_path = work_dir / "latent.npz"
+        tx_sc16 = work_dir / "tx_analog.sc16"
+        manifest_path = work_dir / "manifest.json"
+        out_npz = work_dir / "received_latent.npz"
+        summary_path = work_dir / "decode_summary.json"
+        latent = np.linspace(-1.0, 1.0, num=int(np.prod(shape)), dtype=np.float32).reshape(shape)
+        np.savez(input_path, latent=latent)
+        make_args = argparse.Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest_path),
+            job_id="decode_pipeline_warmup",
+            rate=_env_float("RATE", DEFAULT_RATE),
+            sps=_env_int("ANALOG_SPS", DEFAULT_SPS),
+            rrc_beta=_env_float("ANALOG_RRC_BETA", DEFAULT_RRC_BETA),
+            rrc_span=_env_int("ANALOG_RRC_SPAN", DEFAULT_RRC_SPAN),
+            amp=_env_int("ANALOG_AMPLITUDE", _env_int("AMPLITUDE", DEFAULT_SC16_AMPLITUDE)),
+            zero_guard_samples=_env_int("ANALOG_ZERO_GUARD_SAMPLES", DEFAULT_ZERO_GUARD_SAMPLES),
+            tail_guard_samples=_env_int("ANALOG_TAIL_GUARD_SAMPLES", DEFAULT_TAIL_GUARD_SAMPLES),
+            cfo_pilot_symbols=_env_int("ANALOG_CFO_PILOT_SYMBOLS", DEFAULT_CFO_PILOT_SYMBOLS),
+            sync_pilot_symbols=_env_int("ANALOG_SYNC_PILOT_SYMBOLS", DEFAULT_SYNC_PILOT_SYMBOLS),
+            data_block_symbols=_env_int("ANALOG_DATA_BLOCK_SYMBOLS", DEFAULT_DATA_BLOCK_SYMBOLS),
+            mid_pilot_symbols=_env_int("ANALOG_MID_PILOT_SYMBOLS", DEFAULT_MID_PILOT_SYMBOLS),
+            cfo_seed=_env_int("ANALOG_CFO_SEED", 1001),
+            sync_seed=_env_int("ANALOG_SYNC_SEED", 1002),
+            mid_pilot_seed=_env_int("ANALOG_MID_PILOT_SEED", 1003),
+            capture_margin_samples=_env_int("ANALOG_CAPTURE_MARGIN_SAMPLES", DEFAULT_CAPTURE_MARGIN_SAMPLES),
+            rx_post_quantize=_env_bool("ANALOG_RX_POST_QUANTIZE", True),
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+        make_waveform(make_args)
+        decode_args = argparse.Namespace(
+            rx_sc16=str(tx_sc16),
+            manifest=str(manifest_path),
+            out_npz=str(out_npz),
+            out_wire="",
+            summary_json=str(summary_path),
+            sync_candidates=_env_int("ANALOG_SYNC_CANDIDATES", DEFAULT_SYNC_CANDIDATES),
+            min_sync_metric=_env_float("ANALOG_MIN_SYNC_METRIC", DEFAULT_MIN_SYNC_METRIC),
+            robust_sync=_env_bool("ANALOG_ROBUST_SYNC", True),
+            robust_cfo_max_hz=_env_float("ANALOG_ROBUST_CFO_MAX_HZ", DEFAULT_ROBUST_CFO_MAX_HZ),
+            robust_cfo_step_hz=_env_float("ANALOG_ROBUST_CFO_STEP_HZ", DEFAULT_ROBUST_CFO_STEP_HZ),
+            sync_search_center_symbol=-1,
+            sync_search_window_symbols=_env_int("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS", 0),
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+        summary = decode_waveform(decode_args)
+        return {
+            "decode_pipeline_warmup_enabled": True,
+            "decode_pipeline_warmup_status": "ok",
+            "decode_pipeline_warmup_shape": list(shape),
+            "decode_pipeline_warmup_ms": round(float((time.perf_counter() - started) * 1000.0), 3),
+            "decode_pipeline_warmup_decode_total_ms": float(summary.get("decode_total_ms") or 0.0),
+        }
+    except Exception as exc:
+        return {
+            "decode_pipeline_warmup_enabled": True,
+            "decode_pipeline_warmup_status": "error",
+            "decode_pipeline_warmup_error": str(exc),
+            "decode_pipeline_warmup_ms": round(float((time.perf_counter() - started) * 1000.0), 3),
+        }
+    finally:
+        if _env_bool("ANALOG_DECODE_WARMUP_CLEANUP", True):
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def ensure_batched_float32(array: np.ndarray) -> np.ndarray:
@@ -1378,6 +1496,7 @@ def run_decode_server() -> int:
             "sync_fft_warmup_enabled": False,
             "sync_fft_warmup_error": str(exc),
         })
+    ready_payload.update(warm_decode_pipeline())
     print(json.dumps(ready_payload, ensure_ascii=False), flush=True)
     for line in sys.stdin:
         line = line.strip()

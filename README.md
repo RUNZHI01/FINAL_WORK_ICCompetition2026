@@ -22,7 +22,7 @@
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM + SM2 + ML-DSA 安全信道 Python 包（kem、auth、kdf、secure_channel、session）。
 - `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
-- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：原有 QPSK/CRC/ARQ 可靠字节链路（当前演示主力），以及新增的 analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，WIP，详见 `INTEGRATION_STATUS.md`）。
+- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，当前 USRP 默认），以及原有 QPSK/CRC/ARQ 可靠字节链路兜底（详见 `INTEGRATION_STATUS.md`）。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
 实际演示时主要分成三块：数据面负责把 latent 或现场输入送到板端；控制面负责下发任务、读取状态和收集日志；Electron 负责把链路状态、重建结果和耗时展示出来。
@@ -82,11 +82,11 @@ Windows 现场优先使用原生 PowerShell + Docker，不走 WSL。用于恢复
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 默认写入当前验证环境：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、Paramiko SSH runner、Docker USRP TX runner、板端 `/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_RX_TAIL_SEC=0.05`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_ROBUST_SYNC=0`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不进仓库；在 Electron 界面填写，或运行前临时设置 `REMOTE_PASS`。
+`run-demo-tailscale.*` 默认写入当前验证环境：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、Paramiko SSH runner、Docker USRP TX runner、板端 `/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_RX_TAIL_SEC=0.05`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不进仓库；在 Electron 界面填写，或运行前临时设置 `REMOTE_PASS`。
 
 这个入口默认启用 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，即预录 latent 输入、TCP/Tailscale 控制连接、`MLKEM_AUTH_ENABLED=0`。普通 profile 仍默认开启 ML-KEM auth；关闭 auth 只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。Cockpit 的推理结果对比会接收当前 TVM/MNN 的预录成功结果，因此顶部重建耗时和对比卡片会按同一轮结果刷新。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`，报告文件为 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
 
-切到 USRP 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面应由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 用于让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk` 兜底。快速 IQ profile 默认 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`，保持 TX/RX 常驻，避免每轮反复初始化；`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O，演示后可清理 `/tmp/usrp292x_remote_runs`。
+切到 USRP 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面应由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 用于让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk` 兜底。快速 IQ profile 默认 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`，保持 TX/RX 常驻，避免每轮反复初始化；`ANALOG_DECODE_PIPELINE_WARMUP=1` 会把板端 decode 冷启动挪到 worker startup；`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O，演示后可清理 `/tmp/usrp292x_remote_runs`。Cockpit 的 USRP transport 对比优先显示 raw round records 的 median/p95，避免单个 RF/RX outlier 把结果卡片拉歪。
 
 如果临时绕开 Docker cockpit、直接在 Windows 原生后端调试，必须避免 `C:\Windows\System32\bash.exe` 的 WSL stub。使用 Git Bash，并让 SSH helper 走 Paramiko runner：
 
@@ -352,14 +352,14 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 
 - QPSK 链路保留为兜底演示路径；Cockpit 切到 USRP 模式时默认使用 `iq-direct`，也可在界面手动切回 `qpsk`。`JSCC_LINK_MODE` 环境变量和 Cockpit 的 JSCC 链路开关都可切换：`qpsk` 走原可靠字节链路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
 - IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
-- 2026-07-09 真机 USRP/IQ fast profile（`sps=2`、`amp=6000`、`tail=0.05`、`min_sync=0.05`、`robust=0`、`ARQ1`、`remote-dir`、`cleanup=skip`）验证 `20/20` 通过，最终记录 median `204.6 ms`、p90 `261.2 ms`、min `168.6 ms`、airtime `9.578 ms`；该数据面为本机 TX USRP 到板端 RX USRP 的 RF 链路。
-- IQ 直传 batch runner 默认启用进程内本地 codec（`ANALOG_IN_PROCESS_LOCAL_CODEC=1`）和首次 latent loader warmup（`ANALOG_WARMUP_LOCAL_CODEC=1`），避免每张图重复启动 Python/torch。2026-07-09 软件 dry-run 验证真实 JSCC `.pt` 打包后的 transport-frame `.bin`、20/20 通过，per-image mean `194.60 ms`、median `192.30 ms`、p95 `232.94 ms`、airtime mean `17.517 ms`；裸 `.pt` 输入 mean `174.89 ms`。warmup 单独记录为 `codec_warmup_wall_sec`。
+- 2026-07-09 真机 cockpit USRP/IQ fast profile（`sps=2`、`amp=6000`、`tail=0.05`、`min_sync=0.05`、`robust=0`、`ARQ2`、`remote-dir`、`cleanup=skip`、`decode warmup=1`）验证 `20/20` 通过，fallback `0`，USRP transport median `213.53 ms`、decode median `67.04 ms`、airtime `9.578 ms`；同轮 TVM big.LITTLE median `240.89 ms`。该数据面为本机 TX USRP 到板端 RX USRP 的 RF 链路，控制面仍可走 Tailscale/SSH。
+- IQ 直传 batch runner 默认启用进程内本地 codec（`ANALOG_IN_PROCESS_LOCAL_CODEC=1`）、首次 latent loader warmup（`ANALOG_WARMUP_LOCAL_CODEC=1`）和板端 decode-server pipeline warmup（`ANALOG_DECODE_PIPELINE_WARMUP=1`），避免每张图重复启动 Python/torch 或承担 FFT/NumPy 冷启动。warmup 单独记录为 `codec_warmup_wall_sec` 和 `remote_decode_worker_ready.decode_pipeline_warmup_*`。
 - 真机 IQ 直传前可先生成板端同步包：Windows 运行 `.\docker\prepare-iq-board-sync.ps1`；容器内实际执行 `bash /workspace/scripts/prepare_iq_board_sync.sh`。该脚本只打包，不保存密码；manifest 会提示运行时输入 `SSHPASS` 后再 scp/ssh 到板端，并在板端验证步骤中激活 `tvm310_safe` 环境。
 - 现场切 USRP/IQ 前可运行 `python Semantic-Communication/session_bootstrap/scripts/check_openamp_demo_session_readiness.py --format text`。输出里的 `usrp:` 行会报告是否启用 USRP、当前 `qpsk`/`iq-direct`、`REMOTE_USRP_RX_DIR` 是否缺失，以及 IQ 同步包脚本/产物是否存在；Cockpit 的板卡连接设置也会同步显示会话、USRP RX、JSCC 链路和图库输入的就绪/阻塞状态，并可直接保存板端 USRP RX 目录。
 - Encoder/TVM helper/latent_transport 三处增量补丁已落地，对 QPSK 路径零破坏（默认行为不变，需通过 `JSCC_CHANNEL_MODE=real-usrp` 等环境变量激活）。
 - Server 端 `JSCC_LINK_MODE` 开关、双机 SSH/SCP 远端 RX（`local` / `remote-pull` / `remote-decode` 三档）、Cockpit UI IQ/QPSK 选择与结果 badge 全部 wire 完成。USRP 默认资产发现会优先使用 final 包内 latent，也会兼容工作区根目录的 `原始图像/00000001.jpg...` 和 `jscc-test/encoder_outputs/`；USRP live payload 会附带 `original_gallery`，例如 50 张任务展示 `00000001-00000050` 的原图范围。
 - ML-KEM 安全信道（见第 6 节）已经独立可用，`DUAL_REQUIRED` 默认启用，handshake 在 1.4 s 量级、SHA-256 校验通过。
-- 仍未做：真机线缆 + 30 dB 衰减器实测、TX/RX gain 配对调优、远端 `/home/user/USRP292x/` 同步 IQ runner（当前板端 USRP292x 仍是 QPSK 主线）。
+- 仍未做：真机线缆 + 30 dB 衰减器系统化扫描、TX/RX gain 配对调优、长批量 p95/outlier 抑制。
 - 已知 OpenAMP 控制面问题：`control_guard_state=PROBE_ERROR`、`board status endpoint unavailable: timed out`，与 ML-KEM 数据面相互独立，不影响握手和加密通道本身。
 
 详细差距清单、待办优先级、风险点和软件验证命令见 [`INTEGRATION_STATUS.md`](./INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。

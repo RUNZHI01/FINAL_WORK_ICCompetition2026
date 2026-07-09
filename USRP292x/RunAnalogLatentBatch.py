@@ -888,9 +888,35 @@ class RemoteAnalogDecodeWorker:
         control_socket: str | None = None,
     ) -> "RemoteAnalogDecodeWorker":
         startup_started = time.monotonic()
+        amp = int(getattr(args, "amp", 3000) or 3000)
+        remote_env = [
+            f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
+            f"ANALOG_DECODE_PIPELINE_WARMUP={os.environ.get('ANALOG_DECODE_PIPELINE_WARMUP', '1') or '1'}",
+            f"ANALOG_DECODE_WARMUP_SHAPE={os.environ.get('ANALOG_DECODE_WARMUP_SHAPE', '1,32,32,32') or '1,32,32,32'}",
+            f"RATE={float(getattr(args, 'rate', 5_000_000.0) or 5_000_000.0)}",
+            f"ANALOG_SPS={int(getattr(args, 'sps', 4) or 4)}",
+            f"ANALOG_AMPLITUDE={amp}",
+            f"AMPLITUDE={amp}",
+            f"ANALOG_RRC_BETA={float(getattr(args, 'rrc_beta', 0.35) or 0.35)}",
+            f"ANALOG_RRC_SPAN={int(getattr(args, 'rrc_span', 8) or 8)}",
+            f"ANALOG_ZERO_GUARD_SAMPLES={int(getattr(args, 'zero_guard_samples', 4096) or 4096)}",
+            f"ANALOG_TAIL_GUARD_SAMPLES={int(getattr(args, 'tail_guard_samples', 4096) or 4096)}",
+            f"ANALOG_CFO_PILOT_SYMBOLS={int(getattr(args, 'cfo_pilot_symbols', 1024) or 1024)}",
+            f"ANALOG_SYNC_PILOT_SYMBOLS={int(getattr(args, 'sync_pilot_symbols', 1024) or 1024)}",
+            f"ANALOG_DATA_BLOCK_SYMBOLS={int(getattr(args, 'data_block_symbols', 4096) or 4096)}",
+            f"ANALOG_MID_PILOT_SYMBOLS={int(getattr(args, 'mid_pilot_symbols', 128) or 128)}",
+            f"ANALOG_CAPTURE_MARGIN_SAMPLES={int(getattr(args, 'capture_margin_samples', 20000) or 20000)}",
+            f"ANALOG_RX_POST_QUANTIZE={'1' if bool(getattr(args, 'rx_post_quantize', True)) else '0'}",
+            f"ANALOG_SYNC_CANDIDATES={int(getattr(args, 'sync_candidates', 12) or 12)}",
+            f"ANALOG_MIN_SYNC_METRIC={float(getattr(args, 'min_sync_metric', 0.25) or 0.25)}",
+            f"ANALOG_ROBUST_SYNC={'1' if bool(getattr(args, 'robust_sync', True)) else '0'}",
+            f"ANALOG_ROBUST_CFO_MAX_HZ={float(getattr(args, 'robust_cfo_max_hz', 8000.0) or 8000.0)}",
+            f"ANALOG_ROBUST_CFO_STEP_HZ={float(getattr(args, 'robust_cfo_step_hz', 500.0) or 500.0)}",
+            f"ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'sync_search_window_symbols', 0) or 0)}",
+        ]
         remote_argv = [
             "env",
-            f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
+            *remote_env,
             remote_python_for_decode(args),
             "-u",
             remote_analog_link_path(args),
@@ -924,6 +950,7 @@ class RemoteAnalogDecodeWorker:
         timeout = float(os.environ.get("ANALOG_REMOTE_DECODE_WORKER_START_TIMEOUT_SEC", "120") or "120")
         deadline = time.monotonic() + timeout
         ready_line = ""
+        ready_response: dict[str, Any] | None = None
         while time.monotonic() < deadline:
             remaining = max(0.1, deadline - time.monotonic())
             try:
@@ -937,12 +964,25 @@ class RemoteAnalogDecodeWorker:
                 stderr_handle.close()
                 raise RuntimeError(f"remote decode worker did not become ready after {timeout:.1f}s") from exc
             if candidate_line.strip():
+                try:
+                    candidate_response = json.loads(candidate_line)
+                except json.JSONDecodeError:
+                    if proc.poll() is not None:
+                        stderr_handle.close()
+                        raise RuntimeError(f"remote decode worker exited before ready with status {proc.returncode}")
+                    continue
+                if not isinstance(candidate_response, dict):
+                    if proc.poll() is not None:
+                        stderr_handle.close()
+                        raise RuntimeError(f"remote decode worker exited before ready with status {proc.returncode}")
+                    continue
                 ready_line = candidate_line
+                ready_response = candidate_response
                 break
             if proc.poll() is not None:
                 stderr_handle.close()
                 raise RuntimeError(f"remote decode worker exited before ready with status {proc.returncode}")
-        if not ready_line:
+        if not ready_line or ready_response is None:
             proc.terminate()
             try:
                 proc.wait(timeout=3)
@@ -951,16 +991,6 @@ class RemoteAnalogDecodeWorker:
             stderr_handle.close()
             raise RuntimeError(f"remote decode worker did not become ready after {timeout:.1f}s")
         startup_wall_sec = time.monotonic() - startup_started
-        try:
-            ready_response = json.loads(ready_line)
-        except json.JSONDecodeError as exc:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-            stderr_handle.close()
-            raise RuntimeError(f"remote decode worker returned invalid ready line: {ready_line.strip()}") from exc
         if str(ready_response.get("status") or "").lower() != "ready":
             proc.terminate()
             try:
@@ -1383,7 +1413,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     out_wire = image.image_dir / "merged_round0.bin"
     decode_summary = image.image_dir / "decode_summary.json"
 
-    ssh_control_socket: str | None = None
+    shared_ssh_control_socket = str(getattr(args, "ssh_control_socket", "") or "").strip()
+    ssh_control_socket: str | None = shared_ssh_control_socket or None
     ssh_master_proc: subprocess.Popen | None = None
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     use_in_process_local_codec = bool(getattr(args, "in_process_local_codec", False))
@@ -1464,8 +1495,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     raise RuntimeError(
                         f"--rx-capture-mode={mode} requires --remote-rx-ssh-target (e.g. user@100.x.y.z)"
                     )
-                ssh_master_proc = _ssh_start_control_master(remote_target)
-                ssh_control_socket = _ssh_control_socket_path() if ssh_master_proc else None
+                if not ssh_control_socket:
+                    ssh_master_proc = _ssh_start_control_master(remote_target)
+                    ssh_control_socket = _ssh_control_socket_path() if ssh_master_proc else None
 
             capture_nsamps = int(manifest["capture_nsamps"])
             capture_duration = max(
@@ -1818,20 +1850,32 @@ def main() -> int:
     started = time.monotonic()
     completed: list[ImageRecord] = []
     remote_decode_worker: RemoteAnalogDecodeWorker | None = None
-    if (
-        str(getattr(args, "rx_capture_mode", "") or "").strip().lower() == "remote-decode"
-        and not bool(getattr(args, "dry_run", False))
-        and env_bool("ANALOG_REMOTE_DECODE_WORKER", True)
-    ):
-        remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
-        if remote_target:
-            remote_decode_worker = RemoteAnalogDecodeWorker.start(
-                remote_target,
-                args,
-                run_dir / "remote_decode_worker.log",
-            )
-    setattr(args, "remote_decode_worker", remote_decode_worker)
+    shared_ssh_master_proc: subprocess.Popen | None = None
+    shared_ssh_control_socket: str | None = None
+    remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
+    remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     try:
+        if (
+            remote_mode in {"remote-pull", "remote-decode"}
+            and not bool(getattr(args, "dry_run", False))
+            and remote_target
+        ):
+            shared_ssh_master_proc = _ssh_start_control_master(remote_target)
+            shared_ssh_control_socket = _ssh_control_socket_path() if shared_ssh_master_proc else None
+        if (
+            remote_mode == "remote-decode"
+            and not bool(getattr(args, "dry_run", False))
+            and env_bool("ANALOG_REMOTE_DECODE_WORKER", True)
+        ):
+            if remote_target:
+                remote_decode_worker = RemoteAnalogDecodeWorker.start(
+                    remote_target,
+                    args,
+                    run_dir / "remote_decode_worker.log",
+                    control_socket=shared_ssh_control_socket,
+                )
+        setattr(args, "remote_decode_worker", remote_decode_worker)
+        setattr(args, "ssh_control_socket", shared_ssh_control_socket or "")
         for image in images:
             max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
             result = image
@@ -1849,6 +1893,15 @@ def main() -> int:
     finally:
         if remote_decode_worker is not None:
             remote_decode_worker.close()
+        if shared_ssh_master_proc is not None:
+            try:
+                shared_ssh_master_proc.terminate()
+                shared_ssh_master_proc.wait(timeout=3)
+            except (subprocess.TimeoutExpired, OSError):
+                try:
+                    shared_ssh_master_proc.kill()
+                except OSError:
+                    pass
     passed_count = sum(1 for image in completed if image.passed)
     failed_count = sum(1 for image in completed if not image.passed)
     remote_decoded_dirs = sorted({

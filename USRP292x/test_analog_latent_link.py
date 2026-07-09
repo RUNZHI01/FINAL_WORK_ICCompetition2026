@@ -252,6 +252,21 @@ def test_decode_server_request_can_write_inline_manifest_json(tmp_path):
     assert json.loads(manifest_path.read_text(encoding="utf-8"))["capture_nsamps"] == 1234
 
 
+def test_decode_pipeline_warmup_runs_representative_decode(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANALOG_DECODE_PIPELINE_WARMUP", "1")
+    monkeypatch.setenv("ANALOG_DECODE_WARMUP_DIR", str(tmp_path / "warmup"))
+    monkeypatch.setenv("ANALOG_DECODE_WARMUP_SHAPE", "1,4,4,4")
+    monkeypatch.setenv("ANALOG_SPS", "2")
+    monkeypatch.setenv("ANALOG_AMPLITUDE", "3000")
+    monkeypatch.setenv("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS", "1024")
+
+    payload = analog.warm_decode_pipeline()
+
+    assert payload["decode_pipeline_warmup_enabled"] is True
+    assert payload["decode_pipeline_warmup_status"] == "ok"
+    assert payload["decode_pipeline_warmup_decode_total_ms"] >= 0.0
+
+
 def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
     writes: list[str] = []
 
@@ -261,6 +276,9 @@ def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
             writes.append(text)
 
         def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
             return None
 
     class FakeProc:
@@ -293,6 +311,84 @@ def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
 
     assert writes
     assert "\\u96c6\\u521b\\u8d5b" in writes[0]
+
+
+def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, monkeypatch):
+    popen_commands: list[list[str]] = []
+
+    class FakeStdin:
+        def write(self, _text: str) -> None:
+            return None
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeStdout:
+        def __iter__(self):
+            return iter([
+                "\x1b[?9001l\x1b[?1004l\n",
+                json.dumps({"status": "ready"}) + "\n",
+            ])
+
+    class FakeProc:
+        stdin = FakeStdin()
+        stdout = FakeStdout()
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            return None
+
+    def fake_popen(command, *_args, **_kwargs):
+        popen_commands.append(list(command))
+        return FakeProc()
+
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fake_popen)
+
+    worker = analog_batch.RemoteAnalogDecodeWorker.start(
+        "user@board",
+        Namespace(
+            rate=5_000_000.0,
+            sps=2,
+            amp=6000,
+            rrc_beta=0.35,
+            rrc_span=8,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=1024,
+            sync_pilot_symbols=1024,
+            data_block_symbols=4096,
+            mid_pilot_symbols=128,
+            capture_margin_samples=20000,
+            rx_post_quantize=True,
+            sync_candidates=12,
+            min_sync_metric=0.05,
+            robust_sync=False,
+            sync_search_window_symbols=4096,
+        ),
+        tmp_path / "remote_decode_worker.log",
+    )
+
+    assert worker.ready_response == {"status": "ready"}
+    remote_command = popen_commands[0][-1]
+    assert "ANALOG_DECODE_PIPELINE_WARMUP=1" in remote_command
+    assert "ANALOG_DECODE_WARMUP_SHAPE=1,32,32,32" in remote_command
+    assert "ANALOG_SPS=2" in remote_command
+    assert "ANALOG_AMPLITUDE=6000" in remote_command
+    assert "ANALOG_MIN_SYNC_METRIC=0.05" in remote_command
+    assert "ANALOG_ROBUST_SYNC=0" in remote_command
+    worker.close()
 
 
 def test_find_sync_candidates_respects_symbol_search_window():
@@ -1335,6 +1431,183 @@ def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, mon
     assert summary["failed_count"] == 0
     assert summary["images"][0]["rounds"] == 2
     assert [record["round"] for record in summary["images"][0]["round_records"]] == [0, 1]
+
+
+def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monkeypatch):
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    for idx in range(2):
+        (input_dir / f"case{idx}.bin").write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=input_dir,
+        pattern="*.bin",
+        count=2,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="remote-batch",
+        dry_run=False,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/remote-batch_rx",
+        remote_cleanup_mode="skip",
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        sps=2,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        rx_post_quantize=False,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    master_starts: list[str] = []
+    master_terminated: list[bool] = []
+    worker_control_sockets: list[str | None] = []
+
+    class FakeMaster:
+        def terminate(self):
+            master_terminated.append(True)
+
+        def wait(self, timeout=None):
+            return 0
+
+    class FakeWorker:
+        startup_wall_sec = 0.01
+        ready_response = {"status": "ready"}
+
+        def decode(self, request, log_path, *, timeout):
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "detected_airtime_ms": 9.58,
+                    },
+                }),
+                stderr="",
+            )
+
+        def close(self):
+            return None
+
+    def fake_start_master(target):
+        master_starts.append(target)
+        return FakeMaster()
+
+    def fake_worker_start(target, start_args, log_path, *, control_socket=None):
+        worker_control_sockets.append(control_socket)
+        return FakeWorker()
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {
+            "capture_nsamps": 67888,
+            "tx_waveform_samples": 47888,
+            "job_id": "case",
+        }
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", fake_start_master)
+    monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
+    monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "remote-batch" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert summary["passed_count"] == 2
+    assert master_starts == ["user@board"]
+    assert worker_control_sockets == ["shared-socket"]
+    assert len(master_terminated) == 1
+
+
+def test_batch_runner_closes_shared_ssh_master_when_worker_start_fails(tmp_path, monkeypatch):
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    (input_dir / "case0.bin").write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=input_dir,
+        pattern="*.bin",
+        count=1,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="worker-fail",
+        dry_run=False,
+        rx_capture_mode="remote-decode",
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+    )
+    master_terminated: list[bool] = []
+
+    class FakeMaster:
+        def terminate(self):
+            master_terminated.append(True)
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_worker_start(target, start_args, log_path, *, control_socket=None):
+        raise RuntimeError("worker failed")
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: FakeMaster())
+    monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
+    monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
+
+    try:
+        analog_batch.main()
+    except RuntimeError as exc:
+        assert str(exc) == "worker failed"
+    else:
+        raise AssertionError("worker startup failure should propagate")
+
+    assert master_terminated == [True]
 
 
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):

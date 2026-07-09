@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import shlex
@@ -17,7 +18,7 @@ import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from board_access import (
     BoardAccessConfig,
@@ -1685,7 +1686,99 @@ def _single_metric_from_value(value: float | int | None, *, n: int) -> dict[str,
     }
 
 
+def _metric_from_ms_values(values: list[float]) -> dict[str, Any] | None:
+    numeric_values = sorted(float(value) for value in values if float(value) >= 0.0)
+    if not numeric_values:
+        return None
+    count = len(numeric_values)
+    mid = count // 2
+    if count % 2:
+        median = numeric_values[mid]
+    else:
+        median = (numeric_values[mid - 1] + numeric_values[mid]) / 2.0
+    p95_index = max(0, min(count - 1, math.ceil(0.95 * count) - 1))
+    return {
+        "n": count,
+        "min_ms": round(numeric_values[0], 2),
+        "max_ms": round(numeric_values[-1], 2),
+        "mean_ms": round(sum(numeric_values) / count, 2),
+        "median_ms": round(median, 2),
+        "p95_ms": round(numeric_values[p95_index], 2),
+    }
+
+
+def _float_from_mapping(mapping: Mapping[str, Any], key: str) -> float:
+    try:
+        return float(mapping.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _transport_benchmark_from_iq_round_records(summary: dict[str, Any]) -> dict[str, Any] | None:
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return None
+
+    total_ms_values: list[float] = []
+    airtime_ms_values: list[float] = []
+    decode_ms_values: list[float] = []
+    merge_ms_values: list[float] = []
+    rx_pull_ms_values: list[float] = []
+    cleanup_ms_values: list[float] = []
+    other_ms_values: list[float] = []
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list) or not records:
+            continue
+        total_sec = 0.0
+        airtime_ms = 0.0
+        decode_sec = 0.0
+        merge_sec = 0.0
+        rx_pull_sec = 0.0
+        cleanup_sec = 0.0
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            total_sec += _float_from_mapping(record, "total_wall_sec")
+            airtime_ms += _float_from_mapping(record, "detected_airtime_ms")
+            decode_sec += _float_from_mapping(record, "decode_wall_sec")
+            merge_sec += _float_from_mapping(record, "merge_wall_sec")
+            rx_pull_sec += _float_from_mapping(record, "rx_pull_wall_sec")
+            cleanup_sec += _float_from_mapping(record, "remote_cleanup_wall_sec")
+        if total_sec <= 0.0:
+            continue
+        total_ms_values.append(total_sec * 1000.0)
+        if airtime_ms >= 0.0:
+            airtime_ms_values.append(airtime_ms)
+        decode_ms_values.append(decode_sec * 1000.0)
+        merge_ms_values.append(merge_sec * 1000.0)
+        rx_pull_ms_values.append(rx_pull_sec * 1000.0)
+        cleanup_ms_values.append(cleanup_sec * 1000.0)
+        other_sec = max(
+            0.0,
+            total_sec - (airtime_ms / 1000.0) - decode_sec - merge_sec - rx_pull_sec - cleanup_sec,
+        )
+        other_ms_values.append(other_sec * 1000.0)
+
+    if not total_ms_values:
+        return None
+    return {
+        "radio_airtime_ms": _metric_from_ms_values(airtime_ms_values),
+        "decode_ms": _metric_from_ms_values(decode_ms_values),
+        "merge_ms": _metric_from_ms_values(merge_ms_values),
+        "rx_pull_ms": _metric_from_ms_values(rx_pull_ms_values),
+        "remote_cleanup_ms": _metric_from_ms_values(cleanup_ms_values),
+        "other_wall_ms": _metric_from_ms_values(other_ms_values),
+        "total_ms": _metric_from_ms_values(total_ms_values),
+    }
+
+
 def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    record_benchmark = _transport_benchmark_from_iq_round_records(summary)
+    if record_benchmark is not None:
+        return record_benchmark
     count = max(1, int(summary.get("pass_count") or summary.get("completed_count") or summary.get("target_count") or 1))
     per_image_sec = float(summary.get("per_image_sec") or 0.0)
     payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)

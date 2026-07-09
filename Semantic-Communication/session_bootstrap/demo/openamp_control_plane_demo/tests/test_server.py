@@ -48,6 +48,63 @@ def test_transport_benchmark_exposes_iq_remote_pull_and_cleanup_metrics() -> Non
     assert benchmark["other_wall_ms"]["mean_ms"] == 3900.0
 
 
+def test_transport_benchmark_prefers_iq_round_medians_over_outlier_means() -> None:
+    benchmark = usrp_runtime._transport_benchmark_from_summary(
+        {
+            "pass_count": 3,
+            "per_image_sec": 10.0,
+            "payload_airtime_ms_mean": 9.58,
+            "decode_total_wall_sec_mean": 5.0,
+            "images": [
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 0.20,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.07,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 0.21,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.08,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 7.0,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.07,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert benchmark["total_ms"]["median_ms"] == 210.0
+    assert benchmark["decode_ms"]["median_ms"] == 70.0
+    assert benchmark["other_wall_ms"]["median_ms"] == 120.42
+    assert benchmark["total_ms"]["mean_ms"] > benchmark["total_ms"]["median_ms"]
+
+
 def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
     access = usrp_runtime.BoardAccessConfig(
         host="demo-board",
