@@ -130,6 +130,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fast-arq-profile", action="store_true")
     parser.add_argument("--batch-size", type=int, default=0)
     parser.add_argument("--rx-capture-mode", choices=("local", "remote-pull", "remote-decode"), default=os.environ.get("RX_CAPTURE_MODE", "local"))
+    parser.add_argument(
+        "--remote-cleanup-mode",
+        choices=("sync", "async", "skip"),
+        default=os.environ.get("ANALOG_REMOTE_CLEANUP_MODE", "async"),
+        help="How to remove temporary RX files from the board after remote-pull/remote-decode.",
+    )
     parser.add_argument("--remote-rx-ssh-target", default=os.environ.get("REMOTE_RX_SSH_TARGET", ""))
     parser.add_argument("--remote-rx-run-root", default=os.environ.get("REMOTE_RX_RUN_ROOT", "/tmp/usrp292x_remote_runs"))
     parser.add_argument("--remote-decode-bin", default=os.environ.get("REMOTE_DECODE_BIN", ""))
@@ -591,6 +597,35 @@ def cleanup_remote_file(
         return False
 
 
+def cleanup_remote_file_async(
+    target: str,
+    remote_path: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    if not remote_path:
+        return False
+    remote_cmd = "bash -lc " + shlex.quote(f"rm -f {shlex.quote(remote_path)}")
+    full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with log_path.open("wb") as log_handle:
+            subprocess.Popen(
+                full,
+                cwd=PROJECT_ROOT,
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                shell=False,
+            )
+        return True
+    except OSError as exc:
+        log_path.write_text(str(exc), encoding="utf-8")
+        return False
+
+
 def build_remote_run_dir(args: argparse.Namespace, image: ImageRecord) -> str:
     """Remote directory under --remote-rx-run-root for this image."""
     root = str(args.remote_rx_run_root).rstrip("/")
@@ -952,6 +987,14 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     ssh_master_proc: subprocess.Popen | None = None
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     use_in_process_local_codec = bool(getattr(args, "in_process_local_codec", False))
+    rx_pull_wall_sec = 0.0
+    remote_cleanup_wall_sec = 0.0
+    merge_wall_sec = 0.0
+    remote_cleanup_mode = str(
+        getattr(args, "remote_cleanup_mode", os.environ.get("ANALOG_REMOTE_CLEANUP_MODE", "sync")) or "sync"
+    ).strip().lower()
+    if remote_cleanup_mode not in {"sync", "async", "skip"}:
+        remote_cleanup_mode = "sync"
 
     try:
         make_started = time.monotonic()
@@ -1088,12 +1131,14 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             rx_capture_wall_sec = time.monotonic() - rx_started
 
             if mode == "remote-pull":
+                pull_started = time.monotonic()
                 pull_file_from_remote(
                     remote_target, remote_batch_rx, batch_rx,
                     image.image_dir / "rx_pull.log",
                     control_socket=ssh_control_socket,
                     timeout=int(capture_timeout + 60),
                 )
+                rx_pull_wall_sec = time.monotonic() - pull_started
 
             decode_started = time.monotonic()
             if mode == "remote-decode":
@@ -1169,18 +1214,22 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
 
             # Remote cleanup — best effort, do not fail the run on cleanup errors
             if mode in ("remote-pull", "remote-decode"):
-                for remote_file in (
-                    remote_batch_rx, remote_tx, remote_manifest,
-                    remote_npz if mode == "remote-decode" else "",
-                    remote_wire if mode == "remote-decode" else "",
-                    remote_summary if mode == "remote-decode" else "",
-                ):
-                    if remote_file:
-                        cleanup_remote_file(
-                            remote_target, remote_file,
-                            image.image_dir / f"remote_cleanup_{PurePosixPath(remote_file).name}.log",
-                            control_socket=ssh_control_socket,
-                        )
+                cleanup_started = time.monotonic()
+                if remote_cleanup_mode != "skip":
+                    cleanup_fn = cleanup_remote_file_async if remote_cleanup_mode == "async" else cleanup_remote_file
+                    for remote_file in (
+                        remote_batch_rx, remote_tx, remote_manifest,
+                        remote_npz if mode == "remote-decode" else "",
+                        remote_wire if mode == "remote-decode" else "",
+                        remote_summary if mode == "remote-decode" else "",
+                    ):
+                        if remote_file:
+                            cleanup_fn(
+                                remote_target, remote_file,
+                                image.image_dir / f"remote_cleanup_{PurePosixPath(remote_file).name}.log",
+                                control_socket=ssh_control_socket,
+                            )
+                remote_cleanup_wall_sec = time.monotonic() - cleanup_started
 
         summary_data = read_json(decode_summary) if decode_summary.is_file() else {}
         image.records.append({
@@ -1209,7 +1258,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "make_wall_sec": make_wall_sec,
             "tx_wall_sec": tx_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
+            "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
+            "merge_wall_sec": merge_wall_sec,
+            "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
+            "remote_cleanup_mode": remote_cleanup_mode,
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
         })
@@ -1274,24 +1327,31 @@ def build_transport_metrics(images: list[ImageRecord]) -> dict[str, Any]:
     make_values = _record_float_values(images, "make_wall_sec")
     tx_values = _record_float_values(images, "tx_wall_sec")
     rx_values = _record_float_values(images, "rx_capture_wall_sec")
+    rx_pull_values = _record_float_values(images, "rx_pull_wall_sec")
     decode_values = _record_float_values(images, "decode_wall_sec")
+    merge_values = _record_float_values(images, "merge_wall_sec")
+    cleanup_values = _record_float_values(images, "remote_cleanup_wall_sec")
     airtime_ms_values = _record_float_values(images, "detected_airtime_ms")
     total_mean = _mean(total_values)
     decode_mean = _mean(decode_values)
+    rx_pull_mean = _mean(rx_pull_values)
+    cleanup_mean = _mean(cleanup_values)
     airtime_sec_mean = _mean(airtime_ms_values) / 1000.0 if airtime_ms_values else 0.0
-    merge_mean = 0.0
+    merge_mean = _mean(merge_values)
     return {
         "per_image_sec": total_mean,
         "total_wall_sec_mean": total_mean,
         "make_wall_sec_mean": _mean(make_values),
         "tx_wall_sec_mean": _mean(tx_values),
         "rx_capture_wall_sec_mean": _mean(rx_values),
+        "rx_pull_wall_sec_mean": rx_pull_mean,
         "decode_total_wall_sec_mean": decode_mean,
         "merge_wall_sec_mean": merge_mean,
+        "remote_cleanup_wall_sec_mean": cleanup_mean,
         "payload_airtime_ms_mean": _mean(airtime_ms_values),
         "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": max(
             0.0,
-            total_mean - airtime_sec_mean - decode_mean - merge_mean,
+            total_mean - airtime_sec_mean - decode_mean - merge_mean - rx_pull_mean - cleanup_mean,
         ),
         "compared_transmitted_bytes_mean": _mean_transmitted_bytes(images),
     }

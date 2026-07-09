@@ -508,6 +508,98 @@ def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_p
     assert pushed == []
     assert pulled == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
     assert cleaned == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+    record = result.records[0]
+    assert record["rx_pull_wall_sec"] >= 0.0
+    assert record["remote_cleanup_wall_sec"] >= 0.0
+
+
+def test_transport_metrics_break_out_remote_pull_and_cleanup_wall_time(tmp_path):
+    image = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image.records.append(
+        {
+            "total_wall_sec": 10.0,
+            "detected_airtime_ms": 100.0,
+            "decode_wall_sec": 2.0,
+            "merge_wall_sec": 0.3,
+            "rx_pull_wall_sec": 3.0,
+            "remote_cleanup_wall_sec": 0.7,
+        }
+    )
+
+    metrics = analog_batch.build_transport_metrics([image])
+
+    assert metrics["rx_pull_wall_sec_mean"] == 3.0
+    assert metrics["remote_cleanup_wall_sec_mean"] == 0.7
+    assert abs(metrics["estimated_non_airtime_non_decode_non_merge_wall_sec_mean"] - 3.9) < 1e-9
+
+
+def test_process_image_remote_pull_can_launch_cleanup_async(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-pull",
+        remote_cleanup_mode="async",
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    async_cleaned: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+        return 0
+
+    def fake_cleanup_remote_file(*_args, **_kwargs):
+        raise AssertionError("async cleanup must not call blocking cleanup")
+
+    def fake_cleanup_remote_file_async(_target, remote_path, _log_path, **_kwargs):
+        async_cleaned.append(remote_path)
+        return True
+
+    def fake_pull_file_from_remote(_target, _remote_path, local_path, _log_path, **_kwargs):
+        local_path.write_bytes(b"rx")
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        return f"OK {line}"
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "pull_file_from_remote", fake_pull_file_from_remote)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file", fake_cleanup_remote_file)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_file_async", fake_cleanup_remote_file_async, raising=False)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert async_cleaned == ["/tmp/analog_runs/run42/image_0000/batch_rx.sc16"]
+    assert result.records[0]["remote_cleanup_mode"] == "async"
 
 
 def test_process_image_remote_decode_keeps_remote_directory_setup_for_scp(tmp_path, monkeypatch):

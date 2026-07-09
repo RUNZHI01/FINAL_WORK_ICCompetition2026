@@ -111,9 +111,17 @@ from inference_runner import (
 )
 from openamp_control_wrapper import resolve_bash_executable
 from usrp_runtime import (
+    DEFAULT_RX_CONTROL_PORT,
+    DEFAULT_TX_CONTROL_PORT,
     INFERENCE_ENGINE_MNN,
     INFERENCE_ENGINE_NONE,
     INFERENCE_ENGINE_TVM,
+    RX_CONTROL_HOST_KEYS,
+    RX_CONTROL_PORT_KEYS,
+    SHUTDOWN_AFTER_TRANSPORT_KEYS,
+    TX_CONTROL_HOST_KEYS,
+    TX_CONTROL_PORT_KEYS,
+    USRP_AUTO_START_CONTROL_KEYS,
     ensure_usrp_control_servers_started,
     inspect_usrp_control_servers,
     launch_local_usrp_reconstruction_job,
@@ -153,6 +161,7 @@ DEFAULT_MLKEM_AUTH_SIG_POLICY = "DUAL_REQUIRED"
 SUPPORTED_MLKEM_AUTH_SIG_POLICIES = ("DUAL_REQUIRED", "SM2_ONLY", "MLDSA_ONLY")
 BOARD_TELEMETRY_TTL_SEC = 5.0
 BOARD_POSITION_API_TTL_SEC = 5.0
+USRP_CONTROL_STATUS_TTL_SEC = 2.0
 AIRCRAFT_POSITION_UPSTREAM_DISCOVERY_TTL_SEC = 15.0
 DEFAULT_BOARD_POSITION_API_REMOTE_ROOT = "~/.openamp-demo/board_position_api_service"
 BOARD_POSITION_API_REMOTE_ROOT_KEYS = ("BOARD_POSITION_API_REMOTE_ROOT",)
@@ -831,7 +840,7 @@ def _build_remote_python_exec_command(script: str) -> str:
     encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
     python_command = (
         "import base64; "
-        f"exec(base64.b64decode({encoded!r}).decode('utf-8'))"
+        f'exec(base64.b64decode("{encoded}").decode("utf-8"))'
     )
     return (
         "if command -v python3 >/dev/null 2>&1; then PY=python3; "
@@ -907,7 +916,7 @@ def _remote_http_wait_command(
     encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
     python_command = (
         "import base64; "
-        f"exec(base64.b64decode({encoded!r}).decode('utf-8'))"
+        f'exec(base64.b64decode("{encoded}").decode("utf-8"))'
     )
     return (
         "if command -v python3 >/dev/null 2>&1; then PY=python3; "
@@ -954,7 +963,7 @@ def _remote_http_json_probe_command(url: str, *, timeout_sec: float = 2.0) -> st
     encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
     python_command = (
         "import base64; "
-        f"exec(base64.b64decode({encoded!r}).decode('utf-8'))"
+        f'exec(base64.b64decode("{encoded}").decode("utf-8"))'
     )
     return (
         "if command -v python3 >/dev/null 2>&1; then PY=python3; "
@@ -1001,7 +1010,7 @@ def _remote_terminate_matching_processes_command(pattern: str) -> str:
     encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
     python_command = (
         "import base64; "
-        f"exec(base64.b64decode({encoded!r}).decode('utf-8'))"
+        f'exec(base64.b64decode("{encoded}").decode("utf-8"))'
     )
     return (
         "if command -v python3 >/dev/null 2>&1; then PY=python3; "
@@ -1299,6 +1308,126 @@ def query_board_telemetry(board_access: BoardAccessConfig, *, timeout_sec: float
         "memory_total_mb": round(mem_total_kb / 1024.0, 2),
         "loadavg_1m": loadavg_1m,
         "cpu_cores": cpu_cores,
+    }
+
+
+def _board_position_api_pending_status(
+    board_access: BoardAccessConfig,
+    *,
+    status: str,
+    note: str,
+) -> dict[str, Any]:
+    runtime = _board_position_api_runtime(board_access)
+    return {
+        "status": status,
+        "note": note,
+        "stale": True,
+        "service_reachable": False,
+        "http_status": None,
+        "health_url": _board_position_api_health_url(runtime["runtime_env"]),
+        "remote_root": runtime["remote_root"],
+        "sample_ready": False,
+        "service_state": "",
+        "last_error": "",
+        "source_order": [],
+        "sample": None,
+    }
+
+
+def _board_telemetry_pending_status(*, status: str, note: str) -> dict[str, Any]:
+    return {
+        "status": status,
+        "stale": True,
+        "source": "ssh_procfs",
+        "collected_at": "",
+        "compute_label": "CPU",
+        "compute_pct": None,
+        "memory_pct": None,
+        "memory_used_mb": None,
+        "memory_available_mb": None,
+        "memory_total_mb": None,
+        "loadavg_1m": None,
+        "cpu_cores": None,
+        "note": note,
+    }
+
+
+def _aircraft_position_upstream_pending_status(
+    runtime: dict[str, Any],
+    *,
+    status: str,
+    note: str,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "selected_url": "",
+        "selected_source": "",
+        "candidate_urls": list(runtime["candidate_urls"]),
+        "results": [],
+        "checked_at": now_iso(),
+        "stale": True,
+        "note": note,
+    }
+
+
+def _first_env_value(env_values: dict[str, str], keys: tuple[str, ...], default: str) -> str:
+    for key in keys:
+        value = str(env_values.get(key) or "").strip()
+        if value:
+            return value
+    return default
+
+
+def _env_bool_value(value: str | None, default: bool) -> bool:
+    text = str(value or "").strip().lower()
+    if not text:
+        return default
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _usrp_control_status_placeholder(
+    board_access: BoardAccessConfig,
+    *,
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    env_values = board_access.build_env()
+    rx_host = _first_env_value(env_values, RX_CONTROL_HOST_KEYS, board_access.host)
+    rx_port = _first_env_value(env_values, RX_CONTROL_PORT_KEYS, DEFAULT_RX_CONTROL_PORT)
+    tx_host = _first_env_value(env_values, TX_CONTROL_HOST_KEYS, "127.0.0.1")
+    tx_port = _first_env_value(env_values, TX_CONTROL_PORT_KEYS, DEFAULT_TX_CONTROL_PORT)
+    auto_start = _env_bool_value(
+        _first_env_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"),
+        True,
+    )
+    shutdown_after_transport = _env_bool_value(
+        _first_env_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"),
+        True,
+    )
+    return {
+        "status": status,
+        "stale": True,
+        "message": message,
+        "rx_control": {
+            "host": rx_host,
+            "port": rx_port,
+            "ready": False,
+            "response": "",
+            "status": "",
+        },
+        "tx_control": {
+            "host": tx_host,
+            "port": tx_port,
+            "ready": False,
+            "response": "",
+            "status": "",
+        },
+        "auto_start": auto_start,
+        "shutdown_after_transport": shutdown_after_transport,
     }
 
 
@@ -2224,8 +2353,12 @@ class DashboardState:
         self._board_position_api_cache: dict[str, Any] | None = None
         self._board_position_api_cache_ts: float = 0.0
         self._board_position_api_refreshing = False
+        self._usrp_control_status_cache: dict[str, Any] | None = None
+        self._usrp_control_status_cache_ts: float = 0.0
+        self._usrp_control_status_refreshing = False
         self._aircraft_position_upstream_probe_cache: dict[str, Any] | None = None
         self._aircraft_position_upstream_probe_cache_ts: float = 0.0
+        self._aircraft_position_upstream_probe_refreshing = False
         self._local_aircraft_bridge_state: dict[str, Any] = {
             "status": "idle",
             "last_error": "",
@@ -2469,8 +2602,12 @@ class DashboardState:
             self._board_position_api_cache = None
             self._board_position_api_cache_ts = 0.0
             self._board_position_api_refreshing = False
+            self._usrp_control_status_cache = None
+            self._usrp_control_status_cache_ts = 0.0
+            self._usrp_control_status_refreshing = False
             self._aircraft_position_upstream_probe_cache = None
             self._aircraft_position_upstream_probe_cache_ts = 0.0
+            self._aircraft_position_upstream_probe_refreshing = False
             self._last_control_probe_error = None
             self._auto_control_probe_triggered = False
             self._auto_control_probe_inflight = False
@@ -2510,7 +2647,91 @@ class DashboardState:
                 "status": "waiting_session",
                 "message": "板卡会话未补齐，暂无法探测 USRP persistent TX/RX。",
             }
-        return inspect_usrp_control_servers(board_access)
+        payload = inspect_usrp_control_servers(board_access)
+        with self._lock:
+            self._usrp_control_status_cache = json.loads(json.dumps(payload, ensure_ascii=False))
+            self._usrp_control_status_cache_ts = time.monotonic()
+        return payload
+
+    def _usrp_control_status_snapshot(
+        self,
+        board_access: BoardAccessConfig,
+        *,
+        defer_refresh: bool = False,
+    ) -> dict[str, Any]:
+        with self._lock:
+            cached = (
+                json.loads(json.dumps(self._usrp_control_status_cache, ensure_ascii=False))
+                if self._usrp_control_status_cache is not None
+                else None
+            )
+            cached_ts = self._usrp_control_status_cache_ts
+            refreshing = self._usrp_control_status_refreshing
+
+        age_sec = time.monotonic() - cached_ts if cached_ts > 0 else None
+        if defer_refresh and cached is not None:
+            cached["stale"] = True
+            cached["message"] = "TVM live 推理进行中，暂缓 USRP control 状态刷新，继续展示最近一次缓存值。"
+            return cached
+        if cached is not None and age_sec is not None and age_sec <= USRP_CONTROL_STATUS_TTL_SEC:
+            return cached
+        if not board_access.connection_ready:
+            if cached is not None:
+                cached["stale"] = True
+                cached["message"] = "当前板卡会话不完整，继续展示上一次 USRP control 缓存值。"
+                return cached
+            return {
+                "status": "waiting_session",
+                "stale": True,
+                "message": "板卡会话未补齐，暂无法探测 USRP persistent TX/RX。",
+            }
+        if defer_refresh:
+            return _usrp_control_status_placeholder(
+                board_access,
+                status="deferred",
+                message="TVM live 推理进行中，暂缓 USRP control 状态刷新。",
+            )
+
+        self._start_usrp_control_status_refresh(board_access)
+        if cached is not None:
+            cached["stale"] = True
+            cached["message"] = (
+                "USRP control 状态后台刷新中，继续展示最近一次缓存值。"
+                if not refreshing
+                else "USRP control 状态仍在后台刷新，继续展示最近一次缓存值。"
+            )
+            return cached
+        return _usrp_control_status_placeholder(
+            board_access,
+            status="refreshing",
+            message="USRP control 状态后台刷新中，等待 RX/TX persistent server 首次探测结果。",
+        )
+
+    def _start_usrp_control_status_refresh(self, board_access: BoardAccessConfig) -> None:
+        with self._lock:
+            if self._usrp_control_status_refreshing:
+                return
+            self._usrp_control_status_refreshing = True
+
+        def worker() -> None:
+            try:
+                payload = inspect_usrp_control_servers(board_access)
+            except Exception as exc:
+                payload = _usrp_control_status_placeholder(
+                    board_access,
+                    status="error",
+                    message=f"USRP control 状态刷新失败: {exc}",
+                )
+            with self._lock:
+                self._usrp_control_status_cache = json.loads(json.dumps(payload, ensure_ascii=False))
+                self._usrp_control_status_cache_ts = time.monotonic()
+                self._usrp_control_status_refreshing = False
+
+        threading.Thread(
+            target=worker,
+            daemon=True,
+            name="usrp-control-status-refresh",
+        ).start()
 
     def start_usrp_control(self) -> dict[str, Any]:
         with self._lock:
@@ -4080,38 +4301,81 @@ class DashboardState:
                 else None
             )
             cached_ts = self._aircraft_position_upstream_probe_cache_ts
+            refreshing = self._aircraft_position_upstream_probe_refreshing
         if defer_refresh and cached_probe is not None:
             cached_probe["stale"] = True
             cached_probe["note"] = "TVM live 推理进行中，暂缓板端定位上游探测，继续展示最近一次缓存结果。"
             return cached_probe
+        if defer_refresh:
+            return _aircraft_position_upstream_pending_status(
+                runtime,
+                status="deferred",
+                note="TVM live 推理进行中，暂缓板端定位上游首次探测。",
+            )
         if cached_probe is not None and (time.monotonic() - cached_ts) <= AIRCRAFT_POSITION_UPSTREAM_DISCOVERY_TTL_SEC:
             return cached_probe
-        try:
-            probe = query_board_aircraft_position_upstream(
-                board_access,
-                candidate_urls=list(runtime["candidate_urls"]),
-                upstream_headers=_parse_json_dict_text(runtime["runtime_env"].get("AIRCRAFT_POSITION_UPSTREAM_HEADERS_JSON", "")),
-                timeout_sec=min(max(self._probe_timeout_sec, 2.0), 8.0),
+        self._start_aircraft_position_upstream_probe_refresh(board_access, runtime=runtime)
+        if cached_probe is not None:
+            cached_probe["stale"] = True
+            cached_probe["note"] = (
+                "板端定位上游后台探测中，继续展示最近一次缓存结果。"
+                if not refreshing
+                else "板端定位上游仍在后台探测，继续展示最近一次缓存结果。"
             )
-        except Exception as exc:
-            probe = {
-                "status": "error",
-                "selected_url": "",
-                "selected_source": "",
-                "candidate_urls": list(runtime["candidate_urls"]),
-                "results": [],
-                "checked_at": now_iso(),
-                "error": str(exc),
-            }
-        else:
-            if probe.get("selected_url"):
-                probe["selected_source"] = "auto_discovered"
-            else:
-                probe.setdefault("selected_source", "")
+            return cached_probe
+        return _aircraft_position_upstream_pending_status(
+            runtime,
+            status="refreshing",
+            note="板端定位上游后台探测中，等待首次探测结果。",
+        )
+
+    def _start_aircraft_position_upstream_probe_refresh(
+        self,
+        board_access: BoardAccessConfig,
+        *,
+        runtime: dict[str, Any],
+    ) -> None:
         with self._lock:
-            self._aircraft_position_upstream_probe_cache = json.loads(json.dumps(probe, ensure_ascii=False))
-            self._aircraft_position_upstream_probe_cache_ts = time.monotonic()
-        return probe
+            if self._aircraft_position_upstream_probe_refreshing:
+                return
+            self._aircraft_position_upstream_probe_refreshing = True
+        candidate_urls = list(runtime["candidate_urls"])
+        upstream_headers = _parse_json_dict_text(runtime["runtime_env"].get("AIRCRAFT_POSITION_UPSTREAM_HEADERS_JSON", ""))
+        timeout_sec = min(max(self._probe_timeout_sec, 2.0), 8.0)
+
+        def worker() -> None:
+            try:
+                probe = query_board_aircraft_position_upstream(
+                    board_access,
+                    candidate_urls=candidate_urls,
+                    upstream_headers=upstream_headers,
+                    timeout_sec=timeout_sec,
+                )
+            except Exception as exc:
+                probe = {
+                    "status": "error",
+                    "selected_url": "",
+                    "selected_source": "",
+                    "candidate_urls": candidate_urls,
+                    "results": [],
+                    "checked_at": now_iso(),
+                    "error": str(exc),
+                }
+            else:
+                if probe.get("selected_url"):
+                    probe["selected_source"] = "auto_discovered"
+                else:
+                    probe.setdefault("selected_source", "")
+            with self._lock:
+                self._aircraft_position_upstream_probe_cache = json.loads(json.dumps(probe, ensure_ascii=False))
+                self._aircraft_position_upstream_probe_cache_ts = time.monotonic()
+                self._aircraft_position_upstream_probe_refreshing = False
+
+        threading.Thread(
+            target=worker,
+            daemon=True,
+            name="aircraft-position-upstream-refresh",
+        ).start()
 
     def _ensure_board_position_api_service(self, board_access: BoardAccessConfig) -> None:
         runtime = _board_position_api_runtime(board_access)
@@ -4835,6 +5099,11 @@ class DashboardState:
             cached["stale"] = True
             cached["note"] = "TVM live 推理进行中，暂缓板端资源占用刷新，继续展示最近一次缓存值。"
             return cached
+        if defer_refresh:
+            return _board_telemetry_pending_status(
+                status="deferred",
+                note="TVM live 推理进行中，暂缓板端资源占用首次采样。",
+            )
         if cached is not None and age_sec is not None and age_sec <= BOARD_TELEMETRY_TTL_SEC:
             return cached
 
@@ -4891,37 +5160,14 @@ class DashboardState:
             )
             return cached
 
-        try:
-            telemetry = query_board_telemetry(
-                board_access,
-                timeout_sec=min(max(self._probe_timeout_sec, 2.0), 4.0),
-            )
-        except Exception as exc:
-            if cached is not None:
-                cached["status"] = "stale"
-                cached["stale"] = True
-                cached["note"] = f"板端资源占用刷新失败，继续展示缓存值: {exc}"
-                return cached
-            return {
-                "status": "error",
-                "stale": True,
-                "source": "ssh_procfs",
-                "collected_at": "",
-                "compute_label": "CPU",
-                "compute_pct": None,
-                "memory_pct": None,
-                "memory_used_mb": None,
-                "memory_available_mb": None,
-                "memory_total_mb": None,
-                "loadavg_1m": None,
-                "cpu_cores": None,
-                "note": f"板端资源占用采集失败: {exc}",
-            }
-
-        with self._lock:
-            self._board_telemetry_cache = json.loads(json.dumps(telemetry, ensure_ascii=False))
-            self._board_telemetry_cache_ts = time.monotonic()
-        return telemetry
+        self._start_board_telemetry_refresh(
+            board_access,
+            timeout_sec=min(max(self._probe_timeout_sec, 2.0), 4.0),
+        )
+        return _board_telemetry_pending_status(
+            status="refreshing",
+            note="板端资源占用后台刷新中，等待首次采样结果。",
+        )
 
     def _start_board_telemetry_refresh(self, board_access: BoardAccessConfig, *, timeout_sec: float) -> None:
         with self._lock:
@@ -4967,6 +5213,12 @@ class DashboardState:
             cached["stale"] = True
             cached["note"] = "TVM live 推理进行中，暂缓板端定位 API 刷新，继续展示最近一次缓存值。"
             return cached
+        if defer_refresh:
+            return _board_position_api_pending_status(
+                board_access,
+                status="deferred",
+                note="TVM live 推理进行中，暂缓板端定位 API 首次探测。",
+            )
         if cached is not None and age_sec is not None and age_sec <= BOARD_POSITION_API_TTL_SEC:
             return cached
 
@@ -4982,6 +5234,17 @@ class DashboardState:
                 else "板端定位 API 状态仍在后台刷新，继续展示最近一次缓存值。"
             )
             return cached
+
+        if board_access.connection_ready:
+            self._start_board_position_api_refresh(
+                board_access,
+                timeout_sec=min(max(self._probe_timeout_sec, 1.0), 4.0),
+            )
+            return _board_position_api_pending_status(
+                board_access,
+                status="refreshing",
+                note="板端定位 API 状态后台刷新中，等待首次健康探测结果。",
+            )
 
         payload = _board_position_api_status(
             board_access,
@@ -5034,16 +5297,21 @@ class DashboardState:
         active_inference = self._active_inference_summary()
         batch_status = str((batch_state or {}).get("status") or "").strip().lower()
         defer_board_refresh = bool(active_inference.get("running")) or batch_status in {"launching", "running"}
+        board_transport_mode = normalize_transport_mode(board_access.build_env().get("MLKEM_TRANSPORT_MODE", ""))
+        defer_remote_refresh = defer_board_refresh or board_transport_mode == "usrp"
         aircraft_upstream_probe = self._aircraft_position_upstream_probe_snapshot(
             board_access=board_access,
-            defer_refresh=defer_board_refresh,
+            defer_refresh=defer_remote_refresh,
         )
         discovered_upstream_url = str(aircraft_upstream_probe.get("selected_url") or "").strip()
         board_position_api = self._board_position_api_snapshot(
             board_access,
-            defer_refresh=defer_board_refresh,
+            defer_refresh=defer_remote_refresh,
         )
-        usrp_control_status = self.get_usrp_control_status()
+        usrp_control_status = self._usrp_control_status_snapshot(
+            board_access,
+            defer_refresh=defer_remote_refresh,
+        )
         aircraft_bridge = _aircraft_position_bridge_status(
             board_access,
             aircraft_position_payload=aircraft_position_payload,
@@ -5102,7 +5370,7 @@ class DashboardState:
         live_telemetry = self._board_telemetry_snapshot(
             board_access=board_access,
             board_online=board_online,
-            defer_refresh=defer_board_refresh,
+            defer_refresh=defer_remote_refresh,
         )
         safety_panel = build_safety_panel(
             guard_state=str(guard_state or "UNKNOWN"),

@@ -25,6 +25,8 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'ANALOG_WARMUP_LOCAL_CODEC="${ANALOG_WARMUP_LOCAL_CODEC:-1}"' in script
     assert 'ANALOG_SPS="${ANALOG_SPS:-16}"' in script
     assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-24000}"' in script
+    assert 'ANALOG_RX_TAIL_SEC="${ANALOG_RX_TAIL_SEC:-0.12}"' in script
+    assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 

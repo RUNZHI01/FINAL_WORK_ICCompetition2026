@@ -29,6 +29,25 @@ import usrp_runtime  # noqa: E402
 REPO_ROOT = DEMO_ROOT.parents[2]
 
 
+def test_transport_benchmark_exposes_iq_remote_pull_and_cleanup_metrics() -> None:
+    benchmark = usrp_runtime._transport_benchmark_from_summary(
+        {
+            "pass_count": 1,
+            "per_image_sec": 10.0,
+            "payload_airtime_ms_mean": 100.0,
+            "decode_total_wall_sec_mean": 2.0,
+            "merge_wall_sec_mean": 0.3,
+            "rx_pull_wall_sec_mean": 3.0,
+            "remote_cleanup_wall_sec_mean": 0.7,
+            "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": 3.9,
+        }
+    )
+
+    assert benchmark["rx_pull_ms"]["mean_ms"] == 3000.0
+    assert benchmark["remote_cleanup_ms"]["mean_ms"] == 700.0
+    assert benchmark["other_wall_ms"]["mean_ms"] == 3900.0
+
+
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
     return {
         "requested_at": requested_at,
@@ -5047,6 +5066,13 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["http_status"], 200)
         self.assertEqual(payload["payload"]["status"], "starting")
 
+    def test_remote_http_json_probe_command_avoids_nested_single_quote_splicing(self) -> None:
+        command = server._remote_http_json_probe_command("http://127.0.0.1:9000/health", timeout_sec=4.0)
+
+        self.assertIn('base64.b64decode("', command)
+        self.assertIn('.decode("utf-8")', command)
+        self.assertNotIn("'\"'\"'", command)
+
     def test_board_position_api_status_promotes_live_sample_from_position_endpoint(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
@@ -5121,8 +5147,9 @@ class DemoHTTPServerTest(unittest.TestCase):
                     "results": [],
                 },
             ),
-            patch(
-                "server._board_position_api_status",
+            patch.object(
+                state,
+                "_board_position_api_snapshot",
                 return_value={
                     "status": "source_unavailable",
                     "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
@@ -5254,9 +5281,6 @@ class DemoHTTPServerTest(unittest.TestCase):
         }
         state._board_telemetry_cache_ts = time.monotonic() - (server.BOARD_TELEMETRY_TTL_SEC + 1.0)
 
-        fake_thread = Mock()
-        fake_thread.start = Mock()
-
         with (
             patch.object(
                 state,
@@ -5277,7 +5301,8 @@ class DemoHTTPServerTest(unittest.TestCase):
                     "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
                 },
             ),
-            patch("server.threading.Thread", return_value=fake_thread) as thread_cls,
+            patch.object(state, "_usrp_control_status_snapshot", return_value={"status": "waiting_session"}),
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
@@ -5285,8 +5310,33 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
         self.assertAlmostEqual(payload["live"]["telemetry"]["memory_pct"], 61.2)
         self.assertIn("后台刷新中", payload["live"]["telemetry"]["note"])
-        thread_cls.assert_called_once()
-        fake_thread.start.assert_called_once()
+        start_telemetry_refresh.assert_called_once()
+
+    def test_board_telemetry_snapshot_returns_refreshing_without_sync_on_cold_online_board(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_start_board_telemetry_refresh") as start_refresh,
+            patch(
+                "server.query_board_telemetry",
+                side_effect=AssertionError("system-status must not synchronously probe board telemetry"),
+            ),
+        ):
+            payload = state._board_telemetry_snapshot(
+                board_access=state._board_access,
+                board_online=True,
+            )
+
+        self.assertEqual(payload["status"], "refreshing")
+        self.assertTrue(payload["stale"])
+        self.assertIn("后台刷新", payload["note"])
+        start_refresh.assert_called_once()
 
     def test_board_position_api_snapshot_reuses_cached_payload_while_refreshing(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -5318,6 +5368,87 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertIn("后台刷新中", payload["note"])
         thread_cls.assert_called_once()
         fake_thread.start.assert_called_once()
+
+    def test_aircraft_position_upstream_snapshot_returns_refreshing_without_sync_on_cold_session(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh", create=True) as start_refresh,
+            patch(
+                "server.query_board_aircraft_position_upstream",
+                side_effect=AssertionError("system-status must not synchronously probe aircraft upstream"),
+            ),
+        ):
+            payload = state._aircraft_position_upstream_probe_snapshot(board_access=state._board_access)
+
+        self.assertEqual(payload["status"], "refreshing")
+        self.assertTrue(payload["stale"])
+        self.assertIn("后台探测", payload["note"])
+        start_refresh.assert_called_once()
+
+    def test_system_status_defers_remote_refreshes_for_cold_usrp_session(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "100.121.87.73",
+                    "user": "demo-user",
+                    "password": "demo-pass",
+                    "port": "22",
+                    "transport_mode": "usrp",
+                }
+            ).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-21T15:43:00+0800", "board reachable")
+
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh") as start_upstream_refresh,
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
+            patch.object(state, "_start_board_position_api_refresh") as start_position_refresh,
+            patch.object(state, "_start_usrp_control_status_refresh", create=True) as start_usrp_refresh,
+            patch(
+                "server.query_board_aircraft_position_upstream",
+                side_effect=AssertionError("USRP system-status must not probe aircraft upstream"),
+            ),
+            patch(
+                "server.query_board_telemetry",
+                side_effect=AssertionError("USRP system-status must not probe board telemetry"),
+            ),
+            patch(
+                "server._board_position_api_status",
+                side_effect=AssertionError("USRP system-status must not probe board position API"),
+            ),
+            patch(
+                "server.inspect_usrp_control_servers",
+                side_effect=AssertionError("USRP system-status must not probe USRP control sockets"),
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["telemetry"]["status"], "deferred")
+        self.assertEqual(payload["live"]["aircraft_bridge"]["upstream_probe"]["status"], "deferred")
+        self.assertEqual(payload["live"]["board_position_api"]["status"], "deferred")
+        self.assertTrue(payload["live"]["board_position_api"]["stale"])
+        self.assertIn("暂缓", payload["live"]["board_position_api"]["note"])
+        self.assertEqual(payload["live"]["usrp_control"]["status"], "deferred")
+        self.assertTrue(payload["live"]["usrp_control"]["stale"])
+        self.assertIn("暂缓", payload["live"]["usrp_control"]["message"])
+        start_upstream_refresh.assert_not_called()
+        start_telemetry_refresh.assert_not_called()
+        start_position_refresh.assert_not_called()
+        start_usrp_refresh.assert_not_called()
 
     def test_system_status_skips_remote_refreshes_while_tvm_batch_is_running(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -6038,7 +6169,12 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(state._board_access.build_env()["MLKEM_USRP_MODE"], "ota")
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
 
-        system_status, _, system_payload = request_json(state, "GET", "/api/system-status")
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh"),
+            patch.object(state, "_start_board_position_api_refresh"),
+            patch.object(state, "_start_usrp_control_status_refresh"),
+        ):
+            system_status, _, system_payload = request_json(state, "GET", "/api/system-status")
 
         self.assertEqual(system_status, 200)
         self.assertEqual(system_payload["board_access"]["transport_mode"], "usrp")

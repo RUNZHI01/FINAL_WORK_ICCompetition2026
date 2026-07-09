@@ -57,6 +57,8 @@ $env:MLKEM_TRANSPORT_MODE="usrp"
 $env:OPENAMP_DEMO_INPUT_SOURCE_MODE="usrp"
 $env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
 $env:JSCC_LINK_MODE="iq-direct"
+$env:ANALOG_RX_TAIL_SEC="0.12"
+$env:ANALOG_REMOTE_CLEANUP_MODE="async"
 .\docker\run-demo-tailscale.ps1
 ```
 

@@ -1489,16 +1489,22 @@ def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]
     payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)
     decode_total_wall_sec_mean = float(summary.get("decode_total_wall_sec_mean") or 0.0)
     merge_wall_sec_mean = float(summary.get("merge_wall_sec_mean") or 0.0)
+    rx_pull_wall_sec_mean = float(summary.get("rx_pull_wall_sec_mean") or 0.0)
+    remote_cleanup_wall_sec_mean = float(summary.get("remote_cleanup_wall_sec_mean") or 0.0)
     other_sec_mean = float(summary.get("estimated_non_airtime_non_decode_non_merge_wall_sec_mean") or 0.0)
     air_ms = payload_airtime_ms_mean if payload_airtime_ms_mean > 0 else None
     decode_ms = decode_total_wall_sec_mean * 1000.0 if decode_total_wall_sec_mean > 0 else None
     merge_ms = merge_wall_sec_mean * 1000.0 if merge_wall_sec_mean > 0 else None
+    rx_pull_ms = rx_pull_wall_sec_mean * 1000.0 if rx_pull_wall_sec_mean > 0 else None
+    remote_cleanup_ms = remote_cleanup_wall_sec_mean * 1000.0 if remote_cleanup_wall_sec_mean > 0 else None
     other_ms = other_sec_mean * 1000.0 if other_sec_mean > 0 else None
     total_ms = per_image_sec * 1000.0 if per_image_sec > 0 else None
     return {
         "radio_airtime_ms": _single_metric_from_value(air_ms, n=count),
         "decode_ms": _single_metric_from_value(decode_ms, n=count),
         "merge_ms": _single_metric_from_value(merge_ms, n=count),
+        "rx_pull_ms": _single_metric_from_value(rx_pull_ms, n=count),
+        "remote_cleanup_ms": _single_metric_from_value(remote_cleanup_ms, n=count),
         "other_wall_ms": _single_metric_from_value(other_ms, n=count),
         "total_ms": _single_metric_from_value(total_ms, n=count),
     }
@@ -2376,6 +2382,8 @@ class UsrpBatchSpoolJob:
         payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)
         decode_total_wall_sec_mean = float(summary.get("decode_total_wall_sec_mean") or 0.0)
         merge_wall_sec_mean = float(summary.get("merge_wall_sec_mean") or 0.0)
+        rx_pull_wall_sec_mean = float(summary.get("rx_pull_wall_sec_mean") or 0.0)
+        remote_cleanup_wall_sec_mean = float(summary.get("remote_cleanup_wall_sec_mean") or 0.0)
         diagnostics = {
             "transport_mode": "usrp_batch_spool",
             "link_mode": self._link_mode,
@@ -2435,6 +2443,8 @@ class UsrpBatchSpoolJob:
                 "payload_airtime_ms_mean": round(payload_airtime_ms_mean, 3),
                 "decode_total_wall_sec_mean": round(decode_total_wall_sec_mean * 1000.0, 3),
                 "merge_wall_sec_mean": round(merge_wall_sec_mean * 1000.0, 3),
+                "rx_pull_wall_sec_mean": round(rx_pull_wall_sec_mean * 1000.0, 3),
+                "remote_cleanup_wall_sec_mean": round(remote_cleanup_wall_sec_mean * 1000.0, 3),
                 "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": round(
                     float(summary.get("estimated_non_airtime_non_decode_non_merge_wall_sec_mean") or 0.0) * 1000.0,
                     3,
