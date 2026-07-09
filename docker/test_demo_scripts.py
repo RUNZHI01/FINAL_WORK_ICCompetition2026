@@ -27,6 +27,7 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-24000}"' in script
     assert 'ANALOG_RX_TAIL_SEC="${ANALOG_RX_TAIL_SEC:-0.12}"' in script
     assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"' in script
+    assert 'ANALOG_REMOTE_DECODE_WORKER="${ANALOG_REMOTE_DECODE_WORKER:-1}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 
@@ -52,6 +53,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "OPENAMP_DEMO_LINK_MODE",
         "ANALOG_IN_PROCESS_LOCAL_CODEC",
         "ANALOG_WARMUP_LOCAL_CODEC",
+        "ANALOG_REMOTE_DECODE_WORKER",
         "MLKEM_TRANSPORT_MODE",
         "MLKEM_AUTH_ENABLED",
         "MLKEM_AUTH_SIG_POLICY",

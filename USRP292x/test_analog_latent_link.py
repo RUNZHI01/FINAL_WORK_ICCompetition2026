@@ -115,6 +115,84 @@ def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
 
 
+def test_decode_server_reuses_process_for_json_decode_command(tmp_path):
+    rng = np.random.default_rng(124)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    out_wire = tmp_path / "merged_round0.bin"
+    summary = tmp_path / "decode_summary.json"
+    np.savez(input_path, latent=latent)
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(ANALOG_LINK),
+            "make",
+            "--input",
+            str(input_path),
+            "--out-sc16",
+            str(tx_sc16),
+            "--manifest",
+            str(manifest),
+            "--rate",
+            "5000000",
+            "--sps",
+            "4",
+            "--amp",
+            "3000",
+            "--cfo-pilot-symbols",
+            "128",
+            "--sync-pilot-symbols",
+            "128",
+            "--data-block-symbols",
+            "256",
+            "--mid-pilot-symbols",
+            "32",
+            "--zero-guard-samples",
+            "256",
+            "--tail-guard-samples",
+            "256",
+            "--no-rx-post-quantize",
+        ],
+        check=True,
+        cwd=PROJECT_ROOT,
+    )
+
+    proc = subprocess.Popen(
+        [sys.executable, str(ANALOG_LINK), "decode-server"],
+        cwd=PROJECT_ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.stdin is not None
+    request = {
+        "cmd": "decode",
+        "rx_sc16": str(tx_sc16),
+        "manifest": str(manifest),
+        "out_npz": str(out_npz),
+        "out_wire": str(out_wire),
+        "summary_json": str(summary),
+    }
+    proc.stdin.write(json.dumps(request) + "\n")
+    proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
+    proc.stdin.close()
+    stdout, stderr = proc.communicate(timeout=30)
+
+    assert proc.returncode == 0, stderr
+    responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+    assert responses[0]["status"] == "ok"
+    assert responses[0]["summary_json"] == str(summary)
+    assert responses[-1]["status"] == "bye"
+    assert out_npz.is_file()
+    assert out_wire.is_file()
+    assert summary.is_file()
+
+
 def test_find_sync_candidates_respects_symbol_search_window():
     sps = 4
     sync = analog.make_pilot_symbols(32, 1002)
@@ -808,6 +886,77 @@ def test_process_image_remote_decode_batches_remote_file_operations(tmp_path, mo
         "/tmp/analog_runs/run42/image_0000/merged_round0.bin",
         "/tmp/analog_runs/run42/image_0000/decode_summary.json",
     ]]
+
+
+def test_process_image_remote_decode_uses_persistent_worker_when_available(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    worker_requests: list[dict[str, object]] = []
+
+    class FakeWorker:
+        def decode(self, request, log_path, *, timeout):
+            worker_requests.append(dict(request))
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout="", stderr="")
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_worker=FakeWorker(),
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_pull_files_from_remote_tar(_target, _remote_dir, remote_to_local, _log_path, **_kwargs):
+        for remote_name, local_path in remote_to_local.items():
+            if remote_name == "decode_summary.json":
+                local_path.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+            else:
+                local_path.write_bytes(b"payload")
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_remote_command", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("persistent worker should handle remote decode")))
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(analog_batch, "pull_files_from_remote_tar", fake_pull_files_from_remote_tar)
+    monkeypatch.setattr(analog_batch, "cleanup_remote_files", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert worker_requests
+    assert worker_requests[0]["rx_sc16"] == "/tmp/analog_runs/run42/image_0000/batch_rx.sc16"
+    assert worker_requests[0]["sync_search_window_symbols"] == 4096
 
 
 def test_batch_runner_dry_run_can_inject_simulated_cfo_awgn(tmp_path):

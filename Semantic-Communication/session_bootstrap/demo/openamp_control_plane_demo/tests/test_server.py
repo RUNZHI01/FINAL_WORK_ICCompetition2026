@@ -5689,7 +5689,7 @@ class DemoHTTPServerTest(unittest.TestCase):
             patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
             patch("server._board_position_api_status") as board_position_status,
             patch.object(state, "_start_board_position_api_refresh") as start_position_refresh,
-            patch("server.query_board_aircraft_position_upstream") as query_upstream,
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh") as start_upstream_refresh,
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
@@ -5704,7 +5704,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         start_telemetry_refresh.assert_not_called()
         board_position_status.assert_not_called()
         start_position_refresh.assert_not_called()
-        query_upstream.assert_not_called()
+        start_upstream_refresh.assert_not_called()
 
     def test_system_status_reports_upstream_not_found_when_probe_finds_no_candidate(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)

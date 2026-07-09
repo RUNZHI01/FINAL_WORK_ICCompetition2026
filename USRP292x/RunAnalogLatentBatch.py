@@ -15,12 +15,14 @@ import argparse
 import io
 import json
 import os
+import queue
 import shlex
 import shutil
 import socket
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -80,6 +82,13 @@ def env_optional_float(name: str) -> float | None:
 def env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     return default if raw is None or str(raw).strip() == "" else int(raw)
+
+
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -793,6 +802,115 @@ def remote_pythonpath_for_decode(args: argparse.Namespace) -> str:
     return f"{project_root}/scripts:{project_root}"
 
 
+class RemoteAnalogDecodeWorker:
+    def __init__(
+        self,
+        proc: subprocess.Popen[str],
+        stderr_handle: Any,
+        response_queue: queue.Queue[str],
+        reader_thread: threading.Thread,
+    ) -> None:
+        self.proc = proc
+        self._stderr_handle = stderr_handle
+        self._responses = response_queue
+        self._reader_thread = reader_thread
+
+    @classmethod
+    def start(
+        cls,
+        target: str,
+        args: argparse.Namespace,
+        log_path: Path,
+        *,
+        control_socket: str | None = None,
+    ) -> "RemoteAnalogDecodeWorker":
+        remote_argv = [
+            "env",
+            f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
+            remote_python_for_decode(args),
+            "-u",
+            remote_analog_link_path(args),
+            "decode-server",
+        ]
+        remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
+        full = _ssh_base_args(timeout=15, control_socket=control_socket) + [target, remote_cmd]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        stderr_handle = log_path.open("ab")
+        proc = subprocess.Popen(
+            full,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stderr_handle,
+            text=True,
+            bufsize=1,
+            shell=False,
+        )
+        responses: queue.Queue[str] = queue.Queue()
+
+        def reader() -> None:
+            if proc.stdout is None:
+                return
+            for stdout_line in proc.stdout:
+                responses.put(stdout_line)
+
+        reader_thread = threading.Thread(target=reader, daemon=True)
+        reader_thread.start()
+        return cls(proc, stderr_handle, responses, reader_thread)
+
+    def decode(
+        self,
+        request: dict[str, Any],
+        log_path: Path,
+        *,
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        if self.proc.poll() is not None:
+            raise RuntimeError(f"remote decode worker exited with status {self.proc.returncode}")
+        if self.proc.stdin is None:
+            raise RuntimeError("remote decode worker stdin is closed")
+        self.proc.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
+        self.proc.stdin.flush()
+        try:
+            line = self._responses.get(timeout=timeout)
+        except queue.Empty as exc:
+            self.close(kill=True)
+            raise RuntimeError(f"remote decode worker timed out after {timeout:.1f}s") from exc
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(line, encoding="utf-8")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"remote decode worker returned invalid JSON: {line.strip()}") from exc
+        if str(response.get("status") or "").lower() != "ok":
+            raise RuntimeError(str(response.get("error") or "remote decode worker failed"))
+        return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout=line, stderr="")
+
+    def close(self, *, kill: bool = False) -> None:
+        try:
+            if self.proc.poll() is None and self.proc.stdin is not None and not kill:
+                self.proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
+                self.proc.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        try:
+            if self.proc.stdin is not None:
+                self.proc.stdin.close()
+        except OSError:
+            pass
+        if kill and self.proc.poll() is None:
+            self.proc.kill()
+        try:
+            self.proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        try:
+            self._stderr_handle.close()
+        except OSError:
+            pass
+
+
 def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path, manifest: Path) -> list[str]:
     cmd = [
         sys.executable,
@@ -951,6 +1069,36 @@ def remote_analog_decode_args(
     if args.scramble_context:
         cmd.extend(["--scramble-context", str(args.scramble_context)])
     return cmd
+
+
+def remote_analog_decode_request(
+    args: argparse.Namespace,
+    remote_batch_rx: str,
+    remote_manifest: str,
+    remote_npz: str,
+    remote_wire: str,
+    remote_summary: str,
+) -> dict[str, Any]:
+    request: dict[str, Any] = {
+        "cmd": "decode",
+        "rx_sc16": remote_batch_rx,
+        "manifest": remote_manifest,
+        "out_npz": remote_npz,
+        "out_wire": remote_wire,
+        "summary_json": remote_summary,
+        "sync_candidates": int(args.sync_candidates),
+        "min_sync_metric": float(args.min_sync_metric),
+        "robust_cfo_max_hz": float(args.robust_cfo_max_hz),
+        "robust_cfo_step_hz": float(args.robust_cfo_step_hz),
+        "robust_sync": bool(args.robust_sync),
+        "sync_search_window_symbols": 0
+        if bool(getattr(args, "dry_run", False))
+        else int(getattr(args, "sync_search_window_symbols", 0) or 0),
+        "scramble_key": str(getattr(args, "scramble_key", "") or ""),
+        "scramble_key_hex": str(getattr(args, "scramble_key_hex", "") or ""),
+        "scramble_context": str(getattr(args, "scramble_context", "") or ""),
+    }
+    return request
 
 
 def analog_decode_namespace(
@@ -1272,15 +1420,31 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     remote_wire,
                     remote_summary,
                 )
+                remote_request = remote_analog_decode_request(
+                    args,
+                    remote_batch_rx,
+                    remote_manifest,
+                    remote_npz,
+                    remote_wire,
+                    remote_summary,
+                )
                 # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
                 # happens at capture time, not decode time. Remote decode reads what was captured.
-                run_remote_command(
-                    remote_target,
-                    remote_argv,
-                    image.image_dir / "remote_decode.log",
-                    control_socket=ssh_control_socket,
-                    timeout=max(120.0, capture_timeout),
-                )
+                remote_decode_worker = getattr(args, "remote_decode_worker", None)
+                if remote_decode_worker is not None:
+                    remote_decode_worker.decode(
+                        remote_request,
+                        image.image_dir / "remote_decode.log",
+                        timeout=max(120.0, capture_timeout),
+                    )
+                else:
+                    run_remote_command(
+                        remote_target,
+                        remote_argv,
+                        image.image_dir / "remote_decode.log",
+                        control_socket=ssh_control_socket,
+                        timeout=max(120.0, capture_timeout),
+                    )
                 # Pull npz/wire/summary back to local image_dir paths
                 pull_files_from_remote_tar(
                     remote_target,
@@ -1491,11 +1655,29 @@ def main() -> int:
 
     started = time.monotonic()
     completed: list[ImageRecord] = []
-    for image in images:
-        result = process_image(args, image)
-        completed.append(result)
-        if args.stop_on_fail and not result.passed:
-            break
+    remote_decode_worker: RemoteAnalogDecodeWorker | None = None
+    if (
+        str(getattr(args, "rx_capture_mode", "") or "").strip().lower() == "remote-decode"
+        and not bool(getattr(args, "dry_run", False))
+        and env_bool("ANALOG_REMOTE_DECODE_WORKER", True)
+    ):
+        remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
+        if remote_target:
+            remote_decode_worker = RemoteAnalogDecodeWorker.start(
+                remote_target,
+                args,
+                run_dir / "remote_decode_worker.log",
+            )
+    setattr(args, "remote_decode_worker", remote_decode_worker)
+    try:
+        for image in images:
+            result = process_image(args, image)
+            completed.append(result)
+            if args.stop_on_fail and not result.passed:
+                break
+    finally:
+        if remote_decode_worker is not None:
+            remote_decode_worker.close()
     passed_count = sum(1 for image in completed if image.passed)
     failed_count = sum(1 for image in completed if not image.passed)
 
@@ -1516,6 +1698,7 @@ def main() -> int:
         "payload_is_bit_exact": False,
         "dry_run": bool(args.dry_run),
         "in_process_local_codec": bool(getattr(args, "in_process_local_codec", False)),
+        "remote_decode_worker_enabled": remote_decode_worker is not None,
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
         "rate": float(args.rate),

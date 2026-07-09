@@ -14,6 +14,7 @@ import json
 import math
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -1127,6 +1128,58 @@ def simulate_channel(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
+def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace:
+    return argparse.Namespace(
+        rx_sc16=str(request["rx_sc16"]),
+        manifest=str(request["manifest"]),
+        out_npz=str(request["out_npz"]),
+        out_wire=str(request.get("out_wire") or ""),
+        summary_json=str(request.get("summary_json") or ""),
+        sync_candidates=int(request.get("sync_candidates", DEFAULT_SYNC_CANDIDATES)),
+        min_sync_metric=float(request.get("min_sync_metric", DEFAULT_MIN_SYNC_METRIC)),
+        robust_sync=bool(request.get("robust_sync", True)),
+        robust_cfo_max_hz=float(request.get("robust_cfo_max_hz", DEFAULT_ROBUST_CFO_MAX_HZ)),
+        robust_cfo_step_hz=float(request.get("robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
+        sync_search_center_symbol=int(request.get("sync_search_center_symbol", -1)),
+        sync_search_window_symbols=int(request.get("sync_search_window_symbols", 0)),
+        scramble_key=str(request.get("scramble_key") or ""),
+        scramble_key_hex=str(request.get("scramble_key_hex") or ""),
+        scramble_context=str(request.get("scramble_context") or ""),
+    )
+
+
+def run_decode_server() -> int:
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            request = json.loads(line)
+        except json.JSONDecodeError as exc:
+            print(json.dumps({"status": "error", "error": f"invalid json: {exc}"}, ensure_ascii=False), flush=True)
+            continue
+        cmd = str(request.get("cmd") or "decode").strip().lower()
+        if cmd in {"quit", "exit"}:
+            print(json.dumps({"status": "bye"}, ensure_ascii=False), flush=True)
+            return 0
+        if cmd != "decode":
+            print(json.dumps({"status": "error", "error": f"unsupported cmd: {cmd}"}, ensure_ascii=False), flush=True)
+            continue
+        try:
+            args = decode_namespace_from_request(request)
+            summary = decode_waveform(args)
+            print(json.dumps({
+                "status": "ok",
+                "summary_json": args.summary_json,
+                "sync_metric": summary["sync_metric"],
+                "estimated_cfo_hz": summary["estimated_cfo_hz"],
+            }, ensure_ascii=False), flush=True)
+        except Exception as exc:
+            traceback.print_exc(file=sys.stderr)
+            print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), flush=True)
+    return 0
+
+
 def recover_payload_with_fixed_cfo(
     rx_dc: np.ndarray,
     taps: np.ndarray,
@@ -1356,6 +1409,8 @@ def parse_args() -> argparse.Namespace:
     simulate.add_argument("--seed", type=int, default=1)
     simulate.add_argument("--summary-json", default="")
 
+    sub.add_parser("decode-server")
+
     return parser.parse_args()
 
 
@@ -1389,6 +1444,8 @@ def main() -> int:
             "simulated_snr_db": summary["simulated_snr_db"],
         }, ensure_ascii=False))
         return 0
+    if args.cmd == "decode-server":
+        return run_decode_server()
     raise RuntimeError(f"unknown command: {args.cmd}")
 
 
