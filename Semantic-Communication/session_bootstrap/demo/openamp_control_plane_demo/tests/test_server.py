@@ -4055,6 +4055,7 @@ class ServerMainTest(unittest.TestCase):
                 job._log_handle.close()
 
         command = job._runner_command
+        self.assertIn("RunQpskFileBatchSpoolArq.py", str(command[1]))
         self.assertIn("--decode-backend", command)
         self.assertEqual(command[command.index("--decode-backend") + 1], "python")
         self.assertIn("--tx-file-path-prefix-from", command)
@@ -4063,6 +4064,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
         self.assertNotIn("--sps", command)
         self.assertNotIn("--amp", command)
+        sync_decode_assets.assert_not_called()
 
     def test_usrp_wire_sync_uses_scp_instead_of_ssh_stdin(self) -> None:
         access = usrp_runtime.BoardAccessConfig(
@@ -4182,6 +4184,71 @@ class ServerMainTest(unittest.TestCase):
         sync_decode_assets.assert_called_once()
         _, sync_kwargs = sync_decode_assets.call_args
         self.assertEqual(sync_kwargs["remote_project_root"], "/home/user")
+
+    def test_usrp_iq_direct_tvm_runner_defaults_to_remote_dir_decode(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=1,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("RunAnalogLatentBatch.py", str(command[1]))
+        self.assertIn("--remote-decode-result-mode", command)
+        self.assertEqual(command[command.index("--remote-decode-result-mode") + 1], "remote-dir")
+        self.assertIn("--remote-decoded-output-dir", command)
+        self.assertEqual(
+            command[command.index("--remote-decoded-output-dir") + 1],
+            f"/home/user/cockpit_usrp_rx/{job._run_id}_rx",
+        )
 
     def test_usrp_iq_direct_runner_respects_explicit_sync_overrides(self) -> None:
         class FakeThread:
