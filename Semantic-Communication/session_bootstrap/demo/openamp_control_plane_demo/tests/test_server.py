@@ -4323,6 +4323,65 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(manifest["decode_location"], "board")
         self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
 
+    def test_usrp_iq_remote_decode_refuses_control_plane_wire_restaging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            job = usrp_runtime.UsrpBatchSpoolJob(
+                access,
+                variant="current",
+                max_inputs=1,
+                inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                inference_callback=lambda *_args, **_kwargs: {"status": "ok"},
+            )
+            job._run_dir.mkdir(parents=True, exist_ok=True)
+            job._summary_path.write_text(
+                json.dumps(
+                    {
+                        "target_count": 1,
+                        "completed_count": 1,
+                        "pass_count": 1,
+                        "failed_count": 0,
+                        "all_pass": True,
+                        "remote_decode_result_mode": "pull",
+                        "images": [{"index": 0, "passed": True}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            job._log_path.write_text("", encoding="utf-8")
+            job._process = Mock()
+            job._process.wait.return_value = 0
+            job._log_handle = Mock()
+
+            with (
+                patch("usrp_runtime._stage_merged_wire_blobs_for_remote_decode") as stage_wire,
+                patch("usrp_runtime._sync_and_decode_wire_blobs_on_remote") as sync_wire,
+            ):
+                job._wait_for_completion()
+
+        stage_wire.assert_not_called()
+        sync_wire.assert_not_called()
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["status"], "fallback")
+        self.assertIn("IQ-direct", snapshot["message"])
+        self.assertIn("remote-dir", snapshot["message"])
+
     def test_sync_iq_decode_assets_skips_upload_when_remote_hashes_match(self) -> None:
         import hashlib
 

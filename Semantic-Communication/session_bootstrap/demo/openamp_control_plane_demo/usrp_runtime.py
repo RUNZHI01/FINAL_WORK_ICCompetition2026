@@ -2832,12 +2832,17 @@ class UsrpBatchSpoolJob:
                 self._phase = "transport_shutdown"
                 self._shutdown_control_servers_after_transport()
                 if self._input_source_mode == "usrp":
-                    self._remote_stage_manifest = (
-                        _iq_remote_decode_stage_manifest_from_summary(summary)
-                        if self._link_mode == LINK_MODE_IQ_DIRECT
-                        else None
-                    )
-                    if self._remote_stage_manifest is None:
+                    if self._link_mode == LINK_MODE_IQ_DIRECT:
+                        self._remote_stage_manifest = _iq_remote_decode_stage_manifest_from_summary(summary)
+                        if (
+                            self._remote_stage_manifest is None
+                            and self._inference_engine != INFERENCE_ENGINE_NONE
+                        ):
+                            raise RuntimeError(
+                                "IQ-direct remote-decode 缺少 remote-dir 板端输出目录；"
+                                "为避免 USRP 数据面绕行 Tailscale，拒绝通过控制面重传 wire blob。"
+                            )
+                    else:
                         self._phase = "board_decode"
                         wire_stage_dir = self._run_dir / "board_wire_decode_stage"
                         self._wire_stage_manifest = _stage_merged_wire_blobs_for_remote_decode(
