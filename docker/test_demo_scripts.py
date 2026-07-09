@@ -11,7 +11,7 @@ def read_script(name: str) -> str:
     return (DOCKER_DIR / name).read_text(encoding="utf-8")
 
 
-def test_start_electron_has_tvm250_prerecorded_profile() -> None:
+def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     script = read_script("start-electron-prod-demo.sh")
 
     assert "ICCOMP_COCKPIT_PROFILE" in script
@@ -20,14 +20,19 @@ def test_start_electron_has_tvm250_prerecorded_profile() -> None:
     assert 'MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-tcp}"' in script
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-0}"' in script
     assert 'MLKEM_AUTH_SIG_POLICY="${MLKEM_AUTH_SIG_POLICY:-DUAL_REQUIRED}"' in script
-    assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"' in script
+    assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"' in script
+    assert 'ANALOG_REMOTE_DECODE_RESULT_MODE="${ANALOG_REMOTE_DECODE_RESULT_MODE:-remote-dir}"' in script
     assert 'ANALOG_IN_PROCESS_LOCAL_CODEC="${ANALOG_IN_PROCESS_LOCAL_CODEC:-1}"' in script
     assert 'ANALOG_WARMUP_LOCAL_CODEC="${ANALOG_WARMUP_LOCAL_CODEC:-1}"' in script
-    assert 'ANALOG_SPS="${ANALOG_SPS:-16}"' in script
-    assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-24000}"' in script
-    assert 'ANALOG_RX_TAIL_SEC="${ANALOG_RX_TAIL_SEC:-0.12}"' in script
-    assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"' in script
+    assert 'ANALOG_SPS="${ANALOG_SPS:-2}"' in script
+    assert 'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-6000}"' in script
+    assert 'ANALOG_RX_TAIL_SEC="${ANALOG_RX_TAIL_SEC:-0.05}"' in script
+    assert 'PERSISTENT_RX_TX_DELAY="${PERSISTENT_RX_TX_DELAY:-0}"' in script
+    assert 'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"' in script
+    assert 'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"' in script
+    assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"' in script
     assert 'ANALOG_REMOTE_DECODE_WORKER="${ANALOG_REMOTE_DECODE_WORKER:-1}"' in script
+    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-1}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 
