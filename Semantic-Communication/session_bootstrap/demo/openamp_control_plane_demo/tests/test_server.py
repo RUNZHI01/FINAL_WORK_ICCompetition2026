@@ -1194,6 +1194,147 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(system_payload["recent_results"]["current"]["quality"]["psnr_db"], 37.0)
         self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "tvm")
 
+    def test_start_batch_inference_marks_iq_remote_dir_images_decoded_while_transport_runs(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+        allow_finish = threading.Event()
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "usrp-stream-live-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "iq_remote_decode_manifest": {
+                            "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                            "decode_manifest": {
+                                "decoded_count": 1,
+                                "files": ["/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz"],
+                            },
+                        }
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "transport": {"completed_count": 1, "expected_count": 3, "state": "running"},
+                        "inference": {"completed_count": 0, "expected_count": 3, "state": "pending"},
+                    },
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            self.assertEqual(job_id, "usrp-stream-live-001")
+            allow_finish.wait(timeout=2.0)
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "USRP stream + handwritten TVM",
+                "message": "USRP TVM completed.",
+                "artifact_sha": "sha-usrp-stream",
+                "sample": {"label": "airfield"},
+                "quality": {"psnr_db": 37.0, "ssim": 0.97},
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "timings": {"payload_ms": 121.0, "total_ms": 130.0},
+                "wrapper_summary": {
+                    "inference_engine": "tvm",
+                    "iq_remote_decode_manifest": {
+                        "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                        "decode_manifest": {
+                            "decoded_count": 3,
+                            "files": [
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000001.npz",
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000002.npz",
+                            ],
+                        },
+                    },
+                    "inference_summary": {
+                        "status": "ok",
+                        "processed_count": 3,
+                        "selected_input_count": 3,
+                        "run_samples_ms": [120.0, 121.0, 122.0],
+                        "run_median_ms": 121.0,
+                        "run_mean_ms": 121.0,
+                    },
+                },
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "tvm",
+                        "iq_remote_decode_manifest": {
+                            "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                            "decode_manifest": {
+                                "decoded_count": 3,
+                                "files": [
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000001.npz",
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000002.npz",
+                                ],
+                            },
+                        },
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 3,
+                            "selected_input_count": 3,
+                            "run_samples_ms": [120.0, 121.0, 122.0],
+                            "run_median_ms": 121.0,
+                            "run_mean_ms": 121.0,
+                        },
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "transport": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "inference": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                    },
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                images = current.get("iq_streaming_images") or []
+                if images:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail(f"iq streaming state did not appear: {state.get_batch_state()}")
+
+            self.assertEqual(images[0]["status"], "decoded")
+            self.assertEqual(images[0]["remote_npz"], "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz")
+            self.assertEqual(images[1]["status"], "pending")
+            self.assertEqual(images[2]["status"], "pending")
+            allow_finish.set()
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"usrp stream batch did not finish: {state.get_batch_state()}")
+
+        final_images = state.get_batch_state()["iq_streaming_images"]
+        self.assertEqual([image["status"] for image in final_images], ["done", "done", "done"])
+
     def test_start_batch_inference_marks_done_when_worker_raises(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -3993,6 +4134,62 @@ class ServerMainTest(unittest.TestCase):
 
         self.assertEqual(snapshot["progress"]["count_label"], "2 / 3")
         self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 2)
+
+    def test_usrp_iq_snapshot_exposes_remote_dir_decoded_manifest_before_summary_exists(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+
+            image_0 = job._run_dir / "image_0000"
+            image_0.mkdir(parents=True)
+            (image_0 / "decode_summary.json").write_text(
+                json.dumps({"status": "ok", "frame_complete": True, "sync_success": True}),
+                encoding="utf-8",
+            )
+            with job._lock:
+                job._phase = "transport"
+                job._host_preprocess_completed = 3
+                job._host_preprocess_state = "completed"
+
+            snapshot = job.snapshot()
+
+        manifest = snapshot["wrapper_summary"]["iq_remote_decode_manifest"]
+        self.assertEqual(manifest["remote_dir"], f"/home/user/cockpit_usrp_rx/{job._run_id}_rx")
+        self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+        self.assertEqual(
+            manifest["decode_manifest"]["files"],
+            [f"/home/user/cockpit_usrp_rx/{job._run_id}_rx/00000000.npz"],
+        )
+        self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 1)
 
     def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

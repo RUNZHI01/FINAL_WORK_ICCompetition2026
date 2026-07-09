@@ -1482,6 +1482,78 @@ def _iq_remote_decode_stage_manifest_from_summary(summary: dict[str, Any]) -> di
     }
 
 
+def _image_index_from_run_dir(image_dir: Path) -> int | None:
+    match = re.fullmatch(r"image_(\d+)", image_dir.name)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _iq_remote_decode_stage_manifest_from_image_dirs(run_dir: Path, remote_dir: str) -> dict[str, Any] | None:
+    remote_dir = str(remote_dir or "").strip().rstrip("/")
+    if not remote_dir:
+        return None
+    try:
+        image_dirs = sorted(path for path in run_dir.glob("image_*") if path.is_dir())
+    except OSError:
+        return None
+
+    decoded_images: list[dict[str, Any]] = []
+    for image_dir in image_dirs:
+        image_index = _image_index_from_run_dir(image_dir)
+        if image_index is None:
+            continue
+        summary_path = image_dir / "decode_summary.json"
+        if not summary_path.is_file():
+            continue
+        summary = _safe_read_json(summary_path)
+        status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+        frame_complete = bool(summary.get("frame_complete", True))
+        if not (status_ok and frame_complete):
+            continue
+        remote_npz = str(
+            summary.get("remote_received_latent_npz")
+            or summary.get("target_npz")
+            or summary.get("out_npz")
+            or ""
+        ).strip()
+        if not remote_npz:
+            remote_npz = f"{remote_dir}/{image_index:08d}.npz"
+        decoded_images.append(
+            {
+                "index": image_index,
+                "status": "decoded",
+                "remote_npz": remote_npz,
+                "decode_summary": str(summary_path),
+            }
+        )
+
+    if not decoded_images:
+        return None
+
+    decoded_images.sort(key=lambda item: int(item["index"]))
+    remote_files = [str(item["remote_npz"]) for item in decoded_images]
+    remote_root = remote_dir.rsplit("/", 1)[0] if "/" in remote_dir else remote_dir
+    return {
+        "remote_root": remote_root,
+        "remote_dir": remote_dir,
+        "remote_wire_dir": "",
+        "decode_location": "board",
+        "remote_python": "",
+        "uploaded_bytes": 0,
+        "decode_manifest": {
+            "status": "ok",
+            "source": "iq_remote_decode_partial",
+            "decoded_count": len(remote_files),
+            "files": remote_files,
+            "images": decoded_images,
+        },
+    }
+
+
 def _sync_iq_decode_assets_on_remote(
     access: BoardAccessConfig,
     *,
@@ -2070,6 +2142,7 @@ class UsrpBatchSpoolJob:
         self._input_source_label = input_source_mode_label(self._input_source_mode)
         self._remote_usrp_rx_root = _first_value(env_values, REMOTE_USRP_RX_ROOT_KEYS)
         self._remote_decode_python = _first_value(env_values, REMOTE_DECODE_PYTHON_KEYS, "python3")
+        self._iq_remote_decoded_output_dir = ""
         self._prepared_input_manifest: dict[str, Any] | None = None
         self._wire_stage_manifest: dict[str, Any] | None = None
         self._remote_stage_manifest: dict[str, Any] | None = None
@@ -2367,6 +2440,8 @@ class UsrpBatchSpoolJob:
                 ).strip().rstrip("/")
                 if not remote_decoded_output_dir:
                     remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root or '').rstrip('/')}/{self._run_id}_rx"
+                with self._lock:
+                    self._iq_remote_decoded_output_dir = remote_decoded_output_dir
                 command.extend(["--remote-decoded-output-dir", remote_decoded_output_dir])
             tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
             tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
@@ -3112,6 +3187,7 @@ class UsrpBatchSpoolJob:
             host_preprocess_completed = self._host_preprocess_completed
             host_preprocess_total = self._host_preprocess_total
             host_preprocess_state = self._host_preprocess_state
+            iq_remote_decoded_output_dir = self._iq_remote_decoded_output_dir
         transport_done = phase in {"transport_shutdown", "board_decode", "inference"}
         host_preprocess_done = phase not in {"starting", "host_preprocess"} and host_preprocess_state == "completed"
         decoding = phase in {"transport_shutdown", "board_decode"}
@@ -3142,6 +3218,19 @@ class UsrpBatchSpoolJob:
         if self._control_preflight:
             diagnostics["control_preflight"] = self._control_preflight
 
+        wrapper_summary: dict[str, Any] = {}
+        if self._link_mode == LINK_MODE_IQ_DIRECT and self._inference_engine != INFERENCE_ENGINE_NONE:
+            remote_decoded_output_dir = str(iq_remote_decoded_output_dir or "").strip().rstrip("/")
+            if not remote_decoded_output_dir and self._remote_usrp_rx_root:
+                remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root).rstrip('/')}/{self._run_id}_rx"
+            iq_manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
+                self._run_dir,
+                remote_decoded_output_dir,
+            )
+            if iq_manifest is not None:
+                wrapper_summary["iq_remote_decode_manifest"] = iq_manifest
+                diagnostics["board_decode_partial"] = iq_manifest
+
         return {
             "status": "running",
             "request_state": "running",
@@ -3156,7 +3245,7 @@ class UsrpBatchSpoolJob:
             "data_transport": "usrp",
             "control_handshake_complete": self._control_transport != "none",
             "runner_summary": {},
-            "wrapper_summary": {},
+            "wrapper_summary": wrapper_summary,
             "diagnostics": diagnostics,
             "progress": self._build_progress_payload(
                 state="running",

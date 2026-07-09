@@ -2295,6 +2295,86 @@ def _compute_tvm_benchmark(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _iq_index_from_remote_npz(remote_npz: str) -> int | None:
+    name = PurePosixPath(str(remote_npz or "").strip()).name
+    match = re.fullmatch(r"(\d+)\.npz", name)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _iq_streaming_images_from_manifest(
+    manifest: dict[str, Any] | None,
+    *,
+    total: int,
+    inference_state: str = "pending",
+    final_success: bool | None = None,
+) -> list[dict[str, Any]]:
+    if not isinstance(manifest, dict):
+        return []
+    try:
+        total_count = max(1, int(total))
+    except (TypeError, ValueError):
+        total_count = 1
+
+    decode_manifest = manifest.get("decode_manifest") if isinstance(manifest.get("decode_manifest"), dict) else {}
+    decoded_by_index: dict[int, str] = {}
+    manifest_images = decode_manifest.get("images") if isinstance(decode_manifest.get("images"), list) else []
+    for item in manifest_images:
+        if not isinstance(item, dict):
+            continue
+        try:
+            image_index = int(item.get("index"))
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= image_index < total_count:
+            continue
+        remote_npz = str(item.get("remote_npz") or item.get("target_npz") or "").strip()
+        if remote_npz:
+            decoded_by_index[image_index] = remote_npz
+
+    files = decode_manifest.get("files") if isinstance(decode_manifest.get("files"), list) else []
+    for fallback_index, raw_path in enumerate(files):
+        remote_npz = str(raw_path or "").strip()
+        if not remote_npz:
+            continue
+        image_index = _iq_index_from_remote_npz(remote_npz)
+        if image_index is None:
+            image_index = fallback_index
+        if 0 <= image_index < total_count:
+            decoded_by_index.setdefault(image_index, remote_npz)
+
+    if not decoded_by_index:
+        return []
+
+    normalized_inference_state = str(inference_state or "pending").strip().lower()
+    images: list[dict[str, Any]] = []
+    for image_index in range(total_count):
+        remote_npz = decoded_by_index.get(image_index, "")
+        if remote_npz:
+            if final_success is True or normalized_inference_state == "completed":
+                status = "done"
+            elif final_success is False:
+                status = "failed"
+            elif normalized_inference_state == "running":
+                status = "tvm_running"
+            else:
+                status = "decoded"
+        else:
+            status = "pending"
+        images.append(
+            {
+                "index": image_index,
+                "status": status,
+                "remote_npz": remote_npz,
+            }
+        )
+    return images
+
+
 def _benchmark_metric_value(metric: dict[str, Any] | None) -> float | None:
     if not isinstance(metric, dict):
         return None
@@ -7517,6 +7597,14 @@ class DashboardState:
                 while True:
                     progress = last_result.get("live_progress") if isinstance(last_result.get("live_progress"), dict) else {}
                     live_attempt = last_result.get("live_attempt") if isinstance(last_result.get("live_attempt"), dict) else {}
+                    wrapper_summary = live_attempt.get("wrapper_summary") if isinstance(live_attempt.get("wrapper_summary"), dict) else {}
+                    if not wrapper_summary and isinstance(last_result.get("wrapper_summary"), dict):
+                        wrapper_summary = last_result["wrapper_summary"]
+                    iq_manifest = (
+                        wrapper_summary.get("iq_remote_decode_manifest")
+                        if isinstance(wrapper_summary.get("iq_remote_decode_manifest"), dict)
+                        else None
+                    )
                     stage_progress = live_attempt.get("stage_progress") if isinstance(live_attempt.get("stage_progress"), dict) else {}
                     host_stage = stage_progress.get("host_preprocess") if isinstance(stage_progress.get("host_preprocess"), dict) else {}
                     transport_stage = stage_progress.get("transport") if isinstance(stage_progress.get("transport"), dict) else {}
@@ -7543,6 +7631,18 @@ class DashboardState:
                             }
                             state["completed"] = int(state["inference_progress"]["completed"])
                             state["total"] = max(1, int(state["inference_progress"]["total"]))
+                            iq_images = _iq_streaming_images_from_manifest(
+                                iq_manifest,
+                                total=state["total"],
+                                inference_state=str(inference_stage.get("state") or "pending"),
+                            )
+                            if iq_images:
+                                state["iq_streaming_images"] = iq_images
+                                state["iq_decoded_count"] = sum(
+                                    1
+                                    for image in iq_images
+                                    if image.get("status") in {"decoded", "tvm_running", "done"}
+                                )
                         else:
                             state["completed"] = int(progress.get("completed_count") or 0)
                             state["total"] = max(1, int(progress.get("expected_count") or effective_count))
@@ -7595,6 +7695,11 @@ class DashboardState:
                 transport_benchmark = wrapper_summary.get("transport_benchmark") if isinstance(wrapper_summary.get("transport_benchmark"), dict) else None
                 iq_stage_benchmark = wrapper_summary.get("iq_stage_benchmark") if isinstance(wrapper_summary.get("iq_stage_benchmark"), dict) else None
                 inference_benchmark = wrapper_summary.get("inference_benchmark") if isinstance(wrapper_summary.get("inference_benchmark"), dict) else None
+                iq_manifest = (
+                    wrapper_summary.get("iq_remote_decode_manifest")
+                    if isinstance(wrapper_summary.get("iq_remote_decode_manifest"), dict)
+                    else None
+                )
                 tvm_summary = inference_summary or runner_summary or wrapper_summary
 
                 with self._lock:
@@ -7621,6 +7726,19 @@ class DashboardState:
                         }
                         state["completed"] = int(state["inference_progress"]["completed"])
                         state["total"] = max(1, int(state["inference_progress"]["total"]))
+                        iq_images = _iq_streaming_images_from_manifest(
+                            iq_manifest,
+                            total=state["total"],
+                            inference_state=str(inference_stage.get("state") or ("completed" if is_live else "fallback")),
+                            final_success=is_live,
+                        )
+                        if iq_images:
+                            state["iq_streaming_images"] = iq_images
+                            state["iq_decoded_count"] = sum(
+                                1
+                                for image in iq_images
+                                if image.get("status") in {"decoded", "tvm_running", "done"}
+                            )
                     else:
                         state["completed"] = completed
                         state["total"] = total
