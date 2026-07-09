@@ -33,6 +33,11 @@ $env:ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC="90"
 $env:ANALOG_DECODE_PIPELINE_WARMUP="1"
 $env:ANALOG_PIPELINE_DEPTH="2"
 $env:ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
+$env:ANALOG_SYNC_PROFILE="fast-first"
+$env:ANALOG_FAST_SYNC_CANDIDATES="4"
+$env:ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS="1024"
+$env:ANALOG_FALLBACK_SYNC_CANDIDATES="12"
+$env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
 $env:ANALOG_MIN_SYNC_METRIC="0.05"
 $env:ANALOG_ROBUST_SYNC="0"
 $env:USRP_MAX_ARQ_ROUNDS="2"
@@ -68,12 +73,13 @@ These runs were started through the same backend path used by the cockpit deskto
 
 | Link | Batch | Result | Transport metric | RF airtime | Decode / merge | TVM big.LITTLE |
 |---|---:|---:|---:|---:|---:|---:|
-| IQ direct, recommended sequential TVM | `batch-1783625337-300` | 300/300, fail 0 | median `189.10 ms`, p95 `642.66 ms` | `9.58 ms` | decode median `68.47 ms` | median `242.16 ms`, p95 `244.89 ms` |
+| IQ direct, fast-first sync recommended | `batch-1783626884-300` | 300/300, fail 0 | median `182.28 ms`, p95 `372.96 ms` | `9.58 ms` | decode median `62.96 ms` | median `242.41 ms`, p95 `245.77 ms` |
+| IQ direct, previous sequential-sync baseline | `batch-1783625337-300` | 300/300, fail 0 | median `189.10 ms`, p95 `642.66 ms` | `9.58 ms` | decode median `68.47 ms` | median `242.16 ms`, p95 `244.89 ms` |
 | IQ direct, streaming TVM opt-in experiment | `batch-1783624303-300` | 300/300, fail 0 | median `338.90 ms`, p95 `694.20 ms` | `9.58 ms` | decode median `158.52 ms` | median `248.29 ms`, p95 `322.37 ms` |
 | IQ direct, earlier baseline | `batch-1783610422-300` | 300/300, fail 0 | median `202.54 ms`, mean `311.21 ms`, p95 `598.89 ms` | `9.58 ms` | decode median `63.96 ms` | median `241.21 ms`, p95 `243.76 ms` |
 | QPSK | `batch-1783610673-300` | 300/300, fail 0 | `2961.78 ms/image` | mean `48.02 ms` | decode command mean `2295.96 ms`, merge mean `14.23 ms` | median `240.06 ms`, p95 `242.88 ms` |
 
-IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home/user/cockpit_usrp_rx/<run>_rx`, and TVM consumed that directory directly. In the recommended 2026-07-10 profile, inference stayed pending while transport advanced to `300/300`; TVM started only after IQ decode completed. The streaming TVM experiment did overlap transport and inference, but total wall worsened from `161.17 s` to `233.76 s`, so the overlap path is opt-in only. The QPSK run is now a stable fallback rather than a single-frame proof, but it is still about `15.7x` slower than the latest IQ direct median transport.
+IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home/user/cockpit_usrp_rx/<run>_rx`, and TVM consumed that directory directly. In the recommended 2026-07-10 profile, inference stayed pending while transport advanced to `300/300`; TVM started only after IQ decode completed. The streaming TVM experiment did overlap transport and inference, but total wall worsened from `161.17 s` to `233.76 s`, so the overlap path is opt-in only. The QPSK run is now a stable fallback rather than a single-frame proof, but it is still about `16.3x` slower than the latest IQ direct median transport.
 
 Compared with the older QPSK notes below, the QPSK path improved from tens of seconds per image to about 3 seconds per image:
 
@@ -93,23 +99,25 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 5. For each latent, `AnalogLatentLink.py` maps float latent values to complex I/Q symbols, applies RRC shaping, writes sc16, and sends it through the persistent host TX server at `127.0.0.1:29221`.
 6. The board RX server at `100.121.87.73:29220` captures sc16 into `/tmp/usrp292x_remote_runs/...`. The RX/TX servers stay up across images; per image only sends `CAPTURE`, `SEND`, and `WAIT` style control operations.
 7. A persistent board-side decode worker runs `/home/user/venv/bin/python /home/user/USRP292x/AnalogLatentLink.py decode-server`. `ANALOG_DECODE_PIPELINE_WARMUP=1` moves FFT/import/decode cold start out of the per-image timing path.
-8. In `remote-dir` mode the board decode worker writes `000000xx.npz` directly into `/home/user/cockpit_usrp_rx/<run>_rx`. The cockpit host does not pull the raw sc16 or re-upload decoded latents for TVM.
-9. The TVM big.LITTLE wrapper consumes that board-side RX directory. The inferencer is pinned to big core `[2]`, pre/post stages to little cores `[0,1]`; artifact SHA matches `bf255cd4...`.
-10. Cockpit displays transport and reconstruction separately. Transport median comes from IQ raw round records; TVM median comes from the big.LITTLE run summary.
+8. `ANALOG_SYNC_PROFILE=fast-first` first tries a short sync search (`4` candidates, `1024` symbols). Only failed frames fall back to the slower `12` candidate, `4096` symbol search.
+9. In `remote-dir` mode the board decode worker writes `000000xx.npz` directly into `/home/user/cockpit_usrp_rx/<run>_rx`. The cockpit host does not pull the raw sc16 or re-upload decoded latents for TVM.
+10. The TVM big.LITTLE wrapper consumes that board-side RX directory. The inferencer is pinned to big core `[2]`, pre/post stages to little cores `[0,1]`; artifact SHA matches `bf255cd4...`.
+11. Cockpit displays transport and reconstruction separately. Transport median comes from IQ raw round records; TVM median comes from the big.LITTLE run summary.
 
 ## IQ Direct Current Blockers
 
-- RF/RX outliers remain. Latest recommended median transport is `189.10 ms`, but p95 is still `642.66 ms`. The chain is usable and all-pass at 300 images, but the long tail is not yet clean.
+- RF/RX outliers remain. Latest recommended median transport is `182.28 ms` and p95 is `372.96 ms`, but max transport still has rare multi-second stalls. The chain is usable and all-pass at 300 images; the next target is max-tail cleanup.
 - Do not default-enable streaming TVM. Batch `batch-1783624303-300` proved that TVM can consume IQ decoded files before transport ends, but board CPU/IO contention pushed transport median to `338.90 ms` and TVM p95 to `322.37 ms`.
 - Sync quality is still the main physical-layer risk. Lowering `ANALOG_MIN_SYNC_METRIC` to `0.05` avoids expensive robust CFO fallback on marginal but decodable captures; it does not solve weak RF captures.
-- Decode still costs real time. The warmed board worker is now around `68.47 ms` median in the recommended run, but decode and sync outliers still drive transport p95.
+- Decode still costs real time. The warmed board worker is now around `62.96 ms` median in the recommended run, with fast sync median `21.07 ms`; rare decode/RX stalls still drive the max tail.
 - Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
 - The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
 - The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.
 
 ## Verified Milestones
 
-- 2026-07-10 IQ direct recommended profile after a clean restart: `batch-1783625337-300`, 300/300, fallback 0, transport median `189.10 ms`, transport p95 `642.66 ms`, RF airtime `9.58 ms`, RX capture median `97.40 ms`, board decode median `68.47 ms`, TVM median `242.16 ms`, TVM p95 `244.89 ms`, total cockpit batch wall `161.17 s`. Polling showed inference remained `0/300 pending` until transport was `300/300 completed`; this is the default path.
+- 2026-07-10 IQ direct fast-first recommended profile: `batch-1783626884-300`, 300/300, fallback 0, transport median `182.28 ms`, transport p95 `372.96 ms`, RF airtime `9.58 ms`, RX capture median `97.23 ms`, board decode median `62.96 ms`, TVM median `242.41 ms`, TVM p95 `245.77 ms`, total cockpit batch wall `157.12 s`. All 300 decode summaries used `sync_pass=1`; fast sync median `21.07 ms`, p95 `61.51 ms`.
+- 2026-07-10 IQ direct previous sequential-sync profile after a clean restart: `batch-1783625337-300`, 300/300, fallback 0, transport median `189.10 ms`, transport p95 `642.66 ms`, RF airtime `9.58 ms`, RX capture median `97.40 ms`, board decode median `68.47 ms`, TVM median `242.16 ms`, TVM p95 `244.89 ms`, total cockpit batch wall `161.17 s`. Polling showed inference remained `0/300 pending` until transport was `300/300 completed`; this was the recommended default before fast-first sync.
 - 2026-07-10 IQ streaming TVM experiment: `batch-1783624303-300`, 300/300, fallback 0, but total wall `233.76 s`, transport median `338.90 ms`, transport p95 `694.20 ms`, decode median `158.52 ms`, TVM median `248.29 ms`, TVM p95 `322.37 ms`. Keep `OPENAMP_IQ_STREAMING_TVM` / `USRP_IQ_STREAMING_TVM` unset unless explicitly testing overlap.
 - 2026-07-10 cockpit button-equivalent 300-image validation: IQ direct `batch-1783610422-300` completed 300/300 with transport median `202.54 ms`, TVM median `241.21 ms`, remote-dir board decode, and no fallback. QPSK `batch-1783610673-300` completed 300/300 with transport `2961.78 ms/image`, TVM median `240.06 ms`, and no fallback.
 - 2026-07-09 IQ direct keeps the same persistent USRP control plane as QPSK: board RX stays on `100.121.87.73:29220`, host TX stays on `127.0.0.1:29221`, and each frame sends only `CAPTURE/SEND/WAIT` to those servers. Remote-decode now avoids uploading the unused `tx_analog.sc16`, pulls `received_latent.npz`, `merged_round0.bin`, and `decode_summary.json` in one tar stream, and removes all remote per-frame artifacts with one batched cleanup command.
