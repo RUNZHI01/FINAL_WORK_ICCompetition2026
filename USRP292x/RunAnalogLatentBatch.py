@@ -31,7 +31,7 @@ from contextlib import nullcontext
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -176,6 +176,16 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=env_float("ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC", 0.0),
         help="Optional per-image timeout for the persistent remote decode worker. 0 keeps the existing long timeout.",
+    )
+    parser.add_argument(
+        "--remote-decode-soft-complete-sec",
+        type=float,
+        default=env_float("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", 0.0),
+        help=(
+            "Optional soft wait for remote-dir decode worker responses. If the worker stdout response "
+            "is late but the board output and summary already exist, finish the image without restarting "
+            "the worker. 0 disables the extra remote check."
+        ),
     )
     parser.add_argument(
         "--remote-decode-restart-on-timeout",
@@ -1528,6 +1538,67 @@ def remote_decode_request_timeout(args: argparse.Namespace, capture_timeout: flo
     return max(120.0, float(capture_timeout))
 
 
+def remote_decode_soft_complete_sec(args: argparse.Namespace) -> float:
+    return max(0.0, float(getattr(args, "remote_decode_soft_complete_sec", 0.0) or 0.0))
+
+
+def try_remote_dir_decode_soft_completion(
+    target: str,
+    remote_output: str,
+    remote_summary: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    timeout: float = 3.0,
+) -> dict[str, Any] | None:
+    if not str(target or "").strip() or not str(remote_output or "").strip() or not str(remote_summary or "").strip():
+        return None
+    ssh_timeout = max(1, int(math.ceil(float(timeout or 1.0))))
+    remote_cmd = (
+        f"if test -s {shlex.quote(remote_output)} && test -s {shlex.quote(remote_summary)}; "
+        f"then cat {shlex.quote(remote_summary)}; else exit 3; fi"
+    )
+    full = _ssh_base_args(timeout=ssh_timeout, control_socket=control_socket) + [target, remote_cmd]
+    try:
+        proc = subprocess.run(
+            full,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+            timeout=float(timeout or 1.0) + 2.0,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(f"soft completion check failed: {exc}\n", encoding="utf-8")
+        return None
+
+    stdout_text = (proc.stdout or b"").decode("utf-8", errors="replace")
+    stderr_text = (proc.stderr or b"").decode("utf-8", errors="replace")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(stderr_text if proc.returncode == 0 else (stdout_text + stderr_text), encoding="utf-8")
+    if proc.returncode != 0 or not stdout_text.strip():
+        return None
+    try:
+        summary = json.loads(stdout_text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(summary, dict):
+        return None
+    status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+    if not status_ok or not bool(summary.get("frame_complete", True)):
+        return None
+    return {
+        "status": "ok",
+        "summary_json": remote_summary,
+        "sync_metric": summary.get("sync_metric"),
+        "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
+        "summary": summary,
+    }
+
+
 class RemoteAnalogDecodeWorker:
     def __init__(
         self,
@@ -1554,7 +1625,14 @@ class RemoteAnalogDecodeWorker:
     def _request_match_key(request: dict[str, Any]) -> str:
         return str(request.get("request_id") or request.get("summary_json") or "").strip()
 
-    def _wait_for_response(self, request_key: str, timeout: float) -> tuple[str, dict[str, Any]]:
+    def _wait_for_response(
+        self,
+        request_key: str,
+        timeout: float,
+        *,
+        soft_timeout: float = 0.0,
+        soft_completion: Callable[[], dict[str, Any] | None] | None = None,
+    ) -> tuple[str, dict[str, Any]]:
         pending_line = self._pending_responses.pop(request_key, None) if request_key else None
         if pending_line is not None:
             try:
@@ -1566,14 +1644,30 @@ class RemoteAnalogDecodeWorker:
             return pending_line, pending_response
 
         deadline = time.monotonic() + float(timeout)
+        soft_deadline = (
+            time.monotonic() + float(soft_timeout)
+            if soft_completion is not None and float(soft_timeout or 0.0) > 0.0
+            else 0.0
+        )
+        soft_checked = False
         while True:
             remaining = max(0.0, deadline - time.monotonic())
             if remaining <= 0.0:
                 self.close(kill=True)
                 raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s")
+            wait_timeout = remaining
+            if soft_deadline > 0.0 and not soft_checked:
+                wait_timeout = min(wait_timeout, max(0.0, soft_deadline - time.monotonic()))
             try:
-                line = self._responses.get(timeout=remaining)
+                line = self._responses.get(timeout=wait_timeout)
             except queue.Empty as exc:
+                if soft_deadline > 0.0 and not soft_checked and time.monotonic() >= soft_deadline:
+                    soft_checked = True
+                    soft_response = soft_completion() if soft_completion is not None else None
+                    if isinstance(soft_response, dict):
+                        line = json.dumps(soft_response, ensure_ascii=True) + "\n"
+                        return line, soft_response
+                    continue
                 self.close(kill=True)
                 raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s") from exc
             try:
@@ -1725,6 +1819,8 @@ class RemoteAnalogDecodeWorker:
         log_path: Path,
         *,
         timeout: float,
+        soft_timeout: float = 0.0,
+        soft_completion: Callable[[], dict[str, Any] | None] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if self.proc.poll() is not None:
             raise RuntimeError(f"remote decode worker exited with status {self.proc.returncode}")
@@ -1732,7 +1828,12 @@ class RemoteAnalogDecodeWorker:
             raise RuntimeError("remote decode worker stdin is closed")
         self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
         self.proc.stdin.flush()
-        line, response = self._wait_for_response(self._request_match_key(request), timeout)
+        line, response = self._wait_for_response(
+            self._request_match_key(request),
+            timeout,
+            soft_timeout=soft_timeout,
+            soft_completion=soft_completion,
+        )
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(line, encoding="utf-8")
         if str(response.get("status") or "").lower() != "ok":
@@ -2450,10 +2551,29 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 # happens at capture time, not decode time. Remote decode reads what was captured.
                 worker_response: dict[str, Any] = {}
                 if remote_decode_worker is not None:
+                    decode_kwargs: dict[str, Any] = {
+                        "timeout": remote_decode_request_timeout(args, capture_timeout),
+                    }
+                    soft_complete_sec = remote_decode_soft_complete_sec(args)
+                    if remote_decode_result_mode == "remote-dir" and soft_complete_sec > 0.0:
+                        decode_kwargs["soft_timeout"] = soft_complete_sec
+                        decode_kwargs["soft_completion"] = (
+                            lambda target=remote_target,
+                            output=remote_npz,
+                            summary=remote_summary,
+                            log=image.image_dir / "remote_decode_soft_completion.log",
+                            control=ssh_control_socket: try_remote_dir_decode_soft_completion(
+                                target,
+                                output,
+                                summary,
+                                log,
+                                control_socket=control,
+                            )
+                        )
                     worker_proc = remote_decode_worker.decode(
                         remote_request,
                         image.image_dir / "remote_decode.log",
-                        timeout=remote_decode_request_timeout(args, capture_timeout),
+                        **decode_kwargs,
                     )
                     try:
                         worker_response = json.loads(str(worker_proc.stdout or "{}"))
@@ -2977,10 +3097,29 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
         worker_response: dict[str, Any] = {}
         with pipeline_rf_decode_guard(args):
             if remote_decode_worker is not None:
+                decode_kwargs: dict[str, Any] = {
+                    "timeout": remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
+                }
+                soft_complete_sec = remote_decode_soft_complete_sec(args)
+                if remote_decode_result_mode == "remote-dir" and soft_complete_sec > 0.0:
+                    decode_kwargs["soft_timeout"] = soft_complete_sec
+                    decode_kwargs["soft_completion"] = (
+                        lambda target=str(ctx["remote_target"]),
+                        output=remote_npz,
+                        summary=remote_summary,
+                        log=image.image_dir / "remote_decode_soft_completion.log",
+                        control=ctx["ssh_control_socket"]: try_remote_dir_decode_soft_completion(
+                            target,
+                            output,
+                            summary,
+                            log,
+                            control_socket=control,
+                        )
+                    )
                 worker_proc = remote_decode_worker.decode(
                     remote_request,
                     image.image_dir / "remote_decode.log",
-                    timeout=remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
+                    **decode_kwargs,
                 )
                 try:
                     worker_response = json.loads(str(worker_proc.stdout or "{}"))
@@ -3597,6 +3736,7 @@ def main() -> int:
         ),
         "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
         "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
+        "remote_decode_soft_complete_sec": remote_decode_soft_complete_sec(args),
         "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
         "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
         "remote_decoded_output_dirs": remote_decoded_dirs,

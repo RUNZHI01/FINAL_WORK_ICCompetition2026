@@ -451,6 +451,104 @@ def test_remote_decode_worker_ignores_stale_response_for_previous_request(tmp_pa
     assert writes
 
 
+def test_remote_decode_worker_uses_soft_completion_when_response_lags(tmp_path):
+    writes: list[str] = []
+    soft_completion_calls = 0
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+        returncode = None
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    def soft_completion() -> dict[str, object]:
+        nonlocal soft_completion_calls
+        soft_completion_calls += 1
+        return {
+            "status": "ok",
+            "summary_json": "/tmp/current/decode_summary.json",
+            "summary": {"status": "ok", "sync_metric": 0.8},
+        }
+
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        FakeProc(),
+        FakeHandle(),
+        analog_batch.queue.Queue(),
+        None,
+        {"status": "ready"},
+        0.0,
+    )
+
+    result = worker.decode(
+        {"summary_json": "/tmp/current/decode_summary.json"},
+        tmp_path / "remote_decode.log",
+        timeout=1.0,
+        soft_timeout=0.01,
+        soft_completion=soft_completion,
+    )
+
+    payload = json.loads(result.stdout)
+    assert soft_completion_calls == 1
+    assert payload["summary"]["sync_metric"] == 0.8
+    assert writes
+
+
+def test_remote_dir_soft_completion_returns_worker_shaped_response(tmp_path, monkeypatch):
+    commands: list[list[str]] = []
+
+    def fake_ssh_base_args(*, timeout=10, control_socket=None):
+        return ["ssh", "-T"]
+
+    def fake_run(cmd, **kwargs):
+        commands.append(list(cmd))
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout=json.dumps({
+                "status": "ok",
+                "frame_complete": True,
+                "sync_metric": 0.7,
+                "estimated_cfo_hz": 12.5,
+            }).encode("utf-8"),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(analog_batch, "_ssh_base_args", fake_ssh_base_args)
+    monkeypatch.setattr(analog_batch.subprocess, "run", fake_run)
+
+    response = analog_batch.try_remote_dir_decode_soft_completion(
+        "user@board",
+        "/remote/out/00000001.npz",
+        "/remote/run/decode_summary.json",
+        tmp_path / "soft_completion.log",
+        control_socket=None,
+        timeout=2.0,
+    )
+
+    assert response is not None
+    assert response["status"] == "ok"
+    assert response["summary_json"] == "/remote/run/decode_summary.json"
+    assert response["summary"]["sync_metric"] == 0.7
+    assert commands
+    assert "test -s /remote/out/00000001.npz" in commands[0][-1]
+    assert "cat /remote/run/decode_summary.json" in commands[0][-1]
+
+
 def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, monkeypatch):
     popen_commands: list[list[str]] = []
 
