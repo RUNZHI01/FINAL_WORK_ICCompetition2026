@@ -1601,6 +1601,26 @@ def test_pipeline_capture_attempt_stops_rx_after_capture_busy(tmp_path, monkeypa
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("CAPTURE "))
 
 
+def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
+    args = Namespace(rx_control_host="127.0.0.1", rx_control_port=29220, rx_timeout_sec=30.0)
+    control_lines: list[str] = []
+    status_responses = ["OK busy=1 started=1 done=0 ok=1", "OK busy=0 started=1 done=1 ok=0 error=stopped"]
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line == "STOP":
+            return "OK busy=1 started=1 done=0 ok=1"
+        if line == "STATUS":
+            return status_responses.pop(0)
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    analog_batch.stop_rx_capture(args, tmp_path / "stop.log")
+
+    assert control_lines == ["STOP", "STATUS", "STATUS"]
+
+
 def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

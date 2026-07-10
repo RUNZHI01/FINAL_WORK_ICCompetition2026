@@ -361,20 +361,46 @@ def is_rx_capture_busy_error(exc: Exception) -> bool:
     return "CAPTURE " in text and ("capture_already_running" in text or "ERR busy=" in text)
 
 
+def rx_control_response_busy(response: str) -> bool:
+    for token in str(response or "").replace("\n", " ").split():
+        if token.startswith("busy="):
+            return token.split("=", 1)[1] not in {"0", "false", "False"}
+    return False
+
+
 def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> None:
     timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
+    drain_timeout = max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
+    drain_poll = max(0.01, env_float("ANALOG_RX_STOP_DRAIN_POLL_SEC", 0.05))
+    entries: list[str] = []
     try:
-        run_control(
+        response = run_control(
             str(getattr(args, "rx_control_host", "")),
             int(getattr(args, "rx_control_port", 0)),
             "STOP",
             log_path,
             timeout,
         )
+        entries.append(f"$ STOP\n{response}")
+        if rx_control_response_busy(response) and drain_timeout > 0.0:
+            deadline = time.monotonic() + drain_timeout
+            while True:
+                status = run_control(
+                    str(getattr(args, "rx_control_host", "")),
+                    int(getattr(args, "rx_control_port", 0)),
+                    "STATUS",
+                    log_path,
+                    min(timeout, max(0.1, drain_poll + 0.1)),
+                )
+                entries.append(f"$ STATUS\n{status}")
+                if not rx_control_response_busy(status) or time.monotonic() >= deadline:
+                    break
+                time.sleep(drain_poll)
     except Exception as exc:
+        entries.append(f"STOP failed after RX busy/timeout: {exc}")
+    if entries:
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        previous = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
-        log_path.write_text(f"{previous}STOP failed after RX busy/timeout: {exc}\n", encoding="utf-8")
+        log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
 
 
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
