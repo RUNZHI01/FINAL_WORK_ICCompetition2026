@@ -18,7 +18,11 @@ bounded RX batch session 已做成 opt-in，不进默认 profile。`ANALOG_RX_BA
 
 当前最强组合候选是 bounded RX batch session 加 response-only-summary，但还不是最终目标。50 张 `batch-1783697847-50` 为 `50/50`、fallback `0`，TVM median/p95/max `239.25/243.52/257.93 ms`，IQ `153.55/237.32/286.80 ms`，首次让 50 张 IQ p95 低于 TVM p95。300 张 `batch-1783697942-300` 为 `300/300`、fallback `0`，TVM `239.99/243.44/296.38 ms`，IQ `153.37/269.84/8378.85 ms`，stage records `303`，wall `75.06 s`。这比 no-batch 300 张 p95 `301.74 ms` 和 batch-session-only p95 `321.68 ms` 都好，但 p95 仍高于 TVM，max 还有重试/worker 响应长尾。
 
+`ANALOG_REMOTE_DECODE_WORKER_PREFIX=taskset -c 2` 已做成 opt-in 诊断开关，不进默认 profile。50 张 `batch-1783701414-50` 为 `50/50`、fallback `0`，IQ median/p95/max `154.96/177.68/254.72 ms`，质量 PSNR `37.0445`、SSIM `0.97494`；但 300 张 `batch-1783701712-300` 虽然 `300/300`、fallback `0`，IQ median/p95/max 是 `151.66/275.68/8884.26 ms`，TVM median/p95 `239.15/242.35 ms`。结论：taskset 对 50 张 p95 有帮助，但 300 张没有超过 prior best `269.84 ms`，也没有让 IQ p95 低于 TVM p95。
+
 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.14` 不推荐。带 output-only soft completion 的 50 张 `batch-1783698593-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95/max 恶化到 `169.39/365.51/2122.73 ms`，`soft_count=0`。日志显示 outlier 发生时 NPZ 在 soft timeout 时尚未可见，问题更像 worker 请求排队/调度延迟，而不是“文件已写好但 stdout 晚到”。
+
+taskset profile 上复测 soft-completion 的 `batch-1783702255-300` 不通过：transport `298/300`，fail `2`，`soft_count=0`。失败来自 RX metadata / not-armed 链，不是 TVM 或图像质量；不要把这组 p95 当作有效性能结论。
 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0` 和 `ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=1` 都已拒绝。整批共用 RX session 的 50 张 `batch-1783700070-50` 虽然 `50/50`，但 IQ median/p95/max 恶化到 `185.69/571.83/1217.93 ms`，长尾来自 `rx_session_open` 和 RX control。RX CAPTURE preconnect 的 50 张 `batch-1783700726-50` 也 `50/50`，但 IQ p95 仍是 `270.40 ms`，比 no-preconnect 的 `237.32 ms` 差；它只把瓶颈从 RX control 转移到了板端 decode。
 
@@ -37,6 +41,8 @@ Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES` 是新加的诊断参数，只在 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 时生效。`0` 表示整批共用同一个 RX session；大于 `0` 表示每 N 张关闭并重开一次共享 RX session。`batch-1783696822-50` 用 `16` 张窗口把 IQ median 降到 `154.18 ms`，但 p95 仍是 `326.68 ms`，所以它是后续 300 张 A/B 候选，不是默认 profile。
 
 `ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` 是当前最佳候选组合。300 张 `batch-1783697942-300` 证明它 all-pass，并把 IQ p95 推到 `269.84 ms`，但仍没有达到 p95 远低于 TVM 的最终目标。可以把它作为下一轮优化基线，但不要打开 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC`。
+
+图像质量验收口径是原图/发送图和 TVM 重建图的 PSNR、SSIM，不是逐像素完全相等。当前 Cockpit/IQ/TVM 通过批次反复给出 PSNR `37.0445 dB`、SSIM `0.97494`，输出形状为 `1x3x256x256`。JSCC/TVM 重建是有损链路，逐像素差异正常；如需定位画质退化，应补算 MSE/PSNR/SSIM 或差分图，而不是要求像素 bit-exact。
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝。50 张 `batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。继续保持 `PERSISTENT_RX_TX_DELAY=0`。
 

@@ -762,6 +762,151 @@ def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, mon
     worker.close()
 
 
+def test_remote_decode_worker_start_applies_command_prefix(tmp_path, monkeypatch):
+    popen_commands: list[list[str]] = []
+
+    class FakeStdin:
+        def write(self, _text: str) -> None:
+            return None
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeStdout:
+        def __iter__(self):
+            return iter([json.dumps({"status": "ready"}) + "\n"])
+
+    class FakeProc:
+        stdin = FakeStdin()
+        stdout = FakeStdout()
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            return None
+
+    def fake_popen(command, *_args, **_kwargs):
+        popen_commands.append(list(command))
+        return FakeProc()
+
+    monkeypatch.setenv("ANALOG_REMOTE_DECODE_WORKER_PREFIX", "taskset -c 2")
+    monkeypatch.setenv("REMOTE_DECODE_PYTHON", "/home/user/venv/bin/python")
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fake_popen)
+
+    worker = analog_batch.RemoteAnalogDecodeWorker.start(
+        "user@board",
+        Namespace(
+            rate=5_000_000.0,
+            sps=2,
+            amp=6000,
+            rrc_beta=0.35,
+            rrc_span=8,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=1024,
+            sync_pilot_symbols=1024,
+            data_block_symbols=4096,
+            mid_pilot_symbols=128,
+            capture_margin_samples=20000,
+            rx_post_quantize=True,
+            sync_candidates=12,
+            min_sync_metric=0.05,
+            robust_sync=False,
+            sync_search_window_symbols=4096,
+        ),
+        tmp_path / "remote_decode_worker.log",
+    )
+
+    assert worker.ready_response == {"status": "ready"}
+    remote_command = popen_commands[0][-1]
+    assert "taskset -c 2 /home/user/venv/bin/python -u" in remote_command
+    worker.close()
+
+
+def test_remote_decode_worker_start_omits_command_prefix_by_default(tmp_path, monkeypatch):
+    popen_commands: list[list[str]] = []
+
+    class FakeStdin:
+        def write(self, _text: str) -> None:
+            return None
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeStdout:
+        def __iter__(self):
+            return iter([json.dumps({"status": "ready"}) + "\n"])
+
+    class FakeProc:
+        stdin = FakeStdin()
+        stdout = FakeStdout()
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            return None
+
+    def fake_popen(command, *_args, **_kwargs):
+        popen_commands.append(list(command))
+        return FakeProc()
+
+    monkeypatch.delenv("ANALOG_REMOTE_DECODE_WORKER_PREFIX", raising=False)
+    monkeypatch.setenv("REMOTE_DECODE_PYTHON", "/home/user/venv/bin/python")
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fake_popen)
+
+    worker = analog_batch.RemoteAnalogDecodeWorker.start(
+        "user@board",
+        Namespace(
+            rate=5_000_000.0,
+            sps=2,
+            amp=6000,
+            rrc_beta=0.35,
+            rrc_span=8,
+            zero_guard_samples=4096,
+            tail_guard_samples=4096,
+            cfo_pilot_symbols=1024,
+            sync_pilot_symbols=1024,
+            data_block_symbols=4096,
+            mid_pilot_symbols=128,
+            capture_margin_samples=20000,
+            rx_post_quantize=True,
+            sync_candidates=12,
+            min_sync_metric=0.05,
+            robust_sync=False,
+            sync_search_window_symbols=4096,
+        ),
+        tmp_path / "remote_decode_worker.log",
+    )
+
+    assert worker.ready_response == {"status": "ready"}
+    remote_command = popen_commands[0][-1]
+    assert "taskset" not in remote_command
+    assert "/home/user/venv/bin/python -u" in remote_command
+    worker.close()
+
+
 def test_remote_python_for_decode_rejects_tvm_composite_env(monkeypatch):
     monkeypatch.setenv(
         "REMOTE_DECODE_PYTHON",

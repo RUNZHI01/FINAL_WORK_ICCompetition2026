@@ -1700,6 +1700,13 @@ def remote_pythonpath_for_decode(args: argparse.Namespace) -> str:
     return f"{project_root}/scripts:{project_root}"
 
 
+def remote_decode_worker_prefix_args() -> list[str]:
+    raw = os.environ.get("ANALOG_REMOTE_DECODE_WORKER_PREFIX", "").strip()
+    if not raw:
+        return []
+    return shlex.split(raw)
+
+
 class RemoteDecodeWorkerTimeout(RuntimeError):
     pass
 
@@ -1933,6 +1940,7 @@ class RemoteAnalogDecodeWorker:
         remote_argv = [
             "env",
             *remote_env,
+            *remote_decode_worker_prefix_args(),
             remote_python_for_decode(args),
             "-u",
             remote_analog_link_path(args),
