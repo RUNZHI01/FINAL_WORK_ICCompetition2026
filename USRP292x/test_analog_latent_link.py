@@ -1016,6 +1016,90 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path, monkeypa
     assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
 
 
+def test_decode_waveform_can_memmap_windowed_sc16_without_fromfile(tmp_path, monkeypatch):
+    rng = np.random.default_rng(322)
+    latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
+    input_path = tmp_path / "latent.npz"
+    tx_sc16 = tmp_path / "tx_analog.sc16"
+    rx_sc16 = tmp_path / "rx_analog.sc16"
+    manifest = tmp_path / "manifest.json"
+    out_npz = tmp_path / "received_latent.npz"
+    out_wire = tmp_path / "merged_round0.bin"
+    summary = tmp_path / "decode_summary.json"
+    np.savez(input_path, latent=latent)
+
+    analog.make_waveform(
+        Namespace(
+            input=str(input_path),
+            out_sc16=str(tx_sc16),
+            manifest=str(manifest),
+            job_id="windowed-mmap",
+            rate=5_000_000.0,
+            sps=4,
+            rrc_beta=0.35,
+            rrc_span=8,
+            amp=3000,
+            zero_guard_samples=256,
+            tail_guard_samples=256,
+            cfo_pilot_symbols=128,
+            sync_pilot_symbols=128,
+            data_block_symbols=256,
+            mid_pilot_symbols=32,
+            cfo_seed=1001,
+            sync_seed=1002,
+            mid_pilot_seed=1003,
+            capture_margin_samples=256,
+            rx_post_quantize=False,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+    prefix = np.zeros(12000, dtype=np.int16)
+    suffix = np.zeros(8000, dtype=np.int16)
+    tx_raw = np.fromfile(tx_sc16, dtype=np.int16)
+    np.concatenate([prefix, tx_raw, suffix]).astype(np.int16).tofile(rx_sc16)
+
+    original_fromfile = analog.np.fromfile
+
+    def reject_rx_fromfile(path, *args, **kwargs):
+        if Path(path) == rx_sc16:
+            raise AssertionError("mmap decode should not call np.fromfile on the RX capture")
+        return original_fromfile(path, *args, **kwargs)
+
+    monkeypatch.setattr(analog.np, "fromfile", reject_rx_fromfile)
+
+    result = analog.decode_waveform(
+        Namespace(
+            rx_sc16=str(rx_sc16),
+            manifest=str(manifest),
+            out_npz=str(out_npz),
+            out_wire=str(out_wire),
+            summary_json=str(summary),
+            sync_candidates=12,
+            min_sync_metric=0.25,
+            robust_sync=True,
+            robust_cfo_max_hz=8000.0,
+            robust_cfo_step_hz=500.0,
+            sync_search_center_symbol=-1,
+            sync_search_window_symbols=256,
+            rx_sc16_mmap=True,
+            rx_clipping_decimation=8,
+            scramble_key="",
+            scramble_key_hex="",
+            scramble_context="",
+        )
+    )
+
+    assert result["sync_success"] is True
+    assert result["rx_sc16_mmap_enabled"] is True
+    assert result["rx_clipping_decimation"] == 8
+    assert result["sync_search_raw_sc16_crop_enabled"] is True
+    with np.load(out_npz) as payload:
+        recovered = payload["latent"]
+    assert float(np.mean(np.square(recovered - latent))) < 5.0e-4
+
+
 def test_decode_waveform_fast_first_falls_back_and_records_pass_metrics(tmp_path, monkeypatch):
     rng = np.random.default_rng(126)
     latent = rng.standard_normal((1, 4, 8, 8)).astype(np.float32)
@@ -1619,6 +1703,40 @@ def test_remote_analog_decode_request_can_request_minimal_worker_response(monkey
     )
 
     assert request["response_mode"] == "minimal"
+
+
+def test_remote_analog_decode_request_can_request_sc16_mmap():
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        dry_run=False,
+        rx_sc16_mmap=True,
+        rx_clipping_decimation=8,
+    )
+
+    request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+    )
+
+    assert request["rx_sc16_mmap"] is True
+    assert request["rx_clipping_decimation"] == 8
 
 
 def test_decode_worker_minimal_response_keeps_runner_summary_fields():

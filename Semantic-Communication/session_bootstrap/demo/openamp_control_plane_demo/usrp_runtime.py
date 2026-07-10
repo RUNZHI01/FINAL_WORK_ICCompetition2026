@@ -3116,6 +3116,8 @@ class UsrpBatchSpoolJob:
         }
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             wrapper_summary["iq_radio_metrics"] = _aggregate_iq_radio_metrics(summary)
+            if self._remote_stage_manifest:
+                wrapper_summary["iq_remote_decode_manifest"] = self._remote_stage_manifest
             if iq_stage_benchmark is not None:
                 wrapper_summary["iq_stage_benchmark"] = iq_stage_benchmark
         if self._inference_summary:

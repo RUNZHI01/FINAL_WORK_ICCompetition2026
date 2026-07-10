@@ -446,11 +446,30 @@ def write_sc16(path: Path, interleaved: np.ndarray) -> None:
     interleaved.astype(np.int16, copy=False).tofile(path)
 
 
-def read_sc16_raw(path: Path) -> tuple[np.ndarray, float]:
-    raw = np.fromfile(path, dtype=np.int16)
+def sc16_clipping_ratio(raw: np.ndarray, *, decimation: int = 1) -> float:
+    if raw.size == 0:
+        return 0.0
+    step = max(1, int(decimation))
+    pairs = raw.reshape(-1, 2)
+    if step > 1:
+        pairs = pairs[::step]
+    if pairs.size == 0:
+        return 0.0
+    return float(np.mean((np.abs(pairs[:, 0]) >= 32767) | (np.abs(pairs[:, 1]) >= 32767)))
+
+
+def read_sc16_raw(path: Path, *, use_mmap: bool = False, clipping_decimation: int = 1) -> tuple[np.ndarray, float]:
+    if use_mmap:
+        path = Path(path)
+        if path.stat().st_size == 0:
+            raw = np.zeros(0, dtype=np.int16)
+        else:
+            raw = np.memmap(path, dtype=np.int16, mode="r")
+    else:
+        raw = np.fromfile(path, dtype=np.int16)
     if raw.size % 2:
         raise ValueError(f"sc16 file has odd int16 count: {path}")
-    clipping_ratio = float(np.mean((np.abs(raw[0::2]) >= 32767) | (np.abs(raw[1::2]) >= 32767))) if raw.size else 0.0
+    clipping_ratio = sc16_clipping_ratio(raw, decimation=clipping_decimation)
     return raw, clipping_ratio
 
 
@@ -1206,6 +1225,8 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         getattr(args, "low_sync_retry_threshold", DEFAULT_LOW_SYNC_RETRY_THRESHOLD)
         or DEFAULT_LOW_SYNC_RETRY_THRESHOLD
     )
+    rx_sc16_mmap = bool(getattr(args, "rx_sc16_mmap", False))
+    rx_clipping_decimation = max(1, int(getattr(args, "rx_clipping_decimation", 1) or 1))
     robust_enabled = bool(getattr(args, "robust_sync", True))
     raw_search_center = int(getattr(args, "sync_search_center_symbol", -1))
     search_window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
@@ -1225,7 +1246,11 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
     raw_sc16: np.ndarray | None = None
     rx_clipping_ratio = 0.0
     if search_window_symbols > 0:
-        raw_sc16, rx_clipping_ratio = read_sc16_raw(rx_sc16)
+        raw_sc16, rx_clipping_ratio = read_sc16_raw(
+            rx_sc16,
+            use_mmap=rx_sc16_mmap,
+            clipping_decimation=rx_clipping_decimation,
+        )
         if raw_sc16.size == 0:
             raise RuntimeError(f"empty RX sc16 file: {rx_sc16}")
         mark_timing("read_sc16")
@@ -1577,6 +1602,8 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "dc_real": float(np.real(dc)),
         "dc_imag": float(np.imag(dc)),
         "rx_clipping_ratio": rx_clipping_ratio,
+        "rx_sc16_mmap_enabled": bool(rx_sc16_mmap),
+        "rx_clipping_decimation": int(rx_clipping_decimation),
         "rx_post_quantize": rx_post_quantize,
         "received_latent_sha256": sha256_bytes(latent_out.astype(np.float32, copy=False).tobytes()),
         "payload_symbol_rms": expected_symbol_rms,
@@ -1709,6 +1736,11 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
         robust_cfo_step_hz=float(request.get("robust_cfo_step_hz", DEFAULT_ROBUST_CFO_STEP_HZ)),
         sync_search_center_symbol=int(request.get("sync_search_center_symbol", -1)),
         sync_search_window_symbols=int(request.get("sync_search_window_symbols", 0)),
+        rx_sc16_mmap=bool(request.get("rx_sc16_mmap", _env_bool("ANALOG_RX_SC16_MMAP", False))),
+        rx_clipping_decimation=max(
+            1,
+            int(request.get("rx_clipping_decimation", _env_int("ANALOG_RX_CLIPPING_DECIMATION", 1)) or 1),
+        ),
         scramble_key=str(request.get("scramble_key") or ""),
         scramble_key_hex=str(request.get("scramble_key_hex") or ""),
         scramble_context=str(request.get("scramble_context") or ""),
@@ -2056,6 +2088,18 @@ def parse_args() -> argparse.Namespace:
     decode.add_argument("--robust-cfo-step-hz", type=float, default=DEFAULT_ROBUST_CFO_STEP_HZ)
     decode.add_argument("--sync-search-center-symbol", type=int, default=-1)
     decode.add_argument("--sync-search-window-symbols", type=int, default=0)
+    decode.add_argument(
+        "--rx-sc16-mmap",
+        dest="rx_sc16_mmap",
+        action="store_true",
+        default=_env_bool("ANALOG_RX_SC16_MMAP", False),
+    )
+    decode.add_argument("--no-rx-sc16-mmap", dest="rx_sc16_mmap", action="store_false")
+    decode.add_argument(
+        "--rx-clipping-decimation",
+        type=int,
+        default=_env_int("ANALOG_RX_CLIPPING_DECIMATION", 1),
+    )
     add_scrambling_args(decode)
 
     simulate = sub.add_parser("simulate-channel")

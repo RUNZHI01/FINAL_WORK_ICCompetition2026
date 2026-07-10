@@ -1409,6 +1409,39 @@ class DashboardStateTest(unittest.TestCase):
         final_images = state.get_batch_state()["iq_streaming_images"]
         self.assertEqual([image["status"] for image in final_images], ["done", "done", "done"])
 
+    def test_iq_streaming_images_prefers_npy_summary_files_over_npz_manifest_defaults(self) -> None:
+        manifest = {
+            "decode_manifest": {
+                "images": [
+                    {
+                        "index": 0,
+                        "remote_npz": "/home/user/cockpit_usrp_rx/run_rx/00000000.npz",
+                    },
+                    {
+                        "index": 1,
+                        "remote_npz": "/home/user/cockpit_usrp_rx/run_rx/00000001.npz",
+                    },
+                ],
+                "files": [
+                    "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                    "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+                ],
+            },
+        }
+
+        images = server._iq_streaming_images_from_manifest(
+            manifest,
+            total=2,
+            inference_state="completed",
+            final_success=True,
+        )
+
+        self.assertEqual([image["remote_npz"] for image in images], [
+            "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+            "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+        ])
+        self.assertEqual([image["status"] for image in images], ["done", "done"])
+
     def test_start_batch_inference_marks_done_when_worker_raises(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -3731,6 +3764,37 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env.get("MLKEM_AUTH_SIG_POLICY"), "MLDSA_ONLY")
         self.assertEqual(env.get("MLKEM_AUTH_SERVER_ID"), "phytium-board")
 
+    def test_set_board_access_preserves_usrp_iq_runtime_env_from_process(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "ANALOG_REMOTE_DECODED_FORMAT": "npy",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_PRECONNECT_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+            },
+            clear=False,
+        ):
+            state.set_board_access(
+                {
+                    "host": "100.121.87.73",
+                    "user": "user",
+                    "password": "user",
+                    "transport_mode": "usrp",
+                    "remote_usrp_rx_dir": "/home/user/cockpit_usrp_rx",
+                }
+            )
+
+        env = state._board_access.build_env()
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODED_FORMAT"), "npy")
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODE_RESPONSE_MODE"), "minimal")
+        self.assertEqual(env.get("ANALOG_PRECONNECT_CONTROL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_CONTROL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_MAX_IMAGES"), "16")
+
     def test_session_board_access_rejects_unsupported_auth_sig_policy(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -3846,12 +3910,18 @@ class ServerMainTest(unittest.TestCase):
                 "USRP_WIRE_PREPARE_WORKERS": "2",
                 "USRP_WIRE_CACHE_ENABLED": "1",
                 "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_REMOTE_DECODED_FORMAT": "npy",
                 "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "1",
                 "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "0.14",
                 "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 2",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "1",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK": "64",
+                "ANALOG_RX_SC16_MMAP": "1",
+                "ANALOG_RX_CLIPPING_DECIMATION": "8",
                 "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL": "1",
+                "ANALOG_RX_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
                 "ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC": "1.0",
@@ -3881,12 +3951,18 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
         self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.14")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_WORKER_PREFIX"], "taskset -c 2")
         self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
         self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK"], "64")
+        self.assertEqual(overrides["ANALOG_RX_SC16_MMAP"], "1")
+        self.assertEqual(overrides["ANALOG_RX_CLIPPING_DECIMATION"], "8")
         self.assertEqual(overrides["ANALOG_PRECONNECT_RX_CAPTURE_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_SESSION_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
         self.assertEqual(overrides["ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC"], "1.0")
@@ -4370,6 +4446,67 @@ class ServerMainTest(unittest.TestCase):
             [f"/home/user/cockpit_usrp_rx/{job._run_id}_rx/00000000.npz"],
         )
         self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 1)
+
+    def test_usrp_iq_terminal_snapshot_keeps_final_remote_decode_manifest(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=2,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+            job._remote_stage_manifest = {
+                "remote_dir": "/home/user/cockpit_usrp_rx/run_rx",
+                "decode_manifest": {
+                    "decoded_count": 2,
+                    "files": [
+                        "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                        "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+                    ],
+                },
+            }
+            job._inference_summary = {"status": "ok", "processed_count": 2}
+
+            snapshot = job._build_terminal_snapshot(
+                status="success",
+                status_category="success",
+                message="done",
+                summary={"target_count": 2, "pass_count": 2, "all_pass": True},
+            )
+
+        manifest = snapshot["wrapper_summary"]["iq_remote_decode_manifest"]
+        self.assertEqual(
+            manifest["decode_manifest"]["files"],
+            [
+                "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+            ],
+        )
 
     def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

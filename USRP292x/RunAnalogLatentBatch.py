@@ -210,6 +210,20 @@ def parse_args() -> argparse.Namespace:
         help="Restart the persistent remote decode worker after a request timeout so a later ARQ attempt can continue.",
     )
     parser.add_argument("--no-remote-decode-restart-on-timeout", dest="remote_decode_restart_on_timeout", action="store_false")
+    parser.add_argument(
+        "--rx-sc16-mmap",
+        dest="rx_sc16_mmap",
+        action="store_true",
+        default=env_bool("ANALOG_RX_SC16_MMAP", False),
+        help="Opt-in: let board-side decode mmap RX sc16 captures and materialize only the cropped sync window.",
+    )
+    parser.add_argument("--no-rx-sc16-mmap", dest="rx_sc16_mmap", action="store_false")
+    parser.add_argument(
+        "--rx-clipping-decimation",
+        type=int,
+        default=env_int("ANALOG_RX_CLIPPING_DECIMATION", 1),
+        help="Sample every Nth complex sample when computing rx_clipping_ratio. 1 keeps the exact full-file metric.",
+    )
 
     parser.add_argument("--rx-control-host", default=os.environ.get("RX_CONTROL_HOST", "127.0.0.1"))
     parser.add_argument("--rx-control-port", type=int, default=env_int("RX_CONTROL_PORT", 29220))
@@ -1970,6 +1984,8 @@ class RemoteAnalogDecodeWorker:
             f"ANALOG_ROBUST_CFO_MAX_HZ={float(getattr(args, 'robust_cfo_max_hz', 8000.0) or 8000.0)}",
             f"ANALOG_ROBUST_CFO_STEP_HZ={float(getattr(args, 'robust_cfo_step_hz', 500.0) or 500.0)}",
             f"ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS={int(getattr(args, 'sync_search_window_symbols', 0) or 0)}",
+            f"ANALOG_RX_SC16_MMAP={'1' if bool(getattr(args, 'rx_sc16_mmap', False)) else '0'}",
+            f"ANALOG_RX_CLIPPING_DECIMATION={max(1, int(getattr(args, 'rx_clipping_decimation', 1) or 1))}",
         ]
         remote_argv = [
             "env",
@@ -2302,6 +2318,9 @@ def remote_analog_decode_args(
     append_fast_first_sync_args(cmd, args, attempt_index=attempt_index, max_attempts=max_attempts)
     append_sync_search_window_args(cmd, args)
     cmd.append("--robust-sync" if args.robust_sync else "--no-robust-sync")
+    if bool(getattr(args, "rx_sc16_mmap", False)):
+        cmd.append("--rx-sc16-mmap")
+    cmd.extend(["--rx-clipping-decimation", str(max(1, int(getattr(args, "rx_clipping_decimation", 1) or 1)))])
     if args.scramble_key:
         cmd.extend(["--scramble-key", str(args.scramble_key)])
     if args.scramble_key_hex:
@@ -2338,6 +2357,8 @@ def remote_analog_decode_request(
         "sync_search_window_symbols": 0
         if bool(getattr(args, "dry_run", False))
         else int(getattr(args, "sync_search_window_symbols", 0) or 0),
+        "rx_sc16_mmap": bool(getattr(args, "rx_sc16_mmap", False)),
+        "rx_clipping_decimation": max(1, int(getattr(args, "rx_clipping_decimation", 1) or 1)),
         "scramble_key": str(getattr(args, "scramble_key", "") or ""),
         "scramble_key_hex": str(getattr(args, "scramble_key_hex", "") or ""),
         "scramble_context": str(getattr(args, "scramble_context", "") or ""),
@@ -2396,6 +2417,8 @@ def analog_decode_namespace(
         sync_search_window_symbols=0
         if bool(getattr(args, "dry_run", False))
         else int(getattr(args, "sync_search_window_symbols", 0) or 0),
+        rx_sc16_mmap=bool(getattr(args, "rx_sc16_mmap", False)),
+        rx_clipping_decimation=max(1, int(getattr(args, "rx_clipping_decimation", 1) or 1)),
         scramble_key=str(getattr(args, "scramble_key", "") or ""),
         scramble_key_hex=str(getattr(args, "scramble_key_hex", "") or ""),
         scramble_context=str(getattr(args, "scramble_context", "") or ""),
@@ -4422,6 +4445,8 @@ def main() -> int:
         "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
         "remote_decode_soft_complete_sec": remote_decode_soft_complete_sec(args),
         "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
+        "rx_sc16_mmap": bool(getattr(args, "rx_sc16_mmap", False)),
+        "rx_clipping_decimation": max(1, int(getattr(args, "rx_clipping_decimation", 1) or 1)),
         "remote_capture_dirs_precreated": bool(remote_capture_dirs_precreated),
         "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
         "remote_decoded_output_dirs": remote_decoded_dirs,

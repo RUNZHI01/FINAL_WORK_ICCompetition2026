@@ -24,7 +24,10 @@ if (-not $env:REMOTE_SSH_PORT) {
     $env:REMOTE_SSH_PORT = "22"
 }
 if (-not $env:OPENAMP_SSH_RUNNER) {
-    $env:OPENAMP_SSH_RUNNER = "paramiko"
+    $env:OPENAMP_SSH_RUNNER = "docker"
+}
+if (-not $env:OPENAMP_SSH_DOCKER_IMAGE) {
+    $env:OPENAMP_SSH_DOCKER_IMAGE = "iccomp-usrp-tx:latest"
 }
 if (-not $env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER) {
     $env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER = "1"
@@ -62,6 +65,15 @@ if (-not $env:ANALOG_REMOTE_DECODE_RESULT_MODE) {
 if (-not $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE) {
     $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE = "minimal"
 }
+if (-not $env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY) {
+    $env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY = "1"
+}
+if (-not $env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC) {
+    $env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC = "0"
+}
+if (-not $env:ANALOG_REMOTE_DECODED_FORMAT) {
+    $env:ANALOG_REMOTE_DECODED_FORMAT = "npy"
+}
 if (-not $env:RX_ARM_WAIT_MS) {
     $env:RX_ARM_WAIT_MS = "150"
 }
@@ -81,7 +93,13 @@ if (-not $env:ANALOG_RX_POST_QUANTIZE) {
     $env:ANALOG_RX_POST_QUANTIZE = "0"
 }
 if (-not $env:ANALOG_RX_TAIL_SEC) {
-    $env:ANALOG_RX_TAIL_SEC = "0.05"
+    $env:ANALOG_RX_TAIL_SEC = "0.040"
+}
+if (-not $env:ANALOG_RX_SC16_MMAP) {
+    $env:ANALOG_RX_SC16_MMAP = "1"
+}
+if (-not $env:ANALOG_RX_CLIPPING_DECIMATION) {
+    $env:ANALOG_RX_CLIPPING_DECIMATION = "8"
 }
 if (-not $env:ANALOG_RX_WAIT_TIMEOUT_SEC) {
     $env:ANALOG_RX_WAIT_TIMEOUT_SEC = "1.0"
@@ -119,6 +137,18 @@ if (-not $env:ANALOG_PRECONNECT_RX_CAPTURE_CONTROL) {
 if (-not $env:ANALOG_RX_SESSION_CONTROL) {
     $env:ANALOG_RX_SESSION_CONTROL = "1"
 }
+if (-not $env:ANALOG_RX_BATCH_SESSION_CONTROL) {
+    $env:ANALOG_RX_BATCH_SESSION_CONTROL = "1"
+}
+if (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
+    $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "16"
+}
+if (-not $env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS) {
+    $env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS = "1"
+}
+if (-not $env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK) {
+    $env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK = "80"
+}
 if (-not $env:ANALOG_DECODE_PIPELINE_WARMUP) {
     $env:ANALOG_DECODE_PIPELINE_WARMUP = "1"
 }
@@ -130,6 +160,9 @@ if (-not $env:USRP_MAX_ARQ_ROUNDS) {
 }
 if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
     $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"
+}
+if (-not $env:OPENAMP_DEMO_TVM_BATCH_RUNNER) {
+    $env:OPENAMP_DEMO_TVM_BATCH_RUNNER = "biglittle"
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

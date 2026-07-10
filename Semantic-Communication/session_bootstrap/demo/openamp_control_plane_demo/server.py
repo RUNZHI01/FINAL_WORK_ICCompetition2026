@@ -2297,7 +2297,7 @@ def _compute_tvm_benchmark(summary: dict[str, Any]) -> dict[str, Any]:
 
 def _iq_index_from_remote_npz(remote_npz: str) -> int | None:
     name = PurePosixPath(str(remote_npz or "").strip()).name
-    match = re.fullmatch(r"(\d+)\.npz", name)
+    match = re.fullmatch(r"(\d+)\.(?:npz|npy)", name)
     if not match:
         return None
     try:
@@ -2345,7 +2345,7 @@ def _iq_streaming_images_from_manifest(
         if image_index is None:
             image_index = fallback_index
         if 0 <= image_index < total_count:
-            decoded_by_index.setdefault(image_index, remote_npz)
+            decoded_by_index[image_index] = remote_npz
 
     if not decoded_by_index:
         return []
@@ -3699,6 +3699,40 @@ class DashboardState:
                 runner_value = str(os.environ.get(runner_key) or "").strip()
                 if runner_value:
                     overrides.setdefault(runner_key, runner_value)
+            for runtime_key in (
+                "REMOTE_RX_RUN_ROOT",
+                "REMOTE_USRP_PROJECT_ROOT",
+                "OPENAMP_DEMO_REMOTE_DECODE_PYTHON",
+                "REMOTE_USRP_DECODE_PYTHON",
+                "ANALOG_RX_TAIL_SEC",
+                "ANALOG_REMOTE_CLEANUP_MODE",
+                "ANALOG_PRECONNECT_CONTROL",
+                "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL",
+                "ANALOG_RX_SESSION_CONTROL",
+                "ANALOG_RX_BATCH_SESSION_CONTROL",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE",
+                "ANALOG_REMOTE_DECODED_FORMAT",
+                "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY",
+                "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK",
+                "ANALOG_RX_SC16_MMAP",
+                "ANALOG_RX_CLIPPING_DECIMATION",
+                "ANALOG_ROBUST_SYNC",
+                "ANALOG_MIN_SYNC_METRIC",
+                "ANALOG_SYNC_CANDIDATES",
+                "ANALOG_FAST_SYNC_CANDIDATES",
+                "ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS",
+                "ANALOG_FALLBACK_SYNC_CANDIDATES",
+                "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",
+                "ANALOG_RETRY_ON_BURST_MISS",
+                "ANALOG_RETRY_ON_LOW_SYNC",
+                "ANALOG_LOW_SYNC_RETRY_THRESHOLD",
+            ):
+                runtime_value = str(os.environ.get(runtime_key) or "").strip()
+                if runtime_value:
+                    overrides.setdefault(runtime_key, runtime_value)
             local_image_dir = self._discover_default_local_usrp_image_dir()
             if local_image_dir:
                 overrides.setdefault("OPENAMP_DEMO_LOCAL_IMAGE_DIR", local_image_dir)
@@ -9530,6 +9564,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_PRECONNECT_CONTROL", ""),
         ("ANALOG_PRECONNECT_RX_CAPTURE_CONTROL", ""),
         ("ANALOG_RX_SESSION_CONTROL", ""),
+        ("ANALOG_RX_BATCH_SESSION_CONTROL", ""),
+        ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", ""),
         ("ANALOG_ZERO_GUARD_SAMPLES", ""),
         ("ANALOG_TAIL_GUARD_SAMPLES", ""),
         ("ANALOG_CFO_PILOT_SYMBOLS", ""),
@@ -9560,6 +9596,7 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_REMOTE_DECODE_RESULT_MODE", ""),
         ("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
         ("ANALOG_REMOTE_DECODE_RESPONSE_MODE", ""),
+        ("ANALOG_REMOTE_DECODED_FORMAT", ""),
         ("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", ""),
         ("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", ""),
         ("ANALOG_REMOTE_DECODE_WORKER_PREFIX", ""),
@@ -9569,6 +9606,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC", ""),
         ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS", ""),
         ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK", ""),
+        ("ANALOG_RX_SC16_MMAP", ""),
+        ("ANALOG_RX_CLIPPING_DECIMATION", ""),
         ("ANALOG_SCRAMBLE_KEY", ""),
         ("ANALOG_SCRAMBLE_KEY_HEX", ""),
         ("ANALOG_SCRAMBLE_CONTEXT", ""),
