@@ -14,17 +14,21 @@
 
 `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` 仍不推荐默认打开。复测 `batch-1783696115-50` 为 `50/50`、fallback `0`，IQ median/p95/max `171.53/334.85/1166.81 ms`；`remote_decode_response_overhead_ms` 只改善到 `14.77/113.42/126.89 ms`，但 `rx_session_open_ms` max 达到 `1015.27 ms`，没有降低整体 p95/max。
 
+bounded RX batch session 已做成 opt-in，不进默认 profile。`ANALOG_RX_BATCH_SESSION_CONTROL=1` 加 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` 的复测 `batch-1783696822-50` 为 `50/50`、fallback `0`；TVM median/p95/max `241.94/246.45/275.62 ms`，IQ median/p95/max `154.18/326.68/333.40 ms`。这证明分窗口复用能把 median 压低，但 50 张 p95 仍高于 TVM，且尚未通过 300 张 gate。默认继续保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0`。
+
 Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm、RX 连接、CAPTURE 命令、RX capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。
 
 ## 当前代码和提交
 
 最近三次关键提交：
 
-- `bf16f64 perf: add opt-in iq rx batch session`
-- `c3938ba fix: close shared iq rx session before decode cleanup`
-- `7096a9e docs: record iq rx batch session ab`
+- `f05b072 docs: record iq response-only summary ab`
+- `fa323b6 diagnostics: split iq rx arm latency`
+- `da8e90d diagnostics: expose iq rx tail metrics`
 
 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 已实现为 opt-in。50 张效果很好，`batch-1783690852-50` 的 IQ median/p95/max 是 `155.30/217.47/583.30 ms`；但 300 张 `batch-1783690925-300` 的 IQ median/p95/max 是 `162.20/321.68/6828.85 ms`，p95 高于 TVM，也高于 no-batch A/B。因此默认仍保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0`。
+
+`ANALOG_RX_BATCH_SESSION_MAX_IMAGES` 是新加的诊断参数，只在 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 时生效。`0` 表示整批共用同一个 RX session；大于 `0` 表示每 N 张关闭并重开一次共享 RX session。`batch-1783696822-50` 用 `16` 张窗口把 IQ median 降到 `154.18 ms`，但 p95 仍是 `326.68 ms`，所以它是后续 300 张 A/B 候选，不是默认 profile。
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝。50 张 `batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。继续保持 `PERSISTENT_RX_TX_DELAY=0`。
 
@@ -48,6 +52,7 @@ WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，�
 已经试过但不进默认的路径：
 
 - `ANALOG_RX_BATCH_SESSION_CONTROL=1`：50 张很好，但 300 张 `batch-1783690925-300` p95 `321.68 ms`，比 no-batch A/B 更差。
+- `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`：50 张 `batch-1783696822-50` median `154.18 ms`，但 p95 `326.68 ms`，尚未证明 300 张稳定性。
 - `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`：50 张 `batch-1783693518-50` p95 `382.82 ms`，说明 summary 文件写入不是当前主因。
 - `PERSISTENT_RX_TX_DELAY=0.005`：50 张 p95 恶化到 `306.92 ms`。
 - `ANALOG_RX_TAIL_SEC=0.04/0.045`：出现 no-sync retry 或 p95 大幅恶化，保持 `0.05`。
@@ -90,6 +95,7 @@ ANALOG_PRECONNECT_CONTROL=1
 ANALOG_RX_SESSION_CONTROL=1
 ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=0
 ANALOG_RX_BATCH_SESSION_CONTROL=0
+ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0
 PERSISTENT_RX_TX_DELAY=0
 OPENAMP_TVM_BATCH_RUNNER=biglittle
 OPENAMP_DEMO_TVM_BATCH_RUNNER=biglittle
@@ -145,7 +151,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 优先级如下：
 
-1. 处理 RX arm/wait/control stall。batch session 降低了 median，但 300 张 p95 更差，说明单纯复用连接不是最终解。
+1. 处理 RX arm/wait/control stall。batch session 和 bounded batch session 都能降低 median，但没有通过 p95 gate，说明单纯复用连接不是最终解。
 2. 处理 runner-side decode response wait。多次长尾里板端 reported decode 只有几十毫秒，但 runner 等响应等了几秒。
 3. 复测 decoded output placement/format。tmpfs 能压低 `write_npz`，但之前没有改善 300 张 p95，只能作为诊断项。
 
@@ -168,7 +174,7 @@ git diff --check
 git diff -- USRP292x\RunQpskFileBatchSpoolArq.py
 ```
 
-最近一次已完成验证：`python -m pytest USRP292x/test_analog_latent_link.py -q` 为 `100 passed in 31.04s`；新增后端契约测试和 USRP TVM 批量状态测试通过；`python -m py_compile ...` 通过；`npm run typecheck` 通过。完整 `test_server.py` 单文件曾在 `120 s` 内未跑完，不能视作完整通过。提交前仍需跑 `git diff --check` 并确认 QPSK diff 为空。
+最近一次已完成验证：`python -m pytest USRP292x/test_analog_latent_link.py -q` 为 `101 passed in 32.20s`；`python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::ServerMainTest::test_usrp_iq_direct_runner_respects_explicit_sync_overrides -q` 为 `1 passed in 0.33s`；`python -m py_compile USRP292x\RunAnalogLatentBatch.py USRP292x\AnalogLatentLink.py Semantic-Communication\session_bootstrap\demo\openamp_control_plane_demo\usrp_runtime.py` 通过；`git diff --check` 通过；`git diff -- USRP292x\RunQpskFileBatchSpoolArq.py` 为空。完整 `test_server.py` 单文件曾在 `120 s` 内未跑完，不能视作完整通过。
 
 ## 重要文件
 

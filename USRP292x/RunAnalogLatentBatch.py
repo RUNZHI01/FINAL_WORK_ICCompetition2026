@@ -303,6 +303,15 @@ def parse_args() -> argparse.Namespace:
         help="Disable batch-level RX control connection reuse.",
     )
     parser.add_argument(
+        "--rx-batch-session-max-images",
+        type=int,
+        default=env_int("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", 0),
+        help=(
+            "When batch-level RX control reuse is enabled, recycle the shared RX session after this many images. "
+            "0 keeps one shared session for the whole batch."
+        ),
+    )
+    parser.add_argument(
         "--pipeline-depth",
         type=int,
         default=env_int("ANALOG_PIPELINE_DEPTH", 1),
@@ -4160,6 +4169,8 @@ def main() -> int:
     rx_batch_session_control_requested = False
     rx_batch_session_control_active = False
     rx_batch_session_control_unavailable = False
+    rx_batch_session_max_images = max(0, int(getattr(args, "rx_batch_session_max_images", 0) or 0))
+    rx_batch_session_images_since_open = 0
     remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     try:
@@ -4198,7 +4209,7 @@ def main() -> int:
             and not bool(getattr(args, "stop_on_fail", False))
         )
         rx_batch_session_control_requested = rx_batch_session_control_enabled(args)
-        if rx_batch_session_control_requested and not pipeline_enabled:
+        if rx_batch_session_control_requested and not pipeline_enabled and rx_batch_session_max_images <= 0:
             try:
                 shared_rx_control_session = open_control_session(
                     args.rx_control_host,
@@ -4220,6 +4231,32 @@ def main() -> int:
             pipeline_stats["pipeline_enabled"] = True
         else:
             for image in images:
+                if (
+                    rx_batch_session_control_requested
+                    and rx_batch_session_max_images > 0
+                    and not rx_batch_session_control_unavailable
+                ):
+                    current_session = getattr(args, "rx_control_session", None)
+                    if current_session is not None and rx_batch_session_images_since_open >= rx_batch_session_max_images:
+                        close_preconnected_control(current_session)
+                        clear_shared_rx_control_session(args, current_session)
+                        if shared_rx_control_session is current_session:
+                            shared_rx_control_session = None
+                        rx_batch_session_images_since_open = 0
+                    if getattr(args, "rx_control_session", None) is None:
+                        try:
+                            shared_rx_control_session = open_control_session(
+                                args.rx_control_host,
+                                args.rx_control_port,
+                                max(1.0, float(getattr(args, "rx_timeout_sec", 30.0) or 30.0)),
+                            )
+                        except OSError:
+                            shared_rx_control_session = None
+                            rx_batch_session_control_unavailable = True
+                        else:
+                            setattr(args, "rx_control_session", shared_rx_control_session)
+                            rx_batch_session_control_active = True
+                            rx_batch_session_images_since_open = 0
                 max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
                 result = image
                 for attempt_index in range(max_attempts):
@@ -4234,6 +4271,15 @@ def main() -> int:
                         break
                 setattr(args, "current_decode_attempt_index", 0)
                 setattr(args, "current_decode_max_attempts", 1)
+                if rx_batch_session_control_requested and rx_batch_session_max_images > 0:
+                    if (
+                        shared_rx_control_session is not None
+                        and getattr(args, "rx_control_session", None) is shared_rx_control_session
+                    ):
+                        rx_batch_session_images_since_open += 1
+                    else:
+                        shared_rx_control_session = None
+                        rx_batch_session_images_since_open = 0
                 completed.append(result)
                 if args.stop_on_fail and not result.passed:
                     break
@@ -4309,6 +4355,7 @@ def main() -> int:
         "rx_batch_session_control_requested": bool(rx_batch_session_control_requested),
         "rx_batch_session_control_enabled": bool(rx_batch_session_control_active),
         "rx_batch_session_control_unavailable": bool(rx_batch_session_control_unavailable),
+        "rx_batch_session_max_images": int(rx_batch_session_max_images),
         "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
         "rx_arm_status_poll_sec": rx_arm_status_poll_sec(args),
         "codec_warmup_wall_sec": codec_warmup_wall_sec,

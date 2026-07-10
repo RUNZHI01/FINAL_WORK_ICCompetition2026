@@ -4738,6 +4738,9 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_ROBUST_SYNC": "1",
                     "ANALOG_PIPELINE_DEPTH": "2",
                     "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "1",
+                    "ANALOG_RX_SESSION_CONTROL": "1",
+                    "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                    "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
                 },
                 source_summary="test",
             )
@@ -4768,6 +4771,10 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--pipeline-depth", command)
         self.assertEqual(command[command.index("--pipeline-depth") + 1], "2")
         self.assertIn("--pipeline-rf-decode-overlap", command)
+        self.assertIn("--rx-session-control", command)
+        self.assertIn("--rx-batch-session-control", command)
+        self.assertIn("--rx-batch-session-max-images", command)
+        self.assertEqual(command[command.index("--rx-batch-session-max-images") + 1], "16")
 
     def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
         class FakeThread:

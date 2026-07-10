@@ -4428,6 +4428,104 @@ def test_batch_runner_can_share_rx_control_session_across_sequential_images(tmp_
     assert summary["rx_batch_session_control_enabled"] is True
 
 
+def test_batch_runner_can_recycle_shared_rx_control_session_by_window(tmp_path, monkeypatch):
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    for idx in range(5):
+        (input_dir / f"case{idx}.bin").write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=input_dir,
+        pattern="*.bin",
+        count=5,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="bounded-rx-session",
+        dry_run=False,
+        rx_capture_mode="local",
+        rx_batch_session_control=True,
+        rx_batch_session_max_images=2,
+        rx_session_control=True,
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        remote_rx_ssh_target="",
+        sps=2,
+        rate=5_000_000.0,
+        rx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        rx_post_quantize=False,
+        robust_sync=False,
+        sync_profile="fast-first",
+        sync_candidates=12,
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=False,
+        low_sync_retry_threshold=0.08,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        channel_mode="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    opened: list[object] = []
+    closed: list[object] = []
+    seen_sessions: list[object | None] = []
+
+    class SharedSession:
+        def __init__(self, index: int):
+            self.index = index
+
+        def close(self):
+            closed.append(self)
+
+    def fake_open_session(_host, _port, _timeout):
+        session = SharedSession(len(opened))
+        opened.append(session)
+        return session
+
+    def fake_process_image(process_args, image):
+        seen_sessions.append(getattr(process_args, "rx_control_session", None))
+        image.passed = True
+        image.status = 0
+        image.records.append({
+            "total_wall_sec": 0.1,
+            "rx_capture_wall_sec": 0.02,
+            "decode_wall_sec": 0.03,
+            "detected_airtime_ms": 9.58,
+        })
+        return image
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "open_control_session", fake_open_session)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "bounded-rx-session" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert [session.index for session in opened] == [0, 1, 2]
+    assert [session.index for session in seen_sessions] == [0, 0, 1, 1, 2]
+    assert [session.index for session in closed] == [0, 1, 2]
+    assert summary["rx_batch_session_control_enabled"] is True
+    assert summary["rx_batch_session_max_images"] == 2
+
+
 def test_batch_runner_does_not_retry_failed_ssh_control_master_per_image(tmp_path, monkeypatch):
     input_dir = tmp_path / "inputs"
     input_dir.mkdir()

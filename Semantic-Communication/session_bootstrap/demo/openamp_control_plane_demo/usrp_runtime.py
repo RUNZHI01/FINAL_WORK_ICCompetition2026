@@ -130,6 +130,9 @@ ANALOG_RETRY_ON_BURST_MISS_KEYS = ("ANALOG_RETRY_ON_BURST_MISS",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
+ANALOG_RX_SESSION_CONTROL_KEYS = ("ANALOG_RX_SESSION_CONTROL",)
+ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
+ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
 ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
@@ -2681,6 +2684,22 @@ class UsrpBatchSpoolJob:
                 if _parse_bool(pipeline_rf_decode_overlap, False)
                 else "--no-pipeline-rf-decode-overlap"
             )
+        rx_session_control = _first_value(env_values, ANALOG_RX_SESSION_CONTROL_KEYS)
+        if rx_session_control:
+            args.append("--rx-session-control" if _parse_bool(rx_session_control, False) else "--no-rx-session-control")
+        rx_batch_session_control = _first_value(env_values, ANALOG_RX_BATCH_SESSION_CONTROL_KEYS)
+        if rx_batch_session_control:
+            args.append(
+                "--rx-batch-session-control"
+                if _parse_bool(rx_batch_session_control, False)
+                else "--no-rx-batch-session-control"
+            )
+        rx_batch_session_max_images = _first_value(env_values, ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS)
+        if rx_batch_session_max_images:
+            args.extend([
+                "--rx-batch-session-max-images",
+                str(max(0, _parse_int(rx_batch_session_max_images, 0))),
+            ])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
         if scramble_key:
