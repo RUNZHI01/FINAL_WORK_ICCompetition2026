@@ -7,6 +7,7 @@ Branch: `feat/restore-248`.
 Latest implementation checkpoint before this handoff:
 
 ```text
+7baebf8 perf: expose rx server timing fields
 cb921d2 perf: close iq rx sessions promptly
 8966711 perf: promote iq arm wait profile
 71a591d docs: add iq direct handoff
@@ -44,6 +45,7 @@ All runs below used the Cockpit `/api/run-inference-batch` behavior, IQ direct, 
 | `batch-1783672642-300` | 300 | `300/300`, fallback `0` | `241.93 ms` | `248.18 ms` | `170.84 ms` | `332.98 ms` | Candidate 150 ms arm-wait gate. |
 | `batch-1783674212-50` | 50 | `50/50`, fallback `0` | `238.58 ms` | `241.01 ms` | `182.34 ms` | `251.66 ms` | Smoke after RX session close shutdown fix. |
 | `batch-1783674397-300` | 300 | `300/300`, fallback `0` | `238.87 ms` | `245.54 ms` | `175.28 ms` | `337.46 ms` | Latest gate; session close fix is safe but did not remove 300-image tails. |
+| `batch-1783676258-50` | 50 | `50/50`, fallback `0` | `242.22 ms` | `243.93 ms` | `165.42 ms` | `251.70 ms` | First live run with `rx_server_*` timing fields. |
 
 Reference QPSK transport is about `2961.78 ms/image`. IQ direct is far faster than QPSK on the data plane. The visible reconstruction cadence is still mostly set by TVM, currently around `239-245 ms` per inference sample.
 
@@ -58,6 +60,18 @@ remote_decode_ms     60.23
 board_reported_decode_ms 43.54
 total_transport_ms  175.34
 ```
+
+Instrumentation smoke `batch-1783676258-50` showed the normal RX path is not spending time in server-side drain or stream-command issue:
+
+```text
+rx_server_arm_wait_ms median 0.66, p95 0.89
+rx_server_drain_ms median 0.03, p95 0.03
+rx_server_stream_cmd_ms median 0.16, p95 0.22
+rx_server_receive_ms median 63.61, p95 63.63
+rx_server_capture_ms median 64.27, p95 64.40
+```
+
+This means the normal-path RX floor is currently dominated by capture duration, especially `ANALOG_RX_TAIL_SEC=0.05`, not by server pre-arm drain. Treat smaller RX tail values as an experiment that must pass 50 images before any 300-image gate.
 
 ## Current Profile To Preserve
 
@@ -166,7 +180,7 @@ For speed runs, the runtime security channel was disabled while config still sho
 ## Next Work
 
 1. Keep QPSK frozen. Check `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py` before and after IQ changes.
-2. Re-run a 50-image IQ direct smoke and inspect the new `rx_server_*_ms` benchmark fields before changing behavior.
+2. Re-test `ANALOG_RX_TAIL_SEC=0.04` on 50 images with the current stable profile before considering it for 300. Earlier shorter-tail attempts were mixed, so this must be evidence-driven.
 3. Improve WAIT-timeout recovery. A timeout after partial samples should cancel/drain deterministically before the next ARQ attempt.
 4. Separate board decode compute from worker/control wait. The reported decode time is usually around `44 ms`, but runner-side waits can still reach seconds.
 5. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.
