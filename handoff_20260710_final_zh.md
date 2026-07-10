@@ -83,6 +83,10 @@ session-before-STOP 验证是 `batch-1783683491-300`：`300/300`，fallback `0`�
 
 tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usrp_rx`，`50/50`、fallback `0`，TVM median/p95 `241.53/246.04 ms`，IQ median/p95/max `179.92/360.48/3979.87 ms`。tmpfs 把 `write_npz` median/p95/max 压到 `1.446/2.553/2.719 ms`，但总链路被一次 arm-not-ready retry 和 decode response p95 `125.67 ms` 拖慢。结论：tmpfs 继续保留为诊断项，不默认推广。
 
+decode timing 字段验证是 `batch-1783686020-50`：`50/50`，fallback `0`，TVM median/p95 `239.71/250.01 ms`，IQ median/p95/max `171.80/324.63/1417.55 ms`。新增 `remote_decode_*_ms` 字段已出现在 `iq_stage_benchmark`；板端 decode 内部阶段 p95 都低于 `90 ms`，更大的尾巴仍在 RX control overhead 和 runner-side decode response overhead。
+
+decode timing 300 张 gate 是 `batch-1783686930-300`：`300/300`，fallback `0`，TVM median/p95/max `240.29/242.87/257.55 ms`，IQ median/p95/max `166.04/288.97/7683.31 ms`。IQ median 已明显低于 TVM，但 p95/max 仍需优化。最大值来自一次 `/home` `.npz` 写入 stall；其他 top tail 主要是 RX arm/capture control 约 `1.0-1.1 s` 和 runner-side decode response wait。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动
@@ -100,6 +104,7 @@ tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usr
 - WAIT timeout cleanup 会在 direct STOP 前关闭当前 RX control session，避免同一个服务端控制会话阻塞新 STOP 连接。
 - remote-dir soft completion 命中时会记录 `remote_decode_soft_completed=true`，便于后续 A/B 区分正常 stdout response 和文件探测接管。
 - `iq_stage_benchmark` 会聚合板端 `decode_timing_ms`，输出 `remote_decode_matched_filter_ms`、`remote_decode_initial_sync_ms`、`remote_decode_cfo_estimate_ms`、`remote_decode_payload_recovery_ms`、`remote_decode_write_npz_ms` 等字段，用于定位 decode-side tail。
+- 失败 remote-decode attempt 也会保留 `decode_wall_sec`，避免低 sync/no-sync retry 的耗时归因丢失。
 
 ## 已知卡点
 
@@ -141,7 +146,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
 2. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
-3. 继续处理 decode-side tail。session-before-STOP 已通过 300 张验证，剩余最大值主要是板端 reported decode stall 和 runner 等 decode worker response；下一轮用新增的 `remote_decode_*_ms` 字段判断 tail 落在哪个板端阶段。
+3. 继续处理 IQ p95/max。最新 300 张显示 median 已低于 TVM，但 tail 主要来自 RX arm/capture control、runner 等 decode response，以及 rare `/home` `.npz` 写入 stall。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。
 

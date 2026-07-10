@@ -62,6 +62,10 @@ session-before-STOP 验证：`batch-1783683491-300`，结果 `300/300`、fallbac
 
 tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usrp_rx`，结果 `50/50`、fallback `0`。TVM median/p95 为 `241.53/246.04 ms`，IQ median/p95/max 为 `179.92/360.48/3979.87 ms`。`write_npz` median/p95/max 被压到 `1.446/2.553/2.719 ms`，但总链路仍被 arm-not-ready retry 和 decode response wait 拖慢。tmpfs 继续作为诊断项，不默认推广。
 
+decode timing 字段验证：`batch-1783686020-50`，结果 `50/50`、fallback `0`。TVM median/p95 为 `239.71/250.01 ms`，IQ total median/p95/max 为 `171.80/324.63/1417.55 ms`，stage record 为 `51` 条，因为 image 0 第一次低 sync 后重试成功。新增 `remote_decode_*_ms` 字段已出现在 `iq_stage_benchmark`。板端 decode 内部阶段不是本轮 p95 主因：matched filter p95 `8.97 ms`、initial sync `6.50 ms`、CFO `4.01 ms`、payload recovery `37.73 ms`、`.npz` write `3.28 ms`，board-reported decode p95 `88.40 ms`。更大的尾巴仍是 `rx_capture_control_overhead_ms` p95 `124.74 ms` 和 `remote_decode_response_overhead_ms` p95 `121.63 ms`。
+
+decode timing 300 张 gate：`batch-1783686930-300`，结果 `300/300`、fallback `0`。TVM median/p95/max 为 `240.29/242.87/257.55 ms`，IQ total median/p95/max 为 `166.04/288.97/7683.31 ms`。IQ median 已明显低于 TVM median，但 IQ p95 和 max 仍未达成“远小于 TVM”的最终目标。最大值来自 image 177：board `write_npz` 为 `7440.19 ms`，总 IQ 为 `7683.31 ms`。其他 top tail 是 RX arm/capture control：image 103、110、235 的 `rx_arm_ms` 约 `1025-1122 ms`，但 server capture 仍约 `64 ms`；image 184 是 runner-side decode response wait，`decode_wall_sec` 约 `1231 ms`，board reported decode 约 `56 ms`。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁
@@ -76,6 +80,7 @@ QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。
 - `USRP292x/RunAnalogLatentBatch.py`: 增加 `remote_decode_soft_completed` 记录字段，用于后续 soft-completion A/B 诊断。
 - `USRP292x/AnalogLatentLink.py`: 在 `decode_timing_ms` 中单独记录 `matched_filter`。
 - `USRP292x/RunAnalogLatentBatch.py`: 记录 `remote_decode_timing_ms`，并聚合 `remote_decode_matched_filter_ms`、`remote_decode_initial_sync_ms`、`remote_decode_cfo_estimate_ms`、`remote_decode_payload_recovery_ms`、`remote_decode_write_npz_ms` 等 decode-stage benchmark。
+- `USRP292x/RunAnalogLatentBatch.py`: 修复失败 remote-decode attempt 的 timing 记录；worker 抛错时也会保留 `decode_wall_sec`，避免低 sync/no-sync retry 被记录成 decode `0 ms`。
 - `USRP292x/test_analog_latent_link.py`: 增加和更新失败路径测试，覆盖远端 decode 异常、本地 decode status failure、WAIT timeout、arm status timeout 等相邻路径。
 
 已跑过的本地验证：
@@ -118,11 +123,11 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 ## 下一步建议
 
-1. 先提交当前 decode timing 观测补丁，提交前确认没有生成 report、raw log 或临时运行产物混进 git。
-2. 继续用 `batch-1783683491-300` 作为当前默认 profile 的 300 张基线：IQ median/p95 `169.48/299.73 ms`，TVM median/p95 `242.38/245.50 ms`，fallback `0`。
-3. 下一轮先跑 50 张 Cockpit 等价 gate，确认新增的 `remote_decode_*_ms` 字段能出现在 summary；再跑 300 张 gate 分类剩余 decode-side tail。
+1. 提交当前 decode timing 和失败 attempt timing 补丁，提交前确认没有生成 report、raw log 或临时运行产物混进 git。
+2. 继续用 `batch-1783686930-300` 作为当前默认 profile 的 300 张基线：IQ median/p95 `166.04/288.97 ms`，TVM median/p95 `240.29/242.87 ms`，fallback `0`。
+3. 下一步先处理 p95/max：RX arm/capture control 1s 级 stall、runner-side decode response wait，以及 `/home` `.npz` rare write stall。
 4. 若 tail 仍主要是 runner 等 decode worker response，则继续处理 `remote_decode_response_overhead_ms`；若 tail 落在 matched-filter/sync/CFO/payload recovery，则回到 `AnalogLatentLink.py` 针对对应阶段优化。
-5. 若正常路径继续稳定，再处理 RX capture/control tail。不要在 RX 状态机稳定前默认开启双缓冲或 streaming TVM。
+5. 可做 decoded output placement/format A/B，但只有 300 张全过且 p95/max 同时改善才推广；tmpfs、`.npy` 仍不是默认。
 6. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 
 ## 交接注意事项

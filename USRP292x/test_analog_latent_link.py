@@ -3451,6 +3451,7 @@ def test_process_image_remote_decode_error_preserves_stage_timings(tmp_path, mon
     class FailingWorker:
         def decode(self, _request, _log_path, *, timeout):
             del timeout
+            time.sleep(0.01)
             raise RuntimeError("no sync candidate had a complete frame")
 
     args = Namespace(
@@ -3517,7 +3518,7 @@ def test_process_image_remote_decode_error_preserves_stage_timings(tmp_path, mon
     assert record["rx_arm_wall_sec"] >= 0.0
     assert record["rx_capture_wall_sec"] >= 0.0
     assert record["rx_wait_wall_sec"] >= 0.0
-    assert record["decode_wall_sec"] >= 0.0
+    assert record["decode_wall_sec"] >= 0.005
     assert record["remote_decode_restart_wall_sec"] == 0.0
     assert any(line == "STOP" for line in control_lines)
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
