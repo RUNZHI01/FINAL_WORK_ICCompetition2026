@@ -58,6 +58,8 @@ SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1
 
 STOP timeout-budget 验证：`batch-1783682666-300`，结果 `300/300`、fallback `0`。TVM median/p95 为 `240.17/243.93 ms`，IQ image-level median/p95/max 为 `172.39/310.55/19107.42 ms`，共有 `302` 条 stage record。image 196 仍出现 WAIT timeout 后 STOP `ERR_TIMEOUT`，说明仅扩大 STOP client timeout 不够。根因更新为旧 RX session 未先关闭；代码已改成 WAIT timeout 后先关闭 session，再 direct STOP。
 
+session-before-STOP 验证：`batch-1783683491-300`，结果 `300/300`、fallback `0`。TVM median/p95 为 `242.38/245.50 ms`，IQ image-level median/p95/max 为 `169.48/299.73/6822.54 ms`，共有 `301` 条 stage record。唯一 retry 是 image 263 arm/status timeout，STOP 日志返回 `OK`。剩余 top tail 主要是板端 reported decode stall 和 runner-side decode response wait。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁
@@ -113,7 +115,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 先决定是否提交当前 RX 失败清理补丁。提交前清理 `Semantic-Communication/session_bootstrap/reports/openamp3_usrp_1783681389_current_*.json/.md` 这类本地运行报告，除非要作为证据归档。
 2. 跑一次 300 张 Cockpit 等价 gate，确认 IQ median 仍低于 `200 ms`，p95 尽量低于 `450 ms`，fallback 为 `0`。
-3. 下一轮 300 张里如果出现 WAIT timeout 或 no-sync retry，检查失败 attempt 是否带 STOP 计时字段；尤其确认 session-before-STOP 后 `rx_stop_after_wait_timeout.log` 不再是 `ERR_TIMEOUT`。
+3. 下一步集中处理 decode-side tail：板端 reported decode stall 和 runner 等 decode worker response。RX STOP cleanup 目前已经过 300 张验证。
 4. 若正常路径继续稳定，下一步再处理 `remote_decode_response_overhead_ms` 和 RX capture/control tail。不要在 RX 状态机稳定前默认开启双缓冲或 streaming TVM。
 5. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 

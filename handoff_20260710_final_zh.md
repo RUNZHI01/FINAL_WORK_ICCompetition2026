@@ -79,6 +79,8 @@ cleanup 后 300 张 gate 是 `batch-1783682083-300`：`300/300`，fallback `0`�
 
 STOP timeout-budget 验证是 `batch-1783682666-300`：`300/300`，fallback `0`，TVM median/p95 `240.17/243.93 ms`，IQ median/p95/max `172.39/310.55/19107.42 ms`，stage record `302`。image 196 仍出现 WAIT timeout 后 STOP `ERR_TIMEOUT`，并且第二次 attempt 有约 `6.96 s` runner-side decode wait。根因更新：`ANALOG_RX_SESSION_CONTROL=1` 下 WAIT timeout 后旧 RX session 没有先关闭，runner 直接开新连接发 STOP，可能卡在服务端旧会话/accept 状态。现在 depth-1 和 pipeline capture 两条路径都改成 STOP 前先关闭 RX session。
 
+session-before-STOP 验证是 `batch-1783683491-300`：`300/300`，fallback `0`，TVM median/p95 `242.38/245.50 ms`，IQ median/p95/max `169.48/299.73/6822.54 ms`，stage record `301`。唯一 retry 是 image 263 arm/status timeout，`rx_stop_after_capture_busy.log` 返回 `OK`，不再是 `ERR_TIMEOUT`。剩余最大尾部主要在 decode 侧：真实板端 decode stall 和 runner-side decode response wait。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动
@@ -135,7 +137,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
 2. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
-3. 继续验证 RX WAIT/no-sync retry 恢复：decode/no-sync 失败后的 STOP/drain 已加入，STOP timeout budget 和 session-before-STOP 顺序也已修正；下一次 300 张里检查 `rx_stop_after_wait_timeout.log` 是否返回 OK 和 STOP 计时字段。
+3. 继续处理 decode-side tail。session-before-STOP 已通过 300 张验证，剩余最大值主要是板端 reported decode stall 和 runner 等 decode worker response。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。
 
