@@ -3784,6 +3784,7 @@ class ServerMainTest(unittest.TestCase):
                 "CHUNK_BYTES": "4096",
                 "USRP_WIRE_PREPARE_WORKERS": "2",
                 "USRP_WIRE_CACHE_ENABLED": "1",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
             },
             clear=False,
         ):
@@ -3795,6 +3796,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["CHUNK_BYTES"], "4096")
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
         self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
 
     def test_usrp_job_default_timeout_scales_with_batch_count(self) -> None:
         self.assertEqual(

@@ -1714,6 +1714,40 @@ def decode_namespace_from_request(request: dict[str, Any]) -> argparse.Namespace
     )
 
 
+DECODE_WORKER_MINIMAL_SUMMARY_KEYS = (
+    "status",
+    "sync_success",
+    "frame_complete",
+    "sync_search_mode",
+    "sync_metric",
+    "estimated_cfo_hz",
+    "detected_airtime_ms",
+    "evm_rms",
+    "estimated_snr_db",
+    "rx_clipping_ratio",
+    "decode_total_ms",
+    "decode_timing_ms",
+)
+
+
+def decode_worker_response(summary: dict[str, Any], summary_json: str, *, mode: str = "full") -> dict[str, Any]:
+    response_mode = str(mode or "full").strip().lower()
+    response_summary = summary
+    if response_mode in {"minimal", "compact"}:
+        response_summary = {
+            key: summary[key]
+            for key in DECODE_WORKER_MINIMAL_SUMMARY_KEYS
+            if key in summary
+        }
+    return {
+        "status": "ok",
+        "summary_json": summary_json,
+        "sync_metric": summary.get("sync_metric"),
+        "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
+        "summary": response_summary,
+    }
+
+
 def run_decode_server() -> int:
     ready_payload = {"status": "ready"}
     try:
@@ -1744,13 +1778,10 @@ def run_decode_server() -> int:
         try:
             args = decode_namespace_from_request(request)
             summary = decode_waveform(args)
-            print(json.dumps({
-                "status": "ok",
-                "summary_json": args.summary_json,
-                "sync_metric": summary["sync_metric"],
-                "estimated_cfo_hz": summary["estimated_cfo_hz"],
-                "summary": summary,
-            }, ensure_ascii=False), flush=True)
+            print(json.dumps(
+                decode_worker_response(summary, args.summary_json, mode=str(request.get("response_mode") or "full")),
+                ensure_ascii=False,
+            ), flush=True)
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
             print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), flush=True)

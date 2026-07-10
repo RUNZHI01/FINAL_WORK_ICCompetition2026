@@ -2,6 +2,7 @@
 """Regression tests for the analog latent-IQ USRP path."""
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -1098,6 +1099,7 @@ def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):
         ],
         check=True,
         cwd=PROJECT_ROOT,
+        env={**os.environ, "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal"},
     )
 
     image_dir = run_root / "dry" / "image_0000"
@@ -1113,6 +1115,7 @@ def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):
     assert summary["all_pass"] is True
     assert summary["in_process_local_codec"] is True
     assert summary["codec_warmup_wall_sec"] >= 0.0
+    assert summary["remote_decode_response_mode"] == "minimal"
     assert summary["per_image_sec"] > 0.0
     assert summary["payload_airtime_ms_mean"] > 0.0
     assert summary["decode_total_wall_sec_mean"] > 0.0
@@ -1305,6 +1308,75 @@ def test_remote_analog_decode_request_carries_fast_first_sync_profile(monkeypatc
     assert request["fast_sync_search_window_symbols"] == 1024
     assert request["fallback_sync_candidates"] == 12
     assert request["fallback_sync_search_window_symbols"] == 4096
+
+
+def test_remote_analog_decode_request_can_request_minimal_worker_response(monkeypatch):
+    monkeypatch.setenv("ANALOG_REMOTE_DECODE_RESPONSE_MODE", "minimal")
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        dry_run=False,
+    )
+
+    request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/batch_rx.sc16",
+        "/tmp/run/manifest.json",
+        "/tmp/run/received_latent.npz",
+        "/tmp/run/merged_round0.bin",
+        "/tmp/run/decode_summary.json",
+    )
+
+    assert request["response_mode"] == "minimal"
+
+
+def test_decode_worker_minimal_response_keeps_runner_summary_fields():
+    summary = {
+        "status": "ok",
+        "sync_success": True,
+        "frame_complete": True,
+        "sync_metric": 0.91,
+        "estimated_cfo_hz": 12.5,
+        "detected_airtime_ms": 9.5,
+        "evm_rms": 0.02,
+        "estimated_snr_db": 31.0,
+        "rx_clipping_ratio": 0.0,
+        "decode_total_ms": 41.2,
+        "decode_timing_ms": {"write_npz": 1.5},
+        "debug_large_array": list(range(128)),
+    }
+
+    response = analog.decode_worker_response(summary, "/tmp/run/decode_summary.json", mode="minimal")
+
+    assert response["status"] == "ok"
+    assert response["summary_json"] == "/tmp/run/decode_summary.json"
+    assert response["sync_metric"] == 0.91
+    assert response["estimated_cfo_hz"] == 12.5
+    assert response["summary"] == {
+        "status": "ok",
+        "sync_success": True,
+        "frame_complete": True,
+        "sync_metric": 0.91,
+        "estimated_cfo_hz": 12.5,
+        "detected_airtime_ms": 9.5,
+        "evm_rms": 0.02,
+        "estimated_snr_db": 31.0,
+        "rx_clipping_ratio": 0.0,
+        "decode_total_ms": 41.2,
+        "decode_timing_ms": {"write_npz": 1.5},
+    }
 
 
 def test_remote_analog_decode_request_enables_low_sync_retry_only_before_final_attempt(monkeypatch):

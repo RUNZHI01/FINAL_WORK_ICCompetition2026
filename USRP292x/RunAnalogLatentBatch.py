@@ -1542,6 +1542,15 @@ def remote_decode_soft_complete_sec(args: argparse.Namespace) -> float:
     return max(0.0, float(getattr(args, "remote_decode_soft_complete_sec", 0.0) or 0.0))
 
 
+def remote_decode_response_mode(args: argparse.Namespace) -> str:
+    configured = str(
+        getattr(args, "remote_decode_response_mode", "")
+        or os.environ.get("ANALOG_REMOTE_DECODE_RESPONSE_MODE", "")
+        or ""
+    ).strip().lower()
+    return configured if configured in {"full", "minimal", "compact"} else ""
+
+
 def try_remote_dir_decode_soft_completion(
     target: str,
     remote_output: str,
@@ -2096,6 +2105,9 @@ def remote_analog_decode_request(
         "scramble_context": str(getattr(args, "scramble_context", "") or ""),
     }
     request.update(fast_first_sync_request_fields(args, attempt_index=attempt_index, max_attempts=max_attempts))
+    response_mode = remote_decode_response_mode(args)
+    if response_mode:
+        request["response_mode"] = "minimal" if response_mode == "compact" else response_mode
     return request
 
 
@@ -3735,6 +3747,7 @@ def main() -> int:
             remote_decode_worker.ready_response if remote_decode_worker is not None else {}
         ),
         "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
+        "remote_decode_response_mode": remote_decode_response_mode(args) or "full",
         "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
         "remote_decode_soft_complete_sec": remote_decode_soft_complete_sec(args),
         "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
