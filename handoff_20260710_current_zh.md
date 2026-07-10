@@ -70,6 +70,8 @@ batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 已完成本地实现
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝：`batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。保持 `PERSISTENT_RX_TX_DELAY=0`。
 
+WAIT timeout cleanup 的计时记录已修复：STOP 成功后不再被原始 WAIT 错误文本里的 `stop_cmd_sec=0` / `stop_wait_sec=0` 覆盖，后续 300 张 tail 分析可以信任 `rx_server_stop_*` 字段。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁

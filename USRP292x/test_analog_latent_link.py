@@ -1928,7 +1928,7 @@ def test_process_image_records_rx_stop_timing_after_wait_timeout(tmp_path, monke
             raise RuntimeError(
                 "control command failed: WAIT timeout=0.500000\n"
                 "ERR busy=1 started=1 done=0 ok=1 job_id=9 target_samps=107584 written_samps=47553 "
-                "receive_sec=0.501 wall_sec=0.000"
+                "receive_sec=0.501 stop_cmd_sec=0.000 stop_wait_sec=0.000 wall_sec=0.000"
             )
         if line == "STOP":
             return (

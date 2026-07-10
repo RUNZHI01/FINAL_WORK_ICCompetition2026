@@ -91,6 +91,8 @@ Batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 的 50 张 `batch-178
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝：`batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。保持 `PERSISTENT_RX_TX_DELAY=0`。
 
+WAIT timeout cleanup 的计时记录已修复：STOP 成功后不再被原始 WAIT 错误文本里的 `stop_cmd_sec=0` / `stop_wait_sec=0` 覆盖，后续 300 张 tail 分析可以信任 `rx_server_stop_*` 字段。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动

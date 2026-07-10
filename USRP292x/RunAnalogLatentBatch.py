@@ -2977,7 +2977,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         error_text = str(exc)
         if decode_wall_sec <= 0.0 and decode_started > 0.0:
             decode_wall_sec = time.monotonic() - decode_started
-        rx_server_snapshot.update(parse_rx_control_snapshot_fields(error_text))
+        if not rx_failure_stop_done:
+            rx_server_snapshot.update(parse_rx_control_snapshot_fields(error_text))
         if rx_needs_failure_stop and not rx_failure_stop_done:
             try:
                 close_shared_rx_control_session(args)

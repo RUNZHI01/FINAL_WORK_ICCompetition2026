@@ -20,6 +20,8 @@
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝。50 张 `batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。继续保持 `PERSISTENT_RX_TX_DELAY=0`。
 
+WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，外层异常记录可能再次解析 WAIT 错误文本里的 `stop_cmd_sec=0` / `stop_wait_sec=0`，把真实 STOP 计时覆盖掉。现在这类记录会保留 `rx_stop_after_wait_timeout.log` 里的真实 `rx_server_stop_*` 字段，便于下一轮 300 张长尾归因。
+
 ## 推荐运行配置
 
 保持下面这些环境变量，不要把诊断开关混进默认 profile：
@@ -109,10 +111,9 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 优先级如下：
 
-1. 修正 WAIT timeout cleanup 的计时记录。当前一类失败会先 STOP 成功，但 stage record 可能被原始错误字段覆盖，导致 `rx_server_stop_*` 看起来是 `0`。
-2. 处理 RX arm/wait/control stall。batch session 降低了 median，但 300 张 p95 更差，说明单纯复用连接不是最终解。
-3. 处理 runner-side decode response wait。多次长尾里板端 reported decode 只有几十毫秒，但 runner 等响应等了几秒。
-4. 复测 decoded output placement/format。tmpfs 能压低 `write_npz`，但之前没有改善 300 张 p95，只能作为诊断项。
+1. 处理 RX arm/wait/control stall。batch session 降低了 median，但 300 张 p95 更差，说明单纯复用连接不是最终解。
+2. 处理 runner-side decode response wait。多次长尾里板端 reported decode 只有几十毫秒，但 runner 等响应等了几秒。
+3. 复测 decoded output placement/format。tmpfs 能压低 `write_npz`，但之前没有改善 300 张 p95，只能作为诊断项。
 
 每次改动前后都要确认 QPSK 没被动到：
 
