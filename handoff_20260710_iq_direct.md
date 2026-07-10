@@ -48,6 +48,7 @@ All runs below used the Cockpit `/api/run-inference-batch` behavior, IQ direct, 
 | `batch-1783676258-50` | 50 | `50/50`, fallback `0` | `242.22 ms` | `243.93 ms` | `165.42 ms` | `251.70 ms` | First live run with `rx_server_*` timing fields. |
 | `batch-1783678227-50` | 50 | `50/50`, fallback `0` | `240.61 ms` | `251.31 ms` | `201.17 ms` | `1207.08 ms` | Rejected `ANALOG_RX_TAIL_SEC=0.045`; server receive fell to `58.61 ms`, but RX arm/capture tail worsened. |
 | `batch-1783678924-50` | 50 | `50/50`, fallback `0` | `239.96 ms` | `245.99 ms` | `183.51 ms` | `338.34 ms` | No mid-run status polling; not better. Server capture stayed near `64 ms`, while runner-side RX/decode response wait expanded. |
+| `batch-1783680558-50` | 50 | `50/50`, fallback `0` | `240.13 ms` | `244.14 ms` | `207.72 ms` | `334.49 ms` | First run with derived overhead fields. Image 29 recovered after no-sync; image-level IQ max was `1129.46 ms`. |
 
 Reference QPSK transport is about `2961.78 ms/image`. IQ direct is far faster than QPSK on the data plane. The visible reconstruction cadence is still mostly set by TVM, currently around `239-245 ms` per inference sample.
 
@@ -74,6 +75,8 @@ rx_server_capture_ms median 64.27, p95 64.40
 ```
 
 This means the normal-path RX floor is currently dominated by capture duration, especially `ANALOG_RX_TAIL_SEC=0.05`, not by server pre-arm drain. Smaller RX tail values were re-tested and rejected: `0.04` hit a no-sync retry in a 5-image sanity run, and `0.045` completed 50 images but worsened median and p95.
+
+Derived-overhead validation `batch-1783680558-50` showed server capture remained stable (`64.21/64.35 ms` median/p95), while `rx_capture_control_overhead_ms` p95 was `140.31 ms` and `remote_decode_response_overhead_ms` p95 was `128.12 ms`. The next fix should target RX arm/capture readiness and retry cleanup before decode-response tuning.
 
 ## Current Profile To Preserve
 
@@ -190,8 +193,8 @@ For speed runs, the runtime security channel was disabled while config still sho
 
 1. Keep QPSK frozen. Check `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py` before and after IQ changes.
 2. Keep `ANALOG_RX_TAIL_SEC=0.05`. `0.04` and `0.045` are rejected for the current RF/control profile.
-3. Run the next 50/300-image gate with the new overhead benchmark fields and classify tails as RX client/control, RX server, or decode response.
-4. Improve WAIT-timeout recovery. A timeout after partial samples should cancel/drain deterministically before the next ARQ attempt.
+3. Design RX arm/capture health handling. `batch-1783680558-50` showed stable server capture, but runner-side capture/control overhead and no-sync retry still raise image-level max.
+4. Improve WAIT/no-sync recovery. A timeout or no-sync after partial samples should cancel/drain deterministically before the next ARQ attempt.
 5. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.
 6. Re-run a 300-image gate after any timing behavior change. Do not promote a profile from a single short run.
 

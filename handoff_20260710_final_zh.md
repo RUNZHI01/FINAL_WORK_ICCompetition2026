@@ -71,6 +71,8 @@ OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0
 
 最新 no-poll 对照是 `batch-1783678924-50`：`50/50`，fallback `0`，TVM median/p95 `239.96/245.99 ms`，IQ median/p95/max `183.51/338.34/501.46 ms`。中途少轮询没有改善 tail；最慢样本 server capture 仍约 `64 ms`，但 runner 侧 `rx_capture/rx_wait` 和 decode response 等待拉长。结论：状态轮询不是主因。
 
+最新 overhead 字段验证是 `batch-1783680558-50`：`50/50`，fallback `0`，TVM median/p95 `240.13/244.14 ms`，image-level IQ median/p95/max `207.72/334.49/1129.46 ms`。本轮有 51 条 stage record，image 29 第一次 attempt no-sync 后重试恢复。server capture 仍稳定在约 `64 ms`，但 `rx_capture_control_overhead_ms` p95 `140.31 ms`，`remote_decode_response_overhead_ms` p95 `128.12 ms`。下一步先处理 RX arm/capture readiness 和 retry cleanup，再处理 decode response wait。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动
@@ -123,8 +125,8 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 ## 下一步顺序
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
-2. 用新增的 IQ overhead benchmark 字段跑下一轮 50/300 张 gate，先确认 tail 属于 RX client/control、RX server 还是 decode response。
-3. 做 RX WAIT timeout 恢复：timeout 后显式 cancel/drain，再进入下一次 ARQ retry。
+2. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
+3. 做 RX WAIT/no-sync retry 恢复：timeout 或 no-sync 后显式 cancel/drain，再进入下一次 ARQ retry。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。
 

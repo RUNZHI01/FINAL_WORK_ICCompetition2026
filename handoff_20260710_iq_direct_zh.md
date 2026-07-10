@@ -101,6 +101,8 @@ rx_server_capture_ms median 64.27
 
 no-poll 对照 `batch-1783678924-50` 保持 `50/50`、fallback `0`，TVM median/p95 `239.96/245.99 ms`，IQ median/p95/max `183.51/338.34/501.46 ms`。去掉中途状态轮询没有改善 tail；server capture 仍约 `64 ms`，runner 侧 `rx_capture/rx_wait` 和 decode response 等待才是下一步要拆的部分。
 
+overhead 字段验证 `batch-1783680558-50` 保持 `50/50`、fallback `0`，TVM median/p95 `240.13/244.14 ms`，image-level IQ median/p95/max `207.72/334.49/1129.46 ms`。本轮有 51 条 stage record，image 29 第一次 attempt no-sync 后重试恢复。server capture 仍约 `64 ms`，但 `rx_capture_control_overhead_ms` p95 `140.31 ms`，`remote_decode_response_overhead_ms` p95 `128.12 ms`。下一步先处理 RX arm/capture readiness 和 retry cleanup。
+
 QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多，不要为了 IQ 优化去改 QPSK。
 
 ## 这轮主要改动
@@ -130,8 +132,8 @@ QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多
 
 1. 先提交当前文档更新，保持工作区干净。
 2. 保持 `ANALOG_RX_TAIL_SEC=0.05`。`0.04` 和 `0.045` 当前都不要推广。
-3. 用新增 overhead benchmark 字段跑下一轮 50/300 张 gate，确认 tail 属于 RX client/control、RX server 还是 decode response。
-4. 做 RX WAIT timeout 恢复：timeout 后显式 cancel/drain，再进入下一次 ARQ retry。
+3. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
+4. 做 RX WAIT/no-sync retry 恢复：timeout 或 no-sync 后显式 cancel/drain，再进入下一次 ARQ retry。
 5. RX 状态机稳定前，不要默认打开 double buffering 或 streaming TVM。
 6. 每次 IQ 行为变化后，都要跑 300 张 gate，再决定是否推广。
 
