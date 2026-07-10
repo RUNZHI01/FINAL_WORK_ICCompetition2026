@@ -235,6 +235,26 @@ def parse_args() -> argparse.Namespace:
         default=env_int("ANALOG_PIPELINE_DEPTH", 1),
         help="Number of IQ remote-decode slots to keep in flight. Depth 1 preserves serial behavior.",
     )
+    parser.add_argument(
+        "--remote-stall-snapshot",
+        dest="remote_stall_snapshot",
+        action="store_true",
+        default=env_bool("ANALOG_REMOTE_STALL_SNAPSHOT", False),
+        help="Opt-in diagnostic: collect board CPU/IO status when a remote IQ record exceeds the stall threshold.",
+    )
+    parser.add_argument("--no-remote-stall-snapshot", dest="remote_stall_snapshot", action="store_false")
+    parser.add_argument(
+        "--remote-stall-snapshot-threshold-sec",
+        type=float,
+        default=env_float("ANALOG_REMOTE_STALL_SNAPSHOT_THRESHOLD_SEC", 1.0),
+        help="Collect a remote stall snapshot when any key per-image timing reaches this many seconds.",
+    )
+    parser.add_argument(
+        "--remote-stall-snapshot-limit",
+        type=int,
+        default=env_int("ANALOG_REMOTE_STALL_SNAPSHOT_LIMIT", 3),
+        help="Maximum remote stall snapshots to collect per runner process.",
+    )
 
     parser.add_argument("--rate", type=float, default=env_float("RATE", 5_000_000.0))
     parser.add_argument("--sps", type=int, default=env_int("ANALOG_SPS", 4))
@@ -1078,6 +1098,98 @@ def run_remote_command(
     remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
     full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
     return _run_external(full, log_path, check=True, timeout=timeout)
+
+
+REMOTE_STALL_SNAPSHOT_FIELDS = (
+    "total_wall_sec",
+    "tx_wall_sec",
+    "rx_arm_wall_sec",
+    "rx_capture_wall_sec",
+    "rx_wait_wall_sec",
+    "decode_queue_wall_sec",
+    "decode_wall_sec",
+    "remote_decode_reported_wall_sec",
+    "remote_decode_restart_wall_sec",
+    "remote_dir_publish_wall_sec",
+)
+
+
+def _remote_stall_snapshot_reasons(record: dict[str, Any], threshold_sec: float) -> list[str]:
+    reasons: list[str] = []
+    for field_name in REMOTE_STALL_SNAPSHOT_FIELDS:
+        try:
+            value = float(record.get(field_name) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if value >= threshold_sec:
+            reasons.append(field_name)
+    if record.get("error"):
+        reasons.append("error")
+    return reasons
+
+
+def maybe_capture_remote_stall_snapshot(
+    args: argparse.Namespace,
+    record: dict[str, Any],
+    *,
+    remote_target: str,
+    image_dir: Path,
+    log_name: str,
+    control_socket: str | None = None,
+) -> bool:
+    if not bool(getattr(args, "remote_stall_snapshot", False)):
+        return False
+    if not remote_target:
+        return False
+    limit = max(0, int(getattr(args, "remote_stall_snapshot_limit", 3) or 0))
+    taken = int(getattr(args, "_remote_stall_snapshots_taken", 0) or 0)
+    if taken >= limit:
+        return False
+    threshold = max(0.0, float(getattr(args, "remote_stall_snapshot_threshold_sec", 1.0) or 0.0))
+    reasons = _remote_stall_snapshot_reasons(record, threshold)
+    if not reasons:
+        return False
+
+    log_path = image_dir / log_name
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    script = "\n".join(
+        [
+            "set +e",
+            "echo '=== date ==='",
+            "date -Ins",
+            "echo '=== uptime ==='",
+            "uptime",
+            "echo '=== cpu top ==='",
+            "top -bn1 | head -20",
+            "echo '=== vmstat ==='",
+            "if command -v vmstat >/dev/null 2>&1; then vmstat 1 2; fi",
+            "echo '=== memory ==='",
+            "free -m",
+            "echo '=== filesystems ==='",
+            "df -h /home /tmp /dev/shm 2>/dev/null || true",
+            "echo '=== hot processes ==='",
+            "ps -eo pid,comm,pcpu,pmem,stat --sort=-pcpu | head -20",
+        ]
+    )
+    started = time.monotonic()
+    record["remote_stall_snapshot_log"] = str(log_path)
+    record["remote_stall_snapshot_reason"] = ",".join(reasons)
+    setattr(args, "_remote_stall_snapshots_taken", taken + 1)
+    try:
+        run_remote_command(
+            remote_target,
+            ["bash", "-lc", script],
+            log_path,
+            control_socket=control_socket,
+            timeout=8.0,
+        )
+    except Exception as exc:
+        record["remote_stall_snapshot_error"] = str(exc)
+        if not log_path.exists():
+            log_path.write_text(str(exc) + "\n", encoding="utf-8")
+    finally:
+        record["remote_stall_snapshot_wall_sec"] = time.monotonic() - started
+    return True
 
 
 def cleanup_remote_file(
@@ -2206,7 +2318,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 remote_cleanup_wall_sec = time.monotonic() - cleanup_started
 
         summary_data = read_json(decode_summary) if decode_summary.is_file() else {}
-        image.records.append({
+        record = {
             "round": 0,
             "input": str(image.input_path),
             "tx_sc16": str(tx_sc16),
@@ -2249,7 +2361,16 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "remote_cleanup_mode": remote_cleanup_mode,
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
-        })
+        }
+        maybe_capture_remote_stall_snapshot(
+            args,
+            record,
+            remote_target=remote_target,
+            image_dir=image.image_dir,
+            log_name="remote_stall_snapshot.log",
+            control_socket=ssh_control_socket,
+        )
+        image.records.append(record)
     except Exception as exc:
         image.status = 1
         image.passed = False
@@ -2267,7 +2388,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             except Exception as restart_exc:
                 error_text = f"{error_text}; remote decode worker restart failed: {restart_exc}"
         image.error = error_text
-        image.records.append({
+        record = {
             "round": 0,
             "input": str(image.input_path),
             "error": image.error,
@@ -2285,7 +2406,16 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "remote_decode_restart_wall_sec": remote_decode_restart_wall_sec,
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
-        })
+        }
+        maybe_capture_remote_stall_snapshot(
+            args,
+            record,
+            remote_target=remote_target,
+            image_dir=image.image_dir,
+            log_name="remote_stall_snapshot_error.log",
+            control_socket=ssh_control_socket,
+        )
+        image.records.append(record)
     finally:
         if ssh_master_proc is not None:
             try:
@@ -2309,6 +2439,10 @@ def _append_pipeline_error_record(
     slot_index: int,
     pipeline_depth: int,
     stage_timings: dict[str, float] | None = None,
+    args: argparse.Namespace | None = None,
+    remote_target: str = "",
+    control_socket: str | None = None,
+    log_name: str = "remote_stall_snapshot_pipeline_error.log",
 ) -> ImageRecord:
     image.status = 1
     image.passed = False
@@ -2330,6 +2464,15 @@ def _append_pipeline_error_record(
                 record[key] = float(value)
             except (TypeError, ValueError):
                 continue
+    if args is not None:
+        maybe_capture_remote_stall_snapshot(
+            args,
+            record,
+            remote_target=remote_target,
+            image_dir=image.image_dir,
+            log_name=log_name,
+            control_socket=control_socket,
+        )
     image.records.append(record)
     return image
 
@@ -2652,7 +2795,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
         remote_cleanup_wall_sec = time.monotonic() - cleanup_started
 
         summary_data = read_json(ctx["decode_summary"]) if ctx["decode_summary"].is_file() else {}
-        image.records.append({
+        record = {
             "round": int(ctx["attempt_index"]),
             "attempt": int(ctx["attempt_index"]) + 1,
             "max_attempts": int(ctx["max_attempts"]),
@@ -2701,7 +2844,16 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "slot_wait_wall_sec": float(ctx.get("slot_wait_wall_sec") or 0.0),
             "total_wall_sec": time.monotonic() - started,
             "payload_is_bit_exact": False,
-        })
+        }
+        maybe_capture_remote_stall_snapshot(
+            args,
+            record,
+            remote_target=str(ctx["remote_target"]),
+            image_dir=image.image_dir,
+            log_name="remote_stall_snapshot_pipeline.log",
+            control_socket=ctx["ssh_control_socket"],
+        )
+        image.records.append(record)
     except Exception as exc:
         if decode_started > 0.0:
             decode_wall_sec = time.monotonic() - decode_started
@@ -2740,6 +2892,9 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
                 "slot_wait_wall_sec": float(ctx.get("slot_wait_wall_sec") or 0.0),
             },
+            args=args,
+            remote_target=str(ctx["remote_target"]),
+            control_socket=ctx["ssh_control_socket"],
         )
     return image
 
@@ -2802,6 +2957,9 @@ def _process_images_remote_decode_pipeline(
                                 max_attempts=max_attempts,
                                 slot_index=slot_index,
                                 pipeline_depth=depth,
+                                args=args,
+                                remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
+                                log_name="remote_stall_snapshot_pipeline_capture_error.log",
                             )
                         )
                         available_slots.append(slot_index)
@@ -2836,6 +2994,9 @@ def _process_images_remote_decode_pipeline(
                             max_attempts=max_attempts,
                             slot_index=slot_index,
                             pipeline_depth=depth,
+                            args=args,
+                            remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
+                            log_name="remote_stall_snapshot_pipeline_capture_error.log",
                         )
                     )
                     available_slots.append(slot_index)
@@ -2881,6 +3042,9 @@ def _process_images_remote_decode_pipeline(
                         max_attempts=max_attempts,
                         slot_index=slot_index,
                         pipeline_depth=depth,
+                        args=args,
+                        remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
+                        log_name="remote_stall_snapshot_pipeline_retry_capture_error.log",
                     )
                 )
                 available_slots.append(slot_index)
