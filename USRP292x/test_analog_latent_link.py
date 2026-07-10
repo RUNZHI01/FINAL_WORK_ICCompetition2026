@@ -19,9 +19,21 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 ANALOG_LINK = PROJECT_ROOT / "USRP292x" / "AnalogLatentLink.py"
 ANALOG_BATCH = PROJECT_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
+OTA_RX_SERVER = PROJECT_ROOT / "USRP292x" / "OtaRxPersistentServer.cpp"
 
 from USRP292x import AnalogLatentLink as analog  # noqa: E402
 from USRP292x import RunAnalogLatentBatch as analog_batch  # noqa: E402
+
+
+def test_persistent_rx_startup_drain_can_be_stopped_before_stream_start():
+    source = OTA_RX_SERVER.read_text(encoding="utf-8")
+    drain_start = source.index("// Drain any residual samples from a previous capture.")
+    drain_end = source.index("std::vector<std::complex<std::int16_t>> buff", drain_start)
+    drain_block = source[drain_start:drain_end]
+
+    assert "stop_requested_.load()" in drain_block
+    assert "drain_deadline" in drain_block
+    assert "recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0)" in drain_block
 
 
 def test_load_latent_accepts_quantized_pt_jscc_output(tmp_path):
@@ -1541,6 +1553,105 @@ def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch, wait_e
     assert result.passed is False
     assert any(line == "STOP" for line in control_lines)
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+
+
+def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": True}), encoding="utf-8")
+        return 0
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line.startswith("CAPTURE "):
+            return "OK busy=1 started=0 done=0 ok=1 job_id=1"
+        if line == "STATUS":
+            return "OK busy=1 started=1 done=0 ok=1 job_id=1"
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert control_lines.index("STATUS") < next(i for i, line in enumerate(control_lines) if line.startswith("SEND "))
+
+
+def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line.startswith("CAPTURE "):
+            return "OK busy=1 started=0 done=0 ok=1 job_id=1"
+        if line == "STATUS":
+            raise RuntimeError("control command failed: STATUS\nERR_TIMEOUT host=board port=29220")
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert any(line == "STOP" for line in control_lines)
+    assert not any(line.startswith("SEND ") for line in control_lines)
 
 
 def test_pipeline_capture_attempt_stops_rx_after_capture_busy(tmp_path, monkeypatch):

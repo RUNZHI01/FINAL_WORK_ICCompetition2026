@@ -354,62 +354,66 @@ private:
             {
                 std::vector<std::complex<std::int16_t>> drain_buf(rx_stream->get_max_num_samps());
                 uhd::rx_metadata_t drain_md;
-                while (true) {
-                    std::size_t got = rx_stream->recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.01);
+                const auto drain_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+                while (!stop_requested_.load() && std::chrono::steady_clock::now() < drain_deadline) {
+                    std::size_t got = rx_stream->recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0);
                     if (got == 0) break;
                 }
             }
-            std::vector<std::complex<std::int16_t>> buff(rx_stream->get_max_num_samps());
-            uhd::rx_metadata_t md;
-            uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
-            cmd.num_samps = total_samps;
-            cmd.stream_now = true;
-            rx_stream->issue_stream_cmd(cmd);
 
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (state_.job_id == job_id) {
-                    state_.started = true;
-                }
-            }
-            cv_.notify_all();
+            if (!stop_requested_.load()) {
+                std::vector<std::complex<std::int16_t>> buff(rx_stream->get_max_num_samps());
+                uhd::rx_metadata_t md;
+                uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
+                cmd.num_samps = total_samps;
+                cmd.stream_now = true;
+                rx_stream->issue_stream_cmd(cmd);
 
-            const auto deadline = t0 + std::chrono::seconds(30);
-            while (written < total_samps && !stop_requested_.load()) {
-                if (std::chrono::steady_clock::now() > deadline) {
-                    throw std::runtime_error("RX capture deadline exceeded");
-                }
-                const std::size_t want = std::min<std::size_t>(buff.size(), total_samps - written);
-                const std::size_t got = rx_stream->recv(&buff.front(), want, md, 0.2, false);
-
-                if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-                    ++timeouts;
+                {
                     std::lock_guard<std::mutex> lock(mutex_);
                     if (state_.job_id == job_id) {
-                        state_.timeouts = timeouts;
+                        state_.started = true;
                     }
-                    continue;
                 }
-                if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
-                    ++overflows;
+                cv_.notify_all();
+
+                const auto deadline = t0 + std::chrono::seconds(30);
+                while (written < total_samps && !stop_requested_.load()) {
+                    if (std::chrono::steady_clock::now() > deadline) {
+                        throw std::runtime_error("RX capture deadline exceeded");
+                    }
+                    const std::size_t want = std::min<std::size_t>(buff.size(), total_samps - written);
+                    const std::size_t got = rx_stream->recv(&buff.front(), want, md, 0.2, false);
+
+                    if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+                        ++timeouts;
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (state_.job_id == job_id) {
+                            state_.timeouts = timeouts;
+                        }
+                        continue;
+                    }
+                    if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+                        ++overflows;
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (state_.job_id == job_id) {
+                            state_.overflows = overflows;
+                        }
+                        continue;
+                    }
+                    if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+                        throw std::runtime_error("RX metadata error: " + md.strerror());
+                    }
+                    out.write(reinterpret_cast<const char*>(buff.data()),
+                        static_cast<std::streamsize>(got * sizeof(buff.front())));
+                    written += got;
+
                     std::lock_guard<std::mutex> lock(mutex_);
                     if (state_.job_id == job_id) {
+                        state_.written_samps = written;
+                        state_.timeouts = timeouts;
                         state_.overflows = overflows;
                     }
-                    continue;
-                }
-                if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
-                    throw std::runtime_error("RX metadata error: " + md.strerror());
-                }
-                out.write(reinterpret_cast<const char*>(buff.data()),
-                    static_cast<std::streamsize>(got * sizeof(buff.front())));
-                written += got;
-
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (state_.job_id == job_id) {
-                    state_.written_samps = written;
-                    state_.timeouts = timeouts;
-                    state_.overflows = overflows;
                 }
             }
             out.close();

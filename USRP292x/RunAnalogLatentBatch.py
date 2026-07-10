@@ -368,6 +368,71 @@ def rx_control_response_busy(response: str) -> bool:
     return False
 
 
+def rx_control_response_bool(response: str, key: str) -> bool | None:
+    prefix = f"{key}="
+    for token in str(response or "").replace("\n", " ").split():
+        if token.startswith(prefix):
+            value = token.split("=", 1)[1].strip()
+            return value not in {"0", "false", "False"}
+    return None
+
+
+def rx_capture_response_armed(response: str) -> bool:
+    started = rx_control_response_bool(response, "started")
+    done = rx_control_response_bool(response, "done")
+    if started is None and done is None:
+        return True
+    return bool(started) or bool(done)
+
+
+def is_rx_capture_not_armed_error(exc: Exception) -> bool:
+    return "RX CAPTURE did not arm" in str(exc)
+
+
+def wait_for_rx_capture_armed(
+    args: argparse.Namespace,
+    initial_response: str,
+    log_path: Path,
+    timeout: float,
+    *,
+    session: Any | None = None,
+) -> str:
+    if rx_capture_response_armed(initial_response):
+        return initial_response
+
+    arm_timeout = max(0.0, env_float("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC", 8.0))
+    arm_poll = max(0.01, env_float("ANALOG_RX_ARM_STATUS_POLL_SEC", 0.05))
+    deadline = time.monotonic() + arm_timeout
+    entries = [f"$ CAPTURE\n{initial_response}"]
+    last_response = initial_response
+    while arm_timeout > 0.0 and time.monotonic() < deadline:
+        time.sleep(arm_poll)
+        try:
+            status = run_control_maybe_session(
+                session,
+                str(getattr(args, "rx_control_host", "")),
+                int(getattr(args, "rx_control_port", 0)),
+                "STATUS",
+                log_path,
+                min(float(timeout), max(0.1, arm_poll + 0.1)),
+            )
+        except Exception as exc:
+            entries.append(f"$ STATUS\n{exc}")
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
+            raise RuntimeError(f"RX CAPTURE did not arm before TX\n{exc}") from exc
+        entries.append(f"$ STATUS\n{status}")
+        last_response = status
+        if rx_capture_response_armed(status):
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
+            return status
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
+    raise RuntimeError(f"RX CAPTURE did not arm before TX\n{last_response}")
+
+
 def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> None:
     timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
     drain_timeout = max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
@@ -2203,7 +2268,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     except OSError:
                         rx_session = None
                 try:
-                    run_control_maybe_session(
+                    capture_response = run_control_maybe_session(
                         rx_session,
                         args.rx_control_host,
                         args.rx_control_port,
@@ -2211,8 +2276,15 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         image.image_dir / "rx_capture.log",
                         capture_timeout,
                     )
+                    wait_for_rx_capture_armed(
+                        args,
+                        capture_response,
+                        image.image_dir / "rx_arm_status.log",
+                        capture_timeout,
+                        session=rx_session,
+                    )
                 except Exception as exc:
-                    if is_rx_capture_busy_error(exc):
+                    if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
                         stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
                     raise
                 rx_arm_wall_sec = time.monotonic() - rx_arm_started
@@ -2675,7 +2747,7 @@ def _capture_remote_decode_pipeline_attempt(
             except OSError:
                 rx_session = None
         try:
-            run_control_maybe_session(
+            capture_response = run_control_maybe_session(
                 rx_session,
                 args.rx_control_host,
                 args.rx_control_port,
@@ -2683,8 +2755,15 @@ def _capture_remote_decode_pipeline_attempt(
                 image.image_dir / "rx_capture.log",
                 capture_timeout,
             )
+            wait_for_rx_capture_armed(
+                args,
+                capture_response,
+                image.image_dir / "rx_arm_status.log",
+                capture_timeout,
+                session=rx_session,
+            )
         except Exception as exc:
-            if is_rx_capture_busy_error(exc):
+            if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
                 stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
             raise
         rx_arm_wall_sec = time.monotonic() - rx_arm_started
