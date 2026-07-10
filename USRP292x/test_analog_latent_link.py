@@ -1439,6 +1439,55 @@ def test_process_image_wait_command_uses_rx_timeout_budget(tmp_path, monkeypatch
     assert wait_timeout >= 30.0
 
 
+def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": True}), encoding="utf-8")
+        return 0
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    analog_batch.process_image(args, image)
+
+    wait_line = next(line for line in control_lines if line.startswith("WAIT timeout="))
+    wait_timeout = float(wait_line.split("=", 1)[1])
+    assert wait_timeout == 0.5
+
+
 def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

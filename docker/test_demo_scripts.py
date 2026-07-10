@@ -69,6 +69,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_REMOTE_STALL_SNAPSHOT",
         "ANALOG_REMOTE_STALL_SNAPSHOT_THRESHOLD_SEC",
         "ANALOG_REMOTE_STALL_SNAPSHOT_LIMIT",
+        "ANALOG_RX_WAIT_TIMEOUT_SEC",
         "PERSISTENT_RX_TX_DELAY",
         "ANALOG_REMOTE_CLEANUP_MODE",
         "ANALOG_REMOTE_DECODE_WORKER",

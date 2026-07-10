@@ -202,6 +202,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tx-delay-sec", type=float, default=env_float("PERSISTENT_RX_TX_DELAY", 0.010))
     parser.add_argument("--rx-tail-sec", type=float, default=env_float("ANALOG_RX_TAIL_SEC", 0.300))
     parser.add_argument("--rx-timeout-sec", type=float, default=env_float("BATCH_RX_TIMEOUT_SEC", 30.0))
+    parser.add_argument(
+        "--rx-wait-timeout-sec",
+        type=float,
+        default=env_float("ANALOG_RX_WAIT_TIMEOUT_SEC", 0.0),
+        help="Opt-in shorter timeout for the RX WAIT command. 0 keeps the full capture timeout.",
+    )
     parser.add_argument("--tx-timeout-sec", type=float, default=env_float("BATCH_TX_TIMEOUT_SEC", 30.0))
     parser.add_argument(
         "--preconnect-control",
@@ -336,6 +342,13 @@ def sync_search_center_symbol(args: argparse.Namespace) -> int:
     guard_symbols = int(getattr(args, "zero_guard_samples", 0)) // max(int(args.sps), 1)
     cfo_symbols = 2 * int(getattr(args, "cfo_pilot_symbols", 0))
     return max(0, delay_symbols + guard_symbols + cfo_symbols)
+
+
+def rx_wait_timeout_sec(args: argparse.Namespace, capture_timeout: float) -> float:
+    configured = float(getattr(args, "rx_wait_timeout_sec", 0.0) or 0.0)
+    if configured <= 0.0:
+        return float(capture_timeout)
+    return max(0.001, min(float(capture_timeout), configured))
 
 
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
@@ -2021,6 +2034,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     rx_arm_wall_sec = 0.0
     rx_capture_wall_sec = 0.0
     rx_wait_wall_sec = 0.0
+    wait_timeout = 0.0
     tx_wall_sec = 0.0
     make_wall_sec = 0.0
     decode_wall_sec = 0.0
@@ -2094,6 +2108,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 float(args.tx_delay_sec) + (capture_nsamps / float(args.rate)) + float(args.rx_tail_sec),
             )
             capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
+            wait_timeout = rx_wait_timeout_sec(args, capture_timeout)
 
             # Stage only what the selected RX mode consumes on the remote host.
             # remote-pull captures remotely but decodes locally, so only the
@@ -2148,7 +2163,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     rx_wait_control = preconnect_control(
                         args.rx_control_host,
                         args.rx_control_port,
-                        capture_timeout,
+                        wait_timeout,
                     )
                 time.sleep(max(0.0, float(args.tx_delay_sec)))
                 tx_started = time.monotonic()
@@ -2174,9 +2189,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         rx_session,
                         args.rx_control_host,
                         args.rx_control_port,
-                        f"WAIT timeout={capture_timeout:.6f}",
+                        f"WAIT timeout={wait_timeout:.6f}",
                         image.image_dir / "rx_wait.log",
-                        capture_timeout,
+                        wait_timeout,
                         allow_sent_fallback=True,
                     )
                     rx_session = None
@@ -2185,9 +2200,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         rx_wait_control,
                         args.rx_control_host,
                         args.rx_control_port,
-                        f"WAIT timeout={capture_timeout:.6f}",
+                        f"WAIT timeout={wait_timeout:.6f}",
                         image.image_dir / "rx_wait.log",
-                        capture_timeout,
+                        wait_timeout,
                     )
                 rx_wait_control = None
                 rx_wait_wall_sec = time.monotonic() - rx_wait_started
@@ -2381,6 +2396,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "rx_arm_wall_sec": rx_arm_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
             "rx_wait_wall_sec": rx_wait_wall_sec,
+            "rx_wait_timeout_sec": wait_timeout,
             "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
@@ -2427,6 +2443,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "rx_arm_wall_sec": rx_arm_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
             "rx_wait_wall_sec": rx_wait_wall_sec,
+            "rx_wait_timeout_sec": wait_timeout,
             "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
@@ -2572,6 +2589,7 @@ def _capture_remote_decode_pipeline_attempt(
         float(args.tx_delay_sec) + (capture_nsamps / float(args.rate)) + float(args.rx_tail_sec),
     )
     capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
+    wait_timeout = rx_wait_timeout_sec(args, capture_timeout)
 
     tx_send_control = None
     rx_wait_control = None
@@ -2607,7 +2625,7 @@ def _capture_remote_decode_pipeline_attempt(
             rx_wait_control = preconnect_control(
                 args.rx_control_host,
                 args.rx_control_port,
-                capture_timeout,
+                wait_timeout,
             )
         time.sleep(max(0.0, float(args.tx_delay_sec)))
         tx_started = time.monotonic()
@@ -2632,9 +2650,9 @@ def _capture_remote_decode_pipeline_attempt(
                 rx_session,
                 args.rx_control_host,
                 args.rx_control_port,
-                f"WAIT timeout={capture_timeout:.6f}",
+                f"WAIT timeout={wait_timeout:.6f}",
                 image.image_dir / "rx_wait.log",
-                capture_timeout,
+                wait_timeout,
                 allow_sent_fallback=True,
             )
             rx_session = None
@@ -2643,9 +2661,9 @@ def _capture_remote_decode_pipeline_attempt(
                 rx_wait_control,
                 args.rx_control_host,
                 args.rx_control_port,
-                f"WAIT timeout={capture_timeout:.6f}",
+                f"WAIT timeout={wait_timeout:.6f}",
                 image.image_dir / "rx_wait.log",
-                capture_timeout,
+                wait_timeout,
             )
         rx_wait_control = None
         rx_wait_wall_sec = time.monotonic() - rx_wait_started
@@ -2675,6 +2693,7 @@ def _capture_remote_decode_pipeline_attempt(
         "rx_arm_wall_sec": rx_arm_wall_sec,
         "rx_capture_wall_sec": rx_capture_wall_sec,
         "rx_wait_wall_sec": rx_wait_wall_sec,
+        "rx_wait_timeout_sec": wait_timeout,
         "rx_pull_wall_sec": 0.0,
         "merge_wall_sec": 0.0,
         "remote_cleanup_wall_sec": 0.0,
@@ -2860,6 +2879,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "rx_arm_wall_sec": float(ctx["rx_arm_wall_sec"]),
             "rx_capture_wall_sec": float(ctx["rx_capture_wall_sec"]),
             "rx_wait_wall_sec": float(ctx["rx_wait_wall_sec"]),
+            "rx_wait_timeout_sec": float(ctx.get("rx_wait_timeout_sec") or 0.0),
             "rx_pull_wall_sec": float(ctx["rx_pull_wall_sec"]),
             "decode_wall_sec": decode_wall_sec,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
@@ -2912,6 +2932,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 "rx_arm_wall_sec": float(ctx.get("rx_arm_wall_sec") or 0.0),
                 "rx_capture_wall_sec": float(ctx.get("rx_capture_wall_sec") or 0.0),
                 "rx_wait_wall_sec": float(ctx.get("rx_wait_wall_sec") or 0.0),
+                "rx_wait_timeout_sec": float(ctx.get("rx_wait_timeout_sec") or 0.0),
                 "rx_pull_wall_sec": float(ctx.get("rx_pull_wall_sec") or 0.0),
                 "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
                 "decode_wall_sec": decode_wall_sec,
