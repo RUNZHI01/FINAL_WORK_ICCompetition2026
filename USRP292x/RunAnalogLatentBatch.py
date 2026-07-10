@@ -2421,6 +2421,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     decode_wall_sec = 0.0
     rx_server_snapshot: dict[str, Any] = {}
     rx_capture_control = None
+    rx_needs_failure_stop = False
+    rx_failure_stop_done = False
 
     try:
         if (
@@ -2581,6 +2583,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             rx_session = None
                         stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
+                        rx_failure_stop_done = True
                     raise
                 rx_arm_wall_sec = time.monotonic() - rx_arm_started
                 if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
@@ -2635,10 +2638,12 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     if is_rx_wait_timeout_error(exc):
                         stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
+                        rx_failure_stop_done = True
                     raise
                 rx_wait_control = None
                 rx_wait_wall_sec = time.monotonic() - rx_wait_started
                 rx_capture_wall_sec = time.monotonic() - rx_started
+                rx_needs_failure_stop = True
             finally:
                 close_preconnected_control(rx_capture_control)
                 close_preconnected_control(tx_send_control)
@@ -2788,6 +2793,15 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 if not image.passed:
                     image.error = f"analog decode failed with status {returncode}"
 
+            if not image.passed and rx_needs_failure_stop and not rx_failure_stop_done:
+                try:
+                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_failure.log")
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
+                    rx_failure_stop_done = True
+                except Exception as stop_exc:
+                    stop_error = f"rx stop after failed decode failed: {stop_exc}"
+                    image.error = f"{image.error}; {stop_error}" if image.error else stop_error
+
             # Remote cleanup — best effort, do not fail the run on cleanup errors
             if mode in ("remote-pull", "remote-decode"):
                 cleanup_started = time.monotonic()
@@ -2877,6 +2891,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         image.passed = False
         error_text = str(exc)
         rx_server_snapshot.update(parse_rx_control_snapshot_fields(error_text))
+        if rx_needs_failure_stop and not rx_failure_stop_done:
+            try:
+                stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_error.log")
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
+                rx_failure_stop_done = True
+            except Exception as stop_exc:
+                error_text = f"{error_text}; rx stop after failed decode failed: {stop_exc}"
         remote_decode_restart_wall_sec = 0.0
         if isinstance(exc, RemoteDecodeWorkerTimeout) and remote_target:
             try:

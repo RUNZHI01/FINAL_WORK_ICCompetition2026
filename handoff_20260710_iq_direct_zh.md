@@ -103,6 +103,8 @@ no-poll 对照 `batch-1783678924-50` 保持 `50/50`、fallback `0`，TVM median/
 
 overhead 字段验证 `batch-1783680558-50` 保持 `50/50`、fallback `0`，TVM median/p95 `240.13/244.14 ms`，image-level IQ median/p95/max `207.72/334.49/1129.46 ms`。本轮有 51 条 stage record，image 29 第一次 attempt no-sync 后重试恢复。server capture 仍约 `64 ms`，但 `rx_capture_control_overhead_ms` p95 `140.31 ms`，`remote_decode_response_overhead_ms` p95 `128.12 ms`。下一步先处理 RX arm/capture readiness 和 retry cleanup。
 
+decode 失败后 RX cleanup 验证 `batch-1783681389-50` 保持 `50/50`、fallback `0`，TVM median/p95 `240.73/245.35 ms`，IQ median/p95/max `174.91/269.24/347.72 ms`。本轮没有 retry，说明新增 STOP/drain 清理不影响正常路径；下一次 no-sync/retry 发生时要检查失败 attempt 的 `rx_server_stop_cmd_wall_sec` 和 `rx_server_stop_wait_wall_sec`。
+
 QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多，不要为了 IQ 优化去改 QPSK。
 
 ## 这轮主要改动
@@ -115,6 +117,7 @@ QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多
 - 远端 decode 改为 minimal response，完整 `decode_summary.json` 留在板端，减少 stdout 等待。
 - `OtaRxPersistentServer` 增加 `rx_server_*` 计时字段，`RunAnalogLatentBatch.py` 会记录并聚合到 `iq_stage_benchmark`。
 - `iq_stage_benchmark` 增加 `rx_capture_control_overhead_ms` 和 `remote_decode_response_overhead_ms`，作为 runner 侧 capture/decode response 等待相对 server capture 和板端 reported decode 的诊断估算。
+- WAIT 成功后如果 decode/no-sync 失败，runner 会先 `STOP` 并 drain RX server，再进入 ARQ retry，避免下一轮 attempt 继承不确定的 RX 状态。
 - IQ runner 增加了 ControlMaster 防护：如果批次级 SSH ControlMaster 启动失败，就不再每张图重试一次。这个问题在 Windows/password SSH 路径上会带来约 `10 s/image` 的假尾延迟。
 
 ## 已知问题
@@ -132,7 +135,7 @@ QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多
 
 1. 先提交当前文档更新，保持工作区干净。
 2. 保持 `ANALOG_RX_TAIL_SEC=0.05`。`0.04` 和 `0.045` 当前都不要推广。
-3. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
+3. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。decode/no-sync 失败后的 STOP/drain 已加入，下一轮 retry 要核对 STOP 计时字段。
 4. 做 RX WAIT/no-sync retry 恢复：timeout 或 no-sync 后显式 cancel/drain，再进入下一次 ARQ retry。
 5. RX 状态机稳定前，不要默认打开 double buffering 或 streaming TVM。
 6. 每次 IQ 行为变化后，都要跑 300 张 gate，再决定是否推广。

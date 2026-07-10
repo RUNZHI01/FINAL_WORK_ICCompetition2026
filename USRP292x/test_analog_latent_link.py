@@ -3228,10 +3228,18 @@ def test_process_image_remote_decode_error_preserves_stage_timings(tmp_path, mon
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
+    control_lines: list[str] = []
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line == "STOP":
+            return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.004 stop_wait_sec=0.125 wall_sec=0.129"
+        return f"OK {line}"
+
     monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
     monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
-    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     result = analog_batch.process_image(args, image)
 
@@ -3245,6 +3253,63 @@ def test_process_image_remote_decode_error_preserves_stage_timings(tmp_path, mon
     assert record["rx_wait_wall_sec"] >= 0.0
     assert record["decode_wall_sec"] >= 0.0
     assert record["remote_decode_restart_wall_sec"] == 0.0
+    assert any(line == "STOP" for line in control_lines)
+    assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+    assert record["rx_server_stop_cmd_wall_sec"] == 0.004
+    assert record["rx_server_stop_wait_wall_sec"] == 0.125
+
+
+def test_process_image_stops_rx_after_decode_status_failure(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, _out_wire, summary, _log_path):
+        summary.write_text(json.dumps({"status": "error", "frame_complete": False}), encoding="utf-8")
+        return 1
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line == "STOP":
+            return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.002 stop_wait_sec=0.040 wall_sec=0.042"
+        return f"OK {line}"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert any(line == "STOP" for line in control_lines)
+    assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+    record = result.records[0]
+    assert record["rx_server_stop_cmd_wall_sec"] == 0.002
+    assert record["rx_server_stop_wait_wall_sec"] == 0.040
 
 
 def test_pipeline_finalize_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):
