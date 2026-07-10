@@ -22,6 +22,30 @@
 
 WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，外层异常记录可能再次解析 WAIT 错误文本里的 `stop_cmd_sec=0` / `stop_wait_sec=0`，把真实 STOP 计时覆盖掉。现在这类记录会保留 `rx_stop_after_wait_timeout.log` 里的真实 `rx_server_stop_*` 字段，便于下一轮 300 张长尾归因。
 
+`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` 已实现为 opt-in 诊断开关，但不进默认 profile。50 张 `batch-1783693518-50` 为 `50/50`、fallback `0`，TVM median/p95 `243.64/245.89 ms`，IQ median/p95/max `165.09/382.82/583.99 ms`。p95 没过，主要仍是 RX control 和 worker response wait，而不是板端 summary 文件写入。
+
+## IQ 直传探索路径
+
+已经证明有用、留在推荐 profile 的路径：
+
+- IQ 直传替代 QPSK 数据面：QPSK 参考批次约 `2961.78 ms/image`，IQ 直传正常 median 已到 `165-175 ms` 区间。
+- Docker TX + 板端 `/home/user/venv/bin/python`：解决容器迁移后环境不一致的问题，Cockpit 一键路径重新回到 handwritten TVM + big.LITTLE。
+- `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`：减少 persistent worker stdout 响应体，保留板端完整 summary 文件。
+- `ANALOG_RX_SESSION_CONTROL=1`：同一连接发送 CAPTURE/WAIT，比单独 CAPTURE preconnect 更适合作为默认控制路径。
+- `PERSISTENT_RX_TX_DELAY=0`：RX arm barrier 已经存在，保留固定 TX 延迟会拖慢正常路径。
+- `ANALOG_RX_TAIL_SEC=0.05`：当前可靠下限；短 tail 会引入 no-sync 或 p95 恶化。
+- `ANALOG_RX_POST_QUANTIZE=0`、fast-first sync、`ANALOG_PRECONNECT_CONTROL=1`、`RX_ARM_WAIT_MS=150`：保留在稳定 profile 中。
+- STOP/drain cleanup、session-before-STOP、decode timing 和 STOP timing 记录：主要提升可靠性和可观测性，是继续定位 p95 的基础。
+
+已经试过但不进默认的路径：
+
+- `ANALOG_RX_BATCH_SESSION_CONTROL=1`：50 张很好，但 300 张 `batch-1783690925-300` p95 `321.68 ms`，比 no-batch A/B 更差。
+- `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`：50 张 `batch-1783693518-50` p95 `382.82 ms`，说明 summary 文件写入不是当前主因。
+- `PERSISTENT_RX_TX_DELAY=0.005`：50 张 p95 恶化到 `306.92 ms`。
+- `ANALOG_RX_TAIL_SEC=0.04/0.045`：出现 no-sync retry 或 p95 大幅恶化，保持 `0.05`。
+- depth-2 overlap、streaming TVM overlap：会放大 RX/worker contention，不作为默认。
+- tmpfs、`.npy` decoded output、soft completion、decode-worker timeout/restart、burst-miss retry、low-sync early retry、no-poll：有诊断价值，但没有稳定改善 300 张 p95/max。
+
 ## 推荐运行配置
 
 保持下面这些环境变量，不要把诊断开关混进默认 profile：
@@ -65,6 +89,8 @@ OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0
 ```
 
 不要默认打开 streaming TVM、depth-2 overlap、tmpfs 输出、`.npy` 输出、soft completion、burst-miss retry 或 batch RX session。这些都有诊断价值，但目前没有通过 300 张 p95 gate。
+
+同样不要默认打开 `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`。它只用于确认 board-side `decode_summary.json` 写入是否是长尾来源；当前 50 张证据显示不是主因。
 
 ## 重启流程
 

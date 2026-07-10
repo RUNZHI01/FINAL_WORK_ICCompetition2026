@@ -3979,6 +3979,84 @@ def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_l
     assert cleaned and "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz" not in cleaned[0]
 
 
+def test_process_image_remote_decode_can_skip_board_summary_file_when_response_only(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    worker_requests: list[dict[str, object]] = []
+
+    class FakeWorker:
+        def decode(self, request, log_path, *, timeout):
+            worker_requests.append(dict(request))
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "decode_total_ms": 43.0,
+                    },
+                }),
+                stderr="",
+            )
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decode_response_only_summary=True,
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=FakeWorker(),
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="skip",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert worker_requests[0]["summary_json"] == ""
+    assert worker_requests[0]["out_npz"] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
+    assert json.loads((image.image_dir / "decode_summary.json").read_text(encoding="utf-8"))["decode_total_ms"] == 43.0
+    assert result.records[0]["remote_decode_response_only_summary"] is True
+
+
 def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

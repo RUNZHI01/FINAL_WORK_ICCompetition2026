@@ -188,6 +188,21 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--remote-decode-response-only-summary",
+        dest="remote_decode_response_only_summary",
+        action="store_true",
+        default=env_bool("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", False),
+        help=(
+            "Opt-in for remote-dir persistent-worker mode: return decode_summary through the worker "
+            "response only instead of also writing a board-side decode_summary.json."
+        ),
+    )
+    parser.add_argument(
+        "--no-remote-decode-response-only-summary",
+        dest="remote_decode_response_only_summary",
+        action="store_false",
+    )
+    parser.add_argument(
         "--remote-decode-restart-on-timeout",
         dest="remote_decode_restart_on_timeout",
         action="store_true",
@@ -1698,6 +1713,10 @@ def remote_decode_response_mode(args: argparse.Namespace) -> str:
     return configured if configured in {"full", "minimal", "compact"} else ""
 
 
+def remote_decode_response_only_summary_enabled(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "remote_decode_response_only_summary", False))
+
+
 def try_remote_dir_decode_soft_completion(
     target: str,
     remote_output: str,
@@ -2478,6 +2497,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     decode_wall_sec = 0.0
     decode_started = 0.0
     remote_decode_soft_completed = False
+    remote_decode_response_only_summary = False
     rx_server_snapshot: dict[str, Any] = {}
     rx_capture_control = None
     rx_needs_failure_stop = False
@@ -2766,8 +2786,20 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     remote_manifest,
                     remote_npz,
                     remote_wire,
+                    "",
+                ) if (
+                    remote_decode_worker is not None
+                    and remote_decode_result_mode == "remote-dir"
+                    and remote_decode_response_only_summary_enabled(args)
+                ) else remote_analog_decode_request(
+                    args,
+                    remote_batch_rx,
+                    remote_manifest,
+                    remote_npz,
+                    remote_wire,
                     remote_summary,
                 )
+                remote_decode_response_only_summary = not bool(remote_request.get("summary_json"))
                 remote_decode_worker = getattr(args, "remote_decode_worker", None)
                 if remote_decode_worker is not None:
                     remote_request["manifest_json"] = manifest
@@ -2779,12 +2811,16 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         "timeout": remote_decode_request_timeout(args, capture_timeout),
                     }
                     soft_complete_sec = remote_decode_soft_complete_sec(args)
-                    if remote_decode_result_mode == "remote-dir" and soft_complete_sec > 0.0:
+                    if (
+                        remote_decode_result_mode == "remote-dir"
+                        and soft_complete_sec > 0.0
+                        and bool(remote_request.get("summary_json"))
+                    ):
                         decode_kwargs["soft_timeout"] = soft_complete_sec
                         decode_kwargs["soft_completion"] = (
                             lambda target=remote_target,
                             output=remote_npz,
-                            summary=remote_summary,
+                            summary=str(remote_request.get("summary_json") or remote_summary),
                             log=image.image_dir / "remote_decode_soft_completion.log",
                             control=ssh_control_socket: try_remote_dir_decode_soft_completion(
                                 target,
@@ -2926,6 +2962,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "remote_decode_result_mode": remote_decode_result_mode if str(args.rx_capture_mode) == "remote-decode" else None,
             "remote_decoded_output_dir": remote_decoded_dir or None,
             "remote_received_latent_npz": remote_received_npz or None,
+            "remote_decode_response_only_summary": bool(
+                remote_decode_response_only_summary
+                if str(args.rx_capture_mode) == "remote-decode"
+                else False
+            ),
             "control_preconnect_enabled": bool(getattr(args, "preconnect_control", False)),
             "rx_capture_preconnect_enabled": preconnect_rx_capture_control_enabled(args),
             "rx_session_control_enabled": bool(getattr(args, "rx_session_control", False)),
@@ -3382,10 +3423,24 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             str(ctx["remote_manifest"]),
             remote_npz,
             remote_wire,
+            "",
+            attempt_index=int(ctx["attempt_index"]),
+            max_attempts=int(ctx["max_attempts"]),
+        ) if (
+            getattr(args, "remote_decode_worker", None) is not None
+            and remote_decode_result_mode == "remote-dir"
+            and remote_decode_response_only_summary_enabled(args)
+        ) else remote_analog_decode_request(
+            args,
+            str(ctx["remote_batch_rx"]),
+            str(ctx["remote_manifest"]),
+            remote_npz,
+            remote_wire,
             remote_summary,
             attempt_index=int(ctx["attempt_index"]),
             max_attempts=int(ctx["max_attempts"]),
         )
+        remote_decode_response_only_summary = not bool(remote_request.get("summary_json"))
         remote_decode_worker = getattr(args, "remote_decode_worker", None)
         if remote_decode_worker is not None:
             remote_request["manifest_json"] = ctx["manifest"]
@@ -3396,12 +3451,16 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                     "timeout": remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
                 }
                 soft_complete_sec = remote_decode_soft_complete_sec(args)
-                if remote_decode_result_mode == "remote-dir" and soft_complete_sec > 0.0:
+                if (
+                    remote_decode_result_mode == "remote-dir"
+                    and soft_complete_sec > 0.0
+                    and bool(remote_request.get("summary_json"))
+                ):
                     decode_kwargs["soft_timeout"] = soft_complete_sec
                     decode_kwargs["soft_completion"] = (
                         lambda target=str(ctx["remote_target"]),
                         output=remote_npz,
-                        summary=remote_summary,
+                        summary=str(remote_request.get("summary_json") or remote_summary),
                         log=image.image_dir / "remote_decode_soft_completion.log",
                         control=ctx["ssh_control_socket"]: try_remote_dir_decode_soft_completion(
                             target,
@@ -3508,6 +3567,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "remote_decode_result_mode": remote_decode_result_mode,
             "remote_decoded_output_dir": str(ctx["remote_decoded_dir"]) or None,
             "remote_received_latent_npz": remote_received_npz or None,
+            "remote_decode_response_only_summary": bool(remote_decode_response_only_summary),
             "control_preconnect_enabled": bool(ctx.get("control_preconnect_enabled")),
             "rx_capture_preconnect_enabled": bool(ctx.get("rx_capture_preconnect_enabled")),
             "rx_session_control_enabled": bool(ctx.get("rx_session_control_enabled")),
@@ -4153,6 +4213,7 @@ def main() -> int:
         ),
         "remote_decode_result_mode": str(getattr(args, "remote_decode_result_mode", "") or "pull"),
         "remote_decode_response_mode": remote_decode_response_mode(args) or "full",
+        "remote_decode_response_only_summary": remote_decode_response_only_summary_enabled(args),
         "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
         "remote_decode_soft_complete_sec": remote_decode_soft_complete_sec(args),
         "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
