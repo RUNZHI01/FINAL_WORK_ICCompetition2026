@@ -494,6 +494,55 @@ def test_remote_decode_worker_ignores_stale_response_for_previous_request(tmp_pa
     assert writes
 
 
+def test_remote_path_probe_worker_ignores_stale_response_for_previous_request(tmp_path):
+    writes: list[str] = []
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+    responses.put(json.dumps({
+        "status": "ok",
+        "request_id": "old",
+        "summary": {"status": "ok", "out_npz": "/tmp/old.npy"},
+    }))
+    worker = analog_batch.RemotePathProbeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        0.0,
+    )
+
+    result = worker.probe(
+        "/tmp/current.npy",
+        "",
+        request_id="current",
+        timeout=0.01,
+        log_path=tmp_path / "path_probe.log",
+    )
+
+    assert result is None
+    assert writes
+
+
 def test_remote_analog_decode_request_includes_request_id_without_summary_json():
     args = Namespace(
         sync_candidates=12,

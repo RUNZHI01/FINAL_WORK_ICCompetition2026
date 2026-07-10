@@ -2084,7 +2084,23 @@ for line in sys.stdin:
         try:
             self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
             self.proc.stdin.flush()
-            line = self._responses.get(timeout=max(0.05, float(timeout or 0.05)))
+            deadline = time.monotonic() + max(0.05, float(timeout or 0.05))
+            line = ""
+            while True:
+                remaining = max(0.0, deadline - time.monotonic())
+                if remaining <= 0.0:
+                    return None
+                line = self._responses.get(timeout=max(0.01, remaining))
+                if not request_id:
+                    break
+                try:
+                    response = json.loads(line)
+                except json.JSONDecodeError:
+                    return None
+                if not isinstance(response, dict):
+                    return None
+                if str(response.get("request_id") or "") == request_id:
+                    break
         except (BrokenPipeError, OSError, ValueError, queue.Empty):
             return None
         if log_path is not None:

@@ -4511,7 +4511,10 @@ class ServerMainTest(unittest.TestCase):
     def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             fake_proc = Mock(pid=4242)
-            with patch("usrp_runtime.subprocess.Popen", return_value=fake_proc) as popen:
+            with (
+                patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+                patch("usrp_runtime.subprocess.Popen", return_value=fake_proc) as popen,
+            ):
                 result = usrp_runtime._start_local_tx_server(
                     {"OPENAMP_USRP_TX_RUNNER": "local"},
                     log_dir=Path(temp_dir_name),
@@ -4520,7 +4523,7 @@ class ServerMainTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "started")
         command = popen.call_args.args[0]
-        self.assertEqual(command[0], usrp_runtime.resolve_bash_executable())
+        self.assertEqual(command[0], "bash")
         self.assertTrue(str(command[1]).endswith("OtaTxPersistentServer.sh"))
 
     def test_usrp_local_tx_server_can_start_from_docker_image(self) -> None:
@@ -4548,6 +4551,13 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("127.0.0.1:29221:29221", command)
         self.assertIn("iccomp-usrp-tx:latest", command)
         self.assertEqual(command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
+
+    def test_usrp_tx_server_defaults_to_docker_on_windows_when_available(self) -> None:
+        with (
+            patch.object(usrp_runtime.os, "name", "nt"),
+            patch("usrp_runtime.shutil.which", return_value="docker"),
+        ):
+            self.assertTrue(usrp_runtime._tx_server_uses_docker({}))
 
     def test_usrp_remote_command_timeout_returns_error_completed_process(self) -> None:
         access = usrp_runtime.BoardAccessConfig(
@@ -7674,6 +7684,7 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "",
                 "ANALOG_RX_SC16_MMAP": "",
                 "ANALOG_RX_CLIPPING_DECIMATION": "",
+                "ANALOG_RX_POST_QUANTIZE": "",
                 "ANALOG_RX_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
@@ -7706,6 +7717,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
         self.assertEqual(env["ANALOG_RX_SC16_MMAP"], "1")
         self.assertEqual(env["ANALOG_RX_CLIPPING_DECIMATION"], "8")
+        self.assertEqual(env["ANALOG_RX_POST_QUANTIZE"], "0")
         self.assertEqual(env["ANALOG_RX_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")

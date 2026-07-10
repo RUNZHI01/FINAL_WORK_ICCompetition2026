@@ -47,7 +47,7 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=docker`、`OPENAMP_USRP_TX_RUNNER=docker`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_RX_TAIL_SEC=0.040`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
+`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=docker`、`OPENAMP_USRP_TX_RUNNER=docker`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_RX_TAIL_SEC=0.040`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`USRP_MAX_ARQ_ROUNDS=2`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
 
 名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。USRP 数据面应由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不能把 IQ/latent 主数据绕到 Tailscale 文件传输。默认 `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 会在板端解码后再取结果，避免把原始 IQ 捕获文件拉回控制面。快速 IQ profile 使用 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0` 保持 TX/RX 常驻，使用 `ANALOG_DECODE_PIPELINE_WARMUP=1` 预热板端 decode-server，并使用 `ANALOG_REMOTE_CLEANUP_MODE=skip`；演示后可清理板端 `/tmp/usrp292x_remote_runs`。USRP transport 结果卡片使用 raw round records 的 median/p95，避免 RF/RX 单次离群值污染典型时延。
 
@@ -91,13 +91,16 @@ MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 
 这一路用于恢复 cockpit desktop 下的 handwritten TVM + big.LITTLE 300 张测速口径。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`；报告位于 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
 
-如果不走 Docker cockpit、而是在 Windows 原生后端里临时调试，请不要调用 WSL 的 `bash.exe`。使用 Git Bash，并让密码 SSH helper 走 Paramiko runner：
+如果不走 Docker cockpit、而是在 Windows 原生后端里临时调试，请不要调用 WSL 的 `bash.exe`。使用 Git Bash 作为脚本解释器，并优先让 SSH helper 和本机 TX 都走 Docker：
 
 ```powershell
 $env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
 $env:GIT_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
-$env:OPENAMP_SSH_RUNNER="paramiko"
+$env:OPENAMP_SSH_RUNNER="docker"
+$env:OPENAMP_USRP_TX_RUNNER="docker"
 ```
+
+`usrp_runtime.py` 在 Windows 且 Docker 可用时也会默认选择 Docker TX；显式设置上面的环境变量只是为了现场排障时避免继承旧进程状态。若 Docker 不可用，可临时把 `OPENAMP_SSH_RUNNER` 改成 `paramiko`，但仍不要使用 WSL bash。
 
 旧 WSLg 入口仍保留给已有 WSLg 环境使用；当前 Windows 现场不要走这条路径：
 

@@ -433,7 +433,9 @@ def _tx_server_uses_docker(env_values: dict[str, str]) -> bool:
     runner = _first_value(env_values, ("OPENAMP_USRP_TX_RUNNER", "USRP_TX_RUNNER")).lower()
     local_binary = REPO_ROOT / "USRP292x" / "OtaTxPersistentServer"
     force_local = runner in {"local", "host", "bash"}
-    return runner == "docker" or (not force_local and not local_binary.exists() and shutil.which("docker") is not None)
+    docker_available = shutil.which("docker") is not None
+    prefer_docker_by_default = os.name == "nt" or not local_binary.exists()
+    return runner == "docker" or (not force_local and docker_available and prefer_docker_by_default)
 
 
 def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port: str) -> dict[str, Any]:

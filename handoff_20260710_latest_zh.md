@@ -8,11 +8,23 @@
 
 ## 2026-07-11 最新进展
 
+07:00 最新有效 Cockpit-button-equivalent 300 张是 `batch-1783724189-300`：`300/300`、fallback `0`，TVM `input_count=300`、`processed_count=300`，TVM median/p95/max `241.67/244.62/258.74 ms`，IQ total median/mean/p95/max `156.24/240.41/274.60/7717.03 ms`，PSNR `37.0445`、SSIM `0.97494`。这轮修复了上一轮 TVM 只看到 `299` 个输入的问题，板端实际目录为 `300` 个 `.npy`、无缺号；但 IQ p95 仍高于 TVM p95，不能算最终性能达标。
+
+06:56 最新 20 张健康检查是 `batch-1783724140-20`：`20/20`、fallback `0`，TVM median/p95 `241.22/253.07 ms`，IQ total median/mean/p95/max `158.12/159.47/168.73/231.76 ms`，PSNR `37.0445`、SSIM `0.97494`。这说明短批次正常路径仍明显快于 TVM，且 TVM/输入目录都是完整计数。
+
+本轮关键根因修复：`batch-1783722161-300` 传输 summary 报 `300/300`，但板端目录实际只有 `299` 个 `.npy`，缺 `00000244.npy`，TVM raw log 也从 `00000243.npy` 跳到 `00000245.npy`。原因是 persistent path probe worker 没校验 `request_id`，可能把旧 probe 的 `ok` 响应误配给新文件，导致 runner 把未落盘的远端路径记为 passed。`RemotePathProbeWorker.probe()` 现在要求响应 `request_id` 匹配；本地回归新增 `test_remote_path_probe_worker_ignores_stale_response_for_previous_request`，并通过全量 `USRP292x/test_analog_latent_link.py`。
+
+Windows 原生 backend 的 TX 启动也已修正为默认走 Docker。之前 `OtaTxPersistentServer` 在 Windows 上是 symlink/reparse point，`Path.exists()` 为真但 Git Bash `[[ -x ]]` 会失败，导致 runtime 误走 local bash 并报 `Missing ... OtaTxPersistentServer`。`usrp_runtime._tx_server_uses_docker()` 现在在 Windows 且 Docker 可用时默认选 Docker，除非显式设置 `OPENAMP_USRP_TX_RUNNER=local/host/bash`。
+
+`batch-1783724189-300` 的剩余尾巴：`image 146/147` 是 runner 等 decode worker 响应 `4.99/7.55 s`，但板端 reported decode 只有 `41/48 ms`；`image 171` 是 RX wait/capture `6.24/6.28 s`；`image 153` 发生一次 not-armed 后重试成功。下一步优化应集中在 decode-worker 请求排队/响应流长尾和偶发 RX wait/not-armed，而不是修改 QPSK。
+
 05:34 当前较好的 300 张长测是 `batch-1783719194-300`：`300/300`、fallback `0`，TVM median/p95 `241.00/243.32 ms`，Cockpit API 侧 IQ median/mean/p95/max `158.27/226.27/266.12/10092.53 ms`，stage summary 侧 IQ total p95 `274.86 ms`，PSNR `37.0445`、SSIM `0.97494`。这轮已经包含 repeated soft-completion、Cockpit 默认 `ANALOG_RX_SESSION_CONTROL=1`、`RX_ARM_WAIT_MS=150` 和 not-armed 短 STOP，但 300 张 IQ p95 仍比 TVM p95 高约 `23 ms`，所以目标还没完成。
 
 05:53 重启后默认 profile 的 20 张健康检查是 `batch-1783720370-20`：`20/20`、fallback `0`，IQ total median/mean/p95/max `163.59/178.41/249.12/268.53 ms`，PSNR `37.0445`、SSIM `0.97494`。`rx_server_arm_wait_ms` p95 低于 `1 ms`，说明 `RX_ARM_WAIT_MS=150` 已真正进入 Cockpit 默认路径；短批次能回到约 `250 ms` 显示档，但还需要新 300 张验证。
 
 最新本地修复是 not-armed 恢复链：`RX CAPTURE did not arm before TX` 先走短 `STOP timeout=<ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC>`，如果最后一次 STATUS 仍是 `busy=1`，再追加完整 STOP drain，避免下一轮 ARQ 立即撞 `capture_already_running`。同时 `rx_control_response_busy()` 改为按最后一次 `busy=` 判断，避免 STOP 首行 busy 但后续 STATUS 已 idle 时误判。回归测试已覆盖 `test_process_image_escalates_arm_failure_stop_when_rx_remains_busy` 和 `test_rx_control_response_busy_uses_latest_busy_token`；这项还没跑新硬件 300 张。
+
+06:14 的 300 张 `batch-1783721600-300` 不通过：`299/300`、fallback `1`，IQ p95 恶化，失败帧 image 288 先连续两次 not-armed，最后一次变成 `RX_metadata_error: Unknown error code 0x10`。同时 summary 显示 `rx_post_quantize=True`，与推荐 profile 不一致。已补上 Cockpit 默认 `ANALOG_RX_POST_QUANTIZE=0`，测试 `test_board_access_usrp_iq_defaults_fast_rx_arm_status_timeout` 覆盖；这轮 300 不作为有效性能结论。
 
 两个 A/B 结论保持不变：`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=64` 的 300 张虽然 all-pass，但 p95/max 更差，拒绝；`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.02` 那轮因 SSH kex/worker 启动失败，不是有效性能结论。当前默认 soft-completion 保持 `0.05`，配合 persistent probe repeated check 使用；不要把 `0.02` 当成结论。
 
@@ -22,7 +34,7 @@
 
 Cockpit 对比图片不更新的问题已修。根因是 running 阶段的 manifest 预填了 `.npz` 路径，terminal wrapper summary 没把最终 `iq_remote_decode_manifest` 带回 `/api/batch-state`，导致最终状态保留旧 `.npz`。现在 `usrp_runtime.py` 在 IQ-direct terminal snapshot 中携带最终 remote decode manifest，`server.py` 支持 `.npy` index 并让 summary files 覆盖 manifest defaults。重启后 5 张验证 `batch-1783713778-5` 已返回 5 个 `done`，路径全是 `/home/user/cockpit_usrp_rx/.../*.npy`，质量仍为 PSNR `37.0445`、SSIM `0.97494`。
 
-质量验收口径确认：不是逐像素 bit-exact。当前“测试通过”的画质指标是发送/原始图与 TVM 重建图之间的 PSNR/SSIM；当前稳定值为 PSNR 约 `37.04 dB`、SSIM 约 `0.97494`。JSCC + TVM 重建链路是有损和数值近似的，逐像素完全相等不符合预期；若需要定位退化，应看 MSE/PSNR/SSIM 或差分图。
+质量验收口径确认：不是逐像素 bit-exact。当前“测试通过”的画质指标是发送/原始图与 TVM 重建图之间的 PSNR/SSIM；当前稳定值为 PSNR 约 `37.04 dB`、SSIM 约 `0.97494`。按 `0-255` 像素反推，PSNR `37.0445 dB` 约等于 MSE `12.84`、RMSE `3.58` 灰阶/通道。JSCC + TVM 重建链路是有损和数值近似的，逐像素完全相等不符合预期；若需要定位退化，应看 MSE/PSNR/SSIM 或差分图。
 
 本轮新增的有效改动是预创建远端 capture 目录。`batch-1783704920-300` 的 not-armed 证据显示部分 RX job 有多秒 `wall_sec`，但 `drain_sec`、`stream_cmd_sec`、`receive_sec` 都接近零，瓶颈不像 UHD 收样本，而像每张图 capture 前的远端目录创建或文件打开。`RunAnalogLatentBatch.py` 现在在第一张图 `CAPTURE` 前一次性创建整批远端目录，默认由 `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1` 打开；server 和 Docker wrappers 已透传 `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK`。
 
@@ -72,7 +84,7 @@ Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ 
 - `fa323b6 diagnostics: split iq rx arm latency`
 - `da8e90d diagnostics: expose iq rx tail metrics`
 
-`ANALOG_RX_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` + `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1` + `ANALOG_REMOTE_DECODED_FORMAT=npy` + `ANALOG_RX_SC16_MMAP=1` + `ANALOG_RX_CLIPPING_DECIMATION=8` + `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05` 是当前 7/11 live 候选基线。它已经通过 300 张 all-pass，并让 IQ median 到 `158 ms` 左右；但最新有效 300 张 IQ p95 仍在 `266-275 ms` 区间，高于 TVM p95 `243 ms` 左右，所以不是最终达标结论。`0.02` soft-completion A/B 因 SSH kex/worker 启动失败无效，不能推广。
+`ANALOG_RX_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` + `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1` + `ANALOG_REMOTE_DECODED_FORMAT=npy` + `ANALOG_RX_SC16_MMAP=1` + `ANALOG_RX_CLIPPING_DECIMATION=8` + `ANALOG_RX_POST_QUANTIZE=0` + `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05` 是当前 7/11 live 候选基线。它已经通过 300 张 all-pass，并让 IQ median 到 `158 ms` 左右；但最新有效 300 张 IQ p95 仍在 `266-275 ms` 区间，高于 TVM p95 `243 ms` 左右，所以不是最终达标结论。`0.02` soft-completion A/B 因 SSH kex/worker 启动失败无效，不能推广。
 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES` 只在 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 时生效。`0` 表示整批共用同一个 RX session，已因 `batch-1783700070-50` p95 `571.83 ms` 拒绝；`8` 也已因 `batch-1783707616-50` p95 `363.43 ms` 拒绝。当前保持窗口 `16`。
 
