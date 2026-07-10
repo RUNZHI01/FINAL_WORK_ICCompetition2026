@@ -240,7 +240,7 @@ def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
 
     result = usrp_runtime._start_remote_rx_server(
         access,
-        {"RX_ARM_WAIT_MS": "50"},
+        {"RX_ARM_WAIT_MS": "50", "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0"},
         rx_port="29220",
         remote_run_root="/tmp/usrp292x_remote_runs",
         remote_project_root="/home/user",
@@ -248,6 +248,7 @@ def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
 
     assert result["status"] == "started"
     assert "ARM_WAIT_MS=50" in commands[0]
+    assert "STOP_WAIT_MS=8000" in commands[0]
 
 
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
@@ -3809,7 +3810,10 @@ class ServerMainTest(unittest.TestCase):
             os.environ,
             {
                 "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "MLKEM_TRANSPORT_MODE": "usrp",
+                "MLKEM_USRP_MODE": "ota",
                 "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                "OPENAMP_DEMO_LINK_MODE": "iq-direct",
                 "OPENAMP_DEMO_LOCAL_LATENT_DIR": "/tmp/latents",
                 "CHUNK_BYTES": "4096",
                 "USRP_WIRE_PREPARE_WORKERS": "2",
@@ -3823,13 +3827,23 @@ class ServerMainTest(unittest.TestCase):
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC": "0.05",
                 "ANALOG_PIPELINE_DEPTH": "1",
                 "RX_ARM_WAIT_MS": "50",
+                "RX_STOP_WAIT_MS": "8000",
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET": "/host_workspace",
+                "OPENAMP_SSH_RUNNER": "paramiko",
+                "SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER": "1",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
             },
             clear=False,
         ):
             overrides = server.demo_startup_env_overrides(args)
 
         self.assertEqual(overrides["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(overrides["MLKEM_TRANSPORT_MODE"], "usrp")
+        self.assertEqual(overrides["MLKEM_USRP_MODE"], "ota")
         self.assertEqual(overrides["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(overrides["OPENAMP_DEMO_LINK_MODE"], "iq-direct")
         self.assertEqual(overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"], "/tmp/latents")
         self.assertEqual(overrides["CHUNK_BYTES"], "4096")
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
@@ -3843,6 +3857,45 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
         self.assertEqual(overrides["ANALOG_PIPELINE_DEPTH"], "1")
         self.assertEqual(overrides["RX_ARM_WAIT_MS"], "50")
+        self.assertEqual(overrides["RX_STOP_WAIT_MS"], "8000")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_RUNNER"], "docker")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET"], "/host_workspace")
+        self.assertEqual(overrides["OPENAMP_SSH_RUNNER"], "paramiko")
+        self.assertEqual(overrides["SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER"], "1")
+        self.assertEqual(overrides["OPENAMP_TVM_BATCH_RUNNER"], "biglittle")
+
+    def test_demo_startup_env_overrides_discovers_usrp_latent_dir(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            latent_dir = Path(tmpdir) / "encoder_outputs"
+            latent_dir.mkdir()
+            (latent_dir / "sample.pt").write_bytes(b"latent")
+            with (
+                patch.object(server, "DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES", (latent_dir,)),
+                patch.dict(
+                    os.environ,
+                    {
+                        "MLKEM_TRANSPORT_MODE": "usrp",
+                        "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                        "OPENAMP_DEMO_LOCAL_LATENT_DIR": "",
+                    },
+                    clear=False,
+                ),
+            ):
+                overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"], str(latent_dir))
+        self.assertEqual(overrides["OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED"], "0")
 
     def test_usrp_job_default_timeout_scales_with_batch_count(self) -> None:
         self.assertEqual(
@@ -4320,7 +4373,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("-p", command)
         self.assertIn("127.0.0.1:29221:29221", command)
         self.assertIn("iccomp-usrp-tx:latest", command)
-        self.assertEqual(command[-2:], ["bash", "/workspace/USRP292x/OtaTxPersistentServer.sh"])
+        self.assertEqual(command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
 
     def test_usrp_remote_command_timeout_returns_error_completed_process(self) -> None:
         access = usrp_runtime.BoardAccessConfig(

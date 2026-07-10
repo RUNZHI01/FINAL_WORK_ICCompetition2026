@@ -9440,7 +9440,10 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("TONGSUO_SIG_BRIDGE", ""),
         ("OQS_INSTALL_PATH", ""),
         ("REMOTE_USRP_RX_DIR", ""),
+        ("MLKEM_TRANSPORT_MODE", ""),
+        ("MLKEM_USRP_MODE", ""),
         ("OPENAMP_DEMO_INPUT_SOURCE_MODE", ""),
+        ("OPENAMP_DEMO_LINK_MODE", ""),
         ("OPENAMP_DEMO_LOCAL_LATENT_DIR", ""),
         ("OPENAMP_DEMO_LOCAL_LATENT_PATTERN", ""),
         ("OPENAMP_DEMO_LOCAL_IMAGE_DIR", ""),
@@ -9478,9 +9481,19 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("REMOTE_RX_RUN_ROOT", ""),
         ("REMOTE_USRP_PROJECT_ROOT", ""),
         ("REMOTE_DECODE_BIN", ""),
+        ("OPENAMP_SSH_RUNNER", ""),
+        ("OPENAMP_SSH_DOCKER_IMAGE", ""),
+        ("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", ""),
+        ("OPENAMP_USRP_TX_RUNNER", ""),
+        ("OPENAMP_USRP_TX_DOCKER_IMAGE", ""),
+        ("OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET", ""),
+        ("OPENAMP_TVM_BATCH_RUNNER", ""),
+        ("OPENAMP_DEMO_TVM_BATCH_RUNNER", ""),
+        ("OPENAMP_TVM_BATCH_EXIT_GRACE_SEC", ""),
         ("TX_ARGS", ""),
         ("RX_ARGS", ""),
         ("RX_ARM_WAIT_MS", ""),
+        ("RX_STOP_WAIT_MS", ""),
         ("RATE", ""),
         ("FREQ", ""),
         ("TX_GAIN", ""),
@@ -9560,6 +9573,19 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         value = cli_value or str(os.environ.get(env_name, "") or "").strip()
         if value:
             overrides[env_name] = value
+    raw_transport_mode = str(overrides.get("MLKEM_TRANSPORT_MODE") or "").strip()
+    try:
+        usrp_startup = normalize_transport_mode(raw_transport_mode) == "usrp"
+    except ValueError:
+        usrp_startup = raw_transport_mode.lower() == "usrp"
+    usrp_startup = usrp_startup or str(overrides.get("OPENAMP_DEMO_INPUT_SOURCE_MODE") or "").strip().lower() == "usrp"
+    if usrp_startup:
+        overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")
+        if not str(overrides.get("OPENAMP_DEMO_LOCAL_LATENT_DIR") or "").strip():
+            local_latent_dir = DashboardState._discover_default_local_usrp_latent_dir()
+            if local_latent_dir:
+                overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = local_latent_dir
+                overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
     return overrides
 
 

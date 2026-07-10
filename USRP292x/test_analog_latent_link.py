@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 ANALOG_LINK = PROJECT_ROOT / "USRP292x" / "AnalogLatentLink.py"
 ANALOG_BATCH = PROJECT_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
 OTA_RX_SERVER = PROJECT_ROOT / "USRP292x" / "OtaRxPersistentServer.cpp"
+OTA_RX_SERVER_SCRIPT = PROJECT_ROOT / "USRP292x" / "OtaRxPersistentServer.sh"
 
 from USRP292x import AnalogLatentLink as analog  # noqa: E402
 from USRP292x import RunAnalogLatentBatch as analog_batch  # noqa: E402
@@ -44,6 +45,21 @@ def test_persistent_rx_capture_arm_wait_is_configurable():
     assert "--arm-wait-ms" in source
     assert "std::chrono::milliseconds(opts_.arm_wait_ms)" in source
     assert "std::chrono::seconds(2)" not in source
+
+
+def test_persistent_rx_stop_waits_for_worker_before_replying():
+    source = OTA_RX_SERVER.read_text(encoding="utf-8")
+    script = OTA_RX_SERVER_SCRIPT.read_text(encoding="utf-8")
+    stop_branch = source[source.index('} else if (cmd == "STOP")'):source.index('} else if (cmd == "QUIT")')]
+
+    assert "stop_wait_ms" in source
+    assert "--stop-wait-ms" in source
+    assert "invalid --stop-wait-ms" in source
+    assert 'STOP_WAIT_MS="${STOP_WAIT_MS:-8000}"' in script
+    assert '--stop-wait-ms "${STOP_WAIT_MS}"' in script
+    assert "Snapshot stop_and_wait" in source
+    assert "rx.stop_and_wait" in stop_branch
+    assert "rx.stop()" not in stop_branch
 
 
 def test_load_latent_accepts_quantized_pt_jscc_output(tmp_path):

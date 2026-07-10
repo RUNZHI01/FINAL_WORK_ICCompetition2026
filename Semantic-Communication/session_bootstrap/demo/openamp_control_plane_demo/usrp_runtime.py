@@ -287,6 +287,17 @@ def _first_value(env_values: dict[str, str], keys: tuple[str, ...], default: str
     return default
 
 
+def _rx_stop_wait_ms(env_values: dict[str, str]) -> str:
+    configured = _first_value(env_values, ("RX_STOP_WAIT_MS",))
+    if configured:
+        return configured
+    drain_timeout_sec = _parse_float(
+        _first_value(env_values, ("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC",), "8.0"),
+        8.0,
+    )
+    return str(max(0, int(round(drain_timeout_sec * 1000.0))))
+
+
 def _resolve_existing_path(raw_value: str) -> Path | None:
     text = str(raw_value or "").strip()
     if not text:
@@ -428,6 +439,7 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
     if use_docker:
         image = _first_value(env_values, ("OPENAMP_USRP_TX_DOCKER_IMAGE", "USRP_TX_DOCKER_IMAGE"), "iccomp-usrp-tx:latest")
         mount_target = _first_value(env_values, TX_DOCKER_MOUNT_TARGET_KEYS, DEFAULT_TX_DOCKER_MOUNT_TARGET)
+        script_in_container = f"{mount_target.rstrip('/')}/USRP292x/OtaTxPersistentServer.sh"
         command = [
             "docker",
             "run",
@@ -453,7 +465,7 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
             f"PORT={tx_port}",
             image,
             "bash",
-            "/workspace/USRP292x/OtaTxPersistentServer.sh",
+            script_in_container,
         ]
         result = subprocess.run(command, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
         if result.returncode != 0:
@@ -606,6 +618,7 @@ def _start_remote_rx_server(
         f"ANT={shlex.quote(_first_value(env_values, ('RX_ANT',), DEFAULT_RX_ANT))} "
         f"BIND_ADDR={shlex.quote(_first_value(env_values, ('RX_BIND_ADDR', 'BIND_ADDR'), DEFAULT_BIND_ADDR))} "
         f"ARM_WAIT_MS={shlex.quote(_first_value(env_values, ('RX_ARM_WAIT_MS',), '2000'))} "
+        f"STOP_WAIT_MS={shlex.quote(_rx_stop_wait_ms(env_values))} "
         f"PORT={shlex.quote(str(rx_port))} "
         "./USRP292x/OtaRxPersistentServer.sh "
         f"> {shlex.quote(remote_log)} 2>&1 < /dev/null & "

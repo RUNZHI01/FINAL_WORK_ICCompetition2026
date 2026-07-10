@@ -65,6 +65,9 @@ if (-not $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE) {
 if (-not $env:RX_ARM_WAIT_MS) {
     $env:RX_ARM_WAIT_MS = "50"
 }
+if (-not $env:RX_STOP_WAIT_MS) {
+    $env:RX_STOP_WAIT_MS = "8000"
+}
 if (-not $env:ANALOG_PIPELINE_DEPTH) {
     $env:ANALOG_PIPELINE_DEPTH = "1"
 }

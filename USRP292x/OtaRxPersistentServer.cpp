@@ -41,6 +41,7 @@ struct Options {
     std::size_t channel = 0;
     int port = 29220;
     int arm_wait_ms = 2000;
+    int stop_wait_ms = 8000;
 };
 
 struct Snapshot {
@@ -73,7 +74,8 @@ void print_usage(const char* argv0)
         << "  --wirefmt <fmt>           default sc16\n"
         << "  --bw <Hz>                 optional analog bandwidth\n"
         << "  --setup <sec>             default 0.5\n"
-        << "  --arm-wait-ms <ms>        CAPTURE wait for RX started before reply; default 2000\n";
+        << "  --arm-wait-ms <ms>        CAPTURE wait for RX started before reply; default 2000\n"
+        << "  --stop-wait-ms <ms>       STOP wait for capture worker before reply; default 8000\n";
 }
 
 std::string next_arg(int& i, int argc, char** argv)
@@ -117,6 +119,8 @@ Options parse_args(int argc, char** argv)
             opts.setup = std::stod(next_arg(i, argc, argv));
         } else if (key == "--arm-wait-ms") {
             opts.arm_wait_ms = std::stoi(next_arg(i, argc, argv));
+        } else if (key == "--stop-wait-ms") {
+            opts.stop_wait_ms = std::stoi(next_arg(i, argc, argv));
         } else {
             throw std::runtime_error("unknown option: " + key);
         }
@@ -126,6 +130,9 @@ Options parse_args(int argc, char** argv)
     }
     if (opts.arm_wait_ms < 0) {
         throw std::runtime_error("invalid --arm-wait-ms");
+    }
+    if (opts.stop_wait_ms < 0) {
+        throw std::runtime_error("invalid --stop-wait-ms");
     }
     return opts;
 }
@@ -317,6 +324,12 @@ public:
     {
         stop_requested_.store(true);
         return status();
+    }
+
+    Snapshot stop_and_wait(double timeout_sec)
+    {
+        stop_requested_.store(true);
+        return wait_done(timeout_sec);
     }
 
     double actual_rate() const { return actual_rate_; }
@@ -598,7 +611,10 @@ int main(int argc, char** argv)
                         const Snapshot snap = rx.wait_done(timeout);
                         send_line(client, format_snapshot((snap.busy || !snap.ok) ? "ERR" : "OK", snap));
                     } else if (cmd == "STOP") {
-                        const Snapshot snap = rx.stop();
+                        const double timeout = kv.count("timeout")
+                            ? std::stod(kv.at("timeout"))
+                            : static_cast<double>(opts.stop_wait_ms) / 1000.0;
+                        const Snapshot snap = rx.stop_and_wait(timeout);
                         send_line(client, format_snapshot("OK", snap));
                     } else if (cmd == "QUIT") {
                         rx.stop();
