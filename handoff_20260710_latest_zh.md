@@ -24,6 +24,12 @@ bounded RX batch session 已做成 opt-in，不进默认 profile。`ANALOG_RX_BA
 
 taskset profile 上复测 soft-completion 的 `batch-1783702255-300` 不通过：transport `298/300`，fail `2`，`soft_count=0`。失败来自 RX metadata / not-armed 链，不是 TVM 或图像质量；不要把这组 p95 当作有效性能结论。
 
+最新补丁是 RX arm 状态恢复，不是性能 profile 切换。`wait_for_rx_capture_armed` 现在允许 shared/session `STATUS` 在“命令已发送但 session 超时”后回退到 direct `STATUS`，避免 stale socket 把已经启动的 RX 误判成 not-armed。本地回归测试为 `test_wait_for_rx_capture_armed_falls_back_after_sent_session_status_timeout`。
+
+补丁后的 50 张 smoke `batch-1783703143-50` 为 `50/50`、fallback `0`，TVM median/p95/max `240.75/246.59/262.73 ms`，IQ median/p95/max `155.08/224.53/306.85 ms`，质量 PSNR `37.0445`、SSIM `0.97494`。300 张 `batch-1783703433-300` 为 `300/300`、fallback `0`，TVM `240.23/243.72/259.31 ms`，IQ `150.61/285.72/8847.20 ms`，stage records `302`，PSNR `37.0445`、SSIM `0.97494`。结论：可靠性通过，质量不变，但 IQ p95 没超过 prior best `269.84 ms`，也没低于 TVM p95，所以不能作为最终性能突破。
+
+`batch-1783703433-300` 的长尾归因：image 177/285 是板端 `.npz` 写入真实卡顿，`write_npz` 最高 `5526.98 ms`；image 257/273 是 runner 等 decode worker 响应卡顿，但板端 reported decode 只有约 `39-45 ms`；image 181 是 `RX CAPTURE did not arm before TX` 后 STOP drain 再重试成功。下一步仍应优先处理 decoded-output 写入/worker 响应长尾和 RX not-armed 恢复，而不是继续动 QPSK。
+
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0` 和 `ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=1` 都已拒绝。整批共用 RX session 的 50 张 `batch-1783700070-50` 虽然 `50/50`，但 IQ median/p95/max 恶化到 `185.69/571.83/1217.93 ms`，长尾来自 `rx_session_open` 和 RX control。RX CAPTURE preconnect 的 50 张 `batch-1783700726-50` 也 `50/50`，但 IQ p95 仍是 `270.40 ms`，比 no-preconnect 的 `237.32 ms` 差；它只把瓶颈从 RX control 转移到了板端 decode。
 
 Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm、RX 连接、CAPTURE 命令、RX capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。

@@ -2260,6 +2260,45 @@ def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
     assert control_lines.index("STATUS") < next(i for i, line in enumerate(control_lines) if line.startswith("SEND "))
 
 
+def test_wait_for_rx_capture_armed_falls_back_after_sent_session_status_timeout(tmp_path, monkeypatch):
+    args = Namespace(
+        rx_arm_status_timeout_sec=0.2,
+        rx_arm_status_poll_sec=0.001,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+    )
+    events: list[str] = []
+
+    class FlakySession:
+        def command(self, line, log_path, _timeout):
+            events.append(f"session:{line}")
+            log_path.write_text("session timeout\n", encoding="utf-8")
+            raise analog_batch.ControlSessionUnavailable("timed out", command_sent=True)
+
+        def close(self):
+            events.append("session:close")
+
+    def fake_run_control(_host, _port, line, log_path, _timeout):
+        events.append(f"direct:{line}")
+        log_path.write_text("OK busy=1 started=1 done=0 ok=1 job_id=42\n", encoding="utf-8")
+        return "OK busy=1 started=1 done=0 ok=1 job_id=42"
+
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    response = analog_batch.wait_for_rx_capture_armed(
+        args,
+        "OK busy=1 started=0 done=0 ok=1 job_id=42",
+        tmp_path / "rx_arm_status.log",
+        30.0,
+        session=FlakySession(),
+    )
+
+    assert "started=1" in response
+    assert "session:STATUS" in events
+    assert "session:close" in events
+    assert "direct:STATUS" in events
+
+
 def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

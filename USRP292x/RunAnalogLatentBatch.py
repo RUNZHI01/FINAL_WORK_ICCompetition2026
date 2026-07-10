@@ -595,6 +595,7 @@ def wait_for_rx_capture_armed(
                 "STATUS",
                 log_path,
                 min(float(timeout), max(0.1, arm_poll + 0.1)),
+                allow_sent_fallback=True,
             )
         except Exception as exc:
             entries.append(f"$ STATUS\n{exc}")
