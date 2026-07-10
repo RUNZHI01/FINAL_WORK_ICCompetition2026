@@ -2606,7 +2606,7 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "tx_wall_sec": 0.020,
             "rx_arm_wall_sec": 0.005,
             "rx_capture_wall_sec": 0.050,
-            "rx_wait_wall_sec": 0.025,
+            "rx_wait_wall_sec": 0.055,
             "rx_server_arm_wait_wall_sec": 0.004,
             "rx_server_drain_wall_sec": 0.006,
             "rx_server_stream_cmd_wall_sec": 0.010,
@@ -2629,21 +2629,69 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["tx_control_ms"]["median_ms"] == 15.0
     assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
-    assert benchmark["rx_wait_ms"]["median_ms"] == 21.0
+    assert benchmark["rx_wait_ms"]["median_ms"] == 36.0
     assert benchmark["rx_server_arm_wait_ms"]["median_ms"] == 3.0
     assert benchmark["rx_server_drain_ms"]["median_ms"] == 5.0
     assert benchmark["rx_server_stream_cmd_ms"]["median_ms"] == 8.0
     assert benchmark["rx_server_receive_ms"]["median_ms"] == 27.0
     assert benchmark["rx_server_capture_ms"]["median_ms"] == 36.0
+    assert benchmark["rx_capture_control_overhead_ms"]["median_ms"] == 4.0
+    assert "rx_wait_minus_server_receive_ms" not in benchmark
     assert benchmark["rx_server_stop_cmd_ms"]["max_ms"] == 3.0
     assert benchmark["rx_server_stop_wait_ms"]["max_ms"] == 12.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
     assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
     assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0
+    assert benchmark["remote_decode_response_overhead_ms"]["median_ms"] == 23.0
     assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
     assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
     assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
     assert benchmark["total_transport_ms"]["median_ms"] == 150.0
+
+
+def test_iq_stage_benchmark_skips_derived_metrics_without_complete_inputs(tmp_path):
+    image = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image.records.append(
+        {
+            "rx_capture_wall_sec": 0.120,
+            "rx_wait_wall_sec": 0.080,
+            "decode_wall_sec": 0.090,
+            "remote_decode_reported_wall_sec": 0.040,
+        }
+    )
+
+    benchmark = analog_batch.build_iq_stage_benchmark([image])
+
+    assert "rx_capture_ms" in benchmark
+    assert "remote_decode_ms" in benchmark
+    assert "rx_capture_control_overhead_ms" not in benchmark
+    assert "rx_wait_minus_server_receive_ms" not in benchmark
+    assert "remote_decode_response_overhead_ms" not in benchmark
+
+
+def test_iq_stage_benchmark_skips_decode_response_overhead_without_reported_decode(tmp_path):
+    image = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image.records.append(
+        {
+            "decode_wall_sec": 0.090,
+            "remote_decode_reported_wall_sec": 0.0,
+            "remote_dir_publish_wall_sec": 0.004,
+        }
+    )
+
+    benchmark = analog_batch.build_iq_stage_benchmark([image])
+
+    assert benchmark["remote_decode_ms"]["median_ms"] == 90.0
+    assert benchmark["remote_decode_reported_ms"]["median_ms"] == 0.0
+    assert "remote_decode_response_overhead_ms" not in benchmark
 
 
 def test_pipeline_error_record_preserves_stage_timings(tmp_path):

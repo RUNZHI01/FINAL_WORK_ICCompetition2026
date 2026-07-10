@@ -69,7 +69,7 @@ OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0
 
 最新 50 张 instrumentation smoke 是 `batch-1783676258-50`：`50/50`，fallback `0`，TVM median/p95 `242.22/243.93 ms`，IQ median/p95 `165.42/251.70 ms`。RX server 侧显示正常 receive/capture 约 `63.61/64.27 ms`，说明正常路径主要受 `ANALOG_RX_TAIL_SEC=0.05` 的 capture floor 限制，不是 server drain 或 stream command 卡住。
 
-最新 no-poll 对照是 `batch-1783678924-50`：`50/50`，fallback `0`，TVM median/p95 `239.96/245.99 ms`，IQ median/p95/max `183.51/338.34/501.46 ms`。中途少轮询没有改善 tail；最慢样本 server capture 仍约 `64 ms`，但 runner 侧 `rx_capture/rx_wait` 和 decode response 等待拉长。结论：状态轮询不是主因，下一步应继续拆分 RX client/control 和 decode response overhead。
+最新 no-poll 对照是 `batch-1783678924-50`：`50/50`，fallback `0`，TVM median/p95 `239.96/245.99 ms`，IQ median/p95/max `183.51/338.34/501.46 ms`。中途少轮询没有改善 tail；最慢样本 server capture 仍约 `64 ms`，但 runner 侧 `rx_capture/rx_wait` 和 decode response 等待拉长。结论：状态轮询不是主因。
 
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
@@ -81,6 +81,7 @@ OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0
 - Python runner 复用 RX control session，关闭 socket 前调用 shutdown，减少 stale `capture_already_running`。
 - 远端 decode 使用 minimal response，完整 `decode_summary.json` 留在板端，减少 stdout 等待。
 - `OtaRxPersistentServer` 输出 `rx_server_*` 计时字段，runner 聚合到 `iq_stage_benchmark`。
+- `iq_stage_benchmark` 额外输出 `rx_capture_control_overhead_ms` 和 `remote_decode_response_overhead_ms`，作为 runner 侧 capture/decode response 等待相对 server capture 和板端 reported decode 的诊断估算。
 - 如果批次级 SSH ControlMaster 启动失败，runner 不再每张图重试一次，避免 Windows/password SSH 路径产生约 `10 s/image` 的假尾延迟。
 
 ## 已知卡点
@@ -122,7 +123,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 ## 下一步顺序
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
-2. 给 IQ benchmark 增加 RX client/control overhead 和 decode response overhead 聚合字段，先把 tail 拆清楚。
+2. 用新增的 IQ overhead benchmark 字段跑下一轮 50/300 张 gate，先确认 tail 属于 RX client/control、RX server 还是 decode response。
 3. 做 RX WAIT timeout 恢复：timeout 后显式 cancel/drain，再进入下一次 ARQ retry。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。

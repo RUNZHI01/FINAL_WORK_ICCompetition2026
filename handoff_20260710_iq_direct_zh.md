@@ -99,6 +99,8 @@ rx_server_capture_ms median 64.27
 
 短 tail 复测已经拒绝：`ANALOG_RX_TAIL_SEC=0.04` 的 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然 `50/50`、fallback `0`，但 IQ median `201.17 ms`、p95 `1207.08 ms`，明显差于 `0.05` 的 `165.42/251.70 ms`。
 
+no-poll 对照 `batch-1783678924-50` 保持 `50/50`、fallback `0`，TVM median/p95 `239.96/245.99 ms`，IQ median/p95/max `183.51/338.34/501.46 ms`。去掉中途状态轮询没有改善 tail；server capture 仍约 `64 ms`，runner 侧 `rx_capture/rx_wait` 和 decode response 等待才是下一步要拆的部分。
+
 QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多，不要为了 IQ 优化去改 QPSK。
 
 ## 这轮主要改动
@@ -110,6 +112,7 @@ QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多
 - RX `STOP` 会等 worker 收尾后再返回，减少 stale `capture_already_running`。
 - 远端 decode 改为 minimal response，完整 `decode_summary.json` 留在板端，减少 stdout 等待。
 - `OtaRxPersistentServer` 增加 `rx_server_*` 计时字段，`RunAnalogLatentBatch.py` 会记录并聚合到 `iq_stage_benchmark`。
+- `iq_stage_benchmark` 增加 `rx_capture_control_overhead_ms` 和 `remote_decode_response_overhead_ms`，作为 runner 侧 capture/decode response 等待相对 server capture 和板端 reported decode 的诊断估算。
 - IQ runner 增加了 ControlMaster 防护：如果批次级 SSH ControlMaster 启动失败，就不再每张图重试一次。这个问题在 Windows/password SSH 路径上会带来约 `10 s/image` 的假尾延迟。
 
 ## 已知问题
@@ -127,8 +130,8 @@ QPSK 参考 transport 约 `2961.78 ms/image`。IQ 直传已经比 QPSK 快很多
 
 1. 先提交当前文档更新，保持工作区干净。
 2. 保持 `ANALOG_RX_TAIL_SEC=0.05`。`0.04` 和 `0.045` 当前都不要推广。
-3. 做 RX WAIT timeout 恢复：timeout 后显式 cancel/drain，再进入下一次 ARQ retry。
-4. 继续区分板端 decode compute 和 runner/worker/control wait。板端 reported decode 通常约 `44 ms`，runner 等待偶尔到秒级。
+3. 用新增 overhead benchmark 字段跑下一轮 50/300 张 gate，确认 tail 属于 RX client/control、RX server 还是 decode response。
+4. 做 RX WAIT timeout 恢复：timeout 后显式 cancel/drain，再进入下一次 ARQ retry。
 5. RX 状态机稳定前，不要默认打开 double buffering 或 streaming TVM。
 6. 每次 IQ 行为变化后，都要跑 300 张 gate，再决定是否推广。
 

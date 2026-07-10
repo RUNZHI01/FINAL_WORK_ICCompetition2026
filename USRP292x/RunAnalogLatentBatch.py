@@ -3713,6 +3713,33 @@ def _record_ms_values(images: list[ImageRecord], field_name: str) -> list[float]
     return values
 
 
+def _record_ms_delta_values(
+    images: list[ImageRecord],
+    minuend_field: str,
+    *subtrahend_fields: str,
+    positive_fields: tuple[str, ...] = (),
+) -> list[float]:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            if minuend_field not in record or any(field_name not in record for field_name in subtrahend_fields):
+                continue
+            try:
+                value = float(record.get(minuend_field) or 0.0)
+                subtrahend_values = {
+                    field_name: float(record.get(field_name) or 0.0)
+                    for field_name in subtrahend_fields
+                }
+            except (TypeError, ValueError):
+                continue
+            if any((subtrahend_values.get(field_name, 0.0) <= 0.0) for field_name in positive_fields):
+                continue
+            for field_value in subtrahend_values.values():
+                value -= field_value
+            values.append(max(0.0, value) * 1000.0)
+    return values
+
+
 def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
     values: list[float] = []
     for image in images:
@@ -3751,6 +3778,26 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     benchmark: dict[str, Any] = {}
     for metric_name, record_field in fields:
         metric = _metric_from_ms_values(_record_ms_values(images, record_field))
+        if metric is not None:
+            benchmark[metric_name] = metric
+    derived_fields = (
+        (
+            "rx_capture_control_overhead_ms",
+            "rx_capture_wall_sec",
+            ("rx_server_capture_wall_sec",),
+            ("rx_server_capture_wall_sec",),
+        ),
+        (
+            "remote_decode_response_overhead_ms",
+            "decode_wall_sec",
+            ("remote_decode_reported_wall_sec", "remote_dir_publish_wall_sec"),
+            ("remote_decode_reported_wall_sec",),
+        ),
+    )
+    for metric_name, record_field, subtract_fields, positive_fields in derived_fields:
+        metric = _metric_from_ms_values(
+            _record_ms_delta_values(images, record_field, *subtract_fields, positive_fields=positive_fields)
+        )
         if metric is not None:
             benchmark[metric_name] = metric
     return benchmark
