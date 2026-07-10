@@ -3846,6 +3846,8 @@ class ServerMainTest(unittest.TestCase):
                 "USRP_WIRE_PREPARE_WORKERS": "2",
                 "USRP_WIRE_CACHE_ENABLED": "1",
                 "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "1",
+                "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "0.14",
                 "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 2",
                 "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL": "1",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
@@ -3877,6 +3879,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
         self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.14")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_WORKER_PREFIX"], "taskset -c 2")
         self.assertEqual(overrides["ANALOG_PRECONNECT_RX_CAPTURE_CONTROL"], "1")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")

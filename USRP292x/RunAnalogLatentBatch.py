@@ -2866,7 +2866,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         decode_kwargs["soft_completion"] = (
                             lambda target=remote_target,
                             output=remote_npz,
-                            summary=str(remote_request.get("summary_json") or remote_summary),
+                            summary="" if remote_decode_response_only_summary else str(remote_request.get("summary_json") or remote_summary),
                             request_id=str(remote_request.get("request_id") or ""),
                             log=image.image_dir / "remote_decode_soft_completion.log",
                             control=ssh_control_socket: try_remote_dir_decode_soft_completion(
@@ -3522,7 +3522,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                     decode_kwargs["soft_completion"] = (
                         lambda target=str(ctx["remote_target"]),
                         output=remote_npz,
-                        summary=str(remote_request.get("summary_json") or remote_summary),
+                        summary="" if remote_decode_response_only_summary else str(remote_request.get("summary_json") or remote_summary),
                         request_id=str(remote_request.get("request_id") or ""),
                         log=image.image_dir / "remote_decode_soft_completion.log",
                         control=ctx["ssh_control_socket"]: try_remote_dir_decode_soft_completion(

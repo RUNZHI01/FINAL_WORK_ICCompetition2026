@@ -9560,6 +9560,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_REMOTE_DECODE_RESULT_MODE", ""),
         ("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
         ("ANALOG_REMOTE_DECODE_RESPONSE_MODE", ""),
+        ("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", ""),
+        ("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", ""),
         ("ANALOG_REMOTE_DECODE_WORKER_PREFIX", ""),
         ("ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC", ""),
         ("ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT", ""),

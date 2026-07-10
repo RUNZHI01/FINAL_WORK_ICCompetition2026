@@ -3869,6 +3869,97 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
     assert result.records[0]["remote_decode_timing_ms"]["initial_sync"] == 7.0
 
 
+def test_process_image_soft_completion_summaryless_request_checks_output_only(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    soft_completion_calls: list[tuple[str, str]] = []
+
+    class SummarylessSoftCompletedWorker:
+        def decode(self, request, log_path, *, timeout, soft_timeout=0.0, soft_completion=None):
+            del timeout, soft_timeout
+            assert request.get("summary_json") in (None, "")
+            assert soft_completion is not None
+            response = soft_completion()
+            log_path.write_text(json.dumps(response), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps(response),
+                stderr="",
+            )
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=SummarylessSoftCompletedWorker(),
+        remote_decode_request_timeout_sec=2.5,
+        remote_decode_soft_complete_sec=0.25,
+        remote_decode_response_only_summary=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="skip",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_soft_completion(_target, remote_output, remote_summary, _log_path, **_kwargs):
+        soft_completion_calls.append((remote_output, remote_summary))
+        return {
+            "status": "ok",
+            "soft_completed": True,
+            "summary_json": remote_summary,
+            "summary": {
+                "status": "ok",
+                "frame_complete": True,
+                "sync_success": True,
+                "out_npz": remote_output,
+            },
+        }
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "push_file_to_remote", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("worker mode should send manifest inline")))
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+    monkeypatch.setattr(analog_batch, "try_remote_dir_decode_soft_completion", fake_soft_completion)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is True
+    assert result.records[0]["remote_decode_soft_completed"] is True
+    assert soft_completion_calls
+    assert soft_completion_calls[0][0] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
+    assert soft_completion_calls[0][1] == ""
+
+
 def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
