@@ -57,6 +57,12 @@ struct Snapshot {
     std::size_t timeouts = 0;
     std::size_t overflows = 0;
     double wall_sec = 0.0;
+    double arm_wait_sec = 0.0;
+    double drain_sec = 0.0;
+    double stream_cmd_sec = 0.0;
+    double receive_sec = 0.0;
+    double stop_cmd_sec = 0.0;
+    double stop_wait_sec = 0.0;
 };
 
 void print_usage(const char* argv0)
@@ -188,7 +194,13 @@ std::string format_snapshot(const std::string& prefix, const Snapshot& s)
         << " written_samps=" << s.written_samps
         << " timeouts=" << s.timeouts
         << " overflows=" << s.overflows
-        << " wall_sec=" << s.wall_sec;
+        << " wall_sec=" << s.wall_sec
+        << " arm_wait_sec=" << s.arm_wait_sec
+        << " drain_sec=" << s.drain_sec
+        << " stream_cmd_sec=" << s.stream_cmd_sec
+        << " receive_sec=" << s.receive_sec
+        << " stop_cmd_sec=" << s.stop_cmd_sec
+        << " stop_wait_sec=" << s.stop_wait_sec;
     if (!s.error.empty()) {
         oss << " error=" << sanitize_value(s.error);
     }
@@ -289,11 +301,14 @@ public:
         }
 
         worker_ = std::thread(&PersistentRx::capture_loop, this, file, total_samps, job_counter_);
+        const auto arm_wait_start = std::chrono::steady_clock::now();
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_.wait_for(lock, std::chrono::milliseconds(opts_.arm_wait_ms), [this]() {
                 return state_.started || state_.done;
             });
+            state_.arm_wait_sec = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - arm_wait_start).count();
             return state_;
         }
     }
@@ -329,7 +344,18 @@ public:
     Snapshot stop_and_wait(double timeout_sec)
     {
         stop_requested_.store(true);
-        return wait_done(timeout_sec);
+        const auto stop_wait_start = std::chrono::steady_clock::now();
+        Snapshot snap = wait_done(timeout_sec);
+        snap.stop_wait_sec = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - stop_wait_start).count();
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (state_.job_id == snap.job_id) {
+                state_.stop_wait_sec = snap.stop_wait_sec;
+                snap = state_;
+            }
+        }
+        return snap;
     }
 
     double actual_rate() const { return actual_rate_; }
@@ -356,6 +382,10 @@ private:
         std::size_t overflows = 0;
         bool ok = true;
         std::string error;
+        double drain_sec = 0.0;
+        double stream_cmd_sec = 0.0;
+        double receive_sec = 0.0;
+        double stop_cmd_sec = 0.0;
         const auto t0 = std::chrono::steady_clock::now();
 
         try {
@@ -372,12 +402,19 @@ private:
             auto& rx_stream = rx_stream_;
             // Drain any residual samples from a previous capture.
             {
+                const auto drain_start = std::chrono::steady_clock::now();
                 std::vector<std::complex<std::int16_t>> drain_buf(rx_stream->get_max_num_samps());
                 uhd::rx_metadata_t drain_md;
                 const auto drain_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
                 while (!stop_requested_.load() && std::chrono::steady_clock::now() < drain_deadline) {
                     std::size_t got = rx_stream->recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0);
                     if (got == 0) break;
+                }
+                drain_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - drain_start).count();
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (state_.job_id == job_id) {
+                    state_.drain_sec = drain_sec;
                 }
             }
 
@@ -387,11 +424,17 @@ private:
                 uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
                 cmd.num_samps = total_samps;
                 cmd.stream_now = true;
+                const auto stream_cmd_start = std::chrono::steady_clock::now();
                 rx_stream->issue_stream_cmd(cmd);
+                stream_cmd_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - stream_cmd_start).count();
+                const auto receive_start = std::chrono::steady_clock::now();
 
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
                     if (state_.job_id == job_id) {
+                        state_.stream_cmd_sec = stream_cmd_sec;
+                        state_.receive_sec = 0.0;
                         state_.started = true;
                     }
                 }
@@ -404,12 +447,15 @@ private:
                     }
                     const std::size_t want = std::min<std::size_t>(buff.size(), total_samps - written);
                     const std::size_t got = rx_stream->recv(&buff.front(), want, md, 0.2, false);
+                    receive_sec = std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() - receive_start).count();
 
                     if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
                         ++timeouts;
                         std::lock_guard<std::mutex> lock(mutex_);
                         if (state_.job_id == job_id) {
                             state_.timeouts = timeouts;
+                            state_.receive_sec = receive_sec;
                         }
                         continue;
                     }
@@ -418,6 +464,7 @@ private:
                         std::lock_guard<std::mutex> lock(mutex_);
                         if (state_.job_id == job_id) {
                             state_.overflows = overflows;
+                            state_.receive_sec = receive_sec;
                         }
                         continue;
                     }
@@ -433,6 +480,7 @@ private:
                         state_.written_samps = written;
                         state_.timeouts = timeouts;
                         state_.overflows = overflows;
+                        state_.receive_sec = receive_sec;
                     }
                 }
             }
@@ -450,8 +498,15 @@ private:
         if (stop_requested_.load()) {
             try {
                 uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+                const auto stop_cmd_start = std::chrono::steady_clock::now();
                 rx_stream_->issue_stream_cmd(stop_cmd);
+                stop_cmd_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - stop_cmd_start).count();
             } catch (...) {
+            }
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (state_.job_id == job_id) {
+                state_.stop_cmd_sec = stop_cmd_sec;
             }
         }
 
@@ -467,6 +522,10 @@ private:
                 state_.timeouts = timeouts;
                 state_.overflows = overflows;
                 state_.wall_sec = wall;
+                state_.drain_sec = drain_sec;
+                state_.stream_cmd_sec = stream_cmd_sec;
+                state_.receive_sec = receive_sec;
+                state_.stop_cmd_sec = stop_cmd_sec;
                 state_.error = error;
             }
         }

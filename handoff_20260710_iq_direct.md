@@ -142,6 +142,7 @@ If the UI shows `board status endpoint unavailable` or connection refused, the b
 - Persistent RX supports configurable `--arm-wait-ms` and `--stop-wait-ms`.
 - RX `STOP` waits for the worker before replying, reducing stale `capture_already_running` failures.
 - The Python runner uses same-session RX control and shuts the socket down before closing it, so the RX server sees EOF promptly after a timeout.
+- RX control responses now carry additive server-side timings for arm wait, drain, stream command issue, receive loop, STOP command, and STOP wait. The Python runner records them as `rx_server_*_wall_sec` and aggregates them in `iq_stage_benchmark`.
 - Remote decode returns minimal worker responses while keeping full `decode_summary.json` on the board.
 - Docker wrappers default to `RX_ARM_WAIT_MS=150` and forward the IQ/USRP environment needed by Cockpit.
 
@@ -165,11 +166,11 @@ For speed runs, the runtime security channel was disabled while config still sho
 ## Next Work
 
 1. Keep QPSK frozen. Check `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py` before and after IQ changes.
-2. Add RX server-side timing fields around drain, stream command issue, started/done transition, and stop wait. The current top tail cannot be solved cleanly without knowing where the RX server is waiting.
+2. Re-run a 50-image IQ direct smoke and inspect the new `rx_server_*_ms` benchmark fields before changing behavior.
 3. Improve WAIT-timeout recovery. A timeout after partial samples should cancel/drain deterministically before the next ARQ attempt.
 4. Separate board decode compute from worker/control wait. The reported decode time is usually around `44 ms`, but runner-side waits can still reach seconds.
 5. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.
-6. Re-run a 50-image smoke and a 300-image gate after each timing change. Do not promote a profile from a single short run.
+6. Re-run a 300-image gate after any timing behavior change. Do not promote a profile from a single short run.
 
 ## Verification Before Commit
 
@@ -191,6 +192,13 @@ targeted server tests: passed
 py_compile: passed
 QPSK runner diff: empty
 git diff --check: exit 0, line-ending warnings only
+```
+
+Latest diagnostic-code verification after adding `rx_server_*` fields:
+
+```text
+USRP292x/test_analog_latent_link.py: 87 passed
+python -m py_compile USRP292x\RunAnalogLatentBatch.py: passed
 ```
 
 Remove generated reports, raw logs, and run artifacts before committing unless the task explicitly requires preserving them as evidence.

@@ -62,6 +62,22 @@ def test_persistent_rx_stop_waits_for_worker_before_replying():
     assert "rx.stop()" not in stop_branch
 
 
+def test_persistent_rx_snapshot_reports_server_stage_timings():
+    source = OTA_RX_SERVER.read_text(encoding="utf-8")
+    format_block = source[source.index("std::string format_snapshot"):source.index("bool has_sensor")]
+
+    for field in (
+        "arm_wait_sec",
+        "drain_sec",
+        "stream_cmd_sec",
+        "receive_sec",
+        "stop_cmd_sec",
+        "stop_wait_sec",
+    ):
+        assert f"double {field}" in source
+        assert f'<< " {field}="' in format_block
+
+
 def test_load_latent_accepts_quantized_pt_jscc_output(tmp_path):
     quant = torch.arange(1 * 4 * 4 * 4, dtype=torch.uint8).reshape(1, 4, 4, 4)
     scale = torch.tensor(0.25, dtype=torch.float32)
@@ -1757,6 +1773,71 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
     assert image.records[0]["rx_arm_status_timeout_sec"] == 0.75
 
 
+def test_process_image_records_rx_server_stage_timings(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": True, "decode_total_ms": 42.0}), encoding="utf-8")
+        return 0
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        if line.startswith("CAPTURE "):
+            return (
+                "OK busy=1 started=1 done=0 ok=1 job_id=7 target_samps=107584 written_samps=0 "
+                "arm_wait_sec=0.012 drain_sec=0.004 stream_cmd_sec=0.006 receive_sec=0.000 "
+                "stop_cmd_sec=0.000 stop_wait_sec=0.000 wall_sec=0.000"
+            )
+        if line.startswith("WAIT "):
+            return (
+                "OK busy=0 started=1 done=1 ok=1 job_id=7 target_samps=107584 written_samps=107584 "
+                "arm_wait_sec=0.012 drain_sec=0.004 stream_cmd_sec=0.006 receive_sec=0.041 "
+                "stop_cmd_sec=0.000 stop_wait_sec=0.000 wall_sec=0.052"
+            )
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed
+    record = image.records[0]
+    assert record["rx_server_arm_wait_wall_sec"] == 0.012
+    assert record["rx_server_drain_wall_sec"] == 0.004
+    assert record["rx_server_stream_cmd_wall_sec"] == 0.006
+    assert record["rx_server_receive_wall_sec"] == 0.041
+    assert record["rx_server_capture_wall_sec"] == 0.052
+    assert record["rx_server_target_samps"] == 107584
+    assert record["rx_server_written_samps"] == 107584
+
+
 @pytest.mark.parametrize(
     "wait_error",
     [
@@ -1810,6 +1891,61 @@ def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch, wait_e
     assert result.passed is False
     assert any(line == "STOP" for line in control_lines)
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+
+
+def test_process_image_records_rx_stop_timing_after_wait_timeout(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        if line.startswith("WAIT "):
+            raise RuntimeError(
+                "control command failed: WAIT timeout=0.500000\n"
+                "ERR busy=1 started=1 done=0 ok=1 job_id=9 target_samps=107584 written_samps=47553 "
+                "receive_sec=0.501 wall_sec=0.000"
+            )
+        if line == "STOP":
+            return (
+                "OK busy=0 started=1 done=1 ok=0 job_id=9 target_samps=107584 written_samps=47553 "
+                "stop_cmd_sec=0.003 stop_wait_sec=0.208 wall_sec=0.716"
+            )
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert not result.passed
+    record = image.records[0]
+    assert record["rx_server_receive_wall_sec"] == 0.501
+    assert record["rx_server_stop_cmd_wall_sec"] == 0.003
+    assert record["rx_server_stop_wait_wall_sec"] == 0.208
+    assert record["rx_server_written_samps"] == 47553
 
 
 def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
@@ -2449,6 +2585,13 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_arm_wall_sec": 0.003,
             "rx_capture_wall_sec": 0.030,
             "rx_wait_wall_sec": 0.017,
+            "rx_server_arm_wait_wall_sec": 0.002,
+            "rx_server_drain_wall_sec": 0.004,
+            "rx_server_stream_cmd_wall_sec": 0.006,
+            "rx_server_receive_wall_sec": 0.020,
+            "rx_server_capture_wall_sec": 0.026,
+            "rx_server_stop_cmd_wall_sec": 0.0,
+            "rx_server_stop_wait_wall_sec": 0.0,
             "decode_wall_sec": 0.060,
             "remote_decode_reported_wall_sec": 0.041,
             "remote_decode_restart_wall_sec": 0.0,
@@ -2464,6 +2607,13 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_arm_wall_sec": 0.005,
             "rx_capture_wall_sec": 0.050,
             "rx_wait_wall_sec": 0.025,
+            "rx_server_arm_wait_wall_sec": 0.004,
+            "rx_server_drain_wall_sec": 0.006,
+            "rx_server_stream_cmd_wall_sec": 0.010,
+            "rx_server_receive_wall_sec": 0.034,
+            "rx_server_capture_wall_sec": 0.046,
+            "rx_server_stop_cmd_wall_sec": 0.003,
+            "rx_server_stop_wait_wall_sec": 0.012,
             "decode_wall_sec": 0.080,
             "remote_decode_reported_wall_sec": 0.043,
             "remote_decode_restart_wall_sec": 0.030,
@@ -2480,6 +2630,13 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
     assert benchmark["rx_wait_ms"]["median_ms"] == 21.0
+    assert benchmark["rx_server_arm_wait_ms"]["median_ms"] == 3.0
+    assert benchmark["rx_server_drain_ms"]["median_ms"] == 5.0
+    assert benchmark["rx_server_stream_cmd_ms"]["median_ms"] == 8.0
+    assert benchmark["rx_server_receive_ms"]["median_ms"] == 27.0
+    assert benchmark["rx_server_capture_ms"]["median_ms"] == 36.0
+    assert benchmark["rx_server_stop_cmd_ms"]["max_ms"] == 3.0
+    assert benchmark["rx_server_stop_wait_ms"]["max_ms"] == 12.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
     assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
     assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0

@@ -456,6 +456,43 @@ def rx_control_response_bool(response: str, key: str) -> bool | None:
     return None
 
 
+RX_CONTROL_FLOAT_FIELDS = {
+    "wall_sec": "rx_server_capture_wall_sec",
+    "arm_wait_sec": "rx_server_arm_wait_wall_sec",
+    "drain_sec": "rx_server_drain_wall_sec",
+    "stream_cmd_sec": "rx_server_stream_cmd_wall_sec",
+    "receive_sec": "rx_server_receive_wall_sec",
+    "stop_cmd_sec": "rx_server_stop_cmd_wall_sec",
+    "stop_wait_sec": "rx_server_stop_wait_wall_sec",
+}
+
+RX_CONTROL_INT_FIELDS = {
+    "target_samps": "rx_server_target_samps",
+    "written_samps": "rx_server_written_samps",
+    "timeouts": "rx_server_timeouts",
+    "overflows": "rx_server_overflows",
+}
+
+
+def parse_rx_control_snapshot_fields(response: str) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    for token in str(response or "").replace("\n", " ").split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        if key in RX_CONTROL_FLOAT_FIELDS:
+            try:
+                fields[RX_CONTROL_FLOAT_FIELDS[key]] = float(value)
+            except ValueError:
+                continue
+        elif key in RX_CONTROL_INT_FIELDS:
+            try:
+                fields[RX_CONTROL_INT_FIELDS[key]] = int(value)
+            except ValueError:
+                continue
+    return fields
+
+
 def rx_capture_response_armed(response: str) -> bool:
     started = rx_control_response_bool(response, "started")
     done = rx_control_response_bool(response, "done")
@@ -512,7 +549,7 @@ def wait_for_rx_capture_armed(
     raise RuntimeError(f"RX CAPTURE did not arm before TX\n{last_response}")
 
 
-def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> None:
+def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> str:
     timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
     drain_timeout = max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
     drain_poll = max(0.01, env_float("ANALOG_RX_STOP_DRAIN_POLL_SEC", 0.05))
@@ -545,6 +582,7 @@ def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> None:
     if entries:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
+    return "\n".join(entries)
 
 
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
@@ -2380,6 +2418,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     tx_wall_sec = 0.0
     make_wall_sec = 0.0
     decode_wall_sec = 0.0
+    rx_server_snapshot: dict[str, Any] = {}
     rx_capture_control = None
 
     try:
@@ -2524,19 +2563,23 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             capture_timeout,
                         )
                         rx_capture_control = None
-                    wait_for_rx_capture_armed(
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
+                    capture_response = wait_for_rx_capture_armed(
                         args,
                         capture_response,
                         image.image_dir / "rx_arm_status.log",
                         capture_timeout,
                         session=rx_session,
                     )
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
                 except Exception as exc:
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                     if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
                         if rx_session is not None:
                             close_preconnected_control(rx_session)
                             rx_session = None
-                        stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                        stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                        rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                     raise
                 rx_arm_wall_sec = time.monotonic() - rx_arm_started
                 if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
@@ -2566,7 +2609,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 rx_wait_started = time.monotonic()
                 try:
                     if rx_session is not None:
-                        run_control_maybe_session(
+                        wait_response = run_control_maybe_session(
                             rx_session,
                             args.rx_control_host,
                             args.rx_control_port,
@@ -2577,7 +2620,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         )
                         rx_session = None
                     else:
-                        run_control_maybe_preconnected(
+                        wait_response = run_control_maybe_preconnected(
                             rx_wait_control,
                             args.rx_control_host,
                             args.rx_control_port,
@@ -2585,9 +2628,12 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             image.image_dir / "rx_wait.log",
                             wait_control_timeout,
                         )
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(wait_response))
                 except Exception as exc:
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                     if is_rx_wait_timeout_error(exc):
-                        stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                        stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                        rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                     raise
                 rx_wait_control = None
                 rx_wait_wall_sec = time.monotonic() - rx_wait_started
@@ -2823,11 +2869,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             log_name="remote_stall_snapshot.log",
             control_socket=ssh_control_socket,
         )
+        record.update(rx_server_snapshot)
         image.records.append(record)
     except Exception as exc:
         image.status = 1
         image.passed = False
         error_text = str(exc)
+        rx_server_snapshot.update(parse_rx_control_snapshot_fields(error_text))
         remote_decode_restart_wall_sec = 0.0
         if isinstance(exc, RemoteDecodeWorkerTimeout) and remote_target:
             try:
@@ -2871,6 +2919,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             log_name="remote_stall_snapshot_error.log",
             control_socket=ssh_control_socket,
         )
+        record.update(rx_server_snapshot)
         image.records.append(record)
     finally:
         close_preconnected_control(rx_capture_control)
@@ -3014,6 +3063,7 @@ def _capture_remote_decode_pipeline_attempt(
     tx_send_control = None
     rx_wait_control = None
     rx_session = None
+    rx_server_snapshot: dict[str, Any] = {}
     try:
         with pipeline_rf_decode_guard(args):
             rx_started = time.monotonic()
@@ -3054,19 +3104,23 @@ def _capture_remote_decode_pipeline_attempt(
                         capture_timeout,
                     )
                     rx_capture_control = None
-                wait_for_rx_capture_armed(
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
+                capture_response = wait_for_rx_capture_armed(
                     args,
                     capture_response,
                     image.image_dir / "rx_arm_status.log",
                     capture_timeout,
                     session=rx_session,
                 )
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
             except Exception as exc:
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                 if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
                     if rx_session is not None:
                         close_preconnected_control(rx_session)
                         rx_session = None
-                    stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
             rx_arm_wall_sec = time.monotonic() - rx_arm_started
             if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
@@ -3095,7 +3149,7 @@ def _capture_remote_decode_pipeline_attempt(
             rx_wait_started = time.monotonic()
             try:
                 if rx_session is not None:
-                    run_control_maybe_session(
+                    wait_response = run_control_maybe_session(
                         rx_session,
                         args.rx_control_host,
                         args.rx_control_port,
@@ -3106,7 +3160,7 @@ def _capture_remote_decode_pipeline_attempt(
                     )
                     rx_session = None
                 else:
-                    run_control_maybe_preconnected(
+                    wait_response = run_control_maybe_preconnected(
                         rx_wait_control,
                         args.rx_control_host,
                         args.rx_control_port,
@@ -3114,9 +3168,12 @@ def _capture_remote_decode_pipeline_attempt(
                         image.image_dir / "rx_wait.log",
                         wait_control_timeout,
                     )
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(wait_response))
             except Exception as exc:
+                rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                 if is_rx_wait_timeout_error(exc):
-                    stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                    rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
             rx_wait_control = None
             rx_wait_wall_sec = time.monotonic() - rx_wait_started
@@ -3169,6 +3226,7 @@ def _capture_remote_decode_pipeline_attempt(
         "capture_completed_at": capture_completed_at,
         "decode_queue_wall_sec": 0.0,
         "slot_wait_wall_sec": 0.0,
+        "rx_server_snapshot": rx_server_snapshot,
     }
 
 
@@ -3381,8 +3439,11 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             log_name="remote_stall_snapshot_pipeline.log",
             control_socket=ctx["ssh_control_socket"],
         )
+        record.update(dict(ctx.get("rx_server_snapshot") or {}))
         image.records.append(record)
     except Exception as exc:
+        rx_server_snapshot = dict(ctx.get("rx_server_snapshot") or {})
+        rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
         if decode_started > 0.0:
             decode_wall_sec = time.monotonic() - decode_started
         remote_decode_restart_wall_sec = 0.0
@@ -3421,6 +3482,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 "merge_wall_sec": float(ctx.get("merge_wall_sec") or 0.0),
                 "remote_cleanup_wall_sec": remote_cleanup_wall_sec,
                 "slot_wait_wall_sec": float(ctx.get("slot_wait_wall_sec") or 0.0),
+                **rx_server_snapshot,
             },
             args=args,
             remote_target=str(ctx["remote_target"]),
@@ -3670,6 +3732,13 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
         ("rx_arm_ms", "rx_arm_wall_sec"),
         ("rx_capture_ms", "rx_capture_wall_sec"),
         ("rx_wait_ms", "rx_wait_wall_sec"),
+        ("rx_server_arm_wait_ms", "rx_server_arm_wait_wall_sec"),
+        ("rx_server_drain_ms", "rx_server_drain_wall_sec"),
+        ("rx_server_stream_cmd_ms", "rx_server_stream_cmd_wall_sec"),
+        ("rx_server_receive_ms", "rx_server_receive_wall_sec"),
+        ("rx_server_capture_ms", "rx_server_capture_wall_sec"),
+        ("rx_server_stop_cmd_ms", "rx_server_stop_cmd_wall_sec"),
+        ("rx_server_stop_wait_ms", "rx_server_stop_wait_wall_sec"),
         ("remote_decode_queue_ms", "decode_queue_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_decode_reported_ms", "remote_decode_reported_wall_sec"),
