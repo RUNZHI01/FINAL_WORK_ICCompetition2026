@@ -2201,6 +2201,79 @@ def test_pipeline_session_capture_arm_failure_closes_session_before_stop(tmp_pat
     assert events.index("close:session") < events.index("direct:STOP")
 
 
+def test_pipeline_session_wait_timeout_closes_session_before_stop(tmp_path, monkeypatch):
+    image = analog_batch.ImageRecord(index=196, input_path=tmp_path / "case196.bin", image_dir=tmp_path / "image_0196")
+    image.input_path.write_bytes(b"payload")
+    args = Namespace(
+        remote_rx_ssh_target="user@board",
+        ssh_control_socket="",
+        in_process_local_codec=True,
+        remote_cleanup_mode="skip",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/test_rx",
+        remote_decode_worker=object(),
+        run_id="session-wait-fail",
+        remote_rx_run_root="/tmp/usrp292x_remote_runs",
+        tx_delay_sec=0.0,
+        rate=5_000_000.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        preconnect_control=False,
+        preconnect_rx_capture_control=False,
+        rx_session_control=True,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        tx_timeout_sec=30.0,
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+    )
+    events: list[str] = []
+
+    class FakeSession:
+        def command(self, line, log_path, _timeout):
+            events.append(f"session:{line.split()[0]}")
+            log_path.write_text("OK\n", encoding="utf-8")
+            if line.startswith("WAIT "):
+                raise RuntimeError(
+                    "control command failed: WAIT timeout=0.500000\n"
+                    "ERR busy=1 started=1 done=0 ok=1 job_id=196 target_samps=67888 written_samps=58000"
+                )
+            return "OK busy=1 started=1 done=0 ok=1 job_id=196"
+
+        def close(self):
+            events.append("close:session")
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 67888, "job_id": "case196"}), encoding="utf-8")
+        return {"capture_nsamps": 67888, "job_id": "case196"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        events.append(f"direct:{line.split()[0]}")
+        return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.003 stop_wait_sec=0.208 wall_sec=0.211"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "open_control_session", lambda *_args: FakeSession())
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    with pytest.raises(RuntimeError, match="WAIT timeout"):
+        analog_batch._capture_remote_decode_pipeline_attempt(
+            args,
+            image,
+            attempt_index=0,
+            max_attempts=3,
+            slot_index=0,
+            pipeline_depth=1,
+        )
+
+    assert "close:session" in events
+    assert "direct:STOP" in events
+    assert events.index("close:session") < events.index("direct:STOP")
+
+
 def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
     args = Namespace(rx_control_host="127.0.0.1", rx_control_port=29220, rx_timeout_sec=30.0)
     control_lines: list[str] = []
@@ -2485,6 +2558,71 @@ def test_process_image_reuses_rx_control_session_for_capture_and_wait(tmp_path, 
     assert "direct:SEND" in events
     assert events.index("session:CAPTURE") < events.index("direct:SEND")
     assert events.index("direct:SEND") < events.index("session:WAIT")
+
+
+def test_process_image_session_wait_timeout_closes_session_before_stop(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        preconnect_control=False,
+        rx_session_control=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    events: list[str] = []
+
+    class FakeSession:
+        def command(self, line, log_path, _timeout):
+            events.append(f"session:{line.split()[0]}")
+            log_path.write_text("OK\n", encoding="utf-8")
+            if line.startswith("WAIT "):
+                raise RuntimeError(
+                    "control command failed: WAIT timeout=0.500000\n"
+                    "ERR busy=1 started=1 done=0 ok=1 job_id=9 target_samps=107584 written_samps=47553 "
+                    "receive_sec=0.501 wall_sec=0.000"
+                )
+            return "OK busy=1 started=1 done=0 ok=1 job_id=9"
+
+        def close(self):
+            events.append("close:session")
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_run_control(_host, _port, line, log_path, _timeout):
+        events.append(f"direct:{line.split()[0]}")
+        log_path.write_text("OK\n", encoding="utf-8")
+        if line == "STOP":
+            return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.003 stop_wait_sec=0.208 wall_sec=0.211"
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "open_control_session", lambda *_args: FakeSession())
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert not result.passed
+    assert "close:session" in events
+    assert "direct:STOP" in events
+    assert events.index("close:session") < events.index("direct:STOP")
 
 
 def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_path, monkeypatch):

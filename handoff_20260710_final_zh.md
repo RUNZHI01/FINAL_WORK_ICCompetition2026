@@ -77,6 +77,8 @@ decode 失败后 RX cleanup 验证是 `batch-1783681389-50`：`50/50`，fallback
 
 cleanup 后 300 张 gate 是 `batch-1783682083-300`：`300/300`，fallback `0`，TVM median/p95 `243.38/255.24 ms`，IQ median/p95/max `174.42/308.45/8377.89 ms`。本轮有 305 条 stage record。主要 tail 是一次 WAIT timeout 后 STOP 控制命令 5s 客户端超时、一次 decode worker response wait 约 `7.27 s` 但板端 reported decode 约 `43 ms`、以及一次真实板端 decode 约 `4.09 s`。STOP 客户端 timeout 已改为覆盖 `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`，下一轮 300 张要验证 STOP log 不再出现 `ERR_TIMEOUT`。
 
+STOP timeout-budget 验证是 `batch-1783682666-300`：`300/300`，fallback `0`，TVM median/p95 `240.17/243.93 ms`，IQ median/p95/max `172.39/310.55/19107.42 ms`，stage record `302`。image 196 仍出现 WAIT timeout 后 STOP `ERR_TIMEOUT`，并且第二次 attempt 有约 `6.96 s` runner-side decode wait。根因更新：`ANALOG_RX_SESSION_CONTROL=1` 下 WAIT timeout 后旧 RX session 没有先关闭，runner 直接开新连接发 STOP，可能卡在服务端旧会话/accept 状态。现在 depth-1 和 pipeline capture 两条路径都改成 STOP 前先关闭 RX session。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动
@@ -91,6 +93,7 @@ cleanup 后 300 张 gate 是 `batch-1783682083-300`：`300/300`，fallback `0`�
 - 如果批次级 SSH ControlMaster 启动失败，runner 不再每张图重试一次，避免 Windows/password SSH 路径产生约 `10 s/image` 的假尾延迟。
 - WAIT 成功后如果 decode/no-sync 失败，runner 会发送 `STOP` 并 drain RX server，再进入 ARQ retry，避免下一次 attempt 继承不确定的 RX 状态。
 - `stop_rx_capture()` 的客户端 timeout 已覆盖 RX drain budget，避免 profile 配置 `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0` 时被旧的 5s cap 提前切断。
+- WAIT timeout cleanup 会在 direct STOP 前关闭当前 RX control session，避免同一个服务端控制会话阻塞新 STOP 连接。
 
 ## 已知卡点
 
@@ -132,7 +135,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
 2. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
-3. 继续验证 RX WAIT/no-sync retry 恢复：decode/no-sync 失败后的 STOP/drain 已加入，STOP timeout budget 也已修正；下一次 300 张里检查 `rx_stop_after_wait_timeout.log` 是否返回 OK 和 STOP 计时字段。
+3. 继续验证 RX WAIT/no-sync retry 恢复：decode/no-sync 失败后的 STOP/drain 已加入，STOP timeout budget 和 session-before-STOP 顺序也已修正；下一次 300 张里检查 `rx_stop_after_wait_timeout.log` 是否返回 OK 和 STOP 计时字段。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。
 

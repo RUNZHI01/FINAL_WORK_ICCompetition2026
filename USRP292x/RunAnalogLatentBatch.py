@@ -2637,6 +2637,9 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 except Exception as exc:
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                     if is_rx_wait_timeout_error(exc):
+                        if rx_session is not None:
+                            close_preconnected_control(rx_session)
+                            rx_session = None
                         stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                         rx_failure_stop_done = True
@@ -3195,6 +3198,9 @@ def _capture_remote_decode_pipeline_attempt(
             except Exception as exc:
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
                 if is_rx_wait_timeout_error(exc):
+                    if rx_session is not None:
+                        close_preconnected_control(rx_session)
+                        rx_session = None
                     stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
