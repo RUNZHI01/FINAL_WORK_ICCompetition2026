@@ -4,7 +4,7 @@
 
 当前工作目录是 `FINAL_WORK_ICCompetition2026/FINAL_WORK_ICCompetition2026`，分支为 `feat/restore-248`。Cockpit Desktop 一键测试路径已经恢复到 IQ 直传，链路包含 handwritten TVM 和 big.LITTLE runner。QPSK 已经可用并作为回归基线，后续优化不要再改 `USRP292x/RunQpskFileBatchSpoolArq.py`。
 
-最新已提交基线到 `cd8e754 docs: record iq overhead validation`。本文档覆盖随后这轮 IQ 失败清理补丁：`USRP292x/RunAnalogLatentBatch.py` 和 `USRP292x/test_analog_latent_link.py`。如果该文档已经在 git 历史中，说明补丁已随文档一起落库。
+最新已提交基线到 `bc0cd97 docs: record iq tmpfs diagnostic`。本文档覆盖其后的 IQ soft-completion 观测补丁：`USRP292x/RunAnalogLatentBatch.py` 会在 remote-dir soft completion 命中时记录 `remote_decode_soft_completed=true`，`USRP292x/test_analog_latent_link.py` 增加对应单元测试。该补丁不改变默认性能 profile；默认仍保持 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0`。
 
 ## 当前链路
 
@@ -73,6 +73,7 @@ QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。
 - `USRP292x/RunAnalogLatentBatch.py`: 增加 decode 失败后的 `stop_rx_capture(...)` 清理路径，并记录 `rx_server_stop_cmd_wall_sec` / `rx_server_stop_wait_wall_sec`。
 - `USRP292x/RunAnalogLatentBatch.py`: 修正 `stop_rx_capture(...)` 客户端 timeout，避免 8s drain profile 被旧 5s cap 提前切断。
 - `USRP292x/RunAnalogLatentBatch.py`: 修正 WAIT timeout cleanup 顺序，先关闭 RX session，再通过 direct STOP 清理。
+- `USRP292x/RunAnalogLatentBatch.py`: 增加 `remote_decode_soft_completed` 记录字段，用于后续 soft-completion A/B 诊断。
 - `USRP292x/test_analog_latent_link.py`: 增加和更新失败路径测试，覆盖远端 decode 异常、本地 decode status failure、WAIT timeout、arm status timeout 等相邻路径。
 
 已跑过的本地验证：
@@ -84,7 +85,7 @@ git diff --check
 git diff -- USRP292x\RunQpskFileBatchSpoolArq.py
 ```
 
-其中 pytest 结果为 `91 passed`，QPSK diff 为空。`git diff --check` 只有既有 CRLF 提示，没有 trailing whitespace 错误。
+其中最近一次全量 pytest 结果为 `95 passed in 30.54s`，QPSK diff 为空。`git diff --check` 只有既有 CRLF 提示，没有 trailing whitespace 错误。
 
 ## 重启和 Cockpit 等价验证
 
@@ -115,10 +116,10 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 ## 下一步建议
 
-1. 先决定是否提交当前 RX 失败清理补丁。提交前清理 `Semantic-Communication/session_bootstrap/reports/openamp3_usrp_1783681389_current_*.json/.md` 这类本地运行报告，除非要作为证据归档。
-2. 跑一次 300 张 Cockpit 等价 gate，确认 IQ median 仍低于 `200 ms`，p95 尽量低于 `450 ms`，fallback 为 `0`。
+1. 先提交当前 soft-completion 观测补丁，提交前确认没有生成 report、raw log 或临时运行产物混进 git。
+2. 继续用 `batch-1783683491-300` 作为当前默认 profile 的 300 张基线：IQ median/p95 `169.48/299.73 ms`，TVM median/p95 `242.38/245.50 ms`，fallback `0`。
 3. 下一步集中处理 decode-side tail：板端 reported decode stall 和 runner 等 decode worker response。RX STOP cleanup 目前已经过 300 张验证。
-4. 若正常路径继续稳定，下一步再处理 `remote_decode_response_overhead_ms` 和 RX capture/control tail。不要在 RX 状态机稳定前默认开启双缓冲或 streaming TVM。
+4. 若正常路径继续稳定，再处理 `remote_decode_response_overhead_ms` 和 RX capture/control tail。不要在 RX 状态机稳定前默认开启双缓冲或 streaming TVM。
 5. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 
 ## 交接注意事项

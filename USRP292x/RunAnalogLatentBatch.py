@@ -1693,6 +1693,7 @@ def try_remote_dir_decode_soft_completion(
         return None
     return {
         "status": "ok",
+        "soft_completed": True,
         "summary_json": remote_summary,
         "sync_metric": summary.get("sync_metric"),
         "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
@@ -2420,6 +2421,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     tx_wall_sec = 0.0
     make_wall_sec = 0.0
     decode_wall_sec = 0.0
+    remote_decode_soft_completed = False
     rx_server_snapshot: dict[str, Any] = {}
     rx_capture_control = None
     rx_needs_failure_stop = False
@@ -2726,6 +2728,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         worker_response = json.loads(str(worker_proc.stdout or "{}"))
                     except json.JSONDecodeError:
                         worker_response = {}
+                    remote_decode_soft_completed = bool(worker_response.get("soft_completed"))
                 else:
                     run_remote_command(
                         remote_target,
@@ -2871,6 +2874,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "rx_wait_timeout_sec": wait_timeout,
             "rx_pull_wall_sec": rx_pull_wall_sec,
             "decode_wall_sec": decode_wall_sec,
+            "remote_decode_soft_completed": remote_decode_soft_completed,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": retry_wait_wall_sec,
@@ -3447,6 +3451,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "rx_wait_timeout_sec": float(ctx.get("rx_wait_timeout_sec") or 0.0),
             "rx_pull_wall_sec": float(ctx["rx_pull_wall_sec"]),
             "decode_wall_sec": decode_wall_sec,
+            "remote_decode_soft_completed": bool(worker_response.get("soft_completed")) if isinstance(worker_response, dict) else False,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
             "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,

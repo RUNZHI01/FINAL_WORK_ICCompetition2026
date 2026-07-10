@@ -98,6 +98,7 @@ tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usr
 - WAIT 成功后如果 decode/no-sync 失败，runner 会发送 `STOP` 并 drain RX server，再进入 ARQ retry，避免下一次 attempt 继承不确定的 RX 状态。
 - `stop_rx_capture()` 的客户端 timeout 已覆盖 RX drain budget，避免 profile 配置 `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0` 时被旧的 5s cap 提前切断。
 - WAIT timeout cleanup 会在 direct STOP 前关闭当前 RX control session，避免同一个服务端控制会话阻塞新 STOP 连接。
+- remote-dir soft completion 命中时会记录 `remote_decode_soft_completed=true`，便于后续 A/B 区分正常 stdout response 和文件探测接管。
 
 ## 已知卡点
 
