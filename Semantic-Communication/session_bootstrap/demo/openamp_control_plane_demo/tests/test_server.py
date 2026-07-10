@@ -4609,6 +4609,7 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_MIN_SYNC_METRIC": "0.25",
                     "ANALOG_ROBUST_SYNC": "1",
                     "ANALOG_PIPELINE_DEPTH": "2",
+                    "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "1",
                 },
                 source_summary="test",
             )
@@ -4638,6 +4639,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertNotIn("--no-robust-sync", command)
         self.assertIn("--pipeline-depth", command)
         self.assertEqual(command[command.index("--pipeline-depth") + 1], "2")
+        self.assertIn("--pipeline-rf-decode-overlap", command)
 
     def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
         class FakeThread:

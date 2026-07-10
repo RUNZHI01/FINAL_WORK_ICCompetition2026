@@ -3062,6 +3062,7 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
         remote_decoded_output_dir="/home/user/cockpit_usrp_rx/pipeline-depth-2_rx",
         remote_cleanup_mode="skip",
         pipeline_depth=2,
+        pipeline_rf_decode_overlap=True,
         max_arq_rounds=0,
         stop_on_fail=False,
         in_process_local_codec=True,
@@ -3178,6 +3179,150 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
     assert summary["passed_count"] == 2
     assert events.index("capture_0001") < events.index("decode_done_0")
     assert [image["round_records"][0]["pipeline_slot"] for image in summary["images"]] == [0, 1]
+
+
+def test_batch_runner_pipeline_depth_two_guards_capture_from_decode_by_default(tmp_path, monkeypatch):
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    for idx in range(2):
+        (input_dir / f"case{idx}.bin").write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=input_dir,
+        pattern="*.bin",
+        count=2,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="pipeline-depth-2-guarded",
+        dry_run=False,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/pipeline-depth-2-guarded_rx",
+        remote_cleanup_mode="skip",
+        pipeline_depth=2,
+        pipeline_rf_decode_overlap=False,
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        sps=2,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="192.168.10.22",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        rx_post_quantize=False,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    events: list[str] = []
+    decode_started = threading.Event()
+    second_capture_seen = threading.Event()
+
+    class FakeMaster:
+        def terminate(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    class FakeWorker:
+        startup_wall_sec = 0.01
+        ready_response = {"status": "ready"}
+
+        def decode(self, request, log_path, *, timeout):
+            del timeout
+            out_name = str(request["out_npz"]).rsplit("/", 1)[-1]
+            image_index = int(out_name.split(".", 1)[0])
+            events.append(f"decode_start_{image_index}")
+            if image_index == 0:
+                decode_started.set()
+                assert not second_capture_seen.wait(timeout=0.05), "second capture overlapped guarded decode"
+            events.append(f"decode_done_{image_index}")
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "detected_airtime_ms": 9.58,
+                    },
+                }),
+                stderr="",
+            )
+
+        def close(self):
+            return None
+
+    def fake_worker_start(target, start_args, log_path, *, control_socket=None):
+        return FakeWorker()
+
+    def fake_make(_args, image, tx_sc16, manifest_path, _log_path):
+        if image.index == 1:
+            assert decode_started.wait(timeout=1.0), "first decode did not start before second make"
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {
+            "capture_nsamps": 67888,
+            "tx_waveform_samples": 47888,
+            "job_id": f"case-{image.index}",
+        }
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        if line.startswith("CAPTURE"):
+            image_token = "image_0001" if "image_0001" in line else "image_0000"
+            events.append(f"capture_{image_token[-4:]}")
+            if image_token == "image_0001":
+                second_capture_seen.set()
+        return f"OK {line}"
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: FakeMaster())
+    monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
+    monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "pipeline-depth-2-guarded" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert summary["pipeline_enabled"] is True
+    assert summary["pipeline_depth"] == 2
+    assert summary["pipeline_rf_decode_overlap"] is False
+    assert summary["max_inflight"] == 2
+    assert summary["passed_count"] == 2
+    assert events.index("decode_done_0") < events.index("capture_0001")
 
 
 def test_remote_decode_pipeline_retries_capture_exception_in_same_slot(tmp_path, monkeypatch):

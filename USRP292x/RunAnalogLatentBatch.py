@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import traceback
+from contextlib import nullcontext
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -242,6 +243,19 @@ def parse_args() -> argparse.Namespace:
         help="Number of IQ remote-decode slots to keep in flight. Depth 1 preserves serial behavior.",
     )
     parser.add_argument(
+        "--pipeline-rf-decode-overlap",
+        dest="pipeline_rf_decode_overlap",
+        action="store_true",
+        default=env_bool("ANALOG_PIPELINE_RF_DECODE_OVERLAP", False),
+        help="Allow depth>1 to overlap board decode/result publish with the next USRP RX/TX capture.",
+    )
+    parser.add_argument(
+        "--no-pipeline-rf-decode-overlap",
+        dest="pipeline_rf_decode_overlap",
+        action="store_false",
+        help="Serialize board decode/result publish against the USRP RX/TX critical section.",
+    )
+    parser.add_argument(
         "--remote-stall-snapshot",
         dest="remote_stall_snapshot",
         action="store_true",
@@ -349,6 +363,11 @@ def rx_wait_timeout_sec(args: argparse.Namespace, capture_timeout: float) -> flo
     if configured <= 0.0:
         return float(capture_timeout)
     return max(0.001, min(float(capture_timeout), configured))
+
+
+def pipeline_rf_decode_guard(args: argparse.Namespace) -> Any:
+    lock = getattr(args, "pipeline_rf_decode_lock", None)
+    return lock if lock is not None else nullcontext()
 
 
 def is_rx_wait_timeout_error(exc: Exception) -> bool:
@@ -2729,96 +2748,97 @@ def _capture_remote_decode_pipeline_attempt(
     rx_wait_control = None
     rx_session = None
     try:
-        rx_started = time.monotonic()
-        if bool(getattr(args, "preconnect_control", False)):
-            tx_send_control = preconnect_control(
-                args.tx_control_host,
-                args.tx_control_port,
-                args.tx_timeout_sec,
-            )
-        rx_arm_started = time.monotonic()
-        if bool(getattr(args, "rx_session_control", False)):
-            try:
-                rx_session = open_control_session(
-                    args.rx_control_host,
-                    args.rx_control_port,
-                    capture_timeout,
+        with pipeline_rf_decode_guard(args):
+            rx_started = time.monotonic()
+            if bool(getattr(args, "preconnect_control", False)):
+                tx_send_control = preconnect_control(
+                    args.tx_control_host,
+                    args.tx_control_port,
+                    args.tx_timeout_sec,
                 )
-            except OSError:
-                rx_session = None
-        try:
-            capture_response = run_control_maybe_session(
-                rx_session,
-                args.rx_control_host,
-                args.rx_control_port,
-                f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0",
-                image.image_dir / "rx_capture.log",
-                capture_timeout,
-            )
-            wait_for_rx_capture_armed(
-                args,
-                capture_response,
-                image.image_dir / "rx_arm_status.log",
-                capture_timeout,
-                session=rx_session,
-            )
-        except Exception as exc:
-            if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
-                stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
-            raise
-        rx_arm_wall_sec = time.monotonic() - rx_arm_started
-        if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
-            rx_wait_control = preconnect_control(
-                args.rx_control_host,
-                args.rx_control_port,
-                wait_timeout,
-            )
-        time.sleep(max(0.0, float(args.tx_delay_sec)))
-        tx_started = time.monotonic()
-        tx_control_file = translate_tx_control_file_path(
-            tx_sc16,
-            args.tx_file_path_prefix_from,
-            args.tx_file_path_prefix_to,
-        )
-        run_control_maybe_preconnected(
-            tx_send_control,
-            args.tx_control_host,
-            args.tx_control_port,
-            f"SEND file={tx_control_file}",
-            image.image_dir / "tx_send.log",
-            args.tx_timeout_sec,
-        )
-        tx_send_control = None
-        tx_wall_sec = time.monotonic() - tx_started
-        rx_wait_started = time.monotonic()
-        try:
-            if rx_session is not None:
-                run_control_maybe_session(
+            rx_arm_started = time.monotonic()
+            if bool(getattr(args, "rx_session_control", False)):
+                try:
+                    rx_session = open_control_session(
+                        args.rx_control_host,
+                        args.rx_control_port,
+                        capture_timeout,
+                    )
+                except OSError:
+                    rx_session = None
+            try:
+                capture_response = run_control_maybe_session(
                     rx_session,
                     args.rx_control_host,
                     args.rx_control_port,
-                    f"WAIT timeout={wait_timeout:.6f}",
-                    image.image_dir / "rx_wait.log",
-                    wait_timeout,
-                    allow_sent_fallback=True,
+                    f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0",
+                    image.image_dir / "rx_capture.log",
+                    capture_timeout,
                 )
-                rx_session = None
-            else:
-                run_control_maybe_preconnected(
-                    rx_wait_control,
+                wait_for_rx_capture_armed(
+                    args,
+                    capture_response,
+                    image.image_dir / "rx_arm_status.log",
+                    capture_timeout,
+                    session=rx_session,
+                )
+            except Exception as exc:
+                if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
+                    stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                raise
+            rx_arm_wall_sec = time.monotonic() - rx_arm_started
+            if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
+                rx_wait_control = preconnect_control(
                     args.rx_control_host,
                     args.rx_control_port,
-                    f"WAIT timeout={wait_timeout:.6f}",
-                    image.image_dir / "rx_wait.log",
                     wait_timeout,
                 )
-        except Exception as exc:
-            if is_rx_wait_timeout_error(exc):
-                stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
-            raise
-        rx_wait_control = None
-        rx_wait_wall_sec = time.monotonic() - rx_wait_started
-        rx_capture_wall_sec = time.monotonic() - rx_started
+            time.sleep(max(0.0, float(args.tx_delay_sec)))
+            tx_started = time.monotonic()
+            tx_control_file = translate_tx_control_file_path(
+                tx_sc16,
+                args.tx_file_path_prefix_from,
+                args.tx_file_path_prefix_to,
+            )
+            run_control_maybe_preconnected(
+                tx_send_control,
+                args.tx_control_host,
+                args.tx_control_port,
+                f"SEND file={tx_control_file}",
+                image.image_dir / "tx_send.log",
+                args.tx_timeout_sec,
+            )
+            tx_send_control = None
+            tx_wall_sec = time.monotonic() - tx_started
+            rx_wait_started = time.monotonic()
+            try:
+                if rx_session is not None:
+                    run_control_maybe_session(
+                        rx_session,
+                        args.rx_control_host,
+                        args.rx_control_port,
+                        f"WAIT timeout={wait_timeout:.6f}",
+                        image.image_dir / "rx_wait.log",
+                        wait_timeout,
+                        allow_sent_fallback=True,
+                    )
+                    rx_session = None
+                else:
+                    run_control_maybe_preconnected(
+                        rx_wait_control,
+                        args.rx_control_host,
+                        args.rx_control_port,
+                        f"WAIT timeout={wait_timeout:.6f}",
+                        image.image_dir / "rx_wait.log",
+                        wait_timeout,
+                    )
+            except Exception as exc:
+                if is_rx_wait_timeout_error(exc):
+                    stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                raise
+            rx_wait_control = None
+            rx_wait_wall_sec = time.monotonic() - rx_wait_started
+            rx_capture_wall_sec = time.monotonic() - rx_started
     finally:
         close_preconnected_control(tx_send_control)
         close_preconnected_control(rx_wait_control)
@@ -2913,24 +2933,25 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
         if remote_decode_worker is not None:
             remote_request["manifest_json"] = ctx["manifest"]
         worker_response: dict[str, Any] = {}
-        if remote_decode_worker is not None:
-            worker_proc = remote_decode_worker.decode(
-                remote_request,
-                image.image_dir / "remote_decode.log",
-                timeout=remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
-            )
-            try:
-                worker_response = json.loads(str(worker_proc.stdout or "{}"))
-            except json.JSONDecodeError:
-                worker_response = {}
-        else:
-            run_remote_command(
-                str(ctx["remote_target"]),
-                remote_argv,
-                image.image_dir / "remote_decode.log",
-                control_socket=ctx["ssh_control_socket"],
-                timeout=max(120.0, float(ctx["capture_timeout"])),
-            )
+        with pipeline_rf_decode_guard(args):
+            if remote_decode_worker is not None:
+                worker_proc = remote_decode_worker.decode(
+                    remote_request,
+                    image.image_dir / "remote_decode.log",
+                    timeout=remote_decode_request_timeout(args, float(ctx["capture_timeout"])),
+                )
+                try:
+                    worker_response = json.loads(str(worker_proc.stdout or "{}"))
+                except json.JSONDecodeError:
+                    worker_response = {}
+            else:
+                run_remote_command(
+                    str(ctx["remote_target"]),
+                    remote_argv,
+                    image.image_dir / "remote_decode.log",
+                    control_socket=ctx["ssh_control_socket"],
+                    timeout=max(120.0, float(ctx["capture_timeout"])),
+                )
 
         publish_started = time.monotonic()
         response_summary = worker_response.get("summary") if isinstance(worker_response, dict) else None
@@ -3109,6 +3130,11 @@ def _process_images_remote_decode_pipeline(
 ) -> tuple[list[ImageRecord], dict[str, Any]]:
     depth = max(1, int(pipeline_depth))
     max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
+    pipeline_rf_decode_overlap = bool(getattr(args, "pipeline_rf_decode_overlap", False))
+    if depth > 1 and not pipeline_rf_decode_overlap:
+        setattr(args, "pipeline_rf_decode_lock", threading.Lock())
+    else:
+        setattr(args, "pipeline_rf_decode_lock", None)
     available_slots = list(range(depth))
     ready_contexts: list[dict[str, Any]] = []
     completed: list[ImageRecord] = []
@@ -3257,6 +3283,7 @@ def _process_images_remote_decode_pipeline(
     completed.sort(key=lambda item: item.index)
     return completed, {
         "pipeline_depth": depth,
+        "pipeline_rf_decode_overlap": pipeline_rf_decode_overlap,
         "max_inflight": max_inflight,
         "slot_wait_wall_sec": slot_wait_wall_sec,
     }
@@ -3406,6 +3433,7 @@ def main() -> int:
     pipeline_stats: dict[str, Any] = {
         "pipeline_depth": configured_pipeline_depth,
         "pipeline_enabled": False,
+        "pipeline_rf_decode_overlap": bool(getattr(args, "pipeline_rf_decode_overlap", False)),
         "max_inflight": 0,
         "slot_wait_wall_sec": 0.0,
     }
@@ -3536,6 +3564,7 @@ def main() -> int:
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
         "pipeline_depth": int(pipeline_stats.get("pipeline_depth") or configured_pipeline_depth),
         "pipeline_enabled": bool(pipeline_stats.get("pipeline_enabled")),
+        "pipeline_rf_decode_overlap": bool(pipeline_stats.get("pipeline_rf_decode_overlap")),
         "max_inflight": int(pipeline_stats.get("max_inflight") or 0),
         "slot_wait_ms": round(float(pipeline_stats.get("slot_wait_wall_sec") or 0.0) * 1000.0, 3),
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),

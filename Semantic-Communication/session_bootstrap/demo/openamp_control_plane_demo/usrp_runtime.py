@@ -129,6 +129,7 @@ ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FALLBACK_SYNC_SEARCH_
 ANALOG_RETRY_ON_BURST_MISS_KEYS = ("ANALOG_RETRY_ON_BURST_MISS",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
+ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
 ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
@@ -2659,6 +2660,13 @@ class UsrpBatchSpoolJob:
         pipeline_depth = _first_value(env_values, ANALOG_PIPELINE_DEPTH_KEYS)
         if pipeline_depth:
             args.extend(["--pipeline-depth", str(max(1, _parse_int(pipeline_depth, 1)))])
+        pipeline_rf_decode_overlap = _first_value(env_values, ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS)
+        if pipeline_rf_decode_overlap:
+            args.append(
+                "--pipeline-rf-decode-overlap"
+                if _parse_bool(pipeline_rf_decode_overlap, False)
+                else "--no-pipeline-rf-decode-overlap"
+            )
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
         if scramble_key:
