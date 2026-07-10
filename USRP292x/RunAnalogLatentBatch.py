@@ -353,10 +353,15 @@ def rx_wait_timeout_sec(args: argparse.Namespace, capture_timeout: float) -> flo
 
 def is_rx_wait_timeout_error(exc: Exception) -> bool:
     text = str(exc)
-    return "WAIT timeout=" in text and ("ERR_TIMEOUT" in text or "timed out" in text)
+    return "WAIT timeout=" in text and ("ERR_TIMEOUT" in text or "timed out" in text or "ERR busy=" in text)
 
 
-def stop_rx_capture_after_wait_timeout(args: argparse.Namespace, log_path: Path) -> None:
+def is_rx_capture_busy_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "CAPTURE " in text and ("capture_already_running" in text or "ERR busy=" in text)
+
+
+def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> None:
     timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
     try:
         run_control(
@@ -369,7 +374,7 @@ def stop_rx_capture_after_wait_timeout(args: argparse.Namespace, log_path: Path)
     except Exception as exc:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         previous = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
-        log_path.write_text(f"{previous}STOP failed after WAIT timeout: {exc}\n", encoding="utf-8")
+        log_path.write_text(f"{previous}STOP failed after RX busy/timeout: {exc}\n", encoding="utf-8")
 
 
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
@@ -2171,14 +2176,19 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         )
                     except OSError:
                         rx_session = None
-                run_control_maybe_session(
-                    rx_session,
-                    args.rx_control_host,
-                    args.rx_control_port,
-                    f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration={capture_duration:.6f} nsamps=0",
-                    image.image_dir / "rx_capture.log",
-                    capture_timeout,
-                )
+                try:
+                    run_control_maybe_session(
+                        rx_session,
+                        args.rx_control_host,
+                        args.rx_control_port,
+                        f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration={capture_duration:.6f} nsamps=0",
+                        image.image_dir / "rx_capture.log",
+                        capture_timeout,
+                    )
+                except Exception as exc:
+                    if is_rx_capture_busy_error(exc):
+                        stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                    raise
                 rx_arm_wall_sec = time.monotonic() - rx_arm_started
                 if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
                     rx_wait_control = preconnect_control(
@@ -2228,7 +2238,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                         )
                 except Exception as exc:
                     if is_rx_wait_timeout_error(exc):
-                        stop_rx_capture_after_wait_timeout(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                        stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
                     raise
                 rx_wait_control = None
                 rx_wait_wall_sec = time.monotonic() - rx_wait_started
@@ -2638,14 +2648,19 @@ def _capture_remote_decode_pipeline_attempt(
                 )
             except OSError:
                 rx_session = None
-        run_control_maybe_session(
-            rx_session,
-            args.rx_control_host,
-            args.rx_control_port,
-            f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0",
-            image.image_dir / "rx_capture.log",
-            capture_timeout,
-        )
+        try:
+            run_control_maybe_session(
+                rx_session,
+                args.rx_control_host,
+                args.rx_control_port,
+                f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0",
+                image.image_dir / "rx_capture.log",
+                capture_timeout,
+            )
+        except Exception as exc:
+            if is_rx_capture_busy_error(exc):
+                stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+            raise
         rx_arm_wall_sec = time.monotonic() - rx_arm_started
         if bool(getattr(args, "preconnect_control", False)) and rx_session is None:
             rx_wait_control = preconnect_control(
@@ -2694,7 +2709,7 @@ def _capture_remote_decode_pipeline_attempt(
                 )
         except Exception as exc:
             if is_rx_wait_timeout_error(exc):
-                stop_rx_capture_after_wait_timeout(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
             raise
         rx_wait_control = None
         rx_wait_wall_sec = time.monotonic() - rx_wait_started

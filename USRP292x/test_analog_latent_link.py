@@ -1488,7 +1488,17 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
     assert wait_timeout == 0.5
 
 
-def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "wait_error",
+    [
+        "control command failed: WAIT timeout=0.500000\nERR_TIMEOUT host=127.0.0.1 port=29220",
+        (
+            "control command failed: WAIT timeout=0.500000\n"
+            "ERR busy=1 started=0 done=0 ok=1 job_id=3099 file=/tmp/image_0218/batch_rx.sc16"
+        ),
+    ],
+)
+def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch, wait_error):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
@@ -1520,7 +1530,7 @@ def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch):
     def fake_run_control(_host, _port, line, _log_path, _timeout):
         control_lines.append(line)
         if line.startswith("WAIT "):
-            raise RuntimeError("control command failed: WAIT timeout=0.500000\nERR_TIMEOUT host=127.0.0.1 port=29220")
+            raise RuntimeError(wait_error)
         return "OK"
 
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
@@ -1531,6 +1541,64 @@ def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch):
     assert result.passed is False
     assert any(line == "STOP" for line in control_lines)
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+
+
+def test_pipeline_capture_attempt_stops_rx_after_capture_busy(tmp_path, monkeypatch):
+    image = analog_batch.ImageRecord(index=218, input_path=tmp_path / "case218.bin", image_dir=tmp_path / "image_0218")
+    image.input_path.write_bytes(b"payload")
+    args = Namespace(
+        remote_rx_ssh_target="user@board",
+        ssh_control_socket="",
+        in_process_local_codec=True,
+        remote_cleanup_mode="skip",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/test_rx",
+        remote_decode_worker=object(),
+        run_id="capture-busy",
+        remote_rx_run_root="/tmp/usrp292x_remote_runs",
+        tx_delay_sec=0.0,
+        rate=5_000_000.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        preconnect_control=False,
+        rx_session_control=False,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        tx_timeout_sec=30.0,
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 67888, "job_id": "case218"}), encoding="utf-8")
+        return {"capture_nsamps": 67888, "job_id": "case218"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line.startswith("CAPTURE "):
+            raise RuntimeError("control command failed: CAPTURE file=/tmp/image_0218/batch_rx.sc16\nERR error=capture_already_running")
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    with pytest.raises(RuntimeError, match="capture_already_running"):
+        analog_batch._capture_remote_decode_pipeline_attempt(
+            args,
+            image,
+            attempt_index=0,
+            max_attempts=3,
+            slot_index=0,
+            pipeline_depth=2,
+        )
+
+    assert any(line == "STOP" for line in control_lines)
+    assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("CAPTURE "))
 
 
 def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
