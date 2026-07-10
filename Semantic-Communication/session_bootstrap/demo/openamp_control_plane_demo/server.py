@@ -9567,6 +9567,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT", ""),
         ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC", ""),
         ("ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC", ""),
+        ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS", ""),
+        ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK", ""),
         ("ANALOG_SCRAMBLE_KEY", ""),
         ("ANALOG_SCRAMBLE_KEY_HEX", ""),
         ("ANALOG_SCRAMBLE_CONTEXT", ""),

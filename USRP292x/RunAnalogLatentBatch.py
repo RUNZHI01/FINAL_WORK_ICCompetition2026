@@ -1664,6 +1664,39 @@ def build_remote_run_dir(args: argparse.Namespace, image: ImageRecord) -> str:
     return f"{root}/{args.run_id}/image_{image.index:04d}"
 
 
+def precreate_remote_capture_dirs(
+    args: argparse.Namespace,
+    images: list[ImageRecord],
+    target: str,
+    run_dir: Path,
+    *,
+    control_socket: str | None = None,
+) -> bool:
+    if not target or bool(getattr(args, "dry_run", False)):
+        return False
+    mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
+    if mode not in {"remote-pull", "remote-decode"}:
+        return False
+    if not env_bool("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS", True):
+        return False
+
+    remote_dirs = sorted({build_remote_run_dir(args, image) for image in images})
+    if not remote_dirs:
+        return False
+    chunk_size = max(1, env_int("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK", 80))
+    for chunk_index, start in enumerate(range(0, len(remote_dirs), chunk_size)):
+        chunk = remote_dirs[start:start + chunk_size]
+        mkdir_script = "mkdir -p -- " + " ".join(shlex.quote(path) for path in chunk)
+        run_remote_command(
+            target,
+            ["bash", "-lc", mkdir_script],
+            run_dir / f"remote_capture_dirs_{chunk_index:02d}.log",
+            control_socket=control_socket,
+            timeout=max(15.0, min(120.0, 5.0 + 0.1 * len(chunk))),
+        )
+    return True
+
+
 def remote_python_for_decode(args: argparse.Namespace) -> str:
     """Pick the Python interpreter for remote AnalogLatentLink decode.
 
@@ -4198,6 +4231,7 @@ def main() -> int:
     rx_batch_session_control_requested = False
     rx_batch_session_control_active = False
     rx_batch_session_control_unavailable = False
+    remote_capture_dirs_precreated = False
     rx_batch_session_max_images = max(0, int(getattr(args, "rx_batch_session_max_images", 0) or 0))
     rx_batch_session_images_since_open = 0
     remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
@@ -4224,6 +4258,18 @@ def main() -> int:
                     run_dir / "remote_decode_worker.log",
                     control_socket=shared_ssh_control_socket,
                 )
+        if (
+            remote_mode in {"remote-pull", "remote-decode"}
+            and not bool(getattr(args, "dry_run", False))
+            and remote_target
+        ):
+            remote_capture_dirs_precreated = precreate_remote_capture_dirs(
+                args,
+                images,
+                remote_target,
+                run_dir,
+                control_socket=shared_ssh_control_socket,
+            )
         setattr(args, "remote_decode_worker", remote_decode_worker)
         setattr(args, "ssh_control_socket", shared_ssh_control_socket or "")
         remote_decode_result_mode = str(
@@ -4376,6 +4422,7 @@ def main() -> int:
         "remote_decode_request_timeout_sec": float(getattr(args, "remote_decode_request_timeout_sec", 0.0) or 0.0),
         "remote_decode_soft_complete_sec": remote_decode_soft_complete_sec(args),
         "remote_decode_restart_on_timeout": bool(getattr(args, "remote_decode_restart_on_timeout", False)),
+        "remote_capture_dirs_precreated": bool(remote_capture_dirs_precreated),
         "remote_decoded_output_dir": remote_decoded_dirs[0] if len(remote_decoded_dirs) == 1 else "",
         "remote_decoded_output_dirs": remote_decoded_dirs,
         "remote_received_latent_npz_files": remote_received_npz_files,

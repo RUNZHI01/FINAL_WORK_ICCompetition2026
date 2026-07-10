@@ -4687,6 +4687,16 @@ def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monk
     monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
     monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(
+        analog_batch,
+        "run_remote_command",
+        lambda _target, remote_argv, _log_path, **_kwargs: subprocess.CompletedProcess(
+            args=remote_argv,
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
     monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
 
     assert analog_batch.main() == 0
@@ -4698,6 +4708,110 @@ def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monk
     assert master_starts == ["user@board"]
     assert worker_control_sockets == ["shared-socket"]
     assert len(master_terminated) == 1
+
+
+def test_batch_runner_remote_decode_precreates_capture_dirs_before_first_capture(tmp_path, monkeypatch):
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    for idx in range(2):
+        (input_dir / f"case{idx}.bin").write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=input_dir,
+        pattern="*.bin",
+        count=2,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="precreate-remote-dirs",
+        dry_run=False,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/precreate-remote-dirs_rx",
+        remote_cleanup_mode="skip",
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        sps=2,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        rx_post_quantize=False,
+        robust_sync=False,
+        sync_profile="fast-first",
+        sync_candidates=12,
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        min_sync_metric=0.05,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=False,
+        low_sync_retry_threshold=0.08,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        channel_mode="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    events: list[str] = []
+    mkdir_commands: list[list[str]] = []
+
+    def fake_run_remote_command(target, remote_argv, log_path, *, control_socket=None, timeout=120.0):
+        events.append("mkdir")
+        mkdir_commands.append(remote_argv)
+        log_path.write_text("", encoding="utf-8")
+        return subprocess.CompletedProcess(args=remote_argv, returncode=0, stdout="", stderr="")
+
+    def fake_process_image(_args, image):
+        events.append(f"process_{image.index}")
+        image.status = 0
+        image.passed = True
+        image.records.append({
+            "total_wall_sec": 0.1,
+            "rx_capture_wall_sec": 0.02,
+            "decode_wall_sec": 0.03,
+            "detected_airtime_ms": 9.58,
+        })
+        return image
+
+    monkeypatch.setenv("ANALOG_REMOTE_DECODE_WORKER", "0")
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+
+    assert analog_batch.main() == 0
+
+    assert events[:3] == ["mkdir", "process_0", "process_1"]
+    assert mkdir_commands
+    mkdir_script = mkdir_commands[0][2]
+    assert "mkdir -p --" in mkdir_script
+    assert "/tmp/analog_runs/precreate-remote-dirs/image_0000" in mkdir_script
+    assert "/tmp/analog_runs/precreate-remote-dirs/image_0001" in mkdir_script
 
 
 def test_batch_runner_can_share_rx_control_session_across_sequential_images(tmp_path, monkeypatch):
@@ -4999,6 +5113,16 @@ def test_batch_runner_does_not_retry_failed_ssh_control_master_per_image(tmp_pat
     monkeypatch.setattr(analog_batch, "_ssh_start_control_master", fake_start_master)
     monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(
+        analog_batch,
+        "run_remote_command",
+        lambda _target, remote_argv, _log_path, **_kwargs: subprocess.CompletedProcess(
+            args=remote_argv,
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
     monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
 
     assert analog_batch.main() == 0
@@ -5136,6 +5260,16 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
     monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
     monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(
+        analog_batch,
+        "run_remote_command",
+        lambda _target, remote_argv, _log_path, **_kwargs: subprocess.CompletedProcess(
+            args=remote_argv,
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
     monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     assert analog_batch.main() == 0
@@ -5280,6 +5414,16 @@ def test_batch_runner_pipeline_depth_two_guards_capture_from_decode_by_default(t
     monkeypatch.setattr(analog_batch, "_ssh_control_socket_path", lambda: "shared-socket")
     monkeypatch.setattr(analog_batch.RemoteAnalogDecodeWorker, "start", staticmethod(fake_worker_start))
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(
+        analog_batch,
+        "run_remote_command",
+        lambda _target, remote_argv, _log_path, **_kwargs: subprocess.CompletedProcess(
+            args=remote_argv,
+            returncode=0,
+            stdout="",
+            stderr="",
+        ),
+    )
     monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     assert analog_batch.main() == 0

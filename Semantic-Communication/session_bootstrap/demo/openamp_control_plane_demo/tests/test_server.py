@@ -3849,6 +3849,8 @@ class ServerMainTest(unittest.TestCase):
                 "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "1",
                 "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "0.14",
                 "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 2",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "1",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK": "64",
                 "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL": "1",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
@@ -3882,6 +3884,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.14")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_WORKER_PREFIX"], "taskset -c 2")
+        self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
+        self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK"], "64")
         self.assertEqual(overrides["ANALOG_PRECONNECT_RX_CAPTURE_CONTROL"], "1")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
