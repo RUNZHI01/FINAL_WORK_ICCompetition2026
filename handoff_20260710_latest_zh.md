@@ -16,6 +16,10 @@
 
 bounded RX batch session 已做成 opt-in，不进默认 profile。`ANALOG_RX_BATCH_SESSION_CONTROL=1` 加 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` 的复测 `batch-1783696822-50` 为 `50/50`、fallback `0`；TVM median/p95/max `241.94/246.45/275.62 ms`，IQ median/p95/max `154.18/326.68/333.40 ms`。这证明分窗口复用能把 median 压低，但 50 张 p95 仍高于 TVM，且尚未通过 300 张 gate。默认继续保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0`。
 
+当前最强组合候选是 bounded RX batch session 加 response-only-summary，但还不是最终目标。50 张 `batch-1783697847-50` 为 `50/50`、fallback `0`，TVM median/p95/max `239.25/243.52/257.93 ms`，IQ `153.55/237.32/286.80 ms`，首次让 50 张 IQ p95 低于 TVM p95。300 张 `batch-1783697942-300` 为 `300/300`、fallback `0`，TVM `239.99/243.44/296.38 ms`，IQ `153.37/269.84/8378.85 ms`，stage records `303`，wall `75.06 s`。这比 no-batch 300 张 p95 `301.74 ms` 和 batch-session-only p95 `321.68 ms` 都好，但 p95 仍高于 TVM，max 还有重试/worker 响应长尾。
+
+`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.14` 不推荐。带 output-only soft completion 的 50 张 `batch-1783698593-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95/max 恶化到 `169.39/365.51/2122.73 ms`，`soft_count=0`。日志显示 outlier 发生时 NPZ 在 soft timeout 时尚未可见，问题更像 worker 请求排队/调度延迟，而不是“文件已写好但 stdout 晚到”。
+
 Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm、RX 连接、CAPTURE 命令、RX capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。
 
 ## 当前代码和提交
@@ -29,6 +33,8 @@ Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ 
 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 已实现为 opt-in。50 张效果很好，`batch-1783690852-50` 的 IQ median/p95/max 是 `155.30/217.47/583.30 ms`；但 300 张 `batch-1783690925-300` 的 IQ median/p95/max 是 `162.20/321.68/6828.85 ms`，p95 高于 TVM，也高于 no-batch A/B。因此默认仍保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0`。
 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES` 是新加的诊断参数，只在 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 时生效。`0` 表示整批共用同一个 RX session；大于 `0` 表示每 N 张关闭并重开一次共享 RX session。`batch-1783696822-50` 用 `16` 张窗口把 IQ median 降到 `154.18 ms`，但 p95 仍是 `326.68 ms`，所以它是后续 300 张 A/B 候选，不是默认 profile。
+
+`ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` 是当前最佳候选组合。300 张 `batch-1783697942-300` 证明它 all-pass，并把 IQ p95 推到 `269.84 ms`，但仍没有达到 p95 远低于 TVM 的最终目标。可以把它作为下一轮优化基线，但不要打开 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC`。
 
 `PERSISTENT_RX_TX_DELAY=0.005` 已拒绝。50 张 `batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。继续保持 `PERSISTENT_RX_TX_DELAY=0`。
 
@@ -54,6 +60,7 @@ WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，�
 - `ANALOG_RX_BATCH_SESSION_CONTROL=1`：50 张很好，但 300 张 `batch-1783690925-300` p95 `321.68 ms`，比 no-batch A/B 更差。
 - `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`：50 张 `batch-1783696822-50` median `154.18 ms`，但 p95 `326.68 ms`，尚未证明 300 张稳定性。
 - `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`：50 张 `batch-1783693518-50` p95 `382.82 ms`，说明 summary 文件写入不是当前主因。
+- `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.14`：50 张 `batch-1783698593-50` p95 `365.51 ms`，且没有 soft completion 命中。
 - `PERSISTENT_RX_TX_DELAY=0.005`：50 张 p95 恶化到 `306.92 ms`。
 - `ANALOG_RX_TAIL_SEC=0.04/0.045`：出现 no-sync retry 或 p95 大幅恶化，保持 `0.05`。
 - depth-2 overlap、streaming TVM overlap：会放大 RX/worker contention，不作为默认。
@@ -174,7 +181,7 @@ git diff --check
 git diff -- USRP292x\RunQpskFileBatchSpoolArq.py
 ```
 
-最近一次已完成验证：`python -m pytest USRP292x/test_analog_latent_link.py -q` 为 `101 passed in 32.20s`；`python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::ServerMainTest::test_usrp_iq_direct_runner_respects_explicit_sync_overrides -q` 为 `1 passed in 0.33s`；`python -m py_compile USRP292x\RunAnalogLatentBatch.py USRP292x\AnalogLatentLink.py Semantic-Communication\session_bootstrap\demo\openamp_control_plane_demo\usrp_runtime.py` 通过；`git diff --check` 通过；`git diff -- USRP292x\RunQpskFileBatchSpoolArq.py` 为空。完整 `test_server.py` 单文件曾在 `120 s` 内未跑完，不能视作完整通过。
+最近一次已完成验证：`python -m pytest USRP292x/test_analog_latent_link.py -q` 为 `104 passed in 31.59s`；`python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::ServerMainTest::test_usrp_iq_direct_runner_respects_explicit_sync_overrides -q` 为 `1 passed in 0.37s`；`python -m py_compile USRP292x\RunAnalogLatentBatch.py USRP292x\AnalogLatentLink.py Semantic-Communication\session_bootstrap\demo\openamp_control_plane_demo\usrp_runtime.py` 通过；`git diff --check` 通过；`git diff -- USRP292x\RunQpskFileBatchSpoolArq.py` 为空。完整 `test_server.py` 单文件曾在 `120 s` 内未跑完，不能视作完整通过。
 
 ## 重要文件
 

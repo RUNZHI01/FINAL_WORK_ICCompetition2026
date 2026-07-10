@@ -1731,7 +1731,13 @@ DECODE_WORKER_MINIMAL_SUMMARY_KEYS = (
 )
 
 
-def decode_worker_response(summary: dict[str, Any], summary_json: str, *, mode: str = "full") -> dict[str, Any]:
+def decode_worker_response(
+    summary: dict[str, Any],
+    summary_json: str,
+    *,
+    mode: str = "full",
+    request_id: str = "",
+) -> dict[str, Any]:
     response_mode = str(mode or "full").strip().lower()
     response_summary = summary
     if response_mode in {"minimal", "compact"}:
@@ -1740,13 +1746,16 @@ def decode_worker_response(summary: dict[str, Any], summary_json: str, *, mode: 
             for key in DECODE_WORKER_MINIMAL_SUMMARY_KEYS
             if key in summary
         }
-    return {
+    response = {
         "status": "ok",
         "summary_json": summary_json,
         "sync_metric": summary.get("sync_metric"),
         "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
         "summary": response_summary,
     }
+    if request_id:
+        response["request_id"] = request_id
+    return response
 
 
 def run_decode_server() -> int:
@@ -1780,7 +1789,12 @@ def run_decode_server() -> int:
             args = decode_namespace_from_request(request)
             summary = decode_waveform(args)
             print(json.dumps(
-                decode_worker_response(summary, args.summary_json, mode=str(request.get("response_mode") or "full")),
+                decode_worker_response(
+                    summary,
+                    args.summary_json,
+                    mode=str(request.get("response_mode") or "full"),
+                    request_id=str(request.get("request_id") or ""),
+                ),
                 ensure_ascii=False,
             ), flush=True)
         except Exception as exc:

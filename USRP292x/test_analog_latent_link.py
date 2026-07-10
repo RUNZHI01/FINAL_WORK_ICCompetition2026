@@ -494,6 +494,57 @@ def test_remote_decode_worker_ignores_stale_response_for_previous_request(tmp_pa
     assert writes
 
 
+def test_remote_analog_decode_request_includes_request_id_without_summary_json():
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        dry_run=False,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_decode_response_mode="minimal",
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=False,
+        low_sync_retry_threshold=0.08,
+        max_arq_rounds=2,
+        current_decode_attempt_index=0,
+        current_decode_max_attempts=3,
+    )
+
+    request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/image_0000/batch_rx.sc16",
+        "/tmp/run/image_0000/manifest.json",
+        "/home/user/cockpit_usrp_rx/run_rx/00000000.npz",
+        "",
+        "",
+    )
+
+    assert request["summary_json"] == ""
+    assert request["request_id"]
+
+
+def test_decode_worker_response_echoes_request_id():
+    response = analog.decode_worker_response(
+        {"status": "ok", "sync_success": True},
+        "",
+        mode="minimal",
+        request_id="decode-1",
+    )
+
+    assert response["request_id"] == "decode-1"
+    assert response["summary_json"] == ""
+
+
 def test_remote_decode_worker_uses_soft_completion_when_response_lags(tmp_path):
     writes: list[str] = []
     soft_completion_calls = 0
@@ -591,6 +642,46 @@ def test_remote_dir_soft_completion_returns_worker_shaped_response(tmp_path, mon
     assert commands
     assert "test -s /remote/out/00000001.npz" in commands[0][-1]
     assert "cat /remote/run/decode_summary.json" in commands[0][-1]
+
+
+def test_remote_dir_soft_completion_can_use_output_only_for_summaryless_request(tmp_path, monkeypatch):
+    commands: list[list[str]] = []
+
+    def fake_ssh_base_args(*, timeout=10, control_socket=None):
+        return ["ssh", "-T"]
+
+    def fake_run(cmd, **kwargs):
+        commands.append(list(cmd))
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout=b"",
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(analog_batch, "_ssh_base_args", fake_ssh_base_args)
+    monkeypatch.setattr(analog_batch.subprocess, "run", fake_run)
+
+    response = analog_batch.try_remote_dir_decode_soft_completion(
+        "user@board",
+        "/remote/out/00000001.npz",
+        "",
+        tmp_path / "soft_completion.log",
+        control_socket=None,
+        timeout=2.0,
+        request_id="decode-1",
+    )
+
+    assert response is not None
+    assert response["status"] == "ok"
+    assert response["soft_completed"] is True
+    assert response["request_id"] == "decode-1"
+    assert response["summary_json"] == ""
+    assert response["summary"]["status"] == "ok"
+    assert response["summary"]["frame_complete"] is True
+    assert commands
+    assert "test -s /remote/out/00000001.npz" in commands[0][-1]
+    assert "cat " not in commands[0][-1]
 
 
 def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, monkeypatch):

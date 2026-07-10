@@ -1736,14 +1736,18 @@ def try_remote_dir_decode_soft_completion(
     *,
     control_socket: str | None = None,
     timeout: float = 3.0,
+    request_id: str = "",
 ) -> dict[str, Any] | None:
-    if not str(target or "").strip() or not str(remote_output or "").strip() or not str(remote_summary or "").strip():
+    if not str(target or "").strip() or not str(remote_output or "").strip():
         return None
     ssh_timeout = max(1, int(math.ceil(float(timeout or 1.0))))
-    remote_cmd = (
-        f"if test -s {shlex.quote(remote_output)} && test -s {shlex.quote(remote_summary)}; "
-        f"then cat {shlex.quote(remote_summary)}; else exit 3; fi"
-    )
+    if str(remote_summary or "").strip():
+        remote_cmd = (
+            f"if test -s {shlex.quote(remote_output)} && test -s {shlex.quote(remote_summary)}; "
+            f"then cat {shlex.quote(remote_summary)}; else exit 3; fi"
+        )
+    else:
+        remote_cmd = f"test -s {shlex.quote(remote_output)}"
     full = _ssh_base_args(timeout=ssh_timeout, control_socket=control_socket) + [target, remote_cmd]
     try:
         proc = subprocess.run(
@@ -1765,18 +1769,28 @@ def try_remote_dir_decode_soft_completion(
     stderr_text = (proc.stderr or b"").decode("utf-8", errors="replace")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(stderr_text if proc.returncode == 0 else (stdout_text + stderr_text), encoding="utf-8")
-    if proc.returncode != 0 or not stdout_text.strip():
+    if proc.returncode != 0:
         return None
-    try:
-        summary = json.loads(stdout_text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(summary, dict):
-        return None
+    if str(remote_summary or "").strip():
+        if not stdout_text.strip():
+            return None
+        try:
+            summary = json.loads(stdout_text)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(summary, dict):
+            return None
+    else:
+        summary = {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "out_npz": remote_output,
+        }
     status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
     if not status_ok or not bool(summary.get("frame_complete", True)):
         return None
-    return {
+    response = {
         "status": "ok",
         "soft_completed": True,
         "summary_json": remote_summary,
@@ -1784,6 +1798,9 @@ def try_remote_dir_decode_soft_completion(
         "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
         "summary": summary,
     }
+    if request_id:
+        response["request_id"] = request_id
+    return response
 
 
 class RemoteAnalogDecodeWorker:
@@ -2265,6 +2282,7 @@ def remote_analog_decode_request(
 ) -> dict[str, Any]:
     request: dict[str, Any] = {
         "cmd": "decode",
+        "request_id": f"{remote_npz}:{time.monotonic_ns()}",
         "rx_sc16": remote_batch_rx,
         "manifest": remote_manifest,
         "out_npz": remote_npz,
@@ -2834,13 +2852,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     if (
                         remote_decode_result_mode == "remote-dir"
                         and soft_complete_sec > 0.0
-                        and bool(remote_request.get("summary_json"))
                     ):
                         decode_kwargs["soft_timeout"] = soft_complete_sec
                         decode_kwargs["soft_completion"] = (
                             lambda target=remote_target,
                             output=remote_npz,
                             summary=str(remote_request.get("summary_json") or remote_summary),
+                            request_id=str(remote_request.get("request_id") or ""),
                             log=image.image_dir / "remote_decode_soft_completion.log",
                             control=ssh_control_socket: try_remote_dir_decode_soft_completion(
                                 target,
@@ -2848,6 +2866,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                                 summary,
                                 log,
                                 control_socket=control,
+                                request_id=request_id,
                             )
                         )
                     worker_proc = remote_decode_worker.decode(
@@ -3489,13 +3508,13 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 if (
                     remote_decode_result_mode == "remote-dir"
                     and soft_complete_sec > 0.0
-                    and bool(remote_request.get("summary_json"))
                 ):
                     decode_kwargs["soft_timeout"] = soft_complete_sec
                     decode_kwargs["soft_completion"] = (
                         lambda target=str(ctx["remote_target"]),
                         output=remote_npz,
                         summary=str(remote_request.get("summary_json") or remote_summary),
+                        request_id=str(remote_request.get("request_id") or ""),
                         log=image.image_dir / "remote_decode_soft_completion.log",
                         control=ctx["ssh_control_socket"]: try_remote_dir_decode_soft_completion(
                             target,
@@ -3503,6 +3522,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                             summary,
                             log,
                             control_socket=control,
+                            request_id=request_id,
                         )
                     )
                 worker_proc = remote_decode_worker.decode(
