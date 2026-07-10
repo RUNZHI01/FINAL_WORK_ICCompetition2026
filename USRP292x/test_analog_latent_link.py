@@ -1473,7 +1473,7 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
         tx_control_host="127.0.0.1",
         tx_control_port=29221,
     )
-    control_lines: list[str] = []
+    control_calls: list[tuple[str, float]] = []
 
     def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
         tx_sc16.write_bytes(b"\0" * 128)
@@ -1486,7 +1486,7 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
         return 0
 
     def fake_run_control(_host, _port, line, _log_path, _timeout):
-        control_lines.append(line)
+        control_calls.append((line, float(_timeout)))
         return "OK"
 
     monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
@@ -1495,9 +1495,12 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
 
     analog_batch.process_image(args, image)
 
+    control_lines = [line for line, _timeout in control_calls]
     wait_line = next(line for line in control_lines if line.startswith("WAIT timeout="))
     wait_timeout = float(wait_line.split("=", 1)[1])
     assert wait_timeout == 0.5
+    wait_call_timeout = next(timeout for line, timeout in control_calls if line.startswith("WAIT timeout="))
+    assert wait_call_timeout == 1.5
 
 
 @pytest.mark.parametrize(

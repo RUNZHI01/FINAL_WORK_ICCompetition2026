@@ -365,6 +365,11 @@ def rx_wait_timeout_sec(args: argparse.Namespace, capture_timeout: float) -> flo
     return max(0.001, min(float(capture_timeout), configured))
 
 
+def rx_wait_control_timeout_sec(args: argparse.Namespace, wait_timeout: float, capture_timeout: float) -> float:
+    margin = max(0.0, env_float("ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC", 1.0))
+    return max(float(wait_timeout), min(float(capture_timeout), float(wait_timeout) + margin))
+
+
 def pipeline_rf_decode_guard(args: argparse.Namespace) -> Any:
     lock = getattr(args, "pipeline_rf_decode_lock", None)
     return lock if lock is not None else nullcontext()
@@ -2245,6 +2250,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             )
             capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
             wait_timeout = rx_wait_timeout_sec(args, capture_timeout)
+            wait_control_timeout = rx_wait_control_timeout_sec(args, wait_timeout, capture_timeout)
 
             # Stage only what the selected RX mode consumes on the remote host.
             # remote-pull captures remotely but decodes locally, so only the
@@ -2311,7 +2317,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     rx_wait_control = preconnect_control(
                         args.rx_control_host,
                         args.rx_control_port,
-                        wait_timeout,
+                        wait_control_timeout,
                     )
                 time.sleep(max(0.0, float(args.tx_delay_sec)))
                 tx_started = time.monotonic()
@@ -2340,7 +2346,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             args.rx_control_port,
                             f"WAIT timeout={wait_timeout:.6f}",
                             image.image_dir / "rx_wait.log",
-                            wait_timeout,
+                            wait_control_timeout,
                             allow_sent_fallback=True,
                         )
                         rx_session = None
@@ -2351,7 +2357,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             args.rx_control_port,
                             f"WAIT timeout={wait_timeout:.6f}",
                             image.image_dir / "rx_wait.log",
-                            wait_timeout,
+                            wait_control_timeout,
                         )
                 except Exception as exc:
                     if is_rx_wait_timeout_error(exc):
@@ -2743,6 +2749,7 @@ def _capture_remote_decode_pipeline_attempt(
     )
     capture_timeout = max(args.rx_timeout_sec, capture_nsamps / float(args.rate) + 5.0)
     wait_timeout = rx_wait_timeout_sec(args, capture_timeout)
+    wait_control_timeout = rx_wait_control_timeout_sec(args, wait_timeout, capture_timeout)
 
     tx_send_control = None
     rx_wait_control = None
@@ -2791,7 +2798,7 @@ def _capture_remote_decode_pipeline_attempt(
                 rx_wait_control = preconnect_control(
                     args.rx_control_host,
                     args.rx_control_port,
-                    wait_timeout,
+                    wait_control_timeout,
                 )
             time.sleep(max(0.0, float(args.tx_delay_sec)))
             tx_started = time.monotonic()
@@ -2819,7 +2826,7 @@ def _capture_remote_decode_pipeline_attempt(
                         args.rx_control_port,
                         f"WAIT timeout={wait_timeout:.6f}",
                         image.image_dir / "rx_wait.log",
-                        wait_timeout,
+                        wait_control_timeout,
                         allow_sent_fallback=True,
                     )
                     rx_session = None
@@ -2830,7 +2837,7 @@ def _capture_remote_decode_pipeline_attempt(
                         args.rx_control_port,
                         f"WAIT timeout={wait_timeout:.6f}",
                         image.image_dir / "rx_wait.log",
-                        wait_timeout,
+                        wait_control_timeout,
                     )
             except Exception as exc:
                 if is_rx_wait_timeout_error(exc):
