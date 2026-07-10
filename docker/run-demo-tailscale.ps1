@@ -63,7 +63,7 @@ if (-not $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE) {
     $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE = "minimal"
 }
 if (-not $env:RX_ARM_WAIT_MS) {
-    $env:RX_ARM_WAIT_MS = "50"
+    $env:RX_ARM_WAIT_MS = "150"
 }
 if (-not $env:RX_STOP_WAIT_MS) {
     $env:RX_STOP_WAIT_MS = "8000"
