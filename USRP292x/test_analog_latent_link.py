@@ -2063,6 +2063,49 @@ def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
     assert control_lines == ["STOP", "STATUS", "STATUS"]
 
 
+def test_control_session_close_shutdowns_socket_before_close(monkeypatch):
+    events: list[tuple[str, object | None]] = []
+
+    class FakeSocket:
+        def settimeout(self, _timeout):
+            pass
+
+        def shutdown(self, how):
+            events.append(("shutdown", how))
+
+        def close(self):
+            events.append(("close", None))
+
+    monkeypatch.setattr(analog_batch.socket, "create_connection", lambda *_args, **_kwargs: FakeSocket())
+
+    session = analog_batch.ControlSession("127.0.0.1", 29220, 1.0)
+    session.close()
+
+    assert events == [("shutdown", analog_batch.socket.SHUT_RDWR), ("close", None)]
+
+
+def test_control_session_close_still_closes_when_shutdown_fails(monkeypatch):
+    events: list[str] = []
+
+    class FakeSocket:
+        def settimeout(self, _timeout):
+            pass
+
+        def shutdown(self, _how):
+            events.append("shutdown")
+            raise OSError("already closed")
+
+        def close(self):
+            events.append("close")
+
+    monkeypatch.setattr(analog_batch.socket, "create_connection", lambda *_args, **_kwargs: FakeSocket())
+
+    session = analog_batch.ControlSession("127.0.0.1", 29220, 1.0)
+    session.close()
+
+    assert events == ["shutdown", "close"]
+
+
 def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

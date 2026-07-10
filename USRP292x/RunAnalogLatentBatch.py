@@ -804,6 +804,10 @@ class PreconnectedControl:
             self._sock = None
         if sock is not None:
             try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
                 sock.close()
             except OSError:
                 pass
@@ -877,6 +881,10 @@ class ControlSession:
         sock = self.sock
         self.sock = None  # type: ignore[assignment]
         if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             try:
                 sock.close()
             except OSError:
