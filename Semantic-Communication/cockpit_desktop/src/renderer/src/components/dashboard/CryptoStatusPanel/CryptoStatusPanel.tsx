@@ -326,6 +326,8 @@ export function CryptoStatusPanel() {
         if (transportBm?.merge_ms) rows.push({ label: '文件合并', metric: transportBm.merge_ms })
         if (transportBm?.total_ms) rows.push({ label: '传输/解包总计', metric: transportBm.total_ms })
         if (iqStageBm?.rx_arm_ms) rows.push({ label: 'RX arm', metric: iqStageBm.rx_arm_ms })
+        if (iqStageBm?.rx_session_open_ms) rows.push({ label: 'RX连接', metric: iqStageBm.rx_session_open_ms })
+        if (iqStageBm?.rx_capture_command_ms) rows.push({ label: 'CAPTURE命令', metric: iqStageBm.rx_capture_command_ms })
         if (iqStageBm?.rx_capture_ms) rows.push({ label: 'RX capture', metric: iqStageBm.rx_capture_ms })
         if (iqStageBm?.rx_wait_ms) rows.push({ label: 'RX wait', metric: iqStageBm.rx_wait_ms })
         if (iqStageBm?.rx_arm_control_overhead_ms) rows.push({ label: 'RX arm控制', metric: iqStageBm.rx_arm_control_overhead_ms })

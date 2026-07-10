@@ -2960,6 +2960,8 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
         {
             "tx_wall_sec": 0.010,
             "rx_arm_wall_sec": 0.003,
+            "rx_session_open_wall_sec": 0.001,
+            "rx_capture_command_wall_sec": 0.002,
             "rx_capture_wall_sec": 0.030,
             "rx_wait_wall_sec": 0.017,
             "rx_server_arm_wait_wall_sec": 0.002,
@@ -2989,6 +2991,8 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
         {
             "tx_wall_sec": 0.020,
             "rx_arm_wall_sec": 0.005,
+            "rx_session_open_wall_sec": 0.002,
+            "rx_capture_command_wall_sec": 0.003,
             "rx_capture_wall_sec": 0.050,
             "rx_wait_wall_sec": 0.055,
             "rx_server_arm_wait_wall_sec": 0.004,
@@ -3019,6 +3023,8 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
 
     assert benchmark["tx_control_ms"]["median_ms"] == 15.0
     assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
+    assert benchmark["rx_session_open_ms"]["median_ms"] == 1.5
+    assert benchmark["rx_capture_command_ms"]["median_ms"] == 2.5
     assert benchmark["rx_capture_ms"]["p95_ms"] == 50.0
     assert benchmark["rx_wait_ms"]["median_ms"] == 36.0
     assert benchmark["rx_server_arm_wait_ms"]["median_ms"] == 3.0
@@ -3070,6 +3076,8 @@ def test_iq_stage_benchmark_skips_derived_metrics_without_complete_inputs(tmp_pa
     assert "remote_decode_ms" in benchmark
     assert "rx_capture_control_overhead_ms" not in benchmark
     assert "rx_arm_control_overhead_ms" not in benchmark
+    assert "rx_session_open_ms" not in benchmark
+    assert "rx_capture_command_ms" not in benchmark
     assert "rx_post_arm_to_wait_ms" not in benchmark
     assert "rx_wait_response_overhead_ms" not in benchmark
     assert "rx_wait_minus_server_receive_ms" not in benchmark

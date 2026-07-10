@@ -1444,6 +1444,8 @@ REMOTE_STALL_SNAPSHOT_FIELDS = (
     "total_wall_sec",
     "tx_wall_sec",
     "rx_arm_wall_sec",
+    "rx_session_open_wall_sec",
+    "rx_capture_command_wall_sec",
     "rx_capture_wall_sec",
     "rx_wait_wall_sec",
     "decode_queue_wall_sec",
@@ -2489,6 +2491,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     remote_dir_publish_wall_sec = 0.0
     retry_wait_wall_sec = 0.0
     rx_arm_wall_sec = 0.0
+    rx_session_open_wall_sec = 0.0
+    rx_capture_command_wall_sec = 0.0
     rx_capture_wall_sec = 0.0
     rx_wait_wall_sec = 0.0
     wait_timeout = 0.0
@@ -2621,6 +2625,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     rx_session_shared = rx_session is not None
                     if rx_session is None:
                         try:
+                            rx_session_open_started = time.monotonic()
                             rx_session = open_control_session(
                                 args.rx_control_host,
                                 args.rx_control_port,
@@ -2628,31 +2633,37 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             )
                         except OSError:
                             rx_session = None
+                        finally:
+                            rx_session_open_wall_sec = time.monotonic() - rx_session_open_started
                 try:
                     capture_line = f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration={capture_duration:.6f} nsamps=0"
-                    if rx_session is not None:
-                        capture_response = run_control_maybe_session(
-                            rx_session,
-                            args.rx_control_host,
-                            args.rx_control_port,
-                            capture_line,
-                            image.image_dir / "rx_capture.log",
-                            capture_timeout,
-                        )
-                        if rx_session_shared and control_session_is_closed(rx_session):
-                            clear_shared_rx_control_session(args, rx_session)
-                            rx_session = None
-                            rx_session_shared = False
-                    else:
-                        capture_response = run_control_maybe_preconnected(
-                            rx_capture_control,
-                            args.rx_control_host,
-                            args.rx_control_port,
-                            capture_line,
-                            image.image_dir / "rx_capture.log",
-                            capture_timeout,
-                        )
-                        rx_capture_control = None
+                    rx_capture_command_started = time.monotonic()
+                    try:
+                        if rx_session is not None:
+                            capture_response = run_control_maybe_session(
+                                rx_session,
+                                args.rx_control_host,
+                                args.rx_control_port,
+                                capture_line,
+                                image.image_dir / "rx_capture.log",
+                                capture_timeout,
+                            )
+                            if rx_session_shared and control_session_is_closed(rx_session):
+                                clear_shared_rx_control_session(args, rx_session)
+                                rx_session = None
+                                rx_session_shared = False
+                        else:
+                            capture_response = run_control_maybe_preconnected(
+                                rx_capture_control,
+                                args.rx_control_host,
+                                args.rx_control_port,
+                                capture_line,
+                                image.image_dir / "rx_capture.log",
+                                capture_timeout,
+                            )
+                            rx_capture_control = None
+                    finally:
+                        rx_capture_command_wall_sec = time.monotonic() - rx_capture_command_started
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
                     capture_response = wait_for_rx_capture_armed(
                         args,
@@ -2985,6 +2996,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "make_wall_sec": make_wall_sec,
             "tx_wall_sec": tx_wall_sec,
             "rx_arm_wall_sec": rx_arm_wall_sec,
+            "rx_session_open_wall_sec": rx_session_open_wall_sec,
+            "rx_capture_command_wall_sec": rx_capture_command_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
             "rx_wait_wall_sec": rx_wait_wall_sec,
             "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
@@ -3048,6 +3061,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "make_wall_sec": make_wall_sec,
             "tx_wall_sec": tx_wall_sec,
             "rx_arm_wall_sec": rx_arm_wall_sec,
+            "rx_session_open_wall_sec": rx_session_open_wall_sec,
+            "rx_capture_command_wall_sec": rx_capture_command_wall_sec,
             "rx_capture_wall_sec": rx_capture_wall_sec,
             "rx_wait_wall_sec": rx_wait_wall_sec,
             "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
@@ -3216,6 +3231,8 @@ def _capture_remote_decode_pipeline_attempt(
     rx_wait_control = None
     rx_session = None
     rx_server_snapshot: dict[str, Any] = {}
+    rx_session_open_wall_sec = 0.0
+    rx_capture_command_wall_sec = 0.0
     try:
         with pipeline_rf_decode_guard(args):
             rx_started = time.monotonic()
@@ -3228,6 +3245,7 @@ def _capture_remote_decode_pipeline_attempt(
             rx_arm_started = time.monotonic()
             if bool(getattr(args, "rx_session_control", False)):
                 try:
+                    rx_session_open_started = time.monotonic()
                     rx_session = open_control_session(
                         args.rx_control_host,
                         args.rx_control_port,
@@ -3235,27 +3253,33 @@ def _capture_remote_decode_pipeline_attempt(
                     )
                 except OSError:
                     rx_session = None
+                finally:
+                    rx_session_open_wall_sec = time.monotonic() - rx_session_open_started
             try:
                 capture_line = f"CAPTURE file={remote_batch_rx} duration={capture_duration:.6f} nsamps=0"
-                if rx_session is not None:
-                    capture_response = run_control_maybe_session(
-                        rx_session,
-                        args.rx_control_host,
-                        args.rx_control_port,
-                        capture_line,
-                        image.image_dir / "rx_capture.log",
-                        capture_timeout,
-                    )
-                else:
-                    capture_response = run_control_maybe_preconnected(
-                        rx_capture_control,
-                        args.rx_control_host,
-                        args.rx_control_port,
-                        capture_line,
-                        image.image_dir / "rx_capture.log",
-                        capture_timeout,
-                    )
-                    rx_capture_control = None
+                rx_capture_command_started = time.monotonic()
+                try:
+                    if rx_session is not None:
+                        capture_response = run_control_maybe_session(
+                            rx_session,
+                            args.rx_control_host,
+                            args.rx_control_port,
+                            capture_line,
+                            image.image_dir / "rx_capture.log",
+                            capture_timeout,
+                        )
+                    else:
+                        capture_response = run_control_maybe_preconnected(
+                            rx_capture_control,
+                            args.rx_control_host,
+                            args.rx_control_port,
+                            capture_line,
+                            image.image_dir / "rx_capture.log",
+                            capture_timeout,
+                        )
+                        rx_capture_control = None
+                finally:
+                    rx_capture_command_wall_sec = time.monotonic() - rx_capture_command_started
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
                 capture_response = wait_for_rx_capture_armed(
                     args,
@@ -3357,6 +3381,8 @@ def _capture_remote_decode_pipeline_attempt(
         "make_wall_sec": make_wall_sec,
         "tx_wall_sec": tx_wall_sec,
         "rx_arm_wall_sec": rx_arm_wall_sec,
+        "rx_session_open_wall_sec": rx_session_open_wall_sec,
+        "rx_capture_command_wall_sec": rx_capture_command_wall_sec,
         "rx_capture_wall_sec": rx_capture_wall_sec,
         "rx_wait_wall_sec": rx_wait_wall_sec,
         "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
@@ -3586,6 +3612,8 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "make_wall_sec": float(ctx["make_wall_sec"]),
             "tx_wall_sec": float(ctx["tx_wall_sec"]),
             "rx_arm_wall_sec": float(ctx["rx_arm_wall_sec"]),
+            "rx_session_open_wall_sec": float(ctx.get("rx_session_open_wall_sec") or 0.0),
+            "rx_capture_command_wall_sec": float(ctx.get("rx_capture_command_wall_sec") or 0.0),
             "rx_capture_wall_sec": float(ctx["rx_capture_wall_sec"]),
             "rx_wait_wall_sec": float(ctx["rx_wait_wall_sec"]),
             "rx_arm_status_timeout_sec": float(ctx.get("rx_arm_status_timeout_sec") or rx_arm_status_timeout_sec(args)),
@@ -3645,6 +3673,8 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 "make_wall_sec": float(ctx.get("make_wall_sec") or 0.0),
                 "tx_wall_sec": float(ctx.get("tx_wall_sec") or 0.0),
                 "rx_arm_wall_sec": float(ctx.get("rx_arm_wall_sec") or 0.0),
+                "rx_session_open_wall_sec": float(ctx.get("rx_session_open_wall_sec") or 0.0),
+                "rx_capture_command_wall_sec": float(ctx.get("rx_capture_command_wall_sec") or 0.0),
                 "rx_capture_wall_sec": float(ctx.get("rx_capture_wall_sec") or 0.0),
                 "rx_wait_wall_sec": float(ctx.get("rx_wait_wall_sec") or 0.0),
                 "rx_arm_status_timeout_sec": float(ctx.get("rx_arm_status_timeout_sec") or rx_arm_status_timeout_sec(args)),
@@ -3976,6 +4006,8 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     fields = (
         ("tx_control_ms", "tx_wall_sec"),
         ("rx_arm_ms", "rx_arm_wall_sec"),
+        ("rx_session_open_ms", "rx_session_open_wall_sec"),
+        ("rx_capture_command_ms", "rx_capture_command_wall_sec"),
         ("rx_capture_ms", "rx_capture_wall_sec"),
         ("rx_wait_ms", "rx_wait_wall_sec"),
         ("rx_server_arm_wait_ms", "rx_server_arm_wait_wall_sec"),
