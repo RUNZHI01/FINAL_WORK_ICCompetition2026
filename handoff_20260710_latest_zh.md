@@ -12,6 +12,8 @@
 
 最新拆分验证是 `batch-1783695696-50`：`50/50`、fallback `0`。TVM median/p95/max 为 `242.85/259.12/370.31 ms`；IQ median/p95/max 为 `173.20/335.37/392.09 ms`。新增 `rx_session_open_ms` median/p95/max `17.52/33.38/38.52 ms`，`rx_capture_command_ms` `9.03/17.88/101.49 ms`。这说明本轮 RX WAIT 响应长尾已不明显，下一步更该看 decode worker 响应/板端 decode 尾巴，同时保留对偶发 CAPTURE command 响应尖峰的观测。
 
+`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` 仍不推荐默认打开。复测 `batch-1783696115-50` 为 `50/50`、fallback `0`，IQ median/p95/max `171.53/334.85/1166.81 ms`；`remote_decode_response_overhead_ms` 只改善到 `14.77/113.42/126.89 ms`，但 `rx_session_open_ms` max 达到 `1015.27 ms`，没有降低整体 p95/max。
+
 Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm、RX 连接、CAPTURE 命令、RX capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。
 
 ## 当前代码和提交
