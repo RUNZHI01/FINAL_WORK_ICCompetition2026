@@ -81,7 +81,9 @@ QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。
 - `USRP292x/AnalogLatentLink.py`: 在 `decode_timing_ms` 中单独记录 `matched_filter`。
 - `USRP292x/RunAnalogLatentBatch.py`: 记录 `remote_decode_timing_ms`，并聚合 `remote_decode_matched_filter_ms`、`remote_decode_initial_sync_ms`、`remote_decode_cfo_estimate_ms`、`remote_decode_payload_recovery_ms`、`remote_decode_write_npz_ms` 等 decode-stage benchmark。
 - `USRP292x/RunAnalogLatentBatch.py`: 修复失败 remote-decode attempt 的 timing 记录；worker 抛错时也会保留 `decode_wall_sec`，避免低 sync/no-sync retry 被记录成 decode `0 ms`。
+- `USRP292x/RunAnalogLatentBatch.py`: 增加 opt-in `ANALOG_RX_BATCH_SESSION_CONTROL=1` / `--rx-batch-session-control`。非 pipeline 顺序批次会复用一个 RX control session，批次结束关闭；WAIT timeout、capture busy 或 session 失效时会清空 `args.rx_control_session`，避免复用死 socket。
 - `USRP292x/test_analog_latent_link.py`: 增加和更新失败路径测试，覆盖远端 decode 异常、本地 decode status failure、WAIT timeout、arm status timeout 等相邻路径。
+- `USRP292x/test_analog_latent_link.py`: 增加批次级共享 RX session 和共享 session timeout 失效清理测试。
 
 已跑过的本地验证：
 
@@ -92,7 +94,7 @@ git diff --check
 git diff -- USRP292x\RunQpskFileBatchSpoolArq.py
 ```
 
-其中最近一次全量 pytest 结果为 `95 passed in 31.68s`，QPSK diff 为空。`git diff --check` 只有既有 CRLF 提示，没有 trailing whitespace 错误。
+其中最近一次全量 pytest 结果为 `98 passed in 32.02s`，QPSK diff 为空。`git diff --check` 只有既有 CRLF 提示，没有 trailing whitespace 错误。
 
 ## 重启和 Cockpit 等价验证
 
@@ -125,8 +127,8 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 提交当前 decode timing 和失败 attempt timing 补丁，提交前确认没有生成 report、raw log 或临时运行产物混进 git。
 2. 继续用 `batch-1783686930-300` 作为当前默认 profile 的 300 张基线：IQ median/p95 `166.04/288.97 ms`，TVM median/p95 `240.29/242.87 ms`，fallback `0`。
-3. 下一步先处理 p95/max：RX arm/capture control 1s 级 stall、runner-side decode response wait，以及 `/home` `.npz` rare write stall。
-4. 若 tail 仍主要是 runner 等 decode worker response，则继续处理 `remote_decode_response_overhead_ms`；若 tail 落在 matched-filter/sync/CFO/payload recovery，则回到 `AnalogLatentLink.py` 针对对应阶段优化。
+3. 下一步先用 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 跑 Cockpit 等价 50 张；如果 `50/50`、fallback `0` 且 `rx_capture_control_overhead_ms` p95 改善，再跑 300 张 gate。
+4. 若 batch session 后 tail 仍主要是 runner 等 decode worker response，则继续处理 `remote_decode_response_overhead_ms`；若 tail 落在 matched-filter/sync/CFO/payload recovery，则回到 `AnalogLatentLink.py` 针对对应阶段优化。
 5. 可做 decoded output placement/format A/B，但只有 300 张全过且 p95/max 同时改善才推广；tmpfs、`.npy` 仍不是默认。
 6. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 

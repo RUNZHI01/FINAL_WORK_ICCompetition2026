@@ -272,6 +272,22 @@ def parse_args() -> argparse.Namespace:
         help="Disable same-connection RX CAPTURE/WAIT control.",
     )
     parser.add_argument(
+        "--rx-batch-session-control",
+        dest="rx_batch_session_control",
+        action="store_true",
+        default=env_bool("ANALOG_RX_BATCH_SESSION_CONTROL", False),
+        help=(
+            "Opt-in: reuse one RX control connection for sequential image CAPTURE/WAIT commands. "
+            "The RX server accepts only one active control client, so this is disabled by default."
+        ),
+    )
+    parser.add_argument(
+        "--no-rx-batch-session-control",
+        dest="rx_batch_session_control",
+        action="store_false",
+        help="Disable batch-level RX control connection reuse.",
+    )
+    parser.add_argument(
         "--pipeline-depth",
         type=int,
         default=env_int("ANALOG_PIPELINE_DEPTH", 1),
@@ -423,6 +439,23 @@ def preconnect_rx_capture_control_enabled(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "preconnect_rx_capture_control", False)) and not bool(
         getattr(args, "rx_session_control", False)
     )
+
+
+def rx_batch_session_control_enabled(args: argparse.Namespace) -> bool:
+    return (
+        bool(getattr(args, "rx_batch_session_control", False))
+        and bool(getattr(args, "rx_session_control", False))
+        and not bool(getattr(args, "dry_run", False))
+    )
+
+
+def control_session_is_closed(session: Any | None) -> bool:
+    return session is not None and hasattr(session, "sock") and getattr(session, "sock") is None
+
+
+def clear_shared_rx_control_session(args: argparse.Namespace, session: Any | None) -> None:
+    if session is not None and getattr(args, "rx_control_session", None) is session:
+        setattr(args, "rx_control_session", None)
 
 
 def pipeline_rf_decode_guard(args: argparse.Namespace) -> Any:
@@ -2545,6 +2578,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             tx_send_control = None
             rx_wait_control = None
             rx_session = None
+            rx_session_shared = False
             try:
                 rx_started = time.monotonic()
                 if bool(getattr(args, "preconnect_control", False)):
@@ -2556,14 +2590,17 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 # Tell RX-side OtaRxPersistentServer to capture (rx_control_host points at RX)
                 rx_arm_started = time.monotonic()
                 if bool(getattr(args, "rx_session_control", False)):
-                    try:
-                        rx_session = open_control_session(
-                            args.rx_control_host,
-                            args.rx_control_port,
-                            capture_timeout,
-                        )
-                    except OSError:
-                        rx_session = None
+                    rx_session = getattr(args, "rx_control_session", None)
+                    rx_session_shared = rx_session is not None
+                    if rx_session is None:
+                        try:
+                            rx_session = open_control_session(
+                                args.rx_control_host,
+                                args.rx_control_port,
+                                capture_timeout,
+                            )
+                        except OSError:
+                            rx_session = None
                 try:
                     capture_line = f"CAPTURE file={remote_batch_rx if mode != 'local' else batch_rx} duration={capture_duration:.6f} nsamps=0"
                     if rx_session is not None:
@@ -2575,6 +2612,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             image.image_dir / "rx_capture.log",
                             capture_timeout,
                         )
+                        if rx_session_shared and control_session_is_closed(rx_session):
+                            clear_shared_rx_control_session(args, rx_session)
+                            rx_session = None
+                            rx_session_shared = False
                     else:
                         capture_response = run_control_maybe_preconnected(
                             rx_capture_control,
@@ -2599,6 +2640,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     if is_rx_capture_busy_error(exc) or is_rx_capture_not_armed_error(exc):
                         if rx_session is not None:
                             close_preconnected_control(rx_session)
+                            if rx_session_shared:
+                                clear_shared_rx_control_session(args, rx_session)
                             rx_session = None
                         stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
@@ -2641,6 +2684,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             wait_control_timeout,
                             allow_sent_fallback=True,
                         )
+                        if rx_session_shared and control_session_is_closed(rx_session):
+                            clear_shared_rx_control_session(args, rx_session)
+                        if not rx_session_shared:
+                            close_preconnected_control(rx_session)
                         rx_session = None
                     else:
                         wait_response = run_control_maybe_preconnected(
@@ -2657,6 +2704,8 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     if is_rx_wait_timeout_error(exc):
                         if rx_session is not None:
                             close_preconnected_control(rx_session)
+                            if rx_session_shared:
+                                clear_shared_rx_control_session(args, rx_session)
                             rx_session = None
                         stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
@@ -2670,7 +2719,10 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 close_preconnected_control(rx_capture_control)
                 close_preconnected_control(tx_send_control)
                 close_preconnected_control(rx_wait_control)
-                close_preconnected_control(rx_session)
+                if rx_session is not None:
+                    close_preconnected_control(rx_session)
+                    if rx_session_shared:
+                        clear_shared_rx_control_session(args, rx_session)
 
             if mode == "remote-pull":
                 pull_started = time.monotonic()
@@ -3950,6 +4002,10 @@ def main() -> int:
     remote_decode_worker: RemoteAnalogDecodeWorker | None = None
     shared_ssh_master_proc: subprocess.Popen | None = None
     shared_ssh_control_socket: str | None = None
+    shared_rx_control_session: Any | None = None
+    rx_batch_session_control_requested = False
+    rx_batch_session_control_active = False
+    rx_batch_session_control_unavailable = False
     remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     try:
@@ -3987,6 +4043,20 @@ def main() -> int:
             and remote_decode_result_mode == "remote-dir"
             and not bool(getattr(args, "stop_on_fail", False))
         )
+        rx_batch_session_control_requested = rx_batch_session_control_enabled(args)
+        if rx_batch_session_control_requested and not pipeline_enabled:
+            try:
+                shared_rx_control_session = open_control_session(
+                    args.rx_control_host,
+                    args.rx_control_port,
+                    max(1.0, float(getattr(args, "rx_timeout_sec", 30.0) or 30.0)),
+                )
+            except OSError:
+                shared_rx_control_session = None
+                rx_batch_session_control_unavailable = True
+            else:
+                setattr(args, "rx_control_session", shared_rx_control_session)
+                rx_batch_session_control_active = True
         if pipeline_enabled:
             completed, pipeline_stats = _process_images_remote_decode_pipeline(
                 args,
@@ -4015,6 +4085,12 @@ def main() -> int:
                     break
             pipeline_stats["max_inflight"] = 1 if completed else 0
     finally:
+        if (
+            shared_rx_control_session is not None
+            and getattr(args, "rx_control_session", None) is shared_rx_control_session
+        ):
+            close_preconnected_control(shared_rx_control_session)
+            clear_shared_rx_control_session(args, shared_rx_control_session)
         if remote_decode_worker is not None:
             remote_decode_worker.close()
         if shared_ssh_master_proc is not None:
@@ -4075,6 +4151,9 @@ def main() -> int:
         "remote_received_latent_npz_files": remote_received_npz_files,
         "control_preconnect_enabled": bool(getattr(args, "preconnect_control", False)),
         "rx_session_control_enabled": bool(getattr(args, "rx_session_control", False)),
+        "rx_batch_session_control_requested": bool(rx_batch_session_control_requested),
+        "rx_batch_session_control_enabled": bool(rx_batch_session_control_active),
+        "rx_batch_session_control_unavailable": bool(rx_batch_session_control_unavailable),
         "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
         "rx_arm_status_poll_sec": rx_arm_status_poll_sec(args),
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
