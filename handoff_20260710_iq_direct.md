@@ -46,6 +46,7 @@ All runs below used the Cockpit `/api/run-inference-batch` behavior, IQ direct, 
 | `batch-1783674212-50` | 50 | `50/50`, fallback `0` | `238.58 ms` | `241.01 ms` | `182.34 ms` | `251.66 ms` | Smoke after RX session close shutdown fix. |
 | `batch-1783674397-300` | 300 | `300/300`, fallback `0` | `238.87 ms` | `245.54 ms` | `175.28 ms` | `337.46 ms` | Latest gate; session close fix is safe but did not remove 300-image tails. |
 | `batch-1783676258-50` | 50 | `50/50`, fallback `0` | `242.22 ms` | `243.93 ms` | `165.42 ms` | `251.70 ms` | First live run with `rx_server_*` timing fields. |
+| `batch-1783678227-50` | 50 | `50/50`, fallback `0` | `240.61 ms` | `251.31 ms` | `201.17 ms` | `1207.08 ms` | Rejected `ANALOG_RX_TAIL_SEC=0.045`; server receive fell to `58.61 ms`, but RX arm/capture tail worsened. |
 
 Reference QPSK transport is about `2961.78 ms/image`. IQ direct is far faster than QPSK on the data plane. The visible reconstruction cadence is still mostly set by TVM, currently around `239-245 ms` per inference sample.
 
@@ -71,7 +72,7 @@ rx_server_receive_ms median 63.61, p95 63.63
 rx_server_capture_ms median 64.27, p95 64.40
 ```
 
-This means the normal-path RX floor is currently dominated by capture duration, especially `ANALOG_RX_TAIL_SEC=0.05`, not by server pre-arm drain. Treat smaller RX tail values as an experiment that must pass 50 images before any 300-image gate.
+This means the normal-path RX floor is currently dominated by capture duration, especially `ANALOG_RX_TAIL_SEC=0.05`, not by server pre-arm drain. Smaller RX tail values were re-tested and rejected: `0.04` hit a no-sync retry in a 5-image sanity run, and `0.045` completed 50 images but worsened median and p95.
 
 ## Current Profile To Preserve
 
@@ -79,6 +80,7 @@ Use this profile unless you are running an explicit experiment:
 
 ```text
 OPENAMP_SSH_RUNNER=paramiko
+SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1
 OPENAMP_USRP_TX_RUNNER=docker
 OPENAMP_USRP_TX_DOCKER_IMAGE=iccomp-usrp-tx:latest
 OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET=/host_workspace
@@ -90,8 +92,12 @@ OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp
 OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED=0
 REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python
 OPENAMP_DEMO_REMOTE_DECODE_PYTHON=/home/user/venv/bin/python
+ANALOG_REMOTE_DECODE_WORKER=1
 ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir
 ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal
+ANALOG_REMOTE_CLEANUP_MODE=skip
+ANALOG_RX_TAIL_SEC=0.05
+ANALOG_RX_POST_QUANTIZE=0
 RX_ARM_WAIT_MS=150
 RX_STOP_WAIT_MS=8000
 ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0
@@ -157,6 +163,7 @@ If the UI shows `board status endpoint unavailable` or connection refused, the b
 - RX `STOP` waits for the worker before replying, reducing stale `capture_already_running` failures.
 - The Python runner uses same-session RX control and shuts the socket down before closing it, so the RX server sees EOF promptly after a timeout.
 - RX control responses now carry additive server-side timings for arm wait, drain, stream command issue, receive loop, STOP command, and STOP wait. The Python runner records them as `rx_server_*_wall_sec` and aggregates them in `iq_stage_benchmark`.
+- If batch-level SSH ControlMaster startup fails, the IQ runner now disables per-image ControlMaster retries. This prevents a missing `SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1` from adding about `10 s/image` on Windows/password SSH paths.
 - Remote decode returns minimal worker responses while keeping full `decode_summary.json` on the board.
 - Docker wrappers default to `RX_ARM_WAIT_MS=150` and forward the IQ/USRP environment needed by Cockpit.
 
@@ -180,7 +187,7 @@ For speed runs, the runtime security channel was disabled while config still sho
 ## Next Work
 
 1. Keep QPSK frozen. Check `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py` before and after IQ changes.
-2. Re-test `ANALOG_RX_TAIL_SEC=0.04` on 50 images with the current stable profile before considering it for 300. Earlier shorter-tail attempts were mixed, so this must be evidence-driven.
+2. Keep `ANALOG_RX_TAIL_SEC=0.05`. `0.04` and `0.045` are rejected for the current RF/control profile.
 3. Improve WAIT-timeout recovery. A timeout after partial samples should cancel/drain deterministically before the next ARQ attempt.
 4. Separate board decode compute from worker/control wait. The reported decode time is usually around `44 ms`, but runner-side waits can still reach seconds.
 5. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.

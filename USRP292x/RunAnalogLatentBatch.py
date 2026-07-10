@@ -2391,6 +2391,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
 
     shared_ssh_control_socket = str(getattr(args, "ssh_control_socket", "") or "").strip()
     ssh_control_socket: str | None = shared_ssh_control_socket or None
+    ssh_control_master_unavailable = bool(getattr(args, "ssh_control_master_unavailable", False))
     ssh_master_proc: subprocess.Popen | None = None
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     use_in_process_local_codec = bool(getattr(args, "in_process_local_codec", False))
@@ -2489,7 +2490,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     raise RuntimeError(
                         f"--rx-capture-mode={mode} requires --remote-rx-ssh-target (e.g. user@100.x.y.z)"
                     )
-                if not ssh_control_socket:
+                if not ssh_control_socket and not ssh_control_master_unavailable:
                     ssh_master_proc = _ssh_start_control_master(remote_target)
                     ssh_control_socket = _ssh_control_socket_path() if ssh_master_proc else None
 
@@ -3826,6 +3827,8 @@ def main() -> int:
         ):
             shared_ssh_master_proc = _ssh_start_control_master(remote_target)
             shared_ssh_control_socket = _ssh_control_socket_path() if shared_ssh_master_proc else None
+            if shared_ssh_master_proc is None:
+                setattr(args, "ssh_control_master_unavailable", True)
         if (
             remote_mode == "remote-decode"
             and not bool(getattr(args, "dry_run", False))
