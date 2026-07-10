@@ -81,6 +81,8 @@ STOP timeout-budget 验证是 `batch-1783682666-300`：`300/300`，fallback `0`�
 
 session-before-STOP 验证是 `batch-1783683491-300`：`300/300`，fallback `0`，TVM median/p95 `242.38/245.50 ms`，IQ median/p95/max `169.48/299.73/6822.54 ms`，stage record `301`。唯一 retry 是 image 263 arm/status timeout，`rx_stop_after_capture_busy.log` 返回 `OK`，不再是 `ERR_TIMEOUT`。剩余最大尾部主要在 decode 侧：真实板端 decode stall 和 runner-side decode response wait。
 
+tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usrp_rx`，`50/50`、fallback `0`，TVM median/p95 `241.53/246.04 ms`，IQ median/p95/max `179.92/360.48/3979.87 ms`。tmpfs 把 `write_npz` median/p95/max 压到 `1.446/2.553/2.719 ms`，但总链路被一次 arm-not-ready retry 和 decode response p95 `125.67 ms` 拖慢。结论：tmpfs 继续保留为诊断项，不默认推广。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动

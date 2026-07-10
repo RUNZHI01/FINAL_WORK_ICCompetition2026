@@ -60,6 +60,8 @@ STOP timeout-budget 验证：`batch-1783682666-300`，结果 `300/300`、fallbac
 
 session-before-STOP 验证：`batch-1783683491-300`，结果 `300/300`、fallback `0`。TVM median/p95 为 `242.38/245.50 ms`，IQ image-level median/p95/max 为 `169.48/299.73/6822.54 ms`，共有 `301` 条 stage record。唯一 retry 是 image 263 arm/status timeout，STOP 日志返回 `OK`。剩余 top tail 主要是板端 reported decode stall 和 runner-side decode response wait。
 
+tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usrp_rx`，结果 `50/50`、fallback `0`。TVM median/p95 为 `241.53/246.04 ms`，IQ median/p95/max 为 `179.92/360.48/3979.87 ms`。`write_npz` median/p95/max 被压到 `1.446/2.553/2.719 ms`，但总链路仍被 arm-not-ready retry 和 decode response wait 拖慢。tmpfs 继续作为诊断项，不默认推广。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁
