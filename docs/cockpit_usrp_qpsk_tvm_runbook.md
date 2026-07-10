@@ -84,6 +84,7 @@ These runs were started through the same backend path used by the cockpit deskto
 
 | Link | Batch | Result | Transport metric | RF airtime | Decode / merge | TVM big.LITTLE |
 |---|---:|---:|---:|---:|---:|---:|
+| IQ direct, async stall-snapshot diagnostic | `batch-1783642640-300` | 300/300, fail 0 | median `190.29 ms`, p95 `946.07 ms` | `9.58 ms` | mixed RX wait and decode-worker stalls; publish p95 `1.79 ms` | median `240.79 ms`, p95 `243.97 ms` |
 | IQ direct, fast-first sync recommended | `batch-1783626884-300` | 300/300, fail 0 | median `182.28 ms`, p95 `372.96 ms` | `9.58 ms` | decode median `62.96 ms` | median `242.41 ms`, p95 `245.77 ms` |
 | IQ direct, previous sequential-sync baseline | `batch-1783625337-300` | 300/300, fail 0 | median `189.10 ms`, p95 `642.66 ms` | `9.58 ms` | decode median `68.47 ms` | median `242.16 ms`, p95 `244.89 ms` |
 | IQ direct, streaming TVM opt-in experiment | `batch-1783624303-300` | 300/300, fail 0 | median `338.90 ms`, p95 `694.20 ms` | `9.58 ms` | decode median `158.52 ms` | median `248.29 ms`, p95 `322.37 ms` |
@@ -91,6 +92,8 @@ These runs were started through the same backend path used by the cockpit deskto
 | QPSK | `batch-1783610673-300` | 300/300, fail 0 | `2961.78 ms/image` | mean `48.02 ms` | decode command mean `2295.96 ms`, merge mean `14.23 ms` | median `240.06 ms`, p95 `242.88 ms` |
 
 IQ direct used `remote-dir`: the board decoder wrote flat latent files to `/home/user/cockpit_usrp_rx/<run>_rx`, and TVM consumed that directory directly. In the recommended 2026-07-10 profile, inference stayed pending while transport advanced to `300/300`; TVM started only after IQ decode completed. The streaming TVM experiment did overlap transport and inference, but total wall worsened from `161.17 s` to `233.76 s`, so the overlap path is opt-in only. The QPSK run is now a stable fallback rather than a single-frame proof, but it is still about `16.3x` slower than the latest IQ direct median transport.
+
+`batch-1783642640-300` was a diagnostic run with `ANALOG_REMOTE_STALL_SNAPSHOT=1`, not a new recommended default. It stayed all-pass and TVM remained in the 240 ms band, but transport p95 rose because rare RX wait/capture stalls and decode-worker request stalls appeared. The snapshot launcher is asynchronous, so the captured logs did not block the decode worker; use a higher snapshot limit than `3` if late-batch outliers need board CPU/IO evidence.
 
 2026-07-10 control diagnostics added `rx_arm_ms` and `rx_wait_ms` to the IQ stage benchmark. In `batch-1783629764-50`, transport median was `206.51 ms`, p95 `308.24 ms`, with `tx_control_ms` median `31.42`, `rx_arm_ms` median `35.27`, and `rx_wait_ms` median `30.75`. The opt-in `ANALOG_PRECONNECT_CONTROL=1` run `batch-1783631315-50` stayed all-pass and improved transport p95 to `290.16 ms`, but median stayed `207.08 ms`; keep it experimental rather than default.
 
