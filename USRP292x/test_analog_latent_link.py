@@ -1948,6 +1948,28 @@ def test_process_image_records_rx_stop_timing_after_wait_timeout(tmp_path, monke
     assert record["rx_server_written_samps"] == 47553
 
 
+def test_stop_rx_capture_allows_full_drain_budget(tmp_path, monkeypatch):
+    args = Namespace(
+        rx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+    )
+    timeouts: list[float] = []
+
+    def fake_run_control(_host, _port, line, _log_path, timeout):
+        timeouts.append(timeout)
+        assert line == "STOP"
+        return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.004 stop_wait_sec=7.800 wall_sec=7.804"
+
+    monkeypatch.setenv("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", "8.0")
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    response = analog_batch.stop_rx_capture(args, tmp_path / "rx_stop.log")
+
+    assert "stop_wait_sec=7.800" in response
+    assert timeouts == pytest.approx([8.5])
+
+
 def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")

@@ -550,9 +550,10 @@ def wait_for_rx_capture_armed(
 
 
 def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> str:
-    timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
     drain_timeout = max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
     drain_poll = max(0.01, env_float("ANALOG_RX_STOP_DRAIN_POLL_SEC", 0.05))
+    base_timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
+    timeout = max(base_timeout, drain_timeout + 0.5)
     entries: list[str] = []
     try:
         response = run_control(

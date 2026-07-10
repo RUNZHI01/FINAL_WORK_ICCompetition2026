@@ -52,7 +52,9 @@ SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1
 
 问题定位批次：`batch-1783680558-50`，结果 `50/50`、fallback `0`，但有 `51` 条 stage record。image 29 第一次 attempt 出现 `no sync candidate had a complete frame`，第二次 ARQ 恢复。该批次显示 server capture 仍约 `64 ms`，但 runner 侧 `rx_capture_control_overhead_ms` p95 到 `140.31 ms`，`remote_decode_response_overhead_ms` p95 到 `128.12 ms`。
 
-当前未提交补丁后的 Cockpit 等价 50 张验证：`batch-1783681389-50`，结果 `50/50`、fallback `0`。TVM median/p95 为 `240.73/245.35 ms`，IQ image-level median/p95/max 为 `174.91/269.24/347.72 ms`。stage record 正好 `50` 条，server capture median `64.23 ms`，`rx_capture_control_overhead_ms` p95 `48.65 ms`，`remote_decode_response_overhead_ms` p95 `52.45 ms`。这一轮没有出现 no-sync retry，所以只能证明正常路径没有回退；失败后 STOP/drain 的实际收益还要等下一次出现 no-sync 或用专门故障注入验证。
+当前补丁后的 Cockpit 等价 50 张验证：`batch-1783681389-50`，结果 `50/50`、fallback `0`。TVM median/p95 为 `240.73/245.35 ms`，IQ image-level median/p95/max 为 `174.91/269.24/347.72 ms`。stage record 正好 `50` 条，server capture median `64.23 ms`，`rx_capture_control_overhead_ms` p95 `48.65 ms`，`remote_decode_response_overhead_ms` p95 `52.45 ms`。这一轮没有出现 no-sync retry，所以只能证明正常路径没有回退；失败后 STOP/drain 的实际收益还要等下一次出现 no-sync 或用专门故障注入验证。
+
+当前补丁后的 300 张 gate：`batch-1783682083-300`，结果 `300/300`、fallback `0`。TVM median/p95 为 `243.38/255.24 ms`，IQ image-level median/p95/max 为 `174.42/308.45/8377.89 ms`，共有 `305` 条 stage record。主要 tail 是 WAIT timeout 后 STOP 控制命令被旧 5s 客户端 timeout 截断、decode worker response wait 约 `7.27 s` 但板端 reported decode 约 `43 ms`、以及一次真实板端 decode 约 `4.09 s`。STOP 客户端 timeout 已修到覆盖 `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`；下一轮要验证 STOP log 不再出现 `ERR_TIMEOUT`。
 
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
@@ -63,6 +65,7 @@ QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。
 涉及文件：
 
 - `USRP292x/RunAnalogLatentBatch.py`: 增加 decode 失败后的 `stop_rx_capture(...)` 清理路径，并记录 `rx_server_stop_cmd_wall_sec` / `rx_server_stop_wait_wall_sec`。
+- `USRP292x/RunAnalogLatentBatch.py`: 修正 `stop_rx_capture(...)` 客户端 timeout，避免 8s drain profile 被旧 5s cap 提前切断。
 - `USRP292x/test_analog_latent_link.py`: 增加和更新失败路径测试，覆盖远端 decode 异常、本地 decode status failure、WAIT timeout、arm status timeout 等相邻路径。
 
 已跑过的本地验证：
@@ -107,7 +110,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 先决定是否提交当前 RX 失败清理补丁。提交前清理 `Semantic-Communication/session_bootstrap/reports/openamp3_usrp_1783681389_current_*.json/.md` 这类本地运行报告，除非要作为证据归档。
 2. 跑一次 300 张 Cockpit 等价 gate，确认 IQ median 仍低于 `200 ms`，p95 尽量低于 `450 ms`，fallback 为 `0`。
-3. 如果 300 张里出现 no-sync retry，检查失败 attempt 是否带 `rx_server_stop_cmd_wall_sec` 和 `rx_server_stop_wait_wall_sec`，确认 STOP/drain 真的发生。
+3. 下一轮 300 张里如果出现 WAIT timeout 或 no-sync retry，检查失败 attempt 是否带 STOP 计时字段；尤其确认 `rx_stop_after_wait_timeout.log` 不再是 `ERR_TIMEOUT`。
 4. 若正常路径继续稳定，下一步再处理 `remote_decode_response_overhead_ms` 和 RX capture/control tail。不要在 RX 状态机稳定前默认开启双缓冲或 streaming TVM。
 5. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 
