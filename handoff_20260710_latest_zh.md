@@ -20,6 +20,8 @@ bounded RX batch session 已做成 opt-in，不进默认 profile。`ANALOG_RX_BA
 
 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.14` 不推荐。带 output-only soft completion 的 50 张 `batch-1783698593-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95/max 恶化到 `169.39/365.51/2122.73 ms`，`soft_count=0`。日志显示 outlier 发生时 NPZ 在 soft timeout 时尚未可见，问题更像 worker 请求排队/调度延迟，而不是“文件已写好但 stdout 晚到”。
 
+`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0` 和 `ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=1` 都已拒绝。整批共用 RX session 的 50 张 `batch-1783700070-50` 虽然 `50/50`，但 IQ median/p95/max 恶化到 `185.69/571.83/1217.93 ms`，长尾来自 `rx_session_open` 和 RX control。RX CAPTURE preconnect 的 50 张 `batch-1783700726-50` 也 `50/50`，但 IQ p95 仍是 `270.40 ms`，比 no-preconnect 的 `237.32 ms` 差；它只把瓶颈从 RX control 转移到了板端 decode。
+
 Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm、RX 连接、CAPTURE 命令、RX capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。
 
 ## 当前代码和提交
@@ -59,6 +61,8 @@ WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，�
 
 - `ANALOG_RX_BATCH_SESSION_CONTROL=1`：50 张很好，但 300 张 `batch-1783690925-300` p95 `321.68 ms`，比 no-batch A/B 更差。
 - `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`：50 张 `batch-1783696822-50` median `154.18 ms`，但 p95 `326.68 ms`，尚未证明 300 张稳定性。
+- `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0`：50 张 `batch-1783700070-50` p95 `571.83 ms`，整批复用会放大 session open/arm 抖动。
+- `ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=1`：50 张 `batch-1783700726-50` p95 `270.40 ms`，RX control 变稳但板端 decode 尾巴变成主因，整体不如 no-preconnect。
 - `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`：50 张 `batch-1783693518-50` p95 `382.82 ms`，说明 summary 文件写入不是当前主因。
 - `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.14`：50 张 `batch-1783698593-50` p95 `365.51 ms`，且没有 soft completion 命中。
 - `PERSISTENT_RX_TX_DELAY=0.005`：50 张 p95 恶化到 `306.92 ms`。
