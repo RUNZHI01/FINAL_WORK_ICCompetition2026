@@ -394,6 +394,63 @@ def test_remote_decode_worker_serializes_requests_as_ascii(tmp_path):
     assert "\\u96c6\\u521b\\u8d5b" in writes[0]
 
 
+def test_remote_decode_worker_ignores_stale_response_for_previous_request(tmp_path):
+    writes: list[str] = []
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+        returncode = None
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+    responses.put(json.dumps({
+        "status": "ok",
+        "summary_json": "/tmp/old/decode_summary.json",
+        "summary": {"status": "ok", "sync_metric": 0.1},
+    }))
+    responses.put(json.dumps({
+        "status": "ok",
+        "summary_json": "/tmp/current/decode_summary.json",
+        "summary": {"status": "ok", "sync_metric": 0.9},
+    }))
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        {"status": "ready"},
+        0.0,
+    )
+
+    result = worker.decode(
+        {"summary_json": "/tmp/current/decode_summary.json"},
+        tmp_path / "remote_decode.log",
+        timeout=1.0,
+    )
+
+    payload = json.loads(result.stdout)
+    logged = json.loads((tmp_path / "remote_decode.log").read_text(encoding="utf-8"))
+    assert payload["summary_json"] == "/tmp/current/decode_summary.json"
+    assert logged["summary"]["sync_metric"] == 0.9
+    assert writes
+
+
 def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, monkeypatch):
     popen_commands: list[list[str]] = []
 

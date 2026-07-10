@@ -1544,6 +1544,49 @@ class RemoteAnalogDecodeWorker:
         self._reader_thread = reader_thread
         self.ready_response = ready_response
         self.startup_wall_sec = startup_wall_sec
+        self._pending_responses: dict[str, str] = {}
+
+    @staticmethod
+    def _response_match_key(payload: dict[str, Any]) -> str:
+        return str(payload.get("request_id") or payload.get("summary_json") or "").strip()
+
+    @staticmethod
+    def _request_match_key(request: dict[str, Any]) -> str:
+        return str(request.get("request_id") or request.get("summary_json") or "").strip()
+
+    def _wait_for_response(self, request_key: str, timeout: float) -> tuple[str, dict[str, Any]]:
+        pending_line = self._pending_responses.pop(request_key, None) if request_key else None
+        if pending_line is not None:
+            try:
+                pending_response = json.loads(pending_line)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"remote decode worker returned invalid JSON: {pending_line.strip()}") from exc
+            if not isinstance(pending_response, dict):
+                raise RuntimeError(f"remote decode worker returned non-object JSON: {pending_line.strip()}")
+            return pending_line, pending_response
+
+        deadline = time.monotonic() + float(timeout)
+        while True:
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0.0:
+                self.close(kill=True)
+                raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s")
+            try:
+                line = self._responses.get(timeout=remaining)
+            except queue.Empty as exc:
+                self.close(kill=True)
+                raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s") from exc
+            try:
+                response = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"remote decode worker returned invalid JSON: {line.strip()}") from exc
+            if not isinstance(response, dict):
+                raise RuntimeError(f"remote decode worker returned non-object JSON: {line.strip()}")
+            response_key = self._response_match_key(response)
+            if request_key and response_key and response_key != request_key:
+                self._pending_responses[response_key] = line
+                continue
+            return line, response
 
     @classmethod
     def start(
@@ -1689,17 +1732,9 @@ class RemoteAnalogDecodeWorker:
             raise RuntimeError("remote decode worker stdin is closed")
         self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
         self.proc.stdin.flush()
-        try:
-            line = self._responses.get(timeout=timeout)
-        except queue.Empty as exc:
-            self.close(kill=True)
-            raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s") from exc
+        line, response = self._wait_for_response(self._request_match_key(request), timeout)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(line, encoding="utf-8")
-        try:
-            response = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(f"remote decode worker returned invalid JSON: {line.strip()}") from exc
         if str(response.get("status") or "").lower() != "ok":
             raise RuntimeError(str(response.get("error") or "remote decode worker failed"))
         return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout=line, stderr="")
