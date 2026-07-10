@@ -1797,14 +1797,16 @@ def test_remote_stall_snapshot_records_board_status_for_slow_record(tmp_path, mo
         remote_stall_snapshot_threshold_sec=1.0,
         remote_stall_snapshot_limit=2,
     )
-    calls: list[tuple[str, list[str], Path, str | None, float]] = []
+    launched: list[tuple[list[str], Path]] = []
 
-    def fake_run_remote_command(target, argv, log_path, *, control_socket=None, timeout=120.0):
-        calls.append((target, argv, log_path, control_socket, timeout))
-        log_path.write_text("snapshot\n", encoding="utf-8")
-        return subprocess.CompletedProcess(argv, 0, "", "")
+    class FakePopen:
+        pid = 4242
 
-    monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
+    def fake_popen(argv, **kwargs):
+        launched.append((argv, Path(kwargs["stdout"].name)))
+        return FakePopen()
+
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fake_popen)
 
     captured = analog_batch.maybe_capture_remote_stall_snapshot(
         args,
@@ -1816,14 +1818,57 @@ def test_remote_stall_snapshot_records_board_status_for_slow_record(tmp_path, mo
     )
 
     assert captured is True
-    assert calls
-    assert calls[0][0] == "user@board"
-    assert calls[0][3] == "ctrl.sock"
-    assert calls[0][4] == 8.0
+    assert launched
+    assert "user@board" in launched[0][0]
+    assert any("ctrl.sock" in part for part in launched[0][0])
+    assert launched[0][1] == tmp_path / "remote_stall_snapshot.log"
     assert record["remote_stall_snapshot_log"] == str(tmp_path / "remote_stall_snapshot.log")
     assert record["remote_stall_snapshot_reason"] == "total_wall_sec,rx_wait_wall_sec"
+    assert record["remote_stall_snapshot_async"] is True
+    assert record["remote_stall_snapshot_pid"] == 4242
     assert record["remote_stall_snapshot_wall_sec"] >= 0.0
     assert getattr(args, "_remote_stall_snapshots_taken") == 1
+
+
+def test_remote_stall_snapshot_starts_async_without_waiting_for_ssh(tmp_path, monkeypatch):
+    record = {
+        "total_wall_sec": 1.50,
+        "decode_queue_wall_sec": 1.20,
+    }
+    args = Namespace(
+        remote_stall_snapshot=True,
+        remote_stall_snapshot_threshold_sec=1.0,
+        remote_stall_snapshot_limit=2,
+    )
+    launched: list[list[str]] = []
+
+    def fail_sync_snapshot(*_args, **_kwargs):
+        raise AssertionError("snapshot must not block on run_remote_command")
+
+    class FakePopen:
+        pid = 4242
+
+    def fake_popen(argv, **_kwargs):
+        launched.append(argv)
+        return FakePopen()
+
+    monkeypatch.setattr(analog_batch, "run_remote_command", fail_sync_snapshot)
+    monkeypatch.setattr(analog_batch.subprocess, "Popen", fake_popen)
+
+    captured = analog_batch.maybe_capture_remote_stall_snapshot(
+        args,
+        record,
+        remote_target="user@board",
+        image_dir=tmp_path,
+        log_name="remote_stall_snapshot.log",
+        control_socket="ctrl.sock",
+    )
+
+    assert captured is True
+    assert launched
+    assert record["remote_stall_snapshot_async"] is True
+    assert record["remote_stall_snapshot_pid"] == 4242
+    assert "remote_stall_snapshot_error" not in record
 
 
 def test_remote_stall_snapshot_skips_when_disabled_or_under_threshold(tmp_path, monkeypatch):

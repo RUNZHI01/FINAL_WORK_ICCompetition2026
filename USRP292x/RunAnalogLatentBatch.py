@@ -1100,6 +1100,35 @@ def run_remote_command(
     return _run_external(full, log_path, check=True, timeout=timeout)
 
 
+def launch_remote_command_async(
+    target: str,
+    remote_argv: list[str],
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+) -> subprocess.Popen[bytes]:
+    """Start a remote SSH command and stream output to a log without waiting."""
+    remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
+    full = _ssh_base_args(control_socket=control_socket) + [target, remote_cmd]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_handle = log_path.open("wb")
+    try:
+        proc = subprocess.Popen(
+            full,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            shell=False,
+        )
+    except Exception:
+        log_handle.close()
+        raise
+    log_handle.close()
+    return proc
+
+
 REMOTE_STALL_SNAPSHOT_FIELDS = (
     "total_wall_sec",
     "tx_wall_sec",
@@ -1176,13 +1205,14 @@ def maybe_capture_remote_stall_snapshot(
     record["remote_stall_snapshot_reason"] = ",".join(reasons)
     setattr(args, "_remote_stall_snapshots_taken", taken + 1)
     try:
-        run_remote_command(
+        proc = launch_remote_command_async(
             remote_target,
-            ["bash", "-lc", script],
+            ["timeout", "8s", "bash", "-lc", script],
             log_path,
             control_socket=control_socket,
-            timeout=8.0,
         )
+        record["remote_stall_snapshot_async"] = True
+        record["remote_stall_snapshot_pid"] = int(getattr(proc, "pid", 0) or 0)
     except Exception as exc:
         record["remote_stall_snapshot_error"] = str(exc)
         if not log_path.exists():
