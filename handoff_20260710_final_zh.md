@@ -89,6 +89,8 @@ decode timing 300 张 gate 是 `batch-1783686930-300`：`300/300`，fallback `0`
 
 Batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 的 50 张 `batch-1783690852-50` 通过，IQ median/p95 `155.30/217.47 ms`，但 300 张 `batch-1783690925-300` 变成 IQ median/p95 `162.20/321.68 ms`，p95 高于 TVM。关闭该开关的同代码对照 `batch-1783691290-300` 是 IQ median/p95 `172.71/301.74 ms`。结论：batch session 降低 median，但 300 张 p95 不够稳，只保留 opt-in，不写进默认 profile。
 
+`PERSISTENT_RX_TX_DELAY=0.005` 已拒绝：`batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。保持 `PERSISTENT_RX_TX_DELAY=0`。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动

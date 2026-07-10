@@ -68,6 +68,8 @@ decode timing 300 张 gate：`batch-1783686930-300`，结果 `300/300`、fallbac
 
 batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 已完成本地实现并通过现场 50 张 `batch-1783690852-50`，结果 `50/50`、fallback `0`，IQ median/p95/max `155.30/217.47/583.30 ms`，TVM median/p95 `242.49/246.53 ms`。但 300 张 `batch-1783690925-300` 虽然 `300/300`、fallback `0`，IQ median/p95/max 为 `162.20/321.68/6828.85 ms`，p95 仍高于 TVM。关闭 batch session 的同代码 A/B `batch-1783691290-300` 为 `300/300`、fallback `0`，IQ median/p95/max `172.71/301.74/8598.55 ms`，更稳。结论：batch session 只保留 opt-in，不推广为默认。
 
+`PERSISTENT_RX_TX_DELAY=0.005` 已拒绝：`batch-1783691806-50` 虽然 `50/50`、fallback `0`，但 IQ median/p95 恶化到 `202.47/306.92 ms`。保持 `PERSISTENT_RX_TX_DELAY=0`。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁
