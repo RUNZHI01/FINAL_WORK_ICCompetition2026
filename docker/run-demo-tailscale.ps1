@@ -59,14 +59,41 @@ if (-not $env:JSCC_LINK_MODE) {
 if (-not $env:ANALOG_REMOTE_DECODE_RESULT_MODE) {
     $env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"
 }
+if (-not $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE) {
+    $env:ANALOG_REMOTE_DECODE_RESPONSE_MODE = "minimal"
+}
+if (-not $env:RX_ARM_WAIT_MS) {
+    $env:RX_ARM_WAIT_MS = "50"
+}
+if (-not $env:ANALOG_PIPELINE_DEPTH) {
+    $env:ANALOG_PIPELINE_DEPTH = "1"
+}
 if (-not $env:ANALOG_SPS) {
     $env:ANALOG_SPS = "2"
 }
 if (-not $env:ANALOG_AMPLITUDE) {
     $env:ANALOG_AMPLITUDE = "6000"
 }
+if (-not $env:ANALOG_RX_POST_QUANTIZE) {
+    $env:ANALOG_RX_POST_QUANTIZE = "0"
+}
 if (-not $env:ANALOG_RX_TAIL_SEC) {
     $env:ANALOG_RX_TAIL_SEC = "0.05"
+}
+if (-not $env:ANALOG_RX_WAIT_TIMEOUT_SEC) {
+    $env:ANALOG_RX_WAIT_TIMEOUT_SEC = "1.0"
+}
+if (-not $env:ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC) {
+    $env:ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC = "1.0"
+}
+if (-not $env:ANALOG_RX_ARM_STATUS_TIMEOUT_SEC) {
+    $env:ANALOG_RX_ARM_STATUS_TIMEOUT_SEC = "0.5"
+}
+if (-not $env:ANALOG_RX_ARM_STATUS_POLL_SEC) {
+    $env:ANALOG_RX_ARM_STATUS_POLL_SEC = "0.025"
+}
+if (-not $env:ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC) {
+    $env:ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC = "8.0"
 }
 if (-not $env:PERSISTENT_RX_TX_DELAY) {
     $env:PERSISTENT_RX_TX_DELAY = "0"
@@ -79,6 +106,15 @@ if (-not $env:ANALOG_ROBUST_SYNC) {
 }
 if (-not $env:ANALOG_REMOTE_CLEANUP_MODE) {
     $env:ANALOG_REMOTE_CLEANUP_MODE = "skip"
+}
+if (-not $env:ANALOG_PRECONNECT_CONTROL) {
+    $env:ANALOG_PRECONNECT_CONTROL = "1"
+}
+if (-not $env:ANALOG_PRECONNECT_RX_CAPTURE_CONTROL) {
+    $env:ANALOG_PRECONNECT_RX_CAPTURE_CONTROL = "0"
+}
+if (-not $env:ANALOG_RX_SESSION_CONTROL) {
+    $env:ANALOG_RX_SESSION_CONTROL = "1"
 }
 if (-not $env:ANALOG_DECODE_PIPELINE_WARMUP) {
     $env:ANALOG_DECODE_PIPELINE_WARMUP = "1"

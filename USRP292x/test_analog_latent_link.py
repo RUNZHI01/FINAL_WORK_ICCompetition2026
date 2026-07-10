@@ -37,6 +37,15 @@ def test_persistent_rx_startup_drain_can_be_stopped_before_stream_start():
     assert "recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0)" in drain_block
 
 
+def test_persistent_rx_capture_arm_wait_is_configurable():
+    source = OTA_RX_SERVER.read_text(encoding="utf-8")
+
+    assert "arm_wait_ms" in source
+    assert "--arm-wait-ms" in source
+    assert "std::chrono::milliseconds(opts_.arm_wait_ms)" in source
+    assert "std::chrono::seconds(2)" not in source
+
+
 def test_load_latent_accepts_quantized_pt_jscc_output(tmp_path):
     quant = torch.arange(1 * 4 * 4 * 4, dtype=torch.uint8).reshape(1, 4, 4, 4)
     scale = torch.tensor(0.25, dtype=torch.float32)
@@ -1679,6 +1688,7 @@ def test_process_image_wait_command_uses_rx_timeout_budget(tmp_path, monkeypatch
 
 
 def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC", "0.75")
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
@@ -1728,6 +1738,7 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
     assert wait_timeout == 0.5
     wait_call_timeout = next(timeout for line, timeout in control_calls if line.startswith("WAIT timeout="))
     assert wait_call_timeout == 1.5
+    assert image.records[0]["rx_arm_status_timeout_sec"] == 0.75
 
 
 @pytest.mark.parametrize(
@@ -1942,6 +1953,80 @@ def test_pipeline_capture_attempt_stops_rx_after_capture_busy(tmp_path, monkeypa
     assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("CAPTURE "))
 
 
+def test_pipeline_session_capture_arm_failure_closes_session_before_stop(tmp_path, monkeypatch):
+    image = analog_batch.ImageRecord(index=150, input_path=tmp_path / "case150.bin", image_dir=tmp_path / "image_0150")
+    image.input_path.write_bytes(b"payload")
+    args = Namespace(
+        remote_rx_ssh_target="user@board",
+        ssh_control_socket="",
+        in_process_local_codec=True,
+        remote_cleanup_mode="skip",
+        remote_decode_result_mode="remote-dir",
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/test_rx",
+        remote_decode_worker=object(),
+        run_id="session-arm-fail",
+        remote_rx_run_root="/tmp/usrp292x_remote_runs",
+        tx_delay_sec=0.0,
+        rate=5_000_000.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        rx_arm_status_timeout_sec=0.01,
+        rx_arm_status_poll_sec=0.001,
+        preconnect_control=False,
+        preconnect_rx_capture_control=False,
+        rx_session_control=True,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        tx_timeout_sec=30.0,
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+    )
+    events: list[str] = []
+
+    class FakeSession:
+        def command(self, line, log_path, _timeout):
+            events.append(f"session:{line.split()[0]}")
+            log_path.write_text("OK\n", encoding="utf-8")
+            if line.startswith("CAPTURE "):
+                return "OK busy=1 started=0 done=0 ok=1 job_id=150"
+            if line == "STATUS":
+                return "OK busy=1 started=0 done=0 ok=1 job_id=150"
+            return "OK"
+
+        def close(self):
+            events.append("close:session")
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 67888, "job_id": "case150"}), encoding="utf-8")
+        return {"capture_nsamps": 67888, "job_id": "case150"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        events.append(f"direct:{line.split()[0]}")
+        return "OK busy=0 started=0 done=1 ok=0 error=stopped"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "open_control_session", lambda *_args: FakeSession())
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    with pytest.raises(RuntimeError, match="RX CAPTURE did not arm before TX"):
+        analog_batch._capture_remote_decode_pipeline_attempt(
+            args,
+            image,
+            attempt_index=0,
+            max_attempts=3,
+            slot_index=0,
+            pipeline_depth=1,
+        )
+
+    assert "close:session" in events
+    assert "direct:STOP" in events
+    assert events.index("close:session") < events.index("direct:STOP")
+
+
 def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
     args = Namespace(rx_control_host="127.0.0.1", rx_control_port=29220, rx_timeout_sec=30.0)
     control_lines: list[str] = []
@@ -2037,6 +2122,80 @@ def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
     assert events.index("direct:CAPTURE") < events.index("preconnect:rx")
     assert events.index("preconnect:rx") < events.index("preconnected:tx:SEND")
     assert events.index("preconnected:tx:SEND") < events.index("preconnected:rx:WAIT")
+
+
+def test_process_image_can_preconnect_rx_capture_control(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        preconnect_control=True,
+        preconnect_rx_capture_control=True,
+        rx_session_control=False,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    events: list[str] = []
+
+    class FakePreconnected:
+        def __init__(self, label: str):
+            self.label = label
+
+        def command(self, line, log_path, timeout):
+            del timeout
+            events.append(f"preconnected:{self.label}:{line.split()[0]}")
+            log_path.write_text("OK\n", encoding="utf-8")
+            return "OK"
+
+        def close(self):
+            events.append(f"close:{self.label}")
+
+    def fake_preconnect(_host, port, _timeout):
+        label = "rx" if int(port) == 29220 else "tx"
+        events.append(f"preconnect:{label}")
+        return FakePreconnected(label)
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        events.append("make")
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, out_wire, summary, _log_path):
+        out_wire.write_bytes(b"payload")
+        summary.write_text(json.dumps({"payload_is_bit_exact": True}), encoding="utf-8")
+        return 0
+
+    def fake_run_control(_host, _port, line, log_path, _timeout):
+        events.append(f"direct:{line.split()[0]}")
+        log_path.write_text("OK\n", encoding="utf-8")
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "preconnect_control", fake_preconnect)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed
+    assert events.index("preconnect:rx") < events.index("make")
+    assert "preconnected:rx:CAPTURE" in events
+    assert "direct:CAPTURE" not in events
+    assert image.records[0]["rx_capture_preconnect_enabled"] is True
 
 
 def test_process_image_reuses_rx_control_session_for_capture_and_wait(tmp_path, monkeypatch):

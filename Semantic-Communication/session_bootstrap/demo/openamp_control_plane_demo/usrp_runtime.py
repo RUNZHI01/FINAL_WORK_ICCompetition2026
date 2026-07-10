@@ -605,6 +605,7 @@ def _start_remote_rx_server(
         f"GAIN={shlex.quote(_first_value(env_values, ('RX_GAIN',), DEFAULT_RX_GAIN))} "
         f"ANT={shlex.quote(_first_value(env_values, ('RX_ANT',), DEFAULT_RX_ANT))} "
         f"BIND_ADDR={shlex.quote(_first_value(env_values, ('RX_BIND_ADDR', 'BIND_ADDR'), DEFAULT_BIND_ADDR))} "
+        f"ARM_WAIT_MS={shlex.quote(_first_value(env_values, ('RX_ARM_WAIT_MS',), '2000'))} "
         f"PORT={shlex.quote(str(rx_port))} "
         "./USRP292x/OtaRxPersistentServer.sh "
         f"> {shlex.quote(remote_log)} 2>&1 < /dev/null & "

@@ -220,6 +220,36 @@ def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
     assert run_mock.call_args.args[0][4] == "12345"
 
 
+def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
+    access = usrp_runtime.BoardAccessConfig(
+        host="demo-board",
+        user="user",
+        password="user",
+        port="22",
+        env_file=None,
+        env_values={},
+        source_summary="test",
+    )
+    commands: list[str] = []
+
+    def fake_run_remote_command(_access, remote_command, *, timeout):  # type: ignore[no-untyped-def]
+        commands.append(remote_command)
+        return subprocess.CompletedProcess(args=remote_command, returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(usrp_runtime, "_run_remote_command", fake_run_remote_command)
+
+    result = usrp_runtime._start_remote_rx_server(
+        access,
+        {"RX_ARM_WAIT_MS": "50"},
+        rx_port="29220",
+        remote_run_root="/tmp/usrp292x_remote_runs",
+        remote_project_root="/home/user",
+    )
+
+    assert result["status"] == "started"
+    assert "ARM_WAIT_MS=50" in commands[0]
+
+
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
     return {
         "requested_at": requested_at,
@@ -3785,6 +3815,14 @@ class ServerMainTest(unittest.TestCase):
                 "USRP_WIRE_PREPARE_WORKERS": "2",
                 "USRP_WIRE_CACHE_ENABLED": "1",
                 "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL": "1",
+                "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
+                "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
+                "ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC": "1.0",
+                "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0",
+                "ANALOG_RX_STOP_DRAIN_POLL_SEC": "0.05",
+                "ANALOG_PIPELINE_DEPTH": "1",
+                "RX_ARM_WAIT_MS": "50",
             },
             clear=False,
         ):
@@ -3797,6 +3835,14 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
         self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
         self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(overrides["ANALOG_PRECONNECT_RX_CAPTURE_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
+        self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertEqual(overrides["ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC"], "1.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
+        self.assertEqual(overrides["ANALOG_PIPELINE_DEPTH"], "1")
+        self.assertEqual(overrides["RX_ARM_WAIT_MS"], "50")
 
     def test_usrp_job_default_timeout_scales_with_batch_count(self) -> None:
         self.assertEqual(

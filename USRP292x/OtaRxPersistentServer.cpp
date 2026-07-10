@@ -40,6 +40,7 @@ struct Options {
     double setup = 0.5;
     std::size_t channel = 0;
     int port = 29220;
+    int arm_wait_ms = 2000;
 };
 
 struct Snapshot {
@@ -71,7 +72,8 @@ void print_usage(const char* argv0)
         << "  --channel <index>         default 0\n"
         << "  --wirefmt <fmt>           default sc16\n"
         << "  --bw <Hz>                 optional analog bandwidth\n"
-        << "  --setup <sec>             default 0.5\n";
+        << "  --setup <sec>             default 0.5\n"
+        << "  --arm-wait-ms <ms>        CAPTURE wait for RX started before reply; default 2000\n";
 }
 
 std::string next_arg(int& i, int argc, char** argv)
@@ -113,12 +115,17 @@ Options parse_args(int argc, char** argv)
             opts.bw = std::stod(next_arg(i, argc, argv));
         } else if (key == "--setup") {
             opts.setup = std::stod(next_arg(i, argc, argv));
+        } else if (key == "--arm-wait-ms") {
+            opts.arm_wait_ms = std::stoi(next_arg(i, argc, argv));
         } else {
             throw std::runtime_error("unknown option: " + key);
         }
     }
     if (opts.port <= 0 || opts.port > 65535) {
         throw std::runtime_error("invalid TCP port");
+    }
+    if (opts.arm_wait_ms < 0) {
+        throw std::runtime_error("invalid --arm-wait-ms");
     }
     return opts;
 }
@@ -277,7 +284,7 @@ public:
         worker_ = std::thread(&PersistentRx::capture_loop, this, file, total_samps, job_counter_);
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait_for(lock, std::chrono::seconds(2), [this]() {
+            cv_.wait_for(lock, std::chrono::milliseconds(opts_.arm_wait_ms), [this]() {
                 return state_.started || state_.done;
             });
             return state_;
