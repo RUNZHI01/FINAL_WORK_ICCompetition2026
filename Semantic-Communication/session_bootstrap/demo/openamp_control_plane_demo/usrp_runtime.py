@@ -133,6 +133,8 @@ ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
 ANALOG_RX_SESSION_CONTROL_KEYS = ("ANALOG_RX_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
+ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS = ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC",)
+ANALOG_RX_ARM_STATUS_POLL_KEYS = ("ANALOG_RX_ARM_STATUS_POLL_SEC",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
 ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
@@ -2699,6 +2701,18 @@ class UsrpBatchSpoolJob:
             args.extend([
                 "--rx-batch-session-max-images",
                 str(max(0, _parse_int(rx_batch_session_max_images, 0))),
+            ])
+        rx_arm_status_timeout = _first_value(env_values, ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS)
+        if rx_arm_status_timeout:
+            args.extend([
+                "--rx-arm-status-timeout-sec",
+                str(_parse_float(rx_arm_status_timeout, 8.0)),
+            ])
+        rx_arm_status_poll = _first_value(env_values, ANALOG_RX_ARM_STATUS_POLL_KEYS)
+        if rx_arm_status_poll:
+            args.extend([
+                "--rx-arm-status-poll-sec",
+                str(_parse_float(rx_arm_status_poll, 0.05)),
             ])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)

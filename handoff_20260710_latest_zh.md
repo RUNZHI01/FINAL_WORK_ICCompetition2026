@@ -8,6 +8,14 @@
 
 ## 2026-07-11 最新进展
 
+05:34 当前较好的 300 张长测是 `batch-1783719194-300`：`300/300`、fallback `0`，TVM median/p95 `241.00/243.32 ms`，Cockpit API 侧 IQ median/mean/p95/max `158.27/226.27/266.12/10092.53 ms`，stage summary 侧 IQ total p95 `274.86 ms`，PSNR `37.0445`、SSIM `0.97494`。这轮已经包含 repeated soft-completion、Cockpit 默认 `ANALOG_RX_SESSION_CONTROL=1`、`RX_ARM_WAIT_MS=150` 和 not-armed 短 STOP，但 300 张 IQ p95 仍比 TVM p95 高约 `23 ms`，所以目标还没完成。
+
+05:53 重启后默认 profile 的 20 张健康检查是 `batch-1783720370-20`：`20/20`、fallback `0`，IQ total median/mean/p95/max `163.59/178.41/249.12/268.53 ms`，PSNR `37.0445`、SSIM `0.97494`。`rx_server_arm_wait_ms` p95 低于 `1 ms`，说明 `RX_ARM_WAIT_MS=150` 已真正进入 Cockpit 默认路径；短批次能回到约 `250 ms` 显示档，但还需要新 300 张验证。
+
+最新本地修复是 not-armed 恢复链：`RX CAPTURE did not arm before TX` 先走短 `STOP timeout=<ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC>`，如果最后一次 STATUS 仍是 `busy=1`，再追加完整 STOP drain，避免下一轮 ARQ 立即撞 `capture_already_running`。同时 `rx_control_response_busy()` 改为按最后一次 `busy=` 判断，避免 STOP 首行 busy 但后续 STATUS 已 idle 时误判。回归测试已覆盖 `test_process_image_escalates_arm_failure_stop_when_rx_remains_busy` 和 `test_rx_control_response_busy_uses_latest_busy_token`；这项还没跑新硬件 300 张。
+
+两个 A/B 结论保持不变：`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=64` 的 300 张虽然 all-pass，但 p95/max 更差，拒绝；`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.02` 那轮因 SSH kex/worker 启动失败，不是有效性能结论。当前默认 soft-completion 保持 `0.05`，配合 persistent probe repeated check 使用；不要把 `0.02` 当成结论。
+
 03:52 最新 Cockpit-button-equivalent 300 张是 `batch-1783713085-300`。配置为 Docker SSH/TX、板端 `/home/user/venv/bin/python`、`REMOTE_RX_RUN_ROOT=/tmp/usrp292x_remote_runs`、`ANALOG_RX_TAIL_SEC=0.040`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、bounded RX batch session `16`、minimal decode response、response-only summary、预创建 capture dirs。结果为 `300/300`、fallback `0`；TVM median/mean/p95/max `241.45/242.16/244.54/261.01 ms`；IQ total median/mean/p95/max `155.23/240.64/271.00/9773.22 ms`；PSNR `37.0445`、SSIM `0.97494`。这说明 visible 重建速度已经回到约 `240-250 ms` 档，IQ normal path 明显快于 TVM，但 300 张 p95 仍被少数 `.npy` 写入/board decode/RX capture 长尾拉到 TVM p95 之上，不能算最终 p95 达标。
 
 这轮 `.npy` 数据面是有效的：`batch_spool_summary.json` 的 `remote_received_latent_npz_files` 全部是 `.npy`，`read_sc16` p95 `2.89 ms`，decoded-output write p95 `1.42 ms`。仍有极端尾巴：`image 111` 的 board-reported write 约 `4517 ms`，`image 244` runner decode wait 约 `9682 ms`，`image 226` RX capture 约 `1594 ms`。下一步优化应继续打长尾，而不是动 QPSK。
@@ -50,7 +58,7 @@ taskset profile 上复测 soft-completion 的 `batch-1783702255-300` 不通过�
 
 tmpfs decoded-output 又复测了一轮，仍不进默认 profile。`REMOTE_USRP_RX_DIR=/dev/shm/cockpit_usrp_rx` 的 50 张 `batch-1783704246-50` 为 `50/50`、fallback `0`，`write_npz` p95/max 压到 `2.55/2.61 ms`，但 IQ median/p95/max 恶化为 `153.18/508.96/567.11 ms`，尾巴转移到 RX capture/wait。tmpfs 只保留为 I/O 诊断。
 
-summaryless soft-completion 的逻辑缺口已修：response-only-summary 请求不再要求远端 `decode_summary.json` 存在，server 启动也会透传 `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY` 和 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC`。50 张 `batch-1783704792-50` 为 `50/50`、fallback `0`，TVM `240.29/246.72/258.10 ms`，IQ `154.63/219.79/278.24 ms`，质量不变；但没有 soft 命中。300 张 `batch-1783704920-300` 命中 `5` 次 soft completion，却因 RX WAIT/not-armed 链失败为 `299/300`、fallback `1`。通过帧 IQ p95 `247.85 ms` 不能作为有效结论；默认仍保持 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0`。
+summaryless soft-completion 的逻辑缺口已修：response-only-summary 请求不再要求远端 `decode_summary.json` 存在，server 启动也会透传 `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY` 和 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC`。50 张 `batch-1783704792-50` 为 `50/50`、fallback `0`，TVM `240.29/246.72/258.10 ms`，IQ `154.63/219.79/278.24 ms`，质量不变；但没有 soft 命中。300 张 `batch-1783704920-300` 命中 `5` 次 soft completion，却因 RX WAIT/not-armed 链失败为 `299/300`、fallback `1`。通过帧 IQ p95 `247.85 ms` 不能作为有效结论；当时默认仍保持 `0`，7/11 后当前候选默认改为 `0.05` 并使用 persistent probe repeated check。
 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=0` 和 `ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=1` 都已拒绝。整批共用 RX session 的 50 张 `batch-1783700070-50` 虽然 `50/50`，但 IQ median/p95/max 恶化到 `185.69/571.83/1217.93 ms`，长尾来自 `rx_session_open` 和 RX control。RX CAPTURE preconnect 的 50 张 `batch-1783700726-50` 也 `50/50`，但 IQ p95 仍是 `270.40 ms`，比 no-preconnect 的 `237.32 ms` 差；它只把瓶颈从 RX control 转移到了板端 decode。
 
@@ -64,7 +72,7 @@ Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ 
 - `fa323b6 diagnostics: split iq rx arm latency`
 - `da8e90d diagnostics: expose iq rx tail metrics`
 
-`ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` + `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1` + `ANALOG_REMOTE_DECODED_FORMAT=npy` + `ANALOG_RX_SC16_MMAP=1` + `ANALOG_RX_CLIPPING_DECIMATION=8` 是当前 7/11 live 候选基线。它已经通过 300 张 all-pass，并让 IQ median 到 `155.23 ms`、mean 到 `240.64 ms`；但 300 张 IQ p95 `271.00 ms` 仍高于 TVM p95 `244.54 ms`，所以不是最终达标结论。不要打开 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC`。
+`ANALOG_RX_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` + `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal` + `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` + `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1` + `ANALOG_REMOTE_DECODED_FORMAT=npy` + `ANALOG_RX_SC16_MMAP=1` + `ANALOG_RX_CLIPPING_DECIMATION=8` + `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05` 是当前 7/11 live 候选基线。它已经通过 300 张 all-pass，并让 IQ median 到 `158 ms` 左右；但最新有效 300 张 IQ p95 仍在 `266-275 ms` 区间，高于 TVM p95 `243 ms` 左右，所以不是最终达标结论。`0.02` soft-completion A/B 因 SSH kex/worker 启动失败无效，不能推广。
 
 `ANALOG_RX_BATCH_SESSION_MAX_IMAGES` 只在 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 时生效。`0` 表示整批共用同一个 RX session，已因 `batch-1783700070-50` p95 `571.83 ms` 拒绝；`8` 也已因 `batch-1783707616-50` p95 `363.43 ms` 拒绝。当前保持窗口 `16`。
 
@@ -85,12 +93,12 @@ WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，�
 - `ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`：减少 persistent worker stdout 响应体，保留板端完整 summary 文件。
 - `ANALOG_RX_SESSION_CONTROL=1`：同一连接发送 CAPTURE/WAIT，比单独 CAPTURE preconnect 更适合作为默认控制路径。
 - `ANALOG_RX_BATCH_SESSION_CONTROL=1` + `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`：当前推荐的 bounded RX session 复用窗口，能明显降低 normal-path median；窗口 `0` 和 `8` 都已拒绝。
-- `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`：当前推荐组合的一部分，减少 persistent worker 响应面；不要和 soft completion 混用。
+- `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1` + `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`：当前推荐组合的一部分，减少 persistent worker 响应面，并在 worker stdout 偶发滞后时用 persistent probe repeated check 提前确认远端 `.npy` 已可用。
 - `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`：当前最新有效改动，把远端目录创建移出 per-image RX hot path，降低目录/写入类尾巴。
 - `PERSISTENT_RX_TX_DELAY=0`：RX arm barrier 已经存在，保留固定 TX 延迟会拖慢正常路径。
 - `ANALOG_RX_TAIL_SEC=0.05`：当前可靠下限；短 tail 会引入 no-sync 或 p95 恶化。
 - `ANALOG_RX_POST_QUANTIZE=0`、fast-first sync、`ANALOG_PRECONNECT_CONTROL=1`、`RX_ARM_WAIT_MS=150`：保留在稳定 profile 中。
-- STOP/drain cleanup、session-before-STOP、decode timing 和 STOP timing 记录：主要提升可靠性和可观测性，是继续定位 p95 的基础。
+- STOP/drain cleanup、session-before-STOP、not-armed 短 STOP 后条件完整 drain、decode timing 和 STOP timing 记录：主要提升可靠性和可观测性，是继续定位 p95 的基础。
 
 已经试过但不进默认的路径：
 
@@ -102,7 +110,7 @@ WAIT timeout cleanup 的计时记录已修复。之前内层 STOP 成功后，�
 - `PERSISTENT_RX_TX_DELAY=0.005`：50 张 p95 恶化到 `306.92 ms`。
 - 早期单独 `ANALOG_RX_TAIL_SEC=0.04/0.045` 实验：出现 no-sync retry 或 p95 大幅恶化。7/11 的 `.npy + mmap + bounded session + minimal response` 组合已用 `0.040` 重新通过 300 张，但它仍是当前候选而非最终 p95 达标 profile。
 - depth-2 overlap、streaming TVM overlap：会放大 RX/worker contention，不作为默认。
-- tmpfs capture root、tmpfs decoded output、早期单独 `.npy` decoded output、soft completion、decode-worker timeout/restart、burst-miss retry、low-sync early retry、no-poll：有诊断价值，但没有稳定改善 300 张 p95/max。当前 `.npy` 只随 mmap/response-minimal/bounded-session 组合使用。
+- tmpfs capture root、tmpfs decoded output、早期单独 `.npy` decoded output、旧的一次性 SSH soft completion、decode-worker timeout/restart、burst-miss retry、low-sync early retry、no-poll：有诊断价值，但没有稳定改善 300 张 p95/max。当前 `.npy` 和 `0.05` soft-completion 只随 mmap/response-minimal/bounded-session/persistent-probe 组合使用。
 
 ## 推荐运行配置
 
@@ -126,6 +134,7 @@ ANALOG_REMOTE_DECODE_WORKER=1
 ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir
 ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal
 ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1
+ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05
 ANALOG_REMOTE_DECODED_FORMAT=npy
 ANALOG_REMOTE_CLEANUP_MODE=skip
 REMOTE_RX_RUN_ROOT=/tmp/usrp292x_remote_runs
@@ -154,7 +163,7 @@ OPENAMP_DEMO_TVM_BATCH_RUNNER=biglittle
 OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0
 ```
 
-不要默认打开 streaming TVM、depth-2 overlap、tmpfs capture root、tmpfs decoded output、soft completion、burst-miss retry、low-sync early retry、worker timeout/restart 或窗口 `0/8` 的 batch RX session。这些都有诊断价值，但目前没有通过 300 张 p95 gate。
+不要默认打开 streaming TVM、depth-2 overlap、tmpfs capture root、tmpfs decoded output、旧的一次性 SSH soft completion、burst-miss retry、low-sync early retry、worker timeout/restart 或窗口 `0/8/64` 的 batch RX session。这些都有诊断价值，但目前没有通过 300 张 p95 gate。当前候选只保留 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05` + persistent probe repeated check。
 
 ## 重启流程
 

@@ -4888,6 +4888,8 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_RX_SESSION_CONTROL": "1",
                     "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
                     "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                    "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.5",
+                    "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
                 },
                 source_summary="test",
             )
@@ -4922,6 +4924,10 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--rx-batch-session-control", command)
         self.assertIn("--rx-batch-session-max-images", command)
         self.assertEqual(command[command.index("--rx-batch-session-max-images") + 1], "16")
+        self.assertIn("--rx-arm-status-timeout-sec", command)
+        self.assertEqual(command[command.index("--rx-arm-status-timeout-sec") + 1], "0.5")
+        self.assertIn("--rx-arm-status-poll-sec", command)
+        self.assertEqual(command[command.index("--rx-arm-status-poll-sec") + 1], "0.025")
 
     def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
         class FakeThread:
@@ -7652,6 +7658,63 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["OPENAMP_USRP_TX_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
         self.assertEqual(env["OPENAMP_TVM_BATCH_RUNNER"], "biglittle")
         self.assertEqual(env["OPENAMP_TVM_BATCH_EXIT_GRACE_SEC"], "0.5")
+
+    def test_board_access_usrp_iq_defaults_fast_rx_arm_status_timeout(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "ANALOG_PRECONNECT_CONTROL": "",
+                "ANALOG_REMOTE_CLEANUP_MODE": "",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "",
+                "ANALOG_REMOTE_DECODED_FORMAT": "",
+                "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "",
+                "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "",
+                "ANALOG_RX_SC16_MMAP": "",
+                "ANALOG_RX_CLIPPING_DECIMATION": "",
+                "ANALOG_RX_SESSION_CONTROL": "",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
+                "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "",
+                "ANALOG_RX_ARM_STATUS_POLL_SEC": "",
+                "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "",
+                "ANALOG_RX_STOP_DRAIN_POLL_SEC": "",
+                "RX_ARM_WAIT_MS": "",
+                "RX_STOP_WAIT_MS": "",
+                "REMOTE_USRP_RX_DIR": "",
+            },
+            clear=False,
+        ):
+            status, _, _ = request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "iq-direct"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        env = state._board_access.build_env()
+        self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(env["ANALOG_PRECONNECT_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "skip")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(env["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.05")
+        self.assertEqual(env["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
+        self.assertEqual(env["ANALOG_RX_SC16_MMAP"], "1")
+        self.assertEqual(env["ANALOG_RX_CLIPPING_DECIMATION"], "8")
+        self.assertEqual(env["ANALOG_RX_SESSION_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(env["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.5")
+        self.assertEqual(env["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertEqual(env["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
+        self.assertEqual(env["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
+        self.assertEqual(env["RX_ARM_WAIT_MS"], "150")
+        self.assertEqual(env["RX_STOP_WAIT_MS"], "8000")
 
     def test_board_access_endpoint_accepts_jscc_link_mode_override(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)

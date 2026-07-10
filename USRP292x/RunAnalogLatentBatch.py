@@ -519,10 +519,11 @@ def is_rx_capture_busy_error(exc: Exception) -> bool:
 
 
 def rx_control_response_busy(response: str) -> bool:
+    latest: bool | None = None
     for token in str(response or "").replace("\n", " ").split():
         if token.startswith("busy="):
-            return token.split("=", 1)[1] not in {"0", "false", "False"}
-    return False
+            latest = token.split("=", 1)[1] not in {"0", "false", "False"}
+    return bool(latest)
 
 
 def rx_control_response_bool(response: str, key: str) -> bool | None:
@@ -628,21 +629,36 @@ def wait_for_rx_capture_armed(
     raise RuntimeError(f"RX CAPTURE did not arm before TX\n{last_response}")
 
 
-def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> str:
-    drain_timeout = max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
+def rx_stop_arm_failure_timeout_sec() -> float:
+    return max(0.0, env_float("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", 0.2))
+
+
+def stop_rx_capture(
+    args: argparse.Namespace,
+    log_path: Path,
+    *,
+    drain_timeout: float | None = None,
+) -> str:
+    explicit_drain_timeout = drain_timeout is not None
+    drain_timeout = (
+        max(0.0, float(drain_timeout))
+        if explicit_drain_timeout
+        else max(0.0, env_float("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", 1.0))
+    )
     drain_poll = max(0.01, env_float("ANALOG_RX_STOP_DRAIN_POLL_SEC", 0.05))
     base_timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
     timeout = max(base_timeout, drain_timeout + 0.5)
     entries: list[str] = []
+    stop_line = f"STOP timeout={drain_timeout:.6f}" if explicit_drain_timeout else "STOP"
     try:
         response = run_control(
             str(getattr(args, "rx_control_host", "")),
             int(getattr(args, "rx_control_port", 0)),
-            "STOP",
+            stop_line,
             log_path,
             timeout,
         )
-        entries.append(f"$ STOP\n{response}")
+        entries.append(f"$ {stop_line}\n{response}")
         if rx_control_response_busy(response) and drain_timeout > 0.0:
             deadline = time.monotonic() + drain_timeout
             while True:
@@ -663,6 +679,24 @@ def stop_rx_capture(args: argparse.Namespace, log_path: Path) -> str:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
     return "\n".join(entries)
+
+
+def stop_rx_capture_after_arm_failure(args: argparse.Namespace, log_path: Path) -> str:
+    response = stop_rx_capture(
+        args,
+        log_path,
+        drain_timeout=rx_stop_arm_failure_timeout_sec(),
+    )
+    if not rx_control_response_busy(response):
+        return response
+
+    full_log_path = log_path.with_name(f"{log_path.stem}_full_drain{log_path.suffix}")
+    full_response = stop_rx_capture(args, full_log_path)
+    combined = "\n".join(part.rstrip() for part in (response, full_response) if part).rstrip()
+    if combined:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(combined + "\n", encoding="utf-8")
+    return combined or response
 
 
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
@@ -1792,9 +1826,23 @@ def try_remote_dir_decode_soft_completion(
     control_socket: str | None = None,
     timeout: float = 3.0,
     request_id: str = "",
+    probe_worker: Any | None = None,
 ) -> dict[str, Any] | None:
     if not str(target or "").strip() or not str(remote_output or "").strip():
         return None
+    if probe_worker is not None:
+        try:
+            return probe_worker.probe(
+                remote_output,
+                remote_summary,
+                request_id=request_id,
+                timeout=timeout,
+                log_path=log_path,
+            )
+        except Exception as exc:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(f"persistent soft completion probe failed: {exc}\n", encoding="utf-8")
+            return None
     ssh_timeout = max(1, int(math.ceil(float(timeout or 1.0))))
     if str(remote_summary or "").strip():
         remote_cmd = (
@@ -1858,6 +1906,227 @@ def try_remote_dir_decode_soft_completion(
     return response
 
 
+class RemotePathProbeWorker:
+    _SCRIPT = r"""
+import json
+import os
+import sys
+import traceback
+
+print(json.dumps({"status": "ready"}), flush=True)
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        request = json.loads(line)
+        cmd = str(request.get("cmd") or "probe").strip().lower()
+        request_id = str(request.get("request_id") or "")
+        if cmd in {"quit", "exit"}:
+            print(json.dumps({"status": "bye", "request_id": request_id}), flush=True)
+            break
+        path = str(request.get("path") or "")
+        summary_json = str(request.get("summary") or "")
+        exists = False
+        if path:
+            try:
+                exists = os.path.getsize(path) > 0
+            except OSError:
+                exists = False
+        if not exists:
+            response = {"status": "missing"}
+        elif summary_json:
+            try:
+                if os.path.getsize(summary_json) <= 0:
+                    response = {"status": "missing"}
+                else:
+                    with open(summary_json, "r", encoding="utf-8") as handle:
+                        summary = json.load(handle)
+                    response = {
+                        "status": "ok",
+                        "summary_json": summary_json,
+                        "sync_metric": summary.get("sync_metric"),
+                        "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
+                        "summary": summary,
+                    }
+            except Exception as exc:
+                response = {"status": "error", "error": str(exc)}
+        else:
+            summary = {
+                "status": "ok",
+                "frame_complete": True,
+                "sync_success": True,
+                "out_npz": path,
+            }
+            response = {
+                "status": "ok",
+                "summary_json": "",
+                "sync_metric": None,
+                "estimated_cfo_hz": None,
+                "summary": summary,
+            }
+        if request_id:
+            response["request_id"] = request_id
+        print(json.dumps(response), flush=True)
+    except Exception as exc:
+        traceback.print_exc(file=sys.stderr)
+        print(json.dumps({"status": "error", "error": str(exc)}), flush=True)
+"""
+
+    def __init__(
+        self,
+        proc: subprocess.Popen[str],
+        stderr_handle: Any,
+        response_queue: queue.Queue[str],
+        reader_thread: threading.Thread,
+        startup_wall_sec: float,
+    ) -> None:
+        self.proc = proc
+        self._stderr_handle = stderr_handle
+        self._responses = response_queue
+        self._reader_thread = reader_thread
+        self.startup_wall_sec = startup_wall_sec
+
+    @classmethod
+    def start(
+        cls,
+        target: str,
+        args: argparse.Namespace,
+        log_path: Path,
+        *,
+        control_socket: str | None = None,
+    ) -> "RemotePathProbeWorker":
+        startup_started = time.monotonic()
+        remote_argv = [
+            remote_python_for_decode(args),
+            "-u",
+            "-c",
+            cls._SCRIPT,
+        ]
+        remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
+        full = _ssh_base_args(timeout=15, control_socket=control_socket) + [target, remote_cmd]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        stderr_handle = log_path.open("ab")
+        proc = subprocess.Popen(
+            full,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stderr_handle,
+            text=True,
+            bufsize=1,
+            shell=False,
+        )
+        responses: queue.Queue[str] = queue.Queue()
+
+        def reader() -> None:
+            if proc.stdout is None:
+                return
+            for stdout_line in proc.stdout:
+                responses.put(stdout_line)
+
+        reader_thread = threading.Thread(target=reader, daemon=True)
+        reader_thread.start()
+        timeout = float(os.environ.get("ANALOG_REMOTE_PROBE_WORKER_START_TIMEOUT_SEC", "30") or "30")
+        deadline = time.monotonic() + timeout
+        ready_response: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            try:
+                candidate_line = responses.get(timeout=max(0.1, deadline - time.monotonic()))
+            except queue.Empty as exc:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                stderr_handle.close()
+                raise RuntimeError(f"remote path probe worker did not become ready after {timeout:.1f}s") from exc
+            if not candidate_line.strip():
+                continue
+            try:
+                candidate_response = json.loads(candidate_line)
+            except json.JSONDecodeError:
+                if proc.poll() is not None:
+                    stderr_handle.close()
+                    raise RuntimeError(f"remote path probe worker exited before ready with status {proc.returncode}")
+                continue
+            if isinstance(candidate_response, dict):
+                ready_response = candidate_response
+                break
+        if not isinstance(ready_response, dict) or str(ready_response.get("status") or "").lower() != "ready":
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            stderr_handle.close()
+            raise RuntimeError("remote path probe worker did not return ready status")
+        return cls(proc, stderr_handle, responses, reader_thread, time.monotonic() - startup_started)
+
+    def probe(
+        self,
+        remote_output: str,
+        remote_summary: str,
+        *,
+        request_id: str = "",
+        timeout: float = 3.0,
+        log_path: Path | None = None,
+    ) -> dict[str, Any] | None:
+        if self.proc.poll() is not None or self.proc.stdin is None:
+            return None
+        request = {
+            "cmd": "probe",
+            "path": str(remote_output or ""),
+            "summary": str(remote_summary or ""),
+            "request_id": str(request_id or ""),
+        }
+        try:
+            self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
+            self.proc.stdin.flush()
+            line = self._responses.get(timeout=max(0.05, float(timeout or 0.05)))
+        except (BrokenPipeError, OSError, ValueError, queue.Empty):
+            return None
+        if log_path is not None:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(line, encoding="utf-8")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(response, dict) or str(response.get("status") or "").lower() != "ok":
+            return None
+        summary = response.get("summary") if isinstance(response.get("summary"), dict) else {}
+        status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+        if not status_ok or not bool(summary.get("frame_complete", True)):
+            return None
+        response["soft_completed"] = True
+        return response
+
+    def close(self, *, kill: bool = False) -> None:
+        try:
+            if self.proc.poll() is None and self.proc.stdin is not None and not kill:
+                self.proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
+                self.proc.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        try:
+            if self.proc.stdin is not None:
+                self.proc.stdin.close()
+        except OSError:
+            pass
+        if kill and self.proc.poll() is None:
+            self.proc.kill()
+        try:
+            self.proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        try:
+            self._stderr_handle.close()
+        except OSError:
+            pass
+
+
 class RemoteAnalogDecodeWorker:
     def __init__(
         self,
@@ -1903,29 +2172,31 @@ class RemoteAnalogDecodeWorker:
             return pending_line, pending_response
 
         deadline = time.monotonic() + float(timeout)
-        soft_deadline = (
+        soft_interval = max(0.01, min(float(soft_timeout or 0.0), 0.1))
+        next_soft_check = (
             time.monotonic() + float(soft_timeout)
             if soft_completion is not None and float(soft_timeout or 0.0) > 0.0
             else 0.0
         )
-        soft_checked = False
         while True:
-            remaining = max(0.0, deadline - time.monotonic())
+            now = time.monotonic()
+            remaining = max(0.0, deadline - now)
             if remaining <= 0.0:
                 self.close(kill=True)
                 raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s")
             wait_timeout = remaining
-            if soft_deadline > 0.0 and not soft_checked:
-                wait_timeout = min(wait_timeout, max(0.0, soft_deadline - time.monotonic()))
+            if next_soft_check > 0.0:
+                wait_timeout = min(wait_timeout, max(0.0, next_soft_check - now))
             try:
                 line = self._responses.get(timeout=wait_timeout)
             except queue.Empty as exc:
-                if soft_deadline > 0.0 and not soft_checked and time.monotonic() >= soft_deadline:
-                    soft_checked = True
+                now = time.monotonic()
+                if next_soft_check > 0.0 and now >= next_soft_check:
                     soft_response = soft_completion() if soft_completion is not None else None
                     if isinstance(soft_response, dict):
                         line = json.dumps(soft_response, ensure_ascii=True) + "\n"
                         return line, soft_response
+                    next_soft_check = now + soft_interval
                     continue
                 self.close(kill=True)
                 raise RemoteDecodeWorkerTimeout(f"remote decode worker timed out after {timeout:.1f}s") from exc
@@ -2773,7 +3044,16 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             if rx_session_shared:
                                 clear_shared_rx_control_session(args, rx_session)
                             rx_session = None
-                        stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                        if is_rx_capture_not_armed_error(exc):
+                            stop_response = stop_rx_capture_after_arm_failure(
+                                args,
+                                image.image_dir / "rx_stop_after_capture_busy.log",
+                            )
+                        else:
+                            stop_response = stop_rx_capture(
+                                args,
+                                image.image_dir / "rx_stop_after_capture_busy.log",
+                            )
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                         rx_failure_stop_done = True
                     raise
@@ -2925,13 +3205,15 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             summary="" if remote_decode_response_only_summary else str(remote_request.get("summary_json") or remote_summary),
                             request_id=str(remote_request.get("request_id") or ""),
                             log=image.image_dir / "remote_decode_soft_completion.log",
-                            control=ssh_control_socket: try_remote_dir_decode_soft_completion(
+                            control=ssh_control_socket,
+                            probe=getattr(args, "remote_decode_probe_worker", None): try_remote_dir_decode_soft_completion(
                                 target,
                                 output,
                                 summary,
                                 log,
                                 control_socket=control,
                                 request_id=request_id,
+                                probe_worker=probe,
                             )
                         )
                     worker_proc = remote_decode_worker.decode(
@@ -3388,7 +3670,16 @@ def _capture_remote_decode_pipeline_attempt(
                     if rx_session is not None:
                         close_preconnected_control(rx_session)
                         rx_session = None
-                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_capture_busy.log")
+                    if is_rx_capture_not_armed_error(exc):
+                        stop_response = stop_rx_capture_after_arm_failure(
+                            args,
+                            image.image_dir / "rx_stop_after_capture_busy.log",
+                        )
+                    else:
+                        stop_response = stop_rx_capture(
+                            args,
+                            image.image_dir / "rx_stop_after_capture_busy.log",
+                        )
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
             rx_arm_wall_sec = time.monotonic() - rx_arm_started
@@ -3581,13 +3872,15 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                         summary="" if remote_decode_response_only_summary else str(remote_request.get("summary_json") or remote_summary),
                         request_id=str(remote_request.get("request_id") or ""),
                         log=image.image_dir / "remote_decode_soft_completion.log",
-                        control=ctx["ssh_control_socket"]: try_remote_dir_decode_soft_completion(
+                        control=ctx["ssh_control_socket"],
+                        probe=getattr(args, "remote_decode_probe_worker", None): try_remote_dir_decode_soft_completion(
                             target,
                             output,
                             summary,
                             log,
                             control_socket=control,
                             request_id=request_id,
+                            probe_worker=probe,
                         )
                     )
                 worker_proc = remote_decode_worker.decode(
@@ -4248,6 +4541,7 @@ def main() -> int:
         "slot_wait_wall_sec": 0.0,
     }
     remote_decode_worker: RemoteAnalogDecodeWorker | None = None
+    remote_decode_probe_worker: RemotePathProbeWorker | None = None
     shared_ssh_master_proc: subprocess.Popen | None = None
     shared_ssh_control_socket: str | None = None
     shared_rx_control_session: Any | None = None
@@ -4259,6 +4553,9 @@ def main() -> int:
     rx_batch_session_images_since_open = 0
     remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
+    remote_decode_result_mode = str(
+        getattr(args, "remote_decode_result_mode", os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull")) or "pull"
+    ).strip().lower()
     try:
         if (
             remote_mode in {"remote-pull", "remote-decode"}
@@ -4281,6 +4578,13 @@ def main() -> int:
                     run_dir / "remote_decode_worker.log",
                     control_socket=shared_ssh_control_socket,
                 )
+                if remote_decode_result_mode == "remote-dir" and remote_decode_soft_complete_sec(args) > 0.0:
+                    remote_decode_probe_worker = RemotePathProbeWorker.start(
+                        remote_target,
+                        args,
+                        run_dir / "remote_decode_probe_worker.log",
+                        control_socket=shared_ssh_control_socket,
+                    )
         if (
             remote_mode in {"remote-pull", "remote-decode"}
             and not bool(getattr(args, "dry_run", False))
@@ -4294,10 +4598,8 @@ def main() -> int:
                 control_socket=shared_ssh_control_socket,
             )
         setattr(args, "remote_decode_worker", remote_decode_worker)
+        setattr(args, "remote_decode_probe_worker", remote_decode_probe_worker)
         setattr(args, "ssh_control_socket", shared_ssh_control_socket or "")
-        remote_decode_result_mode = str(
-            getattr(args, "remote_decode_result_mode", os.environ.get("ANALOG_REMOTE_DECODE_RESULT_MODE", "pull")) or "pull"
-        ).strip().lower()
         pipeline_enabled = (
             configured_pipeline_depth > 1
             and remote_mode == "remote-decode"
@@ -4391,6 +4693,8 @@ def main() -> int:
             clear_shared_rx_control_session(args, shared_rx_control_session)
         if remote_decode_worker is not None:
             remote_decode_worker.close()
+        if remote_decode_probe_worker is not None:
+            remote_decode_probe_worker.close()
         if shared_ssh_master_proc is not None:
             try:
                 shared_ssh_master_proc.terminate()
@@ -4435,6 +4739,10 @@ def main() -> int:
         "remote_decode_worker_enabled": remote_decode_worker is not None,
         "remote_decode_worker_startup_wall_sec": (
             float(remote_decode_worker.startup_wall_sec) if remote_decode_worker is not None else 0.0
+        ),
+        "remote_decode_probe_worker_enabled": remote_decode_probe_worker is not None,
+        "remote_decode_probe_worker_startup_wall_sec": (
+            float(remote_decode_probe_worker.startup_wall_sec) if remote_decode_probe_worker is not None else 0.0
         ),
         "remote_decode_worker_ready": (
             remote_decode_worker.ready_response if remote_decode_worker is not None else {}

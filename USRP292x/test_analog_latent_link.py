@@ -602,6 +602,78 @@ def test_remote_decode_worker_uses_soft_completion_when_response_lags(tmp_path):
     assert writes
 
 
+def test_remote_decode_worker_rechecks_soft_completion_until_output_appears(tmp_path):
+    writes: list[str] = []
+    soft_completion_calls = 0
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+        returncode = None
+        killed = False
+
+        def poll(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self, timeout=None) -> int:
+            return 0
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    def soft_completion() -> dict[str, object] | None:
+        nonlocal soft_completion_calls
+        soft_completion_calls += 1
+        if soft_completion_calls == 1:
+            return None
+        return {
+            "status": "ok",
+            "summary_json": "",
+            "summary": {
+                "status": "ok",
+                "frame_complete": True,
+                "sync_metric": 0.92,
+            },
+        }
+
+    proc = FakeProc()
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        proc,
+        FakeHandle(),
+        analog_batch.queue.Queue(),
+        None,
+        {"status": "ready"},
+        0.0,
+    )
+
+    result = worker.decode(
+        {"request_id": "decode-1"},
+        tmp_path / "remote_decode.log",
+        timeout=0.2,
+        soft_timeout=0.01,
+        soft_completion=soft_completion,
+    )
+
+    payload = json.loads(result.stdout)
+    assert soft_completion_calls >= 2
+    assert payload["summary"]["sync_metric"] == 0.92
+    assert proc.killed is False
+    assert writes
+
+
 def test_remote_dir_soft_completion_returns_worker_shaped_response(tmp_path, monkeypatch):
     commands: list[list[str]] = []
 
@@ -682,6 +754,71 @@ def test_remote_dir_soft_completion_can_use_output_only_for_summaryless_request(
     assert commands
     assert "test -s /remote/out/00000001.npz" in commands[0][-1]
     assert "cat " not in commands[0][-1]
+
+
+def test_remote_dir_soft_completion_uses_persistent_probe_without_spawning_ssh(tmp_path, monkeypatch):
+    class FakeProbe:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str, float]] = []
+
+        def probe(self, remote_output: str, remote_summary: str, *, request_id: str = "", timeout: float = 3.0, log_path=None):
+            self.calls.append((remote_output, remote_summary, request_id, timeout))
+            return {
+                "status": "ok",
+                "soft_completed": True,
+                "summary_json": remote_summary,
+                "request_id": request_id,
+                "summary": {
+                    "status": "ok",
+                    "frame_complete": True,
+                    "sync_success": True,
+                    "out_npz": remote_output,
+                },
+            }
+
+    def fail_run(*_args, **_kwargs):
+        raise AssertionError("soft completion should not spawn a one-off ssh probe")
+
+    probe = FakeProbe()
+    monkeypatch.setattr(analog_batch.subprocess, "run", fail_run)
+
+    response = analog_batch.try_remote_dir_decode_soft_completion(
+        "user@board",
+        "/remote/out/00000001.npy",
+        "",
+        tmp_path / "soft_completion.log",
+        timeout=0.25,
+        request_id="decode-1",
+        probe_worker=probe,
+    )
+
+    assert response is not None
+    assert response["soft_completed"] is True
+    assert response["summary"]["out_npz"] == "/remote/out/00000001.npy"
+    assert probe.calls == [("/remote/out/00000001.npy", "", "decode-1", 0.25)]
+
+
+def test_remote_dir_soft_completion_does_not_fallback_to_ssh_when_probe_misses(tmp_path, monkeypatch):
+    class MissingProbe:
+        def probe(self, *_args, **_kwargs):
+            return None
+
+    def fail_run(*_args, **_kwargs):
+        raise AssertionError("missing persistent probe result should let the decode worker continue")
+
+    monkeypatch.setattr(analog_batch.subprocess, "run", fail_run)
+
+    response = analog_batch.try_remote_dir_decode_soft_completion(
+        "user@board",
+        "/remote/out/00000001.npy",
+        "",
+        tmp_path / "soft_completion.log",
+        timeout=0.25,
+        request_id="decode-1",
+        probe_worker=MissingProbe(),
+    )
+
+    assert response is None
 
 
 def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, monkeypatch):
@@ -2460,7 +2597,7 @@ def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, mo
     result = analog_batch.process_image(args, image)
 
     assert result.passed is False
-    assert any(line == "STOP" for line in control_lines)
+    assert any(line == "STOP timeout=0.200000" for line in control_lines)
     assert not any(line.startswith("SEND ") for line in control_lines)
 
 
@@ -2687,6 +2824,69 @@ def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
     analog_batch.stop_rx_capture(args, tmp_path / "stop.log")
 
     assert control_lines == ["STOP", "STATUS", "STATUS"]
+
+
+def test_rx_control_response_busy_uses_latest_busy_token():
+    response = (
+        "$ STOP\nOK busy=1 started=1 done=0 ok=1\n"
+        "$ STATUS\nOK busy=0 started=1 done=1 ok=0 error=stopped"
+    )
+
+    assert analog_batch.rx_control_response_busy(response) is False
+
+
+def test_process_image_escalates_arm_failure_stop_when_rx_remains_busy(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        rx_arm_status_timeout_sec=0.0,
+        rx_arm_status_poll_sec=0.001,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line.startswith("CAPTURE "):
+            return "OK busy=1 started=0 done=0 ok=1 job_id=1"
+        if line == "STOP timeout=0.000000":
+            return "OK busy=1 started=0 done=0 ok=1 job_id=1"
+        if line == "STOP":
+            return "OK busy=0 started=0 done=1 ok=0 error=stopped"
+        return "OK busy=1 started=0 done=0 ok=1 job_id=1"
+
+    monkeypatch.setenv("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", "0.0")
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert "STOP timeout=0.000000" in control_lines
+    assert "STOP" in control_lines
+    assert control_lines.index("STOP") > control_lines.index("STOP timeout=0.000000")
+    assert not any(line.startswith("SEND ") for line in control_lines)
 
 
 def test_control_session_close_shutdowns_socket_before_close(monkeypatch):

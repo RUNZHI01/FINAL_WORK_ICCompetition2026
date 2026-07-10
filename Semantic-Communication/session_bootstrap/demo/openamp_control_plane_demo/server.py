@@ -3704,6 +3704,9 @@ class DashboardState:
                 "REMOTE_USRP_PROJECT_ROOT",
                 "OPENAMP_DEMO_REMOTE_DECODE_PYTHON",
                 "REMOTE_USRP_DECODE_PYTHON",
+                "OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT",
+                "RX_ARM_WAIT_MS",
+                "RX_STOP_WAIT_MS",
                 "ANALOG_RX_TAIL_SEC",
                 "ANALOG_REMOTE_CLEANUP_MODE",
                 "ANALOG_PRECONNECT_CONTROL",
@@ -3729,10 +3732,39 @@ class DashboardState:
                 "ANALOG_RETRY_ON_BURST_MISS",
                 "ANALOG_RETRY_ON_LOW_SYNC",
                 "ANALOG_LOW_SYNC_RETRY_THRESHOLD",
+                "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC",
+                "ANALOG_RX_STOP_DRAIN_POLL_SEC",
             ):
                 runtime_value = str(os.environ.get(runtime_key) or "").strip()
                 if runtime_value:
                     overrides.setdefault(runtime_key, runtime_value)
+            if normalize_jscc_link_mode(overrides.get("JSCC_LINK_MODE", ""), default="iq-direct") == "iq-direct":
+                for key, value in (
+                    ("OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT", "0"),
+                    ("REMOTE_USRP_RX_DIR", "/home/user/cockpit_usrp_rx"),
+                    ("REMOTE_RX_RUN_ROOT", "/tmp/usrp292x_remote_runs"),
+                    ("RX_ARM_WAIT_MS", "150"),
+                    ("RX_STOP_WAIT_MS", "8000"),
+                    ("ANALOG_RX_TAIL_SEC", "0.040"),
+                    ("ANALOG_REMOTE_CLEANUP_MODE", "skip"),
+                    ("ANALOG_PRECONNECT_CONTROL", "1"),
+                    ("ANALOG_RX_SESSION_CONTROL", "1"),
+                    ("ANALOG_RX_BATCH_SESSION_CONTROL", "1"),
+                    ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", "16"),
+                    ("ANALOG_REMOTE_DECODE_RESPONSE_MODE", "minimal"),
+                    ("ANALOG_REMOTE_DECODED_FORMAT", "npy"),
+                    ("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", "1"),
+                    ("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", "0.05"),
+                    ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS", "1"),
+                    ("ANALOG_RX_SC16_MMAP", "1"),
+                    ("ANALOG_RX_CLIPPING_DECIMATION", "8"),
+                    ("ANALOG_ROBUST_SYNC", "0"),
+                    ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC", "0.5"),
+                    ("ANALOG_RX_ARM_STATUS_POLL_SEC", "0.025"),
+                    ("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", "8.0"),
+                    ("ANALOG_RX_STOP_DRAIN_POLL_SEC", "0.05"),
+                ):
+                    overrides.setdefault(key, value)
             local_image_dir = self._discover_default_local_usrp_image_dir()
             if local_image_dir:
                 overrides.setdefault("OPENAMP_DEMO_LOCAL_IMAGE_DIR", local_image_dir)
