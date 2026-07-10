@@ -1302,6 +1302,7 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
         else None
     )
     mf0 = matched_filter(rx_search, taps)
+    mark_timing("matched_filter")
 
     class SyncAttemptError(RuntimeError):
         def __init__(self, message: str, metrics: dict[str, Any]) -> None:

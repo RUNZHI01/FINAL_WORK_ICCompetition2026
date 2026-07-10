@@ -168,6 +168,7 @@ def test_make_decode_clean_sc16_loopback_recovers_float_latent(tmp_path):
     assert summary_data["payload_is_bit_exact"] is False
     assert summary_data["decode_total_ms"] >= 0.0
     assert "initial_sync" in summary_data["decode_timing_ms"]
+    assert "matched_filter" in summary_data["decode_timing_ms"]
     assert manifest_data["payload_is_bit_exact"] is False
     assert recovered.shape == latent.shape
     assert out_wire.is_file()
@@ -2755,6 +2756,13 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_server_stop_wait_wall_sec": 0.0,
             "decode_wall_sec": 0.060,
             "remote_decode_reported_wall_sec": 0.041,
+            "remote_decode_timing_ms": {
+                "matched_filter": 2.0,
+                "initial_sync": 8.0,
+                "cfo_estimate": 3.0,
+                "payload_recovery": 20.0,
+                "write_npz": 1.5,
+            },
             "remote_decode_restart_wall_sec": 0.0,
             "decode_queue_wall_sec": 0.005,
             "remote_dir_publish_wall_sec": 0.004,
@@ -2777,6 +2785,13 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
             "rx_server_stop_wait_wall_sec": 0.012,
             "decode_wall_sec": 0.080,
             "remote_decode_reported_wall_sec": 0.043,
+            "remote_decode_timing_ms": {
+                "matched_filter": 4.0,
+                "initial_sync": 12.0,
+                "cfo_estimate": 5.0,
+                "payload_recovery": 32.0,
+                "write_npz": 2.5,
+            },
             "remote_decode_restart_wall_sec": 0.030,
             "decode_queue_wall_sec": 0.015,
             "remote_dir_publish_wall_sec": 0.006,
@@ -2802,6 +2817,11 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["rx_server_stop_wait_ms"]["max_ms"] == 12.0
     assert benchmark["remote_decode_ms"]["mean_ms"] == 70.0
     assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
+    assert benchmark["remote_decode_matched_filter_ms"]["median_ms"] == 3.0
+    assert benchmark["remote_decode_initial_sync_ms"]["p95_ms"] == 12.0
+    assert benchmark["remote_decode_cfo_estimate_ms"]["median_ms"] == 4.0
+    assert benchmark["remote_decode_payload_recovery_ms"]["median_ms"] == 26.0
+    assert benchmark["remote_decode_write_npz_ms"]["max_ms"] == 2.5
     assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0
     assert benchmark["remote_decode_response_overhead_ms"]["median_ms"] == 23.0
     assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
@@ -3280,6 +3300,11 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
                         "frame_complete": True,
                         "sync_success": True,
                         "decode_total_ms": 42.0,
+                        "decode_timing_ms": {
+                            "matched_filter": 2.5,
+                            "initial_sync": 7.0,
+                            "payload_recovery": 20.0,
+                        },
                     },
                 }),
                 stderr="",
@@ -3335,6 +3360,8 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
 
     assert result.passed is True
     assert result.records[0]["remote_decode_soft_completed"] is True
+    assert result.records[0]["remote_decode_timing_ms"]["matched_filter"] == 2.5
+    assert result.records[0]["remote_decode_timing_ms"]["initial_sync"] == 7.0
 
 
 def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):

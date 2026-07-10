@@ -99,6 +99,7 @@ tmpfs decoded-output 复测：`batch-1783684070-50` 使用 `/dev/shm/cockpit_usr
 - `stop_rx_capture()` 的客户端 timeout 已覆盖 RX drain budget，避免 profile 配置 `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0` 时被旧的 5s cap 提前切断。
 - WAIT timeout cleanup 会在 direct STOP 前关闭当前 RX control session，避免同一个服务端控制会话阻塞新 STOP 连接。
 - remote-dir soft completion 命中时会记录 `remote_decode_soft_completed=true`，便于后续 A/B 区分正常 stdout response 和文件探测接管。
+- `iq_stage_benchmark` 会聚合板端 `decode_timing_ms`，输出 `remote_decode_matched_filter_ms`、`remote_decode_initial_sync_ms`、`remote_decode_cfo_estimate_ms`、`remote_decode_payload_recovery_ms`、`remote_decode_write_npz_ms` 等字段，用于定位 decode-side tail。
 
 ## 已知卡点
 
@@ -140,7 +141,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
 2. 设计 RX arm/capture health handling。`batch-1783680558-50` 显示 server capture 稳定，但 runner 侧 capture/control overhead 和 no-sync retry 仍会拉高 image-level max。
-3. 继续处理 decode-side tail。session-before-STOP 已通过 300 张验证，剩余最大值主要是板端 reported decode stall 和 runner 等 decode worker response。
+3. 继续处理 decode-side tail。session-before-STOP 已通过 300 张验证，剩余最大值主要是板端 reported decode stall 和 runner 等 decode worker response；下一轮用新增的 `remote_decode_*_ms` 字段判断 tail 落在哪个板端阶段。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。
 

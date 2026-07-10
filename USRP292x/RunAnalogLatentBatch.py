@@ -1413,6 +1413,21 @@ def _remote_stall_snapshot_reasons(record: dict[str, Any], threshold_sec: float)
     return reasons
 
 
+def sanitize_decode_timing_ms(summary_data: dict[str, Any]) -> dict[str, float]:
+    raw_timing = summary_data.get("decode_timing_ms")
+    if not isinstance(raw_timing, dict):
+        return {}
+    timing: dict[str, float] = {}
+    for key, value in raw_timing.items():
+        if not isinstance(key, str):
+            continue
+        try:
+            timing[key] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return timing
+
+
 def maybe_capture_remote_stall_snapshot(
     args: argparse.Namespace,
     record: dict[str, Any],
@@ -2876,6 +2891,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "decode_wall_sec": decode_wall_sec,
             "remote_decode_soft_completed": remote_decode_soft_completed,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
+            "remote_decode_timing_ms": sanitize_decode_timing_ms(summary_data),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": retry_wait_wall_sec,
             "merge_wall_sec": merge_wall_sec,
@@ -3453,6 +3469,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "decode_wall_sec": decode_wall_sec,
             "remote_decode_soft_completed": bool(worker_response.get("soft_completed")) if isinstance(worker_response, dict) else False,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
+            "remote_decode_timing_ms": sanitize_decode_timing_ms(summary_data),
             "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": 0.0,
@@ -3773,6 +3790,22 @@ def _record_ms_delta_values(
     return values
 
 
+def _record_nested_ms_values(images: list[ImageRecord], record_field: str, nested_key: str) -> list[float]:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            raw_nested = record.get(record_field)
+            if not isinstance(raw_nested, dict):
+                continue
+            try:
+                value = float(raw_nested.get(nested_key) or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if value >= 0.0:
+                values.append(value)
+    return values
+
+
 def _mean_transmitted_bytes(images: list[ImageRecord]) -> float:
     values: list[float] = []
     for image in images:
@@ -3811,6 +3844,23 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     benchmark: dict[str, Any] = {}
     for metric_name, record_field in fields:
         metric = _metric_from_ms_values(_record_ms_values(images, record_field))
+        if metric is not None:
+            benchmark[metric_name] = metric
+    decode_timing_fields = (
+        ("remote_decode_setup_ms", "setup"),
+        ("remote_decode_read_sc16_ms", "read_sc16"),
+        ("remote_decode_dc_and_crop_ms", "dc_and_crop"),
+        ("remote_decode_matched_filter_ms", "matched_filter"),
+        ("remote_decode_initial_sync_ms", "initial_sync"),
+        ("remote_decode_cfo_estimate_ms", "cfo_estimate"),
+        ("remote_decode_payload_recovery_ms", "payload_recovery"),
+        ("remote_decode_latent_reconstruct_ms", "latent_reconstruct"),
+        ("remote_decode_write_npz_ms", "write_npz"),
+        ("remote_decode_summary_metrics_ms", "summary_metrics"),
+        ("remote_decode_write_wire_ms", "write_wire"),
+    )
+    for metric_name, timing_key in decode_timing_fields:
+        metric = _metric_from_ms_values(_record_nested_ms_values(images, "remote_decode_timing_ms", timing_key))
         if metric is not None:
             benchmark[metric_name] = metric
     derived_fields = (
