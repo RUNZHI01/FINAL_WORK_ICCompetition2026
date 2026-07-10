@@ -458,6 +458,13 @@ def clear_shared_rx_control_session(args: argparse.Namespace, session: Any | Non
         setattr(args, "rx_control_session", None)
 
 
+def close_shared_rx_control_session(args: argparse.Namespace) -> None:
+    session = getattr(args, "rx_control_session", None)
+    if session is not None:
+        close_preconnected_control(session)
+        clear_shared_rx_control_session(args, session)
+
+
 def pipeline_rf_decode_guard(args: argparse.Namespace) -> Any:
     lock = getattr(args, "pipeline_rf_decode_lock", None)
     return lock if lock is not None else nullcontext()
@@ -2870,6 +2877,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
 
             if not image.passed and rx_needs_failure_stop and not rx_failure_stop_done:
                 try:
+                    close_shared_rx_control_session(args)
                     stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_failure.log")
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                     rx_failure_stop_done = True
@@ -2972,6 +2980,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         rx_server_snapshot.update(parse_rx_control_snapshot_fields(error_text))
         if rx_needs_failure_stop and not rx_failure_stop_done:
             try:
+                close_shared_rx_control_session(args)
                 stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_error.log")
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 rx_failure_stop_done = True

@@ -2772,6 +2772,76 @@ def test_process_image_shared_session_wait_timeout_clears_batch_session(tmp_path
     assert getattr(args, "rx_control_session", None) is None
 
 
+def test_process_image_shared_session_decode_failure_closes_before_stop(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        preconnect_control=False,
+        rx_session_control=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    events: list[str] = []
+
+    class SharedSession:
+        def command(self, line, log_path, _timeout):
+            events.append(f"shared:{line.split()[0]}")
+            log_path.write_text("OK\n", encoding="utf-8")
+            return "OK busy=1 started=1 done=1 ok=1 job_id=0"
+
+        def close(self):
+            events.append("shared:close")
+
+    shared_session = SharedSession()
+    args.rx_control_session = shared_session
+
+    def fail_open_session(*_args, **_kwargs):
+        raise AssertionError("process_image should use the shared RX control session")
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_decode(_args, _batch_rx, _manifest_path, _out_npz, _out_wire, summary, _log_path):
+        summary.write_text(json.dumps({"payload_is_bit_exact": False}), encoding="utf-8")
+        return 1
+
+    def fake_run_control(_host, _port, line, log_path, _timeout):
+        events.append(f"direct:{line.split()[0]}")
+        log_path.write_text("OK\n", encoding="utf-8")
+        if line == "STOP":
+            return "OK busy=0 started=1 done=1 ok=0 stop_cmd_sec=0.003 stop_wait_sec=0.208 wall_sec=0.211"
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "open_control_session", fail_open_session)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_in_process_decode", fake_decode)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert not result.passed
+    assert "shared:close" in events
+    assert "direct:STOP" in events
+    assert events.index("shared:close") < events.index("direct:STOP")
+    assert getattr(args, "rx_control_session", None) is None
+
+
 def test_process_image_remote_pull_avoids_unneeded_remote_staging_commands(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
