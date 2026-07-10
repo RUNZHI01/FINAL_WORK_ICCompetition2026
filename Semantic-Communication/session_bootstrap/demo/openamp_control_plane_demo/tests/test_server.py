@@ -105,6 +105,33 @@ def test_transport_benchmark_prefers_iq_round_medians_over_outlier_means() -> No
     assert benchmark["total_ms"]["mean_ms"] > benchmark["total_ms"]["median_ms"]
 
 
+def test_crypto_status_exposes_iq_stage_benchmark_from_batch_state() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._crypto_enabled = True
+    state._crypto_status_cache = {
+        "channel_state": "ready",
+        "kem_backend": "mock-kem",
+        "cipher_suite": "mock-cipher",
+        "board_configured": True,
+    }
+    state._crypto_status_cache_ts = time.monotonic()
+    state._batch_state = {
+        "status": "done",
+        "completed": 5,
+        "total": 5,
+        "iq_stage_benchmark": {
+            "rx_arm_control_overhead_ms": {"n": 5, "median_ms": 21.0, "p95_ms": 45.0},
+            "rx_wait_response_overhead_ms": {"n": 5, "median_ms": 1.4, "p95_ms": 126.0},
+        },
+    }
+
+    status = state._get_crypto_status_core()
+
+    assert status["batch_status"] == "done"
+    assert status["batch_iq_stage_benchmark"]["rx_arm_control_overhead_ms"]["median_ms"] == 21.0
+    assert status["batch_iq_stage_benchmark"]["rx_wait_response_overhead_ms"]["p95_ms"] == 126.0
+
+
 def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
     benchmark = usrp_runtime._iq_stage_benchmark_from_summary(
         {

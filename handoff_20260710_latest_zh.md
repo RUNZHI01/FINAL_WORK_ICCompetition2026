@@ -8,6 +8,10 @@
 
 最新同代码 no-batch 300 张 A/B 是 `batch-1783691290-300`：`300/300`、fallback `0`。TVM median/p95/max 为 `241.84/253.13/265.85 ms`；IQ median/p95/max 为 `172.71/301.74/8598.55 ms`。这说明正常路径速度够了，剩下问题集中在 RX arm/wait/control stall、runner-side decode response wait，以及少数 `/home` `.npz` 写入 stall。
 
+最新 50 张 Cockpit-equivalent 复测是 `batch-1783694251-50`：`50/50`、fallback `0`。TVM median/p95/max 为 `241.53/247.05/257.82 ms`；IQ median/p95/max 为 `217.35/520.90/1306.86 ms`。这轮新增了更细的长尾拆分：`rx_arm_control_overhead_ms` median/p95/max `21.04/45.41/1159.40 ms`，`rx_wait_response_overhead_ms` `1.36/125.83/266.76 ms`，`remote_decode_response_overhead_ms` `16.45/128.18/395.78 ms`，而 `rx_server_receive_ms` 稳定在 `63.61/63.64/64.03 ms`。结论是服务端实际收样本很稳定，长尾主要在 runner 到 RX 控制响应、WAIT 响应和 decode worker 响应边界。
+
+Cockpit Desktop 已跟上主链路参数和主要指标：一键路径仍是 IQ direct、Docker TX、板端 venv RX、handwritten TVM、big.LITTLE；`/api/batch-state` 已返回 `transport_benchmark`、`inference_benchmark`、`iq_stage_benchmark`。本轮补了 `/api/crypto-status` 的 `batch_iq_stage_benchmark` 透出，并在 Cockpit benchmark 表中显示 RX arm/capture/wait、RX arm 控制长尾、WAIT 响应长尾和 decode 响应长尾，避免这些指标只存在于 JSON 里。
+
 ## 当前代码和提交
 
 最近三次关键提交：
@@ -160,7 +164,7 @@ git diff --check
 git diff -- USRP292x\RunQpskFileBatchSpoolArq.py
 ```
 
-最近一次完整单测为 `99 passed in 32.81s`。`py_compile` 通过。`git diff --check` 只有 CRLF 提示。QPSK diff 为空。
+最近一次已完成验证：`python -m pytest USRP292x/test_analog_latent_link.py -q` 为 `100 passed in 31.04s`；新增后端契约测试和 USRP TVM 批量状态测试通过；`python -m py_compile ...` 通过；`npm run typecheck` 通过。完整 `test_server.py` 单文件曾在 `120 s` 内未跑完，不能视作完整通过。提交前仍需跑 `git diff --check` 并确认 QPSK diff 为空。
 
 ## 重要文件
 

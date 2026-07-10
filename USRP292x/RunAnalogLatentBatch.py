@@ -3915,6 +3915,33 @@ def _record_ms_delta_values(
     return values
 
 
+def _record_rx_wait_response_overhead_ms_values(images: list[ImageRecord]) -> list[float]:
+    values: list[float] = []
+    for image in images:
+        for record in image.records:
+            required = (
+                "rx_capture_wall_sec",
+                "rx_arm_wall_sec",
+                "rx_wait_wall_sec",
+                "rx_server_capture_wall_sec",
+            )
+            if any(field_name not in record for field_name in required):
+                continue
+            try:
+                rx_capture = float(record.get("rx_capture_wall_sec") or 0.0)
+                rx_arm = float(record.get("rx_arm_wall_sec") or 0.0)
+                rx_wait = float(record.get("rx_wait_wall_sec") or 0.0)
+                server_capture = float(record.get("rx_server_capture_wall_sec") or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if server_capture <= 0.0:
+                continue
+            post_arm_to_wait = max(0.0, rx_capture - rx_arm - rx_wait)
+            expected_wait_for_capture = max(0.0, server_capture - post_arm_to_wait)
+            values.append(max(0.0, rx_wait - expected_wait_for_capture) * 1000.0)
+    return values
+
+
 def _record_nested_ms_values(images: list[ImageRecord], record_field: str, nested_key: str) -> list[float]:
     values: list[float] = []
     for image in images:
@@ -4006,6 +4033,31 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
         metric = _metric_from_ms_values(
             _record_ms_delta_values(images, record_field, *subtract_fields, positive_fields=positive_fields)
         )
+        if metric is not None:
+            benchmark[metric_name] = metric
+    extra_derived_metrics = (
+        (
+            "rx_arm_control_overhead_ms",
+            _record_ms_delta_values(
+                images,
+                "rx_arm_wall_sec",
+                "rx_server_arm_wait_wall_sec",
+                positive_fields=("rx_server_arm_wait_wall_sec",),
+            ),
+        ),
+        (
+            "rx_post_arm_to_wait_ms",
+            _record_ms_delta_values(
+                images,
+                "rx_capture_wall_sec",
+                "rx_arm_wall_sec",
+                "rx_wait_wall_sec",
+            ),
+        ),
+        ("rx_wait_response_overhead_ms", _record_rx_wait_response_overhead_ms_values(images)),
+    )
+    for metric_name, values in extra_derived_metrics:
+        metric = _metric_from_ms_values(values)
         if metric is not None:
             benchmark[metric_name] = metric
     return benchmark

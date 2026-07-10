@@ -3026,6 +3026,10 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["rx_server_stream_cmd_ms"]["median_ms"] == 8.0
     assert benchmark["rx_server_receive_ms"]["median_ms"] == 27.0
     assert benchmark["rx_server_capture_ms"]["median_ms"] == 36.0
+    assert benchmark["rx_arm_control_overhead_ms"]["median_ms"] == 1.0
+    assert benchmark["rx_post_arm_to_wait_ms"]["median_ms"] == 5.0
+    assert benchmark["rx_wait_response_overhead_ms"]["median_ms"] == 5.0
+    assert benchmark["rx_wait_response_overhead_ms"]["p95_ms"] == 9.0
     assert benchmark["rx_capture_control_overhead_ms"]["median_ms"] == 4.0
     assert "rx_wait_minus_server_receive_ms" not in benchmark
     assert benchmark["rx_server_stop_cmd_ms"]["max_ms"] == 3.0
@@ -3065,6 +3069,9 @@ def test_iq_stage_benchmark_skips_derived_metrics_without_complete_inputs(tmp_pa
     assert "rx_capture_ms" in benchmark
     assert "remote_decode_ms" in benchmark
     assert "rx_capture_control_overhead_ms" not in benchmark
+    assert "rx_arm_control_overhead_ms" not in benchmark
+    assert "rx_post_arm_to_wait_ms" not in benchmark
+    assert "rx_wait_response_overhead_ms" not in benchmark
     assert "rx_wait_minus_server_receive_ms" not in benchmark
     assert "remote_decode_response_overhead_ms" not in benchmark
 

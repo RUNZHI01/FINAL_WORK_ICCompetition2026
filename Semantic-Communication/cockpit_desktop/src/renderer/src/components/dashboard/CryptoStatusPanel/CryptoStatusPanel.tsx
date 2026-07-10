@@ -316,14 +316,21 @@ export function CryptoStatusPanel() {
       </div>
 
       {/* Batch benchmark results */}
-      {data.batch_status === 'done' && (data.batch_benchmark || data.batch_transport_benchmark || data.batch_inference_benchmark) && (() => {
+      {data.batch_status === 'done' && (data.batch_benchmark || data.batch_transport_benchmark || data.batch_inference_benchmark || data.batch_iq_stage_benchmark) && (() => {
         const inferenceBm = data.batch_inference_benchmark ?? data.batch_benchmark
         const transportBm = data.batch_transport_benchmark
+        const iqStageBm = data.batch_iq_stage_benchmark
         const rows: { label: string; metric: BenchmarkMetric }[] = []
         if (transportBm?.radio_airtime_ms) rows.push({ label: '无线空口', metric: transportBm.radio_airtime_ms })
         if (transportBm?.decode_ms) rows.push({ label: '板端解码', metric: transportBm.decode_ms })
         if (transportBm?.merge_ms) rows.push({ label: '文件合并', metric: transportBm.merge_ms })
         if (transportBm?.total_ms) rows.push({ label: '传输/解包总计', metric: transportBm.total_ms })
+        if (iqStageBm?.rx_arm_ms) rows.push({ label: 'RX arm', metric: iqStageBm.rx_arm_ms })
+        if (iqStageBm?.rx_capture_ms) rows.push({ label: 'RX capture', metric: iqStageBm.rx_capture_ms })
+        if (iqStageBm?.rx_wait_ms) rows.push({ label: 'RX wait', metric: iqStageBm.rx_wait_ms })
+        if (iqStageBm?.rx_arm_control_overhead_ms) rows.push({ label: 'RX arm控制', metric: iqStageBm.rx_arm_control_overhead_ms })
+        if (iqStageBm?.rx_wait_response_overhead_ms) rows.push({ label: 'WAIT响应', metric: iqStageBm.rx_wait_response_overhead_ms })
+        if (iqStageBm?.remote_decode_response_overhead_ms) rows.push({ label: 'Decode响应', metric: iqStageBm.remote_decode_response_overhead_ms })
         if (inferenceBm?.inference_ms) rows.push({ label: '推理重建', metric: inferenceBm.inference_ms })
         if (inferenceBm?.total_ms && inferenceBm.total_ms !== inferenceBm.inference_ms) rows.push({ label: '推理侧总计', metric: inferenceBm.total_ms })
         const validRows = rows.filter((row) => row.metric != null)

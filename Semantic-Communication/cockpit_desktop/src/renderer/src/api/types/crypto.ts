@@ -14,6 +14,7 @@ export type BenchmarkMetric = {
 }
 
 export type BatchBenchmark = {
+  [metric: string]: BenchmarkMetric | null | undefined
   handshake_ms?: BenchmarkMetric | null
   encrypt_ms?: BenchmarkMetric | null
   decrypt_ms?: BenchmarkMetric | null
@@ -134,6 +135,8 @@ export type CryptoStatusResponse = {
   batch_transport_benchmark?: BatchBenchmark | null
   /** Pure board-side TVM/MNN reconstruction benchmark */
   batch_inference_benchmark?: BatchBenchmark | null
+  /** IQ direct detailed transport stage benchmark */
+  batch_iq_stage_benchmark?: BatchBenchmark | null
   /** Batch inference run status: 'running' | 'done' | null */
   batch_status?: string | null
   /** Number of completed images in current/last batch */
@@ -174,6 +177,7 @@ export type BatchStateResponse = {
   benchmark?: BatchBenchmark | null
   transport_benchmark?: BatchBenchmark | null
   inference_benchmark?: BatchBenchmark | null
+  iq_stage_benchmark?: BatchBenchmark | null
   host_preprocess_progress?: BatchStageProgress | null
   transport_progress?: BatchStageProgress | null
   inference_progress?: BatchStageProgress | null
