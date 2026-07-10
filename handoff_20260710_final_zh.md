@@ -87,6 +87,8 @@ decode timing 字段验证是 `batch-1783686020-50`：`50/50`，fallback `0`，T
 
 decode timing 300 张 gate 是 `batch-1783686930-300`：`300/300`，fallback `0`，TVM median/p95/max `240.29/242.87/257.55 ms`，IQ median/p95/max `166.04/288.97/7683.31 ms`。IQ median 已明显低于 TVM，但 p95/max 仍需优化。最大值来自一次 `/home` `.npz` 写入 stall；其他 top tail 主要是 RX arm/capture control 约 `1.0-1.1 s` 和 runner-side decode response wait。
 
+Batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 的 50 张 `batch-1783690852-50` 通过，IQ median/p95 `155.30/217.47 ms`，但 300 张 `batch-1783690925-300` 变成 IQ median/p95 `162.20/321.68 ms`，p95 高于 TVM。关闭该开关的同代码对照 `batch-1783691290-300` 是 IQ median/p95 `172.71/301.74 ms`。结论：batch session 降低 median，但 300 张 p95 不够稳，只保留 opt-in，不写进默认 profile。
+
 短 RX tail 已拒绝：`ANALOG_RX_TAIL_SEC=0.04` 在 5 张 sanity 出现 no-sync retry；`0.045` 的 50 张 `batch-1783678227-50` 虽然全过，但 IQ median/p95 变成 `201.17/1207.08 ms`。保持 `0.05`。
 
 ## 本轮主要改动
@@ -105,7 +107,7 @@ decode timing 300 张 gate 是 `batch-1783686930-300`：`300/300`，fallback `0`
 - remote-dir soft completion 命中时会记录 `remote_decode_soft_completed=true`，便于后续 A/B 区分正常 stdout response 和文件探测接管。
 - `iq_stage_benchmark` 会聚合板端 `decode_timing_ms`，输出 `remote_decode_matched_filter_ms`、`remote_decode_initial_sync_ms`、`remote_decode_cfo_estimate_ms`、`remote_decode_payload_recovery_ms`、`remote_decode_write_npz_ms` 等字段，用于定位 decode-side tail。
 - 失败 remote-decode attempt 也会保留 `decode_wall_sec`，避免低 sync/no-sync retry 的耗时归因丢失。
-- 新增 opt-in `ANALOG_RX_BATCH_SESSION_CONTROL=1` / `--rx-batch-session-control`。它只用于非 pipeline 顺序批次，复用一个 RX control session 跨图片发送 CAPTURE/WAIT；正常结束后关闭，WAIT timeout/capture busy/session 失效后清空共享 session，避免后续图片复用死连接。该开关已通过本地单元测试，还没跑现场 50/300 张 gate。
+- 新增 opt-in `ANALOG_RX_BATCH_SESSION_CONTROL=1` / `--rx-batch-session-control`。它只用于非 pipeline 顺序批次，复用一个 RX control session 跨图片发送 CAPTURE/WAIT；正常结束后关闭，WAIT timeout/capture busy/session 失效后清空共享 session，避免后续图片复用死连接。现场 A/B 后不推广为默认。
 
 ## 已知卡点
 
@@ -146,7 +148,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 ## 下一步顺序
 
 1. 保持 QPSK 冻结，任何 IQ 改动前后都检查 `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py`。
-2. 先现场验证 `ANALOG_RX_BATCH_SESSION_CONTROL=1`。从 Cockpit 等价 50 张开始；如果 `50/50`、fallback `0` 且 RX control overhead p95 改善，再跑 300 张 gate。通过前不要写入默认 profile。
+2. 保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0` 作为默认；`ANALOG_RX_BATCH_SESSION_CONTROL=1` 只作为诊断/后续实验开关。
 3. 继续处理 IQ p95/max。最新 300 张显示 median 已低于 TVM，但 tail 主要来自 RX arm/capture control、runner 等 decode response，以及 rare `/home` `.npz` 写入 stall。
 4. RX 状态机稳定前，不默认开启 double buffering、streaming TVM 或 depth-2 overlap。
 5. 每次 timing 行为变化后先跑 50 张，再跑 300 张 gate。只看短跑 median 不够。

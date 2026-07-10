@@ -13,7 +13,9 @@
 - `USRP292x/RunAnalogLatentBatch.py`
 - `USRP292x/test_analog_latent_link.py`
 
-这部分是在做 opt-in 的批次级 RX control session 复用，目标是减少每张图反复建立 CAPTURE/WAIT 控制连接造成的 tail。当前代码已经完成本地实现：`ANALOG_RX_BATCH_SESSION_CONTROL=1` / `--rx-batch-session-control` 会在非 pipeline 顺序批次里打开一个 RX control session，跨图片复用，并在 batch 结束关闭；WAIT timeout、capture busy 或 session 失效后会清空 `args.rx_control_session`。本地验证已通过，现场 50/300 张 gate 还没跑。
+这部分是在做 opt-in 的批次级 RX control session 复用，目标是减少每张图反复建立 CAPTURE/WAIT 控制连接造成的 tail。当前代码已经完成本地实现：`ANALOG_RX_BATCH_SESSION_CONTROL=1` / `--rx-batch-session-control` 会在非 pipeline 顺序批次里打开一个 RX control session，跨图片复用，并在 batch 结束关闭；WAIT timeout、capture busy、decode/no-sync cleanup 或 session 失效后会清空 `args.rx_control_session`。本地验证已通过，现场 A/B 结论是不推广为默认：50 张变快，但 300 张 p95 不如 no-batch。
+
+现场数据：batch session 50 张 `batch-1783690852-50` 为 `50/50`、fallback `0`，IQ median/p95/max `155.30/217.47/583.30 ms`；batch session 300 张 `batch-1783690925-300` 为 `300/300`、fallback `0`，IQ median/p95/max `162.20/321.68/6828.85 ms`。关闭 batch session 的 300 张 A/B `batch-1783691290-300` 为 `300/300`、fallback `0`，IQ median/p95/max `172.71/301.74/8598.55 ms`。默认继续用 no-batch；下一步处理 RX arm/wait/control stall 和 rare `/home` `.npz` write stall。
 
 ## 推荐运行配置
 
@@ -72,8 +74,8 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 ## 下一步
 
-1. 保持 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 为 opt-in。它不能直接默认打开，因为 RX server 单客户端会话被长时间占用时，外部 `STATUS/STOP` 连接会被挡住。
-2. 现场先跑 Cockpit 等价 50 张；如果 `50/50`、fallback `0` 且 `rx_capture_control_overhead_ms` p95 改善，再跑 300 张 gate。
+1. 保持 `ANALOG_RX_BATCH_SESSION_CONTROL=0` 作为默认；`ANALOG_RX_BATCH_SESSION_CONTROL=1` 只作为 opt-in 诊断开关。它不能直接默认打开，因为 RX server 单客户端会话被长时间占用时，外部 `STATUS/STOP` 连接会被挡住，而且 300 张 p95 A/B 未通过。
+2. 下一步优先处理 RX arm/wait/control stall；如果 p95 仍高，再处理 runner-side decode response wait 和 `/home` `.npz` write stall。
 3. 提交前本地验证：
 
 ```powershell

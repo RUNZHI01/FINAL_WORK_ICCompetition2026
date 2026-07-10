@@ -66,6 +66,8 @@ decode timing 字段验证：`batch-1783686020-50`，结果 `50/50`、fallback `
 
 decode timing 300 张 gate：`batch-1783686930-300`，结果 `300/300`、fallback `0`。TVM median/p95/max 为 `240.29/242.87/257.55 ms`，IQ total median/p95/max 为 `166.04/288.97/7683.31 ms`。IQ median 已明显低于 TVM median，但 IQ p95 和 max 仍未达成“远小于 TVM”的最终目标。最大值来自 image 177：board `write_npz` 为 `7440.19 ms`，总 IQ 为 `7683.31 ms`。其他 top tail 是 RX arm/capture control：image 103、110、235 的 `rx_arm_ms` 约 `1025-1122 ms`，但 server capture 仍约 `64 ms`；image 184 是 runner-side decode response wait，`decode_wall_sec` 约 `1231 ms`，board reported decode 约 `56 ms`。
 
+batch RX session A/B：`ANALOG_RX_BATCH_SESSION_CONTROL=1` 已完成本地实现并通过现场 50 张 `batch-1783690852-50`，结果 `50/50`、fallback `0`，IQ median/p95/max `155.30/217.47/583.30 ms`，TVM median/p95 `242.49/246.53 ms`。但 300 张 `batch-1783690925-300` 虽然 `300/300`、fallback `0`，IQ median/p95/max 为 `162.20/321.68/6828.85 ms`，p95 仍高于 TVM。关闭 batch session 的同代码 A/B `batch-1783691290-300` 为 `300/300`、fallback `0`，IQ median/p95/max `172.71/301.74/8598.55 ms`，更稳。结论：batch session 只保留 opt-in，不推广为默认。
+
 QPSK 参考批次 `batch-1783610673-300` 的 transport 约 `2961.78 ms/image`。IQ 直传已经明显快于 QPSK，后续不要用 QPSK 解码拖慢飞腾派路径。
 
 ## 本次 RX 失败清理补丁
@@ -127,8 +129,8 @@ Invoke-RestMethod -Uri http://127.0.0.1:8079/api/batch-state | ConvertTo-Json -D
 
 1. 提交当前 decode timing 和失败 attempt timing 补丁，提交前确认没有生成 report、raw log 或临时运行产物混进 git。
 2. 继续用 `batch-1783686930-300` 作为当前默认 profile 的 300 张基线：IQ median/p95 `166.04/288.97 ms`，TVM median/p95 `240.29/242.87 ms`，fallback `0`。
-3. 下一步先用 `ANALOG_RX_BATCH_SESSION_CONTROL=1` 跑 Cockpit 等价 50 张；如果 `50/50`、fallback `0` 且 `rx_capture_control_overhead_ms` p95 改善，再跑 300 张 gate。
-4. 若 batch session 后 tail 仍主要是 runner 等 decode worker response，则继续处理 `remote_decode_response_overhead_ms`；若 tail 落在 matched-filter/sync/CFO/payload recovery，则回到 `AnalogLatentLink.py` 针对对应阶段优化。
+3. `ANALOG_RX_BATCH_SESSION_CONTROL=1` 不推广为默认；300 张 A/B 显示它降低 median，但 p95 不如 no-batch。
+4. 下一步继续处理 IQ p95/max：优先 RX arm/wait/control stall，其次 runner-side decode response wait 和 rare `/home` `.npz` write stall。
 5. 可做 decoded output placement/format A/B，但只有 300 张全过且 p95/max 同时改善才推广；tmpfs、`.npy` 仍不是默认。
 6. 认证和 ML-KEM 先维持不进 per-image hot path。security-on 要单独跑 20 张和 300 张，对比开销；如果超过约 `5%`，性能基线继续保留 security-off 并记录差值。
 
