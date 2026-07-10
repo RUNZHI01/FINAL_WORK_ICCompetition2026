@@ -1488,6 +1488,51 @@ def test_process_image_wait_command_can_use_short_rx_wait_budget(tmp_path, monke
     assert wait_timeout == 0.5
 
 
+def test_process_image_stops_rx_after_wait_timeout(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="local",
+        remote_rx_ssh_target="",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.05,
+        rx_timeout_sec=30.0,
+        rx_wait_timeout_sec=0.5,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+    )
+    control_lines: list[str] = []
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest_path.write_text(json.dumps({"capture_nsamps": 107584, "job_id": "case0"}), encoding="utf-8")
+        return {"capture_nsamps": 107584, "job_id": "case0"}
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line.startswith("WAIT "):
+            raise RuntimeError("control command failed: WAIT timeout=0.500000\nERR_TIMEOUT host=127.0.0.1 port=29220")
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert any(line == "STOP" for line in control_lines)
+    assert control_lines.index("STOP") > next(i for i, line in enumerate(control_lines) if line.startswith("WAIT "))
+
+
 def test_process_image_preconnects_tx_and_wait_control(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
@@ -2934,6 +2979,48 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
     assert summary["passed_count"] == 2
     assert events.index("capture_0001") < events.index("decode_done_0")
     assert [image["round_records"][0]["pipeline_slot"] for image in summary["images"]] == [0, 1]
+
+
+def test_remote_decode_pipeline_retries_capture_exception_in_same_slot(tmp_path, monkeypatch):
+    image = analog_batch.ImageRecord(index=0, input_path=tmp_path / "case0.bin", image_dir=tmp_path / "image_0000")
+    image.input_path.write_bytes(b"payload")
+    args = Namespace(max_arq_rounds=1, remote_rx_ssh_target="user@board")
+    capture_attempts: list[tuple[int, int, int]] = []
+
+    def fake_capture(_args, item, *, attempt_index, max_attempts, slot_index, pipeline_depth):
+        capture_attempts.append((item.index, attempt_index, slot_index))
+        if attempt_index == 0:
+            raise RuntimeError("control command failed: WAIT timeout=0.500000\nERR_TIMEOUT host=board port=29220")
+        return {
+            "image": item,
+            "attempt_index": attempt_index,
+            "max_attempts": max_attempts,
+            "slot_index": slot_index,
+            "pipeline_depth": pipeline_depth,
+        }
+
+    def fake_finalize(_args, ctx):
+        item = ctx["image"]
+        item.status = 0
+        item.passed = True
+        item.error = ""
+        item.records.append({
+            "attempt": int(ctx["attempt_index"]) + 1,
+            "pipeline_slot": int(ctx["slot_index"]),
+            "total_wall_sec": 0.1,
+        })
+        return item
+
+    monkeypatch.setattr(analog_batch, "_capture_remote_decode_pipeline_attempt", fake_capture)
+    monkeypatch.setattr(analog_batch, "_finalize_remote_decode_pipeline_attempt", fake_finalize)
+
+    completed, stats = analog_batch._process_images_remote_decode_pipeline(args, [image], pipeline_depth=1)
+
+    assert stats["pipeline_depth"] == 1
+    assert completed[0].passed is True
+    assert capture_attempts == [(0, 0, 0), (0, 1, 0)]
+    assert completed[0].records[0]["error"].startswith("control command failed: WAIT timeout")
+    assert completed[0].records[-1]["attempt"] == 2
 
 
 def test_batch_runner_closes_shared_ssh_master_when_worker_start_fails(tmp_path, monkeypatch):

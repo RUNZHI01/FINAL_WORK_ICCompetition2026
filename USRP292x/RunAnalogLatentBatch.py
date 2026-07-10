@@ -351,6 +351,27 @@ def rx_wait_timeout_sec(args: argparse.Namespace, capture_timeout: float) -> flo
     return max(0.001, min(float(capture_timeout), configured))
 
 
+def is_rx_wait_timeout_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "WAIT timeout=" in text and ("ERR_TIMEOUT" in text or "timed out" in text)
+
+
+def stop_rx_capture_after_wait_timeout(args: argparse.Namespace, log_path: Path) -> None:
+    timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
+    try:
+        run_control(
+            str(getattr(args, "rx_control_host", "")),
+            int(getattr(args, "rx_control_port", 0)),
+            "STOP",
+            log_path,
+            timeout,
+        )
+    except Exception as exc:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        previous = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+        log_path.write_text(f"{previous}STOP failed after WAIT timeout: {exc}\n", encoding="utf-8")
+
+
 def append_sync_search_window_args(cmd: list[str], args: argparse.Namespace) -> None:
     window_symbols = int(getattr(args, "sync_search_window_symbols", 0) or 0)
     if window_symbols <= 0 or bool(getattr(args, "dry_run", False)):
@@ -2184,26 +2205,31 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 tx_send_control = None
                 tx_wall_sec = time.monotonic() - tx_started
                 rx_wait_started = time.monotonic()
-                if rx_session is not None:
-                    run_control_maybe_session(
-                        rx_session,
-                        args.rx_control_host,
-                        args.rx_control_port,
-                        f"WAIT timeout={wait_timeout:.6f}",
-                        image.image_dir / "rx_wait.log",
-                        wait_timeout,
-                        allow_sent_fallback=True,
-                    )
-                    rx_session = None
-                else:
-                    run_control_maybe_preconnected(
-                        rx_wait_control,
-                        args.rx_control_host,
-                        args.rx_control_port,
-                        f"WAIT timeout={wait_timeout:.6f}",
-                        image.image_dir / "rx_wait.log",
-                        wait_timeout,
-                    )
+                try:
+                    if rx_session is not None:
+                        run_control_maybe_session(
+                            rx_session,
+                            args.rx_control_host,
+                            args.rx_control_port,
+                            f"WAIT timeout={wait_timeout:.6f}",
+                            image.image_dir / "rx_wait.log",
+                            wait_timeout,
+                            allow_sent_fallback=True,
+                        )
+                        rx_session = None
+                    else:
+                        run_control_maybe_preconnected(
+                            rx_wait_control,
+                            args.rx_control_host,
+                            args.rx_control_port,
+                            f"WAIT timeout={wait_timeout:.6f}",
+                            image.image_dir / "rx_wait.log",
+                            wait_timeout,
+                        )
+                except Exception as exc:
+                    if is_rx_wait_timeout_error(exc):
+                        stop_rx_capture_after_wait_timeout(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                    raise
                 rx_wait_control = None
                 rx_wait_wall_sec = time.monotonic() - rx_wait_started
                 rx_capture_wall_sec = time.monotonic() - rx_started
@@ -2645,26 +2671,31 @@ def _capture_remote_decode_pipeline_attempt(
         tx_send_control = None
         tx_wall_sec = time.monotonic() - tx_started
         rx_wait_started = time.monotonic()
-        if rx_session is not None:
-            run_control_maybe_session(
-                rx_session,
-                args.rx_control_host,
-                args.rx_control_port,
-                f"WAIT timeout={wait_timeout:.6f}",
-                image.image_dir / "rx_wait.log",
-                wait_timeout,
-                allow_sent_fallback=True,
-            )
-            rx_session = None
-        else:
-            run_control_maybe_preconnected(
-                rx_wait_control,
-                args.rx_control_host,
-                args.rx_control_port,
-                f"WAIT timeout={wait_timeout:.6f}",
-                image.image_dir / "rx_wait.log",
-                wait_timeout,
-            )
+        try:
+            if rx_session is not None:
+                run_control_maybe_session(
+                    rx_session,
+                    args.rx_control_host,
+                    args.rx_control_port,
+                    f"WAIT timeout={wait_timeout:.6f}",
+                    image.image_dir / "rx_wait.log",
+                    wait_timeout,
+                    allow_sent_fallback=True,
+                )
+                rx_session = None
+            else:
+                run_control_maybe_preconnected(
+                    rx_wait_control,
+                    args.rx_control_host,
+                    args.rx_control_port,
+                    f"WAIT timeout={wait_timeout:.6f}",
+                    image.image_dir / "rx_wait.log",
+                    wait_timeout,
+                )
+        except Exception as exc:
+            if is_rx_wait_timeout_error(exc):
+                stop_rx_capture_after_wait_timeout(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+            raise
         rx_wait_control = None
         rx_wait_wall_sec = time.monotonic() - rx_wait_started
         rx_capture_wall_sec = time.monotonic() - rx_started
@@ -2977,6 +3008,46 @@ def _process_images_remote_decode_pipeline(
         captured_at = float(ctx.get("capture_completed_at") or time.monotonic())
         ctx["decode_queue_wall_sec"] = max(0.0, time.monotonic() - captured_at)
 
+    def capture_or_complete(
+        image: ImageRecord,
+        *,
+        slot_index: int,
+        attempt_index: int,
+        log_name: str,
+    ) -> tuple[dict[str, Any] | None, ImageRecord | None]:
+        current_attempt = int(attempt_index)
+        current_image = image
+        while True:
+            attempt_started = time.monotonic()
+            try:
+                return (
+                    _capture_remote_decode_pipeline_attempt(
+                        args,
+                        current_image,
+                        attempt_index=current_attempt,
+                        max_attempts=max_attempts,
+                        slot_index=slot_index,
+                        pipeline_depth=depth,
+                    ),
+                    None,
+                )
+            except Exception as exc:
+                current_image = _append_pipeline_error_record(
+                    current_image,
+                    exc,
+                    started=attempt_started,
+                    attempt_index=current_attempt,
+                    max_attempts=max_attempts,
+                    slot_index=slot_index,
+                    pipeline_depth=depth,
+                    args=args,
+                    remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
+                    log_name=log_name,
+                )
+                if current_attempt + 1 >= max_attempts:
+                    return None, current_image
+                current_attempt += 1
+
     with ThreadPoolExecutor(max_workers=1, thread_name_prefix="iq-remote-decode") as executor:
         while next_image_index < len(images) or ready_contexts or decode_future is not None:
             if decode_future is None:
@@ -2989,32 +3060,18 @@ def _process_images_remote_decode_pipeline(
                     slot_index = available_slots.pop(0)
                     image = images[next_image_index]
                     next_image_index += 1
-                    try:
-                        ctx = _capture_remote_decode_pipeline_attempt(
-                            args,
-                            image,
-                            attempt_index=0,
-                            max_attempts=max_attempts,
-                            slot_index=slot_index,
-                            pipeline_depth=depth,
-                        )
-                    except Exception as exc:
-                        completed.append(
-                            _append_pipeline_error_record(
-                                image,
-                                exc,
-                                started=time.monotonic(),
-                                attempt_index=0,
-                                max_attempts=max_attempts,
-                                slot_index=slot_index,
-                                pipeline_depth=depth,
-                                args=args,
-                                remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
-                                log_name="remote_stall_snapshot_pipeline_capture_error.log",
-                            )
-                        )
+                    ctx, failed_image = capture_or_complete(
+                        image,
+                        slot_index=slot_index,
+                        attempt_index=0,
+                        log_name="remote_stall_snapshot_pipeline_capture_error.log",
+                    )
+                    if failed_image is not None:
+                        completed.append(failed_image)
                         available_slots.append(slot_index)
                         available_slots.sort()
+                        continue
+                    if ctx is None:
                         continue
                     mark_decode_queue(ctx)
                     decode_future = (ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, ctx))
@@ -3026,32 +3083,18 @@ def _process_images_remote_decode_pipeline(
                 slot_index = available_slots.pop(0)
                 image = images[next_image_index]
                 next_image_index += 1
-                try:
-                    ctx = _capture_remote_decode_pipeline_attempt(
-                        args,
-                        image,
-                        attempt_index=0,
-                        max_attempts=max_attempts,
-                        slot_index=slot_index,
-                        pipeline_depth=depth,
-                    )
-                except Exception as exc:
-                    completed.append(
-                        _append_pipeline_error_record(
-                            image,
-                            exc,
-                            started=time.monotonic(),
-                            attempt_index=0,
-                            max_attempts=max_attempts,
-                            slot_index=slot_index,
-                            pipeline_depth=depth,
-                            args=args,
-                            remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
-                            log_name="remote_stall_snapshot_pipeline_capture_error.log",
-                        )
-                    )
+                ctx, failed_image = capture_or_complete(
+                    image,
+                    slot_index=slot_index,
+                    attempt_index=0,
+                    log_name="remote_stall_snapshot_pipeline_capture_error.log",
+                )
+                if failed_image is not None:
+                    completed.append(failed_image)
                     available_slots.append(slot_index)
                     available_slots.sort()
+                    continue
+                if ctx is None:
                     continue
                 ready_contexts.append(ctx)
                 update_max_inflight()
@@ -3074,32 +3117,18 @@ def _process_images_remote_decode_pipeline(
                 available_slots.sort()
                 continue
 
-            try:
-                retry_ctx = _capture_remote_decode_pipeline_attempt(
-                    args,
-                    result,
-                    attempt_index=attempt_index + 1,
-                    max_attempts=max_attempts,
-                    slot_index=slot_index,
-                    pipeline_depth=depth,
-                )
-            except Exception as exc:
-                completed.append(
-                    _append_pipeline_error_record(
-                        result,
-                        exc,
-                        started=time.monotonic(),
-                        attempt_index=attempt_index + 1,
-                        max_attempts=max_attempts,
-                        slot_index=slot_index,
-                        pipeline_depth=depth,
-                        args=args,
-                        remote_target=str(getattr(args, "remote_rx_ssh_target", "") or ""),
-                        log_name="remote_stall_snapshot_pipeline_retry_capture_error.log",
-                    )
-                )
+            retry_ctx, failed_image = capture_or_complete(
+                result,
+                slot_index=slot_index,
+                attempt_index=attempt_index + 1,
+                log_name="remote_stall_snapshot_pipeline_retry_capture_error.log",
+            )
+            if failed_image is not None:
+                completed.append(failed_image)
                 available_slots.append(slot_index)
                 available_slots.sort()
+                continue
+            if retry_ctx is None:
                 continue
             mark_decode_queue(retry_ctx)
             decode_future = (retry_ctx, executor.submit(_finalize_remote_decode_pipeline_attempt, args, retry_ctx))
