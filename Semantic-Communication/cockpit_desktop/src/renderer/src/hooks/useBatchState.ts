@@ -87,7 +87,7 @@ export function useBatchStatePoll() {
             queryKey: ['system-status'],
             queryFn: getSystemStatus,
           }).then((payload) => {
-            const current = payload?.recent_results?.current
+            const current = payload?.recent_results?.[batchComparison.engine] ?? payload?.recent_results?.current
             if (current?.execution_mode === 'live' && current?.status === 'success') {
               setLastCompletedInference(current)
               recordComparisonResult(current, setComparisonResult)

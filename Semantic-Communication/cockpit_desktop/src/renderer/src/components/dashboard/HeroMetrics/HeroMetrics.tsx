@@ -46,8 +46,11 @@ export function HeroMetrics({ system, inferenceProgress, batchState }: HeroMetri
   const status = system.data
   const comparisonResults = useAppStore((s) => s.comparisonResults)
   const pendingBatchJobId = useAppStore((s) => s.pendingBatchJobId)
-  const recentCurrentComparison = comparisonResultFromInferencePayload(status?.recent_results?.current)
-  const recentBaselineComparison = comparisonResultFromInferencePayload(status?.recent_results?.baseline)
+  const recentTvmComparisonRaw = comparisonResultFromInferencePayload(status?.recent_results?.tvm ?? status?.recent_results?.current)
+  const recentTvmComparison = recentTvmComparisonRaw?.engine === 'tvm' ? recentTvmComparisonRaw : undefined
+  const recentMnnComparisonRaw = comparisonResultFromInferencePayload(status?.recent_results?.mnn ?? status?.recent_results?.current)
+  const recentMnnComparison = recentMnnComparisonRaw?.engine === 'mnn' ? recentMnnComparisonRaw : undefined
+  const recentBaselineComparison = comparisonResultFromInferencePayload(status?.recent_results?.pytorch ?? status?.recent_results?.baseline)
   const live = status?.live
   const boardOnline = live?.board_online ?? false
   const batch = batchState?.data
@@ -60,7 +63,10 @@ export function HeroMetrics({ system, inferenceProgress, batchState }: HeroMetri
     ? batch
     : undefined
 
-  const acceleratorResults = [comparisonResults.tvm ?? recentCurrentComparison, comparisonResults.mnn]
+  const acceleratorResults = [
+    comparisonResults.tvm ?? recentTvmComparison,
+    comparisonResults.mnn ?? recentMnnComparison,
+  ]
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
   const latestAccelerator = acceleratorResults.reduce<(typeof acceleratorResults)[number] | undefined>(
     (latest, item) => {

@@ -23,8 +23,8 @@ export function ComparisonCard({ system }: ComparisonCardProps) {
     lastCompletedInference?.variant === 'current'
     && lastCompletedInference?.execution_mode === 'live'
     && lastCompletedInference?.status === 'success'
-  ) ? lastCompletedInference : currentFromStatus
-  const baseline = results?.['baseline']
+  ) ? lastCompletedInference : (results?.['tvm'] ?? currentFromStatus)
+  const baseline = results?.['pytorch'] ?? results?.['baseline']
 
   if (system.isPending) {
     return (

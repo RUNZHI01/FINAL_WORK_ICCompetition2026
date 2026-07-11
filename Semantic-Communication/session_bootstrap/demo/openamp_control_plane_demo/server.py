@@ -6388,6 +6388,23 @@ class DashboardState:
 
         return cached_payload
 
+    @staticmethod
+    def _engine_recent_result_key(payload: dict[str, Any], variant: str) -> str:
+        normalized_variant = str(variant or payload.get("variant") or "").strip().lower()
+        if normalized_variant == "baseline":
+            return "pytorch"
+        if normalized_variant != "current":
+            return ""
+        wrapper_summary = payload.get("wrapper_summary") if isinstance(payload.get("wrapper_summary"), dict) else {}
+        runner_summary = payload.get("runner_summary") if isinstance(payload.get("runner_summary"), dict) else {}
+        engine = str(
+            payload.get("inference_engine")
+            or wrapper_summary.get("inference_engine")
+            or runner_summary.get("inference_engine")
+            or ""
+        ).strip().lower()
+        return "mnn" if engine == "mnn" else "tvm"
+
     def _update_last_inference_summary(self, payload: dict[str, Any], variant: str) -> None:
         cached_payload = self._hydrate_recent_inference_payload(payload)
         timings = payload.get("timings") if isinstance(payload.get("timings"), dict) else {}
@@ -6405,6 +6422,9 @@ class DashboardState:
             "request_state": payload.get("request_state", "completed"),
         }
         self._recent_inference_results[variant] = cached_payload
+        engine_key = self._engine_recent_result_key(cached_payload, variant)
+        if engine_key:
+            self._recent_inference_results[engine_key] = cached_payload
 
     def _running_inference_job_record(self) -> dict[str, Any] | None:
         with self._lock:

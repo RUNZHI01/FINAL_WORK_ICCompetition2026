@@ -7267,6 +7267,44 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-archive-001")
         self.assertEqual(payload["recent_results"]["baseline"]["execution_mode"], "reference")
 
+    def test_system_status_endpoint_keeps_engine_specific_recent_results(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload["job_id"] = "baseline-usrp-001"
+        tvm_payload = server.build_prerecorded_inference_result(0, "current")
+        tvm_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "variant": "current",
+                "job_id": "usrp-tvm-001",
+                "wrapper_summary": {"inference_engine": "tvm"},
+            }
+        )
+        mnn_payload = server.build_prerecorded_inference_result(0, "current")
+        mnn_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "variant": "current",
+                "job_id": "usrp-mnn-001",
+                "wrapper_summary": {"inference_engine": "mnn"},
+            }
+        )
+
+        state._update_last_inference_summary(tvm_payload, "current")
+        state._update_last_inference_summary(mnn_payload, "current")
+        state._update_last_inference_summary(baseline_payload, "baseline")
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["recent_results"]["current"]["job_id"], "usrp-mnn-001")
+        self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-usrp-001")
+        self.assertEqual(payload["recent_results"]["tvm"]["job_id"], "usrp-tvm-001")
+        self.assertEqual(payload["recent_results"]["mnn"]["job_id"], "usrp-mnn-001")
+        self.assertEqual(payload["recent_results"]["pytorch"]["job_id"], "baseline-usrp-001")
+
     def test_operator_readiness_smoke_state_covers_required_page_modules(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state = DashboardState(None, 30.0, probe_cache_path=None, event_archive_root=temp_dir)

@@ -438,19 +438,26 @@ export function DashboardPageMinimal() {
   // Derived data
   const recentResults = status?.recent_results
   const currentResultFromStore = lastCompletedInference?.variant === 'current' ? lastCompletedInference : undefined
-  const currentResult = currentResultFromStore ?? recentResults?.current
+  const currentResult = currentResultFromStore ?? recentResults?.current ?? recentResults?.tvm ?? recentResults?.mnn
   const baselineResultFromStore = lastCompletedInference?.variant === 'baseline' ? lastCompletedInference : undefined
-  const baselineResult = baselineResultFromStore ?? recentResults?.baseline
-  const currentComparisonFromPayload = comparisonResultFromInferencePayload(currentResult)
+  const baselineResult = baselineResultFromStore ?? recentResults?.pytorch ?? recentResults?.baseline
+  const currentComparisonFromStore = comparisonResultFromInferencePayload(currentResultFromStore)
+  const tvmComparisonFromPayloadRaw = comparisonResultFromInferencePayload(recentResults?.tvm ?? recentResults?.current)
+  const tvmComparisonFromPayload = tvmComparisonFromPayloadRaw?.engine === 'tvm' ? tvmComparisonFromPayloadRaw : undefined
+  const mnnComparisonFromPayloadRaw = comparisonResultFromInferencePayload(recentResults?.mnn ?? recentResults?.current)
+  const mnnComparisonFromPayload = mnnComparisonFromPayloadRaw?.engine === 'mnn' ? mnnComparisonFromPayloadRaw : undefined
   const baselineComparisonFromPayload = comparisonResultFromInferencePayload(baselineResult)
   const pytorchComparison =
     baselineComparisonFromPayload
     ?? comparisonResults.pytorch
   const tvmComparison =
     comparisonResults.tvm
-    ?? currentComparisonFromPayload
+    ?? (currentComparisonFromStore?.engine === 'tvm' ? currentComparisonFromStore : undefined)
+    ?? tvmComparisonFromPayload
   const mnnComparison =
     comparisonResults.mnn
+    ?? (currentComparisonFromStore?.engine === 'mnn' ? currentComparisonFromStore : undefined)
+    ?? mnnComparisonFromPayload
   const comparisonRows = [pytorchComparison, tvmComparison, mnnComparison]
     .filter((item): item is ComparisonResult => Boolean(item))
   const maxComparisonMs = Math.max(...comparisonRows.map((item) => item.reconstructionMs), 1)

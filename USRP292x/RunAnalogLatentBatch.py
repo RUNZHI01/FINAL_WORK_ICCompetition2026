@@ -4972,7 +4972,7 @@ def main() -> int:
                     health_reset = reset_rx_health_after_record(result)
                     if result.passed:
                         break
-                    if health_reset and attempt_index + 1 >= max_attempts and extra_health_retries > 0:
+                    if health_reset and extra_health_retries > 0:
                         extra_health_retries -= 1
                         max_attempts += 1
                     attempt_index += 1

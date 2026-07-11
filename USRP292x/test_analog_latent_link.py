@@ -5562,6 +5562,115 @@ def test_batch_runner_grants_one_extra_attempt_after_rx_health_stall(tmp_path, m
     assert closed
 
 
+def test_batch_runner_grants_health_extra_attempt_even_when_stall_is_not_final_attempt(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=None,
+        pattern="*.bin",
+        count=1,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="rx-health-mid-budget",
+        dry_run=False,
+        rx_capture_mode="local",
+        max_arq_rounds=2,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        rx_session_control=True,
+        rx_batch_session_control=True,
+        rx_batch_session_max_images=16,
+        rx_health_reset_on_stall=True,
+        rx_health_stall_threshold_sec=0.25,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        rx_timeout_sec=30.0,
+        rate=5_000_000.0,
+        sps=16,
+        rx_post_quantize=True,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.08,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    opened: list[str] = []
+    closed: list[str] = []
+    attempts: list[int] = []
+
+    class FakeSession:
+        def __init__(self, name: str):
+            self.name = name
+
+        def close(self):
+            closed.append(self.name)
+
+    def fake_open_control_session(_host, _port, _timeout):
+        name = f"session-{len(opened) + 1}"
+        opened.append(name)
+        return FakeSession(name)
+
+    def fake_process_image(_args, image):
+        attempt = len(attempts) + 1
+        attempts.append(attempt)
+        if attempt == 1:
+            image.status = 1
+            image.passed = False
+            image.error = "sync metric 0.038799 below threshold 0.050000"
+        elif attempt == 2:
+            image.status = 1
+            image.passed = False
+            image.error = (
+                "RX CAPTURE did not arm before TX\n"
+                "OK busy=1 started=0 done=0 ok=1 written_samps=0"
+            )
+        elif attempt == 3:
+            image.status = 1
+            image.passed = False
+            image.error = "no sync candidate had a complete frame"
+        else:
+            image.status = 0
+            image.passed = True
+            image.error = ""
+        image.records.append({
+            "error": image.error,
+            "rx_capture_wall_sec": 0.0 if attempt == 2 else 0.08,
+            "rx_wait_wall_sec": 0.0 if attempt == 2 else 0.03,
+            "total_wall_sec": 7.5 if attempt == 2 else 0.18,
+        })
+        return image
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "load_inputs", lambda _args: [input_path])
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "open_control_session", fake_open_control_session)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "rx-health-mid-budget" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert attempts == [1, 2, 3, 4]
+    assert summary["passed_count"] == 1
+    assert summary["failed_count"] == 0
+    assert summary["rx_health_reset_count"] == 1
+    assert summary["images"][0]["round_records"][1]["rx_health_reset_after_stall"] is True
+    assert closed
+
+
 def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monkeypatch):
     input_dir = tmp_path / "inputs"
     input_dir.mkdir()
