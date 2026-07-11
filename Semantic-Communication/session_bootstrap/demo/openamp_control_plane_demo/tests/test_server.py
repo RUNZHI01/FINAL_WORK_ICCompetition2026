@@ -3924,7 +3924,9 @@ class ServerMainTest(unittest.TestCase):
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
+                "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
                 "ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC": "1.0",
+                "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "0.0",
                 "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0",
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC": "0.05",
                 "ANALOG_PIPELINE_DEPTH": "1",
@@ -3965,7 +3967,9 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertEqual(overrides["ANALOG_RX_WAIT_TIMEOUT_SEC"], "1.0")
         self.assertEqual(overrides["ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC"], "1.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC"], "0.0")
         self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
         self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
         self.assertEqual(overrides["ANALOG_PIPELINE_DEPTH"], "1")
@@ -4900,6 +4904,7 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
                     "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.5",
                     "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
+                    "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
                 },
                 source_summary="test",
             )
@@ -4938,6 +4943,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(command[command.index("--rx-arm-status-timeout-sec") + 1], "0.5")
         self.assertIn("--rx-arm-status-poll-sec", command)
         self.assertEqual(command[command.index("--rx-arm-status-poll-sec") + 1], "0.025")
+        self.assertIn("--rx-wait-timeout-sec", command)
+        self.assertEqual(command[command.index("--rx-wait-timeout-sec") + 1], "1.0")
 
     def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
         class FakeThread:
@@ -7690,6 +7697,7 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "",
+                "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "",
                 "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "",
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC": "",
                 "RX_ARM_WAIT_MS": "",
@@ -7723,6 +7731,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
         self.assertEqual(env["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.5")
         self.assertEqual(env["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertNotIn("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", env)
         self.assertEqual(env["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
         self.assertEqual(env["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
         self.assertEqual(env["RX_ARM_WAIT_MS"], "150")

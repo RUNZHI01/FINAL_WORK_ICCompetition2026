@@ -135,6 +135,7 @@ ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
 ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS = ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC",)
 ANALOG_RX_ARM_STATUS_POLL_KEYS = ("ANALOG_RX_ARM_STATUS_POLL_SEC",)
+ANALOG_RX_WAIT_TIMEOUT_KEYS = ("ANALOG_RX_WAIT_TIMEOUT_SEC",)
 ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
 ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
 ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
@@ -2715,6 +2716,12 @@ class UsrpBatchSpoolJob:
             args.extend([
                 "--rx-arm-status-poll-sec",
                 str(_parse_float(rx_arm_status_poll, 0.05)),
+            ])
+        rx_wait_timeout = _first_value(env_values, ANALOG_RX_WAIT_TIMEOUT_KEYS)
+        if rx_wait_timeout:
+            args.extend([
+                "--rx-wait-timeout-sec",
+                str(max(0.0, _parse_float(rx_wait_timeout, 0.0))),
             ])
 
         scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)

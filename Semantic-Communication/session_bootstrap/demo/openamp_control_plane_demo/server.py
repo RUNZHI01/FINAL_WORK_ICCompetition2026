@@ -3733,6 +3733,8 @@ class DashboardState:
                 "ANALOG_RETRY_ON_BURST_MISS",
                 "ANALOG_RETRY_ON_LOW_SYNC",
                 "ANALOG_LOW_SYNC_RETRY_THRESHOLD",
+                "ANALOG_RX_WAIT_TIMEOUT_SEC",
+                "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC",
                 "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC",
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC",
             ):
@@ -9610,7 +9612,9 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_RX_POST_QUANTIZE", ""),
         ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC", ""),
         ("ANALOG_RX_ARM_STATUS_POLL_SEC", ""),
+        ("ANALOG_RX_WAIT_TIMEOUT_SEC", ""),
         ("ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC", ""),
+        ("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", ""),
         ("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", ""),
         ("ANALOG_RX_STOP_DRAIN_POLL_SEC", ""),
         ("ANALOG_PIPELINE_DEPTH", ""),

@@ -494,6 +494,62 @@ def test_remote_decode_worker_ignores_stale_response_for_previous_request(tmp_pa
     assert writes
 
 
+def test_remote_decode_worker_reports_runner_timing(tmp_path):
+    writes: list[str] = []
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+        returncode = None
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+    responses.put(json.dumps({
+        "status": "ok",
+        "request_id": "decode-1",
+        "summary": {"status": "ok", "sync_metric": 0.9},
+    }))
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        {"status": "ready"},
+        0.0,
+    )
+
+    result = worker.decode(
+        {"request_id": "decode-1"},
+        tmp_path / "remote_decode.log",
+        timeout=1.0,
+    )
+
+    payload = json.loads(result.stdout)
+    logged = json.loads((tmp_path / "remote_decode.log").read_text(encoding="utf-8"))
+    for source in (payload, logged):
+        timing = source["runner_timing_ms"]
+        assert timing["send_ms"] >= 0.0
+        assert timing["response_wait_ms"] >= 0.0
+        assert timing["call_ms"] >= timing["send_ms"]
+        assert timing["call_ms"] >= timing["response_wait_ms"]
+    assert writes
+
+
 def test_remote_path_probe_worker_ignores_stale_response_for_previous_request(tmp_path):
     writes: list[str] = []
 
@@ -3623,6 +3679,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
                 "write_npz": 1.5,
             },
             "remote_decode_restart_wall_sec": 0.0,
+            "remote_decode_worker_send_wall_sec": 0.001,
+            "remote_decode_worker_response_wait_wall_sec": 0.050,
+            "remote_decode_worker_call_wall_sec": 0.052,
             "decode_queue_wall_sec": 0.005,
             "remote_dir_publish_wall_sec": 0.004,
             "retry_wait_wall_sec": 0.0,
@@ -3654,6 +3713,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
                 "write_npz": 2.5,
             },
             "remote_decode_restart_wall_sec": 0.030,
+            "remote_decode_worker_send_wall_sec": 0.003,
+            "remote_decode_worker_response_wait_wall_sec": 0.070,
+            "remote_decode_worker_call_wall_sec": 0.074,
             "decode_queue_wall_sec": 0.015,
             "remote_dir_publish_wall_sec": 0.006,
             "retry_wait_wall_sec": 0.020,
@@ -3690,6 +3752,9 @@ def test_iq_stage_benchmark_aggregates_runner_records(tmp_path):
     assert benchmark["remote_decode_payload_recovery_ms"]["median_ms"] == 26.0
     assert benchmark["remote_decode_write_npz_ms"]["max_ms"] == 2.5
     assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0
+    assert benchmark["remote_decode_worker_send_ms"]["median_ms"] == 2.0
+    assert benchmark["remote_decode_worker_response_wait_ms"]["median_ms"] == 60.0
+    assert benchmark["remote_decode_worker_call_ms"]["median_ms"] == 63.0
     assert benchmark["remote_decode_response_overhead_ms"]["median_ms"] == 23.0
     assert benchmark["remote_decode_queue_ms"]["median_ms"] == 10.0
     assert benchmark["remote_dir_publish_ms"]["median_ms"] == 5.0
@@ -4178,6 +4243,11 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
                             "payload_recovery": 20.0,
                         },
                     },
+                    "runner_timing_ms": {
+                        "send_ms": 1.5,
+                        "response_wait_ms": 51.0,
+                        "call_ms": 53.0,
+                    },
                 }),
                 stderr="",
             )
@@ -4234,13 +4304,16 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
     assert result.records[0]["remote_decode_soft_completed"] is True
     assert result.records[0]["remote_decode_timing_ms"]["matched_filter"] == 2.5
     assert result.records[0]["remote_decode_timing_ms"]["initial_sync"] == 7.0
+    assert result.records[0]["remote_decode_worker_send_wall_sec"] == 0.0015
+    assert result.records[0]["remote_decode_worker_response_wait_wall_sec"] == 0.051
+    assert result.records[0]["remote_decode_worker_call_wall_sec"] == 0.053
 
 
 def test_process_image_soft_completion_summaryless_request_checks_output_only(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
-    soft_completion_calls: list[tuple[str, str]] = []
+    soft_completion_calls: list[tuple[str, str, float | None]] = []
 
     class SummarylessSoftCompletedWorker:
         def decode(self, request, log_path, *, timeout, soft_timeout=0.0, soft_completion=None):
@@ -4299,7 +4372,7 @@ def test_process_image_soft_completion_summaryless_request_checks_output_only(tm
         return manifest
 
     def fake_soft_completion(_target, remote_output, remote_summary, _log_path, **_kwargs):
-        soft_completion_calls.append((remote_output, remote_summary))
+        soft_completion_calls.append((remote_output, remote_summary, _kwargs.get("timeout")))
         return {
             "status": "ok",
             "soft_completed": True,
@@ -4325,6 +4398,7 @@ def test_process_image_soft_completion_summaryless_request_checks_output_only(tm
     assert soft_completion_calls
     assert soft_completion_calls[0][0] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
     assert soft_completion_calls[0][1] == ""
+    assert soft_completion_calls[0][2] == 0.25
 
 
 def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):

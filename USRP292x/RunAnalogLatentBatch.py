@@ -1509,6 +1509,9 @@ REMOTE_STALL_SNAPSHOT_FIELDS = (
     "decode_queue_wall_sec",
     "decode_wall_sec",
     "remote_decode_reported_wall_sec",
+    "remote_decode_worker_send_wall_sec",
+    "remote_decode_worker_response_wait_wall_sec",
+    "remote_decode_worker_call_wall_sec",
     "remote_decode_restart_wall_sec",
     "remote_dir_publish_wall_sec",
 )
@@ -1538,6 +1541,24 @@ def sanitize_decode_timing_ms(summary_data: dict[str, Any]) -> dict[str, float]:
             continue
         try:
             timing[key] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return timing
+
+
+def remote_decode_worker_timing_wall_sec(worker_response: dict[str, Any]) -> dict[str, float]:
+    raw_timing = worker_response.get("runner_timing_ms")
+    if not isinstance(raw_timing, dict):
+        return {}
+    fields = (
+        ("remote_decode_worker_send_wall_sec", "send_ms"),
+        ("remote_decode_worker_response_wait_wall_sec", "response_wait_ms"),
+        ("remote_decode_worker_call_wall_sec", "call_ms"),
+    )
+    timing: dict[str, float] = {}
+    for record_field, timing_key in fields:
+        try:
+            timing[record_field] = max(0.0, float(raw_timing.get(timing_key) or 0.0)) / 1000.0
         except (TypeError, ValueError):
             continue
     return timing
@@ -2375,14 +2396,26 @@ class RemoteAnalogDecodeWorker:
             raise RuntimeError(f"remote decode worker exited with status {self.proc.returncode}")
         if self.proc.stdin is None:
             raise RuntimeError("remote decode worker stdin is closed")
+        call_started = time.monotonic()
+        send_started = call_started
         self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
         self.proc.stdin.flush()
+        send_wall_sec = time.monotonic() - send_started
+        response_wait_started = time.monotonic()
         line, response = self._wait_for_response(
             self._request_match_key(request),
             timeout,
             soft_timeout=soft_timeout,
             soft_completion=soft_completion,
         )
+        response_wait_wall_sec = time.monotonic() - response_wait_started
+        call_wall_sec = time.monotonic() - call_started
+        response["runner_timing_ms"] = {
+            "send_ms": send_wall_sec * 1000.0,
+            "response_wait_ms": response_wait_wall_sec * 1000.0,
+            "call_ms": call_wall_sec * 1000.0,
+        }
+        line = json.dumps(response, ensure_ascii=True) + "\n"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(line, encoding="utf-8")
         if str(response.get("status") or "").lower() != "ok":
@@ -2881,6 +2914,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     decode_started = 0.0
     remote_decode_soft_completed = False
     remote_decode_response_only_summary = False
+    worker_response: dict[str, Any] = {}
     rx_server_snapshot: dict[str, Any] = {}
     rx_capture_control = None
     rx_needs_failure_stop = False
@@ -3204,7 +3238,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     remote_request["manifest_json"] = manifest
                 # NB: remote argv ignores rx_post_quantize on the wire — RX-side quantization
                 # happens at capture time, not decode time. Remote decode reads what was captured.
-                worker_response: dict[str, Any] = {}
+                worker_response = {}
                 if remote_decode_worker is not None:
                     decode_kwargs: dict[str, Any] = {
                         "timeout": remote_decode_request_timeout(args, capture_timeout),
@@ -3228,6 +3262,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                                 summary,
                                 log,
                                 control_socket=control,
+                                timeout=soft_complete_sec,
                                 request_id=request_id,
                                 probe_worker=probe,
                             )
@@ -3398,6 +3433,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "remote_decode_soft_completed": remote_decode_soft_completed,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
             "remote_decode_timing_ms": sanitize_decode_timing_ms(summary_data),
+            **remote_decode_worker_timing_wall_sec(worker_response),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": retry_wait_wall_sec,
             "merge_wall_sec": merge_wall_sec,
@@ -3895,6 +3931,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                             summary,
                             log,
                             control_socket=control,
+                            timeout=soft_complete_sec,
                             request_id=request_id,
                             probe_worker=probe,
                         )
@@ -4026,6 +4063,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "remote_decode_soft_completed": bool(worker_response.get("soft_completed")) if isinstance(worker_response, dict) else False,
             "remote_decode_reported_wall_sec": float(summary_data.get("decode_total_ms") or 0.0) / 1000.0,
             "remote_decode_timing_ms": sanitize_decode_timing_ms(summary_data),
+            **remote_decode_worker_timing_wall_sec(worker_response),
             "decode_queue_wall_sec": float(ctx.get("decode_queue_wall_sec") or 0.0),
             "remote_dir_publish_wall_sec": remote_dir_publish_wall_sec,
             "retry_wait_wall_sec": 0.0,
@@ -4423,6 +4461,9 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
         ("remote_decode_queue_ms", "decode_queue_wall_sec"),
         ("remote_decode_ms", "decode_wall_sec"),
         ("remote_decode_reported_ms", "remote_decode_reported_wall_sec"),
+        ("remote_decode_worker_send_ms", "remote_decode_worker_send_wall_sec"),
+        ("remote_decode_worker_response_wait_ms", "remote_decode_worker_response_wait_wall_sec"),
+        ("remote_decode_worker_call_ms", "remote_decode_worker_call_wall_sec"),
         ("remote_decode_restart_ms", "remote_decode_restart_wall_sec"),
         ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
         ("retry_wait_ms", "retry_wait_wall_sec"),

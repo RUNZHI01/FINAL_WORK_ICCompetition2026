@@ -8,6 +8,10 @@
 
 ## 2026-07-11 最新进展
 
+08:20 最新结论：decode-worker soft-probe timeout 修复有效，但 RX 侧长尾仍是主瓶颈。`batch-1783726777-300` 为 `300/300`、fallback `0`，TVM median/p95/max `241.78/244.73/277.54 ms`，IQ total median/p95/max `158.38/333.24/10395.30 ms`，PSNR `37.0445`、SSIM `0.97494`。新增 worker timing 显示 `remote_decode_worker_response_wait_ms` max 已从上一轮的 `8694 ms` 降到 `405.91 ms`，说明 soft-completion probe 不再被默认 3 秒探测拖住；剩余 p95/max 主要来自 RX arm/capture 和偶发板端 decode/write。
+
+08:35 三个新 A/B 都不能作为默认 profile。`ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` 已正确透传到每个 round，但 `batch-1783727897-300` 虽然 `300/300`，IQ p95/max 恶化到 `904.15/10540.47 ms`。再叠加短 STOP（`RX_STOP_WAIT_MS=200`、`ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2`、`ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC=0.0`）的 `batch-1783728580-300` 失败为 `296/300`；去掉 `rx_wait_timeout` 但保留短 STOP 的 `batch-1783728902-300` 仍失败为 `299/300`。短 STOP 会降低部分等待样本，但可能留下 `capture_already_running` 状态残留，所以默认保持稳定的 `RX_STOP_WAIT_MS=8000` / `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`。新代码只保留 `ANALOG_RX_WAIT_TIMEOUT_SEC` 和 `ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC` 的 opt-in 透传。
+
 07:00 最新有效 Cockpit-button-equivalent 300 张是 `batch-1783724189-300`：`300/300`、fallback `0`，TVM `input_count=300`、`processed_count=300`，TVM median/p95/max `241.67/244.62/258.74 ms`，IQ total median/mean/p95/max `156.24/240.41/274.60/7717.03 ms`，PSNR `37.0445`、SSIM `0.97494`。这轮修复了上一轮 TVM 只看到 `299` 个输入的问题，板端实际目录为 `300` 个 `.npy`、无缺号；但 IQ p95 仍高于 TVM p95，不能算最终性能达标。
 
 06:56 最新 20 张健康检查是 `batch-1783724140-20`：`20/20`、fallback `0`，TVM median/p95 `241.22/253.07 ms`，IQ total median/mean/p95/max `158.12/159.47/168.73/231.76 ms`，PSNR `37.0445`、SSIM `0.97494`。这说明短批次正常路径仍明显快于 TVM，且 TVM/输入目录都是完整计数。
