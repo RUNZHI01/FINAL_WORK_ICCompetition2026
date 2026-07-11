@@ -16,6 +16,8 @@ e7ac4e8 perf: stabilize iq cockpit container path
 
 The Cockpit Desktop one-click path is back on IQ direct with handwritten TVM and the big.LITTLE runner. The latest 300-image Cockpit-equivalent run is all-pass and keeps the IQ transport median below the TVM median. This is good enough as the current recovered profile, but it is not the final tail-latency fix: p95 and max still show RX/decode long-tail events.
 
+2026-07-11 update: Windows Git Bash/sshpass cannot reliably carry binary stdin for the IQ remote-decode asset upload. The symptom is `getsockname failed: Not a socket` followed by a full batch fallback before transport starts. The same stdin upload works through `OPENAMP_SSH_RUNNER=docker`, so Cockpit Desktop now injects Docker SSH defaults on Windows. The best 300-image run after this fix is `batch-1783748855-300`: `300/300`, fallback `0`, TVM median/p95 `240.72/243.50 ms`, IQ median/p95 `161.95/289.82 ms`.
+
 Do not change QPSK while continuing IQ work. QPSK is the regression baseline.
 
 ## Active Runtime Path
@@ -50,6 +52,10 @@ All runs below used the Cockpit `/api/run-inference-batch` behavior, IQ direct, 
 | `batch-1783678924-50` | 50 | `50/50`, fallback `0` | `239.96 ms` | `245.99 ms` | `183.51 ms` | `338.34 ms` | No mid-run status polling; not better. Server capture stayed near `64 ms`, while runner-side RX/decode response wait expanded. |
 | `batch-1783680558-50` | 50 | `50/50`, fallback `0` | `240.13 ms` | `244.14 ms` | `207.72 ms` | `334.49 ms` | First run with derived overhead fields. Image 29 recovered after no-sync; image-level IQ max was `1129.46 ms`. |
 | `batch-1783681389-50` | 50 | `50/50`, fallback `0` | `240.73 ms` | `245.35 ms` | `174.91 ms` | `269.24 ms` | Decode-failure STOP/drain cleanup did not regress the normal path; no retry occurred in this run. |
+| `batch-1783748751-50` | 50 | `50/50`, fallback `0` | `242.02 ms` | `244.31 ms` | `176.61 ms` | `320.35 ms` | First smoke after switching backend asset sync to Docker SSH runner. |
+| `batch-1783748855-300` | 300 | `300/300`, fallback `0` | `240.72 ms` | `243.50 ms` | `161.95 ms` | `289.82 ms` | Best current Windows Cockpit run: Docker SSH runner, RX health reset on, batch session window `16`. |
+| `batch-1783749340-300` | 300 | `300/300`, fallback `0` | `241.94 ms` | `244.69 ms` | `161.51 ms` | `525.65 ms` | Rejected A/B: RX health reset off doubled `>500 ms` records. |
+| `batch-1783749717-300` | 300 | `300/300`, fallback `0` | `241.87 ms` | `245.20 ms` | `164.32 ms` | `556.29 ms` | Rejected A/B: whole-batch RX session (`max_images=0`) worsened retries and p95. |
 
 Reference QPSK transport is about `2961.78 ms/image`. IQ direct is far faster than QPSK on the data plane. The visible reconstruction cadence is still mostly set by TVM, currently around `239-245 ms` per inference sample.
 
@@ -86,8 +92,8 @@ Decode-failure RX cleanup validation `batch-1783681389-50` stayed all-pass with 
 Use this profile unless you are running an explicit experiment:
 
 ```text
-OPENAMP_SSH_RUNNER=paramiko
-SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1
+OPENAMP_SSH_RUNNER=docker
+OPENAMP_SSH_DOCKER_IMAGE=iccomp-usrp-tx:latest
 OPENAMP_USRP_TX_RUNNER=docker
 OPENAMP_USRP_TX_DOCKER_IMAGE=iccomp-usrp-tx:latest
 OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET=/host_workspace
@@ -115,6 +121,10 @@ ANALOG_RX_ARM_STATUS_POLL_SEC=0.025
 ANALOG_PIPELINE_DEPTH=1
 ANALOG_PRECONNECT_CONTROL=1
 ANALOG_RX_SESSION_CONTROL=1
+ANALOG_RX_BATCH_SESSION_CONTROL=1
+ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16
+ANALOG_RX_HEALTH_RESET_ON_STALL=1
+ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC=0.25
 ANALOG_PRECONNECT_RX_CAPTURE_CONTROL=0
 PERSISTENT_RX_TX_DELAY=0
 OPENAMP_TVM_BATCH_RUNNER=biglittle
@@ -175,6 +185,7 @@ If the UI shows `board status endpoint unavailable` or connection refused, the b
 - If batch-level SSH ControlMaster startup fails, the IQ runner now disables per-image ControlMaster retries. This prevents a missing `SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1` from adding about `10 s/image` on Windows/password SSH paths.
 - Remote decode returns minimal worker responses while keeping full `decode_summary.json` on the board.
 - Docker wrappers default to `RX_ARM_WAIT_MS=150` and forward the IQ/USRP environment needed by Cockpit.
+- Cockpit Desktop now injects Windows-safe Docker SSH defaults for the Python backend (`OPENAMP_SSH_RUNNER=docker`, image `iccomp-usrp-tx:latest`) and enables the validated RX health-reset guard. This prevents the IQ remote-decode asset-sync path from falling back on Windows SSH stdin errors.
 
 ## Known Tail Issues
 
