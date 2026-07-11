@@ -3149,6 +3149,27 @@ def test_stop_rx_capture_polls_status_until_idle(tmp_path, monkeypatch):
     assert control_lines == ["STOP", "STATUS", "STATUS"]
 
 
+def test_stop_rx_capture_polls_status_after_stop_timeout(tmp_path, monkeypatch):
+    args = Namespace(rx_control_host="127.0.0.1", rx_control_port=29220, rx_timeout_sec=30.0)
+    control_lines: list[str] = []
+    status_responses = ["OK busy=1 started=0 done=0 ok=1", "OK busy=0 started=0 done=1 ok=0 error=stopped"]
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line == "STOP":
+            raise RuntimeError("control command failed: STOP\nERR_TIMEOUT host=127.0.0.1 port=29220")
+        if line == "STATUS":
+            return status_responses.pop(0)
+        return "OK"
+
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    response = analog_batch.stop_rx_capture(args, tmp_path / "stop.log")
+
+    assert control_lines == ["STOP", "STATUS", "STATUS"]
+    assert analog_batch.rx_control_response_busy(response) is False
+
+
 def test_rx_control_response_busy_uses_latest_busy_token():
     response = (
         "$ STOP\nOK busy=1 started=1 done=0 ok=1\n"

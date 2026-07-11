@@ -675,6 +675,25 @@ def stop_rx_capture(
                 time.sleep(drain_poll)
     except Exception as exc:
         entries.append(f"STOP failed after RX busy/timeout: {exc}")
+        if drain_timeout > 0.0:
+            deadline = time.monotonic() + drain_timeout
+            while True:
+                try:
+                    status = run_control(
+                        str(getattr(args, "rx_control_host", "")),
+                        int(getattr(args, "rx_control_port", 0)),
+                        "STATUS",
+                        log_path,
+                        min(timeout, max(0.1, drain_poll + 0.1)),
+                    )
+                    entries.append(f"$ STATUS\n{status}")
+                    if not rx_control_response_busy(status) or time.monotonic() >= deadline:
+                        break
+                except Exception as status_exc:
+                    entries.append(f"STATUS after STOP failure failed: {status_exc}")
+                    if time.monotonic() >= deadline:
+                        break
+                time.sleep(drain_poll)
     if entries:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
