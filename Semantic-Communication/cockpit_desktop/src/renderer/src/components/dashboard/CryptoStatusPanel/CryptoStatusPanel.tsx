@@ -2,7 +2,7 @@ import { useCryptoStatus } from '../../../hooks/useCryptoStatus'
 import { postCryptoReset, postCryptoTest, postCryptoToggle } from '../../../api/client'
 import s from './CryptoStatusPanel.module.css'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { BenchmarkMetric } from '../../../api/types/crypto'
+import type { BenchmarkMetric, IqTailAudit } from '../../../api/types/crypto'
 
 const STATE_LABEL: Record<string, { label: string; tone: string }> = {
   idle: { label: '空闲', tone: 'neutral' },
@@ -19,6 +19,11 @@ type MetricItem = {
   value: ReactNode
   tone?: MetricTone
   wide?: boolean
+}
+
+function countValue(audit: IqTailAudit, key: keyof IqTailAudit): number | null {
+  const value = audit[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 export function CryptoStatusPanel() {
@@ -244,6 +249,44 @@ export function CryptoStatusPanel() {
     })
   }
 
+  const iqTailAudit = data.batch_iq_tail_audit
+  const iqTailAuditItems: MetricItem[] = []
+  if (data.batch_status === 'done' && iqTailAudit) {
+    const totalCount = countValue(iqTailAudit, 'record_count')
+    const referenceMs = countValue(iqTailAudit, 'reference_ms')
+    const overReference = countValue(iqTailAudit, 'over_reference_count')
+    if (totalCount != null) {
+      iqTailAuditItems.push({ label: '记录数', value: totalCount, tone: 'mono' })
+    }
+    if (referenceMs != null && overReference != null) {
+      iqTailAuditItems.push({
+        label: `>${referenceMs.toFixed(1)}ms`,
+        value: overReference,
+        tone: overReference > 0 ? 'fail' : 'ok',
+      })
+    }
+    const tailRows: [keyof IqTailAudit, string][] = [
+      ['total_gt_250ms_count', '>250ms'],
+      ['total_gt_275ms_count', '>275ms'],
+      ['total_gt_500ms_count', '>500ms'],
+      ['rx_control_overhead_gt_50ms_count', 'RX控制尾部'],
+      ['server_capture_gt_100ms_count', 'RX采集尾部'],
+      ['decode_gt_160ms_count', '解码尾部'],
+      ['worker_over_reported_gt_80ms_count', 'Worker响应'],
+      ['soft_completed_count', 'Soft完成'],
+    ]
+    for (const [key, label] of tailRows) {
+      const value = countValue(iqTailAudit, key)
+      if (value != null) {
+        iqTailAuditItems.push({
+          label,
+          value,
+          tone: value > 0 && key !== 'soft_completed_count' ? 'fail' : 'mono',
+        })
+      }
+    }
+  }
+
   const infoItems: MetricItem[] = []
   if (testResult) {
     infoItems.push({
@@ -368,6 +411,23 @@ export function CryptoStatusPanel() {
           </div>
         )
       })()}
+
+      {iqTailAuditItems.length > 0 && (
+        <div className={s.subSection}>
+          <div className={s.subSectionTitle}>IQ尾部审计</div>
+          <div className={s.metricGrid}>
+            {iqTailAuditItems.map((item) => (
+              <div
+                key={item.label}
+                className={`${s.metricCard}${item.wide ? ` ${s.metricWide}` : ''}`}
+              >
+                <div className={s.metricLabel}>{item.label}</div>
+                <div className={metricValueClass(item.tone)}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={s.testSection}>
         <div className={s.actionRow}>

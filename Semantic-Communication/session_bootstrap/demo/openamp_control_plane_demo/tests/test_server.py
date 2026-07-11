@@ -132,6 +132,53 @@ def test_crypto_status_exposes_iq_stage_benchmark_from_batch_state() -> None:
     assert status["batch_iq_stage_benchmark"]["rx_wait_response_overhead_ms"]["p95_ms"] == 126.0
 
 
+def test_crypto_status_exposes_iq_tail_audit_from_batch_state() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._crypto_enabled = True
+    state._crypto_status_cache = {
+        "channel_state": "ready",
+        "kem_backend": "mock-kem",
+        "cipher_suite": "mock-cipher",
+        "board_configured": True,
+    }
+    state._crypto_status_cache_ts = time.monotonic()
+    state._batch_state = {
+        "status": "done",
+        "completed": 5,
+        "total": 5,
+        "iq_tail_audit": {
+            "record_count": 5,
+            "over_reference_count": 2,
+            "reference_ms": 244.45,
+            "total_gt_250ms_count": 2,
+            "rx_control_overhead_gt_50ms_count": 1,
+        },
+    }
+
+    status = state._get_crypto_status_core()
+
+    assert status["batch_iq_tail_audit"]["over_reference_count"] == 2
+    assert status["batch_iq_tail_audit"]["rx_control_overhead_gt_50ms_count"] == 1
+
+
+def test_iq_tail_audit_from_summary_preserves_runner_counts() -> None:
+    audit = usrp_runtime._iq_tail_audit_from_summary(
+        {
+            "iq_tail_audit": {
+                "record_count": 300,
+                "reference_ms": 244.45,
+                "over_reference_count": 33,
+                "total_gt_250ms_count": 30,
+                "decode_gt_160ms_count": 17,
+            }
+        }
+    )
+
+    assert audit is not None
+    assert audit["over_reference_count"] == 33
+    assert audit["decode_gt_160ms_count"] == 17
+
+
 def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
     benchmark = usrp_runtime._iq_stage_benchmark_from_summary(
         {

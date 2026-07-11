@@ -4001,6 +4001,7 @@ class DashboardState:
                     "batch_transport_benchmark": None,
                     "batch_inference_benchmark": None,
                     "batch_iq_stage_benchmark": None,
+                    "batch_iq_tail_audit": None,
                 }
             cached = self._crypto_status_cache
             cache_ts = self._crypto_status_cache_ts
@@ -4011,6 +4012,7 @@ class DashboardState:
                 transport_bm = batch.get("transport_benchmark") if batch else None
                 inference_bm = batch.get("inference_benchmark") if batch else None
                 iq_stage_bm = batch.get("iq_stage_benchmark") if batch else None
+                iq_tail_audit = batch.get("iq_tail_audit") if batch else None
                 bs = batch.get("status") if batch else None
                 bc_completed = batch.get("completed", 0) if batch else 0
                 bc_total = batch.get("total", 0) if batch else 0
@@ -4022,6 +4024,7 @@ class DashboardState:
                     "batch_transport_benchmark": transport_bm,
                     "batch_inference_benchmark": inference_bm,
                     "batch_iq_stage_benchmark": iq_stage_bm,
+                    "batch_iq_tail_audit": iq_tail_audit,
                     "batch_status": bs,
                     "batch_completed": bc_completed,
                     "batch_total": bc_total,
@@ -4050,6 +4053,7 @@ class DashboardState:
                 "batch_transport_benchmark": None,
                 "batch_inference_benchmark": None,
                 "batch_iq_stage_benchmark": None,
+                "batch_iq_tail_audit": None,
                 "batch_status": None,
                 "batch_completed": 0,
                 "batch_total": 0,
@@ -4077,6 +4081,7 @@ class DashboardState:
             data["batch_transport_benchmark"] = batch.get("transport_benchmark") if batch else None
             data["batch_inference_benchmark"] = batch.get("inference_benchmark") if batch else None
             data["batch_iq_stage_benchmark"] = batch.get("iq_stage_benchmark") if batch else None
+            data["batch_iq_tail_audit"] = batch.get("iq_tail_audit") if batch else None
             data["batch_status"] = batch.get("status") if batch else None
             data["batch_completed"] = batch.get("completed", 0) if batch else 0
             data["batch_total"] = batch.get("total", 0) if batch else 0
@@ -4101,6 +4106,7 @@ class DashboardState:
                     "batch_transport_benchmark": batch.get("transport_benchmark") if batch else None,
                     "batch_inference_benchmark": batch.get("inference_benchmark") if batch else None,
                     "batch_iq_stage_benchmark": batch.get("iq_stage_benchmark") if batch else None,
+                    "batch_iq_tail_audit": batch.get("iq_tail_audit") if batch else None,
                     "batch_status": batch.get("status") if batch else None,
                     "batch_completed": batch.get("completed", 0) if batch else 0,
                     "batch_total": batch.get("total", 0) if batch else 0,
@@ -4121,6 +4127,7 @@ class DashboardState:
                     "batch_transport_benchmark": batch.get("transport_benchmark") if batch else None,
                     "batch_inference_benchmark": batch.get("inference_benchmark") if batch else None,
                     "batch_iq_stage_benchmark": batch.get("iq_stage_benchmark") if batch else None,
+                    "batch_iq_tail_audit": batch.get("iq_tail_audit") if batch else None,
                     "batch_status": batch.get("status") if batch else None,
                     "batch_completed": batch.get("completed", 0) if batch else 0,
                     "batch_total": batch.get("total", 0) if batch else 0,
@@ -4152,6 +4159,7 @@ class DashboardState:
                 "batch_transport_benchmark": None,
                 "batch_inference_benchmark": None,
                 "batch_iq_stage_benchmark": None,
+                "batch_iq_tail_audit": None,
                 "batch_status": None,
                 "batch_completed": 0,
                 "batch_total": 0,
@@ -7269,6 +7277,8 @@ class DashboardState:
                         state["inference_benchmark"] = state["benchmark"]
                         transport_benchmark = wrapper_summary.get("transport_benchmark") if isinstance(wrapper_summary.get("transport_benchmark"), dict) else None
                         state["transport_benchmark"] = transport_benchmark
+                        iq_tail_audit = wrapper_summary.get("iq_tail_audit") if isinstance(wrapper_summary.get("iq_tail_audit"), dict) else None
+                        state["iq_tail_audit"] = iq_tail_audit
                         state["engine"] = "mnn"
                         state["runner_summary"] = inference_summary
                         if succeeded:
@@ -7780,6 +7790,7 @@ class DashboardState:
                 inference_summary = wrapper_summary.get("inference_summary") if isinstance(wrapper_summary.get("inference_summary"), dict) else {}
                 transport_benchmark = wrapper_summary.get("transport_benchmark") if isinstance(wrapper_summary.get("transport_benchmark"), dict) else None
                 iq_stage_benchmark = wrapper_summary.get("iq_stage_benchmark") if isinstance(wrapper_summary.get("iq_stage_benchmark"), dict) else None
+                iq_tail_audit = wrapper_summary.get("iq_tail_audit") if isinstance(wrapper_summary.get("iq_tail_audit"), dict) else None
                 inference_benchmark = wrapper_summary.get("inference_benchmark") if isinstance(wrapper_summary.get("inference_benchmark"), dict) else None
                 iq_manifest = (
                     wrapper_summary.get("iq_remote_decode_manifest")
@@ -7861,6 +7872,7 @@ class DashboardState:
                         state["inference_benchmark"] = inference_benchmark
                         state["transport_benchmark"] = transport_benchmark
                         state["iq_stage_benchmark"] = iq_stage_benchmark
+                        state["iq_tail_audit"] = iq_tail_audit
                         state["runner_summary"] = inference_summary or runner_summary
                         if is_live:
                             state["quality"] = self._build_prerecorded_payload_safe(image_index=0, variant="current").get("quality")

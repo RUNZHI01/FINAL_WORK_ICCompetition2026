@@ -26,6 +26,22 @@ export type BatchBenchmark = {
   other_wall_ms?: BenchmarkMetric | null
 }
 
+export type IqTailAudit = {
+  [metric: string]: number | string | null | undefined
+  record_count?: number
+  reference_ms?: number | null
+  over_reference_count?: number
+  total_gt_250ms_count?: number
+  total_gt_275ms_count?: number
+  total_gt_500ms_count?: number
+  rx_control_overhead_gt_50ms_count?: number
+  server_capture_gt_100ms_count?: number
+  decode_gt_160ms_count?: number
+  worker_over_reported_gt_80ms_count?: number
+  write_gt_100ms_count?: number
+  soft_completed_count?: number
+}
+
 export type BatchStageProgress = {
   completed?: number
   total?: number
@@ -137,6 +153,8 @@ export type CryptoStatusResponse = {
   batch_inference_benchmark?: BatchBenchmark | null
   /** IQ direct detailed transport stage benchmark */
   batch_iq_stage_benchmark?: BatchBenchmark | null
+  /** IQ direct transport tail classifier from batch_spool_summary.json */
+  batch_iq_tail_audit?: IqTailAudit | null
   /** Batch inference run status: 'running' | 'done' | null */
   batch_status?: string | null
   /** Number of completed images in current/last batch */
@@ -178,6 +196,7 @@ export type BatchStateResponse = {
   transport_benchmark?: BatchBenchmark | null
   inference_benchmark?: BatchBenchmark | null
   iq_stage_benchmark?: BatchBenchmark | null
+  iq_tail_audit?: IqTailAudit | null
   host_preprocess_progress?: BatchStageProgress | null
   transport_progress?: BatchStageProgress | null
   inference_progress?: BatchStageProgress | null

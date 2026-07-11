@@ -1926,6 +1926,13 @@ def _iq_stage_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any] 
     return benchmark or None
 
 
+def _iq_tail_audit_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    existing = summary.get("iq_tail_audit") if isinstance(summary, dict) else None
+    if isinstance(existing, dict) and existing:
+        return existing
+    return None
+
+
 def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
     record_benchmark = _transport_benchmark_from_iq_round_records(summary)
     if record_benchmark is not None:
@@ -3091,6 +3098,7 @@ class UsrpBatchSpoolJob:
 
         transport_benchmark = _transport_benchmark_from_summary(summary)
         iq_stage_benchmark = _iq_stage_benchmark_from_summary(summary)
+        iq_tail_audit = _iq_tail_audit_from_summary(summary)
         inference_benchmark = summary.get("benchmark") if isinstance(summary.get("benchmark"), dict) else None
         inference_pipeline = summary.get("pipeline") if isinstance(summary.get("pipeline"), dict) else {}
         runner_summary = {
@@ -3143,6 +3151,8 @@ class UsrpBatchSpoolJob:
                 wrapper_summary["iq_remote_decode_manifest"] = self._remote_stage_manifest
             if iq_stage_benchmark is not None:
                 wrapper_summary["iq_stage_benchmark"] = iq_stage_benchmark
+            if iq_tail_audit is not None:
+                wrapper_summary["iq_tail_audit"] = iq_tail_audit
         if self._inference_summary:
             wrapper_summary["inference_engine"] = self._inference_engine
             wrapper_summary["inference_summary"] = self._inference_summary
