@@ -1942,6 +1942,8 @@ def test_batch_runner_dry_run_writes_usrp_runtime_compatible_outputs(tmp_path):
     assert summary["per_image_sec"] > 0.0
     assert summary["payload_airtime_ms_mean"] > 0.0
     assert summary["decode_total_wall_sec_mean"] > 0.0
+    assert summary["iq_tail_audit"]["record_count"] == 1
+    assert summary["iq_tail_audit"]["total_gt_250ms_count"] >= 0
 
 
 def test_process_image_dry_run_uses_in_process_local_codec(tmp_path, monkeypatch):
@@ -4049,6 +4051,100 @@ def test_iq_stage_benchmark_skips_decode_response_overhead_without_reported_deco
     assert benchmark["remote_decode_ms"]["median_ms"] == 90.0
     assert benchmark["remote_decode_reported_ms"]["median_ms"] == 0.0
     assert "remote_decode_response_overhead_ms" not in benchmark
+
+
+def test_iq_tail_audit_classifies_mid_tail_records(tmp_path):
+    image_a = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image_b = analog_batch.ImageRecord(
+        index=1,
+        input_path=tmp_path / "case1.bin",
+        image_dir=tmp_path / "image_0001",
+    )
+    image_c = analog_batch.ImageRecord(
+        index=2,
+        input_path=tmp_path / "case2.bin",
+        image_dir=tmp_path / "image_0002",
+    )
+    image_a.records.append(
+        {
+            "total_wall_sec": 0.280,
+            "rx_capture_wall_sec": 0.200,
+            "rx_server_capture_wall_sec": 0.064,
+            "decode_wall_sec": 0.060,
+            "remote_decode_worker_response_wait_wall_sec": 0.055,
+            "remote_decode_reported_wall_sec": 0.041,
+            "remote_decode_timing_ms": {"write_npz": 1.2},
+            "remote_decode_soft_completed": False,
+        }
+    )
+    image_b.records.append(
+        {
+            "total_wall_sec": 0.310,
+            "rx_capture_wall_sec": 0.072,
+            "rx_server_capture_wall_sec": 0.064,
+            "decode_wall_sec": 0.210,
+            "remote_decode_worker_response_wait_wall_sec": 0.205,
+            "remote_decode_reported_wall_sec": 0.041,
+            "remote_decode_timing_ms": {"write_npz": 1.1},
+            "remote_decode_soft_completed": True,
+        }
+    )
+    image_c.records.append(
+        {
+            "total_wall_sec": 0.180,
+            "rx_capture_wall_sec": 0.140,
+            "rx_server_capture_wall_sec": 0.120,
+            "decode_wall_sec": 0.055,
+            "remote_decode_worker_response_wait_wall_sec": 0.052,
+            "remote_decode_reported_wall_sec": 0.040,
+            "remote_decode_timing_ms": {"write_npz": 150.0},
+            "remote_decode_soft_completed": False,
+        }
+    )
+
+    audit = analog_batch.build_iq_tail_audit(
+        [image_a, image_b, image_c],
+        reference_ms=244.45,
+    )
+
+    assert audit["record_count"] == 3
+    assert audit["reference_ms"] == 244.45
+    assert audit["over_reference_count"] == 2
+    assert audit["total_gt_250ms_count"] == 2
+    assert audit["total_gt_275ms_count"] == 2
+    assert audit["rx_control_overhead_gt_50ms_count"] == 1
+    assert audit["server_capture_gt_100ms_count"] == 1
+    assert audit["decode_gt_160ms_count"] == 1
+    assert audit["worker_over_reported_gt_80ms_count"] == 1
+    assert audit["write_gt_100ms_count"] == 1
+    assert audit["soft_completed_count"] == 1
+    assert audit["over_reference_breakdown"]["rx_control_overhead_gt_50ms_count"] == 1
+    assert audit["over_reference_breakdown"]["decode_gt_160ms_count"] == 1
+
+
+def test_iq_tail_audit_does_not_infer_rx_overhead_without_server_capture(tmp_path):
+    image = analog_batch.ImageRecord(
+        index=0,
+        input_path=tmp_path / "case0.bin",
+        image_dir=tmp_path / "image_0000",
+    )
+    image.records.append(
+        {
+            "total_wall_sec": 0.300,
+            "rx_capture_wall_sec": 0.240,
+            "decode_wall_sec": 0.040,
+        }
+    )
+
+    audit = analog_batch.build_iq_tail_audit([image], reference_ms=244.45)
+
+    assert audit["over_reference_count"] == 1
+    assert audit["rx_control_overhead_gt_50ms_count"] == 0
+    assert audit["over_reference_breakdown"]["rx_control_overhead_gt_50ms_count"] == 0
 
 
 def test_pipeline_error_record_preserves_stage_timings(tmp_path):

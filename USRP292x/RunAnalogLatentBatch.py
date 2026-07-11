@@ -4604,6 +4604,107 @@ def build_iq_stage_benchmark(images: list[ImageRecord]) -> dict[str, Any]:
     return benchmark
 
 
+def build_iq_tail_audit(
+    images: list[ImageRecord],
+    *,
+    reference_ms: float | None = None,
+    rx_control_overhead_ms: float = 50.0,
+    server_capture_ms: float = 100.0,
+    decode_ms: float = 160.0,
+    worker_over_reported_ms: float = 80.0,
+    write_ms: float = 100.0,
+) -> dict[str, Any]:
+    records: list[dict[str, float | bool]] = []
+
+    def seconds_to_ms(record: dict[str, Any], key: str) -> float:
+        try:
+            return float(record.get(key) or 0.0) * 1000.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    for image in images:
+        for record in image.records:
+            timing = record.get("remote_decode_timing_ms")
+            write_npz_ms = 0.0
+            if isinstance(timing, dict):
+                try:
+                    write_npz_ms = float(timing.get("write_npz") or 0.0)
+                except (TypeError, ValueError):
+                    write_npz_ms = 0.0
+            rx_capture_ms = seconds_to_ms(record, "rx_capture_wall_sec")
+            server_capture_value_ms = seconds_to_ms(record, "rx_server_capture_wall_sec")
+            rx_control_overhead_value_ms = (
+                max(0.0, rx_capture_ms - server_capture_value_ms)
+                if server_capture_value_ms > 0.0
+                else 0.0
+            )
+            worker_wait_ms = seconds_to_ms(record, "remote_decode_worker_response_wait_wall_sec")
+            reported_ms = seconds_to_ms(record, "remote_decode_reported_wall_sec")
+            worker_over_reported = max(0.0, worker_wait_ms - reported_ms) if reported_ms > 0.0 else 0.0
+            records.append({
+                "total_ms": seconds_to_ms(record, "total_wall_sec"),
+                "rx_control_overhead_ms": rx_control_overhead_value_ms,
+                "server_capture_ms": server_capture_value_ms,
+                "decode_ms": seconds_to_ms(record, "decode_wall_sec"),
+                "worker_over_reported_ms": worker_over_reported,
+                "write_ms": write_npz_ms,
+                "soft_completed": bool(record.get("remote_decode_soft_completed")),
+            })
+
+    def count_if(predicate: Callable[[dict[str, float | bool]], bool], rows: list[dict[str, float | bool]] | None = None) -> int:
+        selected = records if rows is None else rows
+        return sum(1 for row in selected if predicate(row))
+
+    reference = float(reference_ms or 0.0)
+    over_reference = [row for row in records if reference > 0.0 and float(row["total_ms"]) > reference]
+    breakdown_rows = over_reference if reference > 0.0 else []
+    thresholds = {
+        "rx_control_overhead_ms": float(rx_control_overhead_ms),
+        "server_capture_ms": float(server_capture_ms),
+        "decode_ms": float(decode_ms),
+        "worker_over_reported_ms": float(worker_over_reported_ms),
+        "write_ms": float(write_ms),
+    }
+
+    def classification_counts(rows: list[dict[str, float | bool]] | None = None) -> dict[str, int]:
+        return {
+            "rx_control_overhead_gt_50ms_count": count_if(
+                lambda row: float(row["rx_control_overhead_ms"]) > rx_control_overhead_ms,
+                rows,
+            ),
+            "server_capture_gt_100ms_count": count_if(
+                lambda row: float(row["server_capture_ms"]) > server_capture_ms,
+                rows,
+            ),
+            "decode_gt_160ms_count": count_if(
+                lambda row: float(row["decode_ms"]) > decode_ms,
+                rows,
+            ),
+            "worker_over_reported_gt_80ms_count": count_if(
+                lambda row: float(row["worker_over_reported_ms"]) > worker_over_reported_ms,
+                rows,
+            ),
+            "write_gt_100ms_count": count_if(
+                lambda row: float(row["write_ms"]) > write_ms,
+                rows,
+            ),
+        }
+
+    audit: dict[str, Any] = {
+        "record_count": len(records),
+        "reference_ms": round(reference, 2) if reference > 0.0 else None,
+        "over_reference_count": len(over_reference),
+        "total_gt_250ms_count": count_if(lambda row: float(row["total_ms"]) > 250.0),
+        "total_gt_275ms_count": count_if(lambda row: float(row["total_ms"]) > 275.0),
+        "total_gt_500ms_count": count_if(lambda row: float(row["total_ms"]) > 500.0),
+        "soft_completed_count": count_if(lambda row: bool(row["soft_completed"])),
+        "thresholds_ms": thresholds,
+        "over_reference_breakdown": classification_counts(breakdown_rows),
+    }
+    audit.update(classification_counts())
+    return audit
+
+
 def build_transport_metrics(images: list[ImageRecord]) -> dict[str, Any]:
     total_values = _record_float_values(images, "total_wall_sec")
     make_values = _record_float_values(images, "make_wall_sec")
@@ -4897,6 +4998,10 @@ def main() -> int:
         "slot_wait_ms": round(float(pipeline_stats.get("slot_wait_wall_sec") or 0.0) * 1000.0, 3),
         "channel_mode": os.environ.get("JSCC_CHANNEL_MODE", ""),
         "iq_stage_benchmark": build_iq_stage_benchmark(completed),
+        "iq_tail_audit": build_iq_tail_audit(
+            completed,
+            reference_ms=env_float("ANALOG_IQ_TAIL_REFERENCE_MS", 0.0),
+        ),
         "rate": float(args.rate),
         "sps": int(args.sps),
         "rx_post_quantize": bool(args.rx_post_quantize),
