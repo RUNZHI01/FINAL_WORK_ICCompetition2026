@@ -18,6 +18,8 @@ The Cockpit Desktop one-click path is back on IQ direct with handwritten TVM and
 
 2026-07-11 update: Windows Git Bash/sshpass cannot reliably carry binary stdin for the IQ remote-decode asset upload. The symptom is `getsockname failed: Not a socket` followed by a full batch fallback before transport starts. The same stdin upload works through `OPENAMP_SSH_RUNNER=docker`, so Cockpit Desktop now injects Docker SSH defaults on Windows. The best 300-image run after this fix is `batch-1783748855-300`: `300/300`, fallback `0`, TVM median/p95 `240.72/243.50 ms`, IQ median/p95 `161.95/289.82 ms`.
 
+2026-07-11 retry-fix update: a later 300-image run, `batch-1783753159-300`, exposed one missing decoded latent at image `142`. Root cause was an RX health failure sequence (`RX CAPTURE did not arm before TX`, then `RX_metadata_error: Unknown error code 0x10`) that exhausted the normal three ARQ attempts before the next image recovered. `RunAnalogLatentBatch.py` now treats these RX errors as health-stall records and grants one extra attempt after recycling the shared RX session. Validation `batch-1783753807-300` stayed `300/300`, fallback `0`; image `48` recovered on attempt 4. The follow-up `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=32` A/B, `batch-1783754244-300`, was all-pass but much slower, so keep window `16`.
+
 Do not change QPSK while continuing IQ work. QPSK is the regression baseline.
 
 ## Active Runtime Path
@@ -56,6 +58,9 @@ All runs below used the Cockpit `/api/run-inference-batch` behavior, IQ direct, 
 | `batch-1783748855-300` | 300 | `300/300`, fallback `0` | `240.72 ms` | `243.50 ms` | `161.95 ms` | `289.82 ms` | Best current Windows Cockpit run: Docker SSH runner, RX health reset on, batch session window `16`. |
 | `batch-1783749340-300` | 300 | `300/300`, fallback `0` | `241.94 ms` | `244.69 ms` | `161.51 ms` | `525.65 ms` | Rejected A/B: RX health reset off doubled `>500 ms` records. |
 | `batch-1783749717-300` | 300 | `300/300`, fallback `0` | `241.87 ms` | `245.20 ms` | `164.32 ms` | `556.29 ms` | Rejected A/B: whole-batch RX session (`max_images=0`) worsened retries and p95. |
+| `batch-1783753159-300` | 300 | `299/300`, fallback `1` | n/a | n/a | `154.36 ms` | `278.14 ms` | Rejected failure run: image `142` missed output after RX not-armed / metadata error exhausted ARQ attempts. |
+| `batch-1783753807-300` | 300 | `300/300`, fallback `0` | `240.38 ms` | `242.90 ms` | `172.43 ms` | `268.58 ms` | Accepted retry-fix validation. Runner summary: window `16`, `rx_health_reset_count=5`, image `48` recovered on attempt 4. |
+| `batch-1783754244-300` | 300 | `300/300`, fallback `0` | `240.86 ms` | `243.37 ms` | `181.03 ms` | `426.95 ms` | Rejected A/B: session window `32` increased resets and p95. |
 
 Reference QPSK transport is about `2961.78 ms/image`. IQ direct is far faster than QPSK on the data plane. The visible reconstruction cadence is still mostly set by TVM, currently around `239-245 ms` per inference sample.
 
@@ -186,6 +191,7 @@ If the UI shows `board status endpoint unavailable` or connection refused, the b
 - Remote decode returns minimal worker responses while keeping full `decode_summary.json` on the board.
 - Docker wrappers default to `RX_ARM_WAIT_MS=150` and forward the IQ/USRP environment needed by Cockpit.
 - Cockpit Desktop now injects Windows-safe Docker SSH defaults for the Python backend (`OPENAMP_SSH_RUNNER=docker`, image `iccomp-usrp-tx:latest`) and enables the validated RX health-reset guard. This prevents the IQ remote-decode asset-sync path from falling back on Windows SSH stdin errors.
+- IQ direct now treats RX not-armed / zero-sample metadata failures as RX health stalls and allows one extra post-reset attempt for that image. This recovered `batch-1783753807-300` image `48` without touching QPSK.
 
 ## Known Tail Issues
 
@@ -209,9 +215,10 @@ For speed runs, the runtime security channel was disabled while config still sho
 1. Keep QPSK frozen. Check `git diff -- USRP292x/RunQpskFileBatchSpoolArq.py` before and after IQ changes.
 2. Keep `ANALOG_RX_TAIL_SEC=0.05`. `0.04` and `0.045` are rejected for the current RF/control profile.
 3. Design RX arm/capture health handling. `batch-1783680558-50` showed stable server capture, but runner-side capture/control overhead and no-sync retry still raise image-level max. Decode/no-sync failure cleanup is now in place; confirm STOP timing fields on the next retry record.
-4. Improve WAIT/no-sync recovery. A timeout or no-sync after partial samples should cancel/drain deterministically before the next ARQ attempt.
-5. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.
-6. Re-run a 300-image gate after any timing behavior change. Do not promote a profile from a single short run.
+4. Keep RX batch session window at `16`. The `32`-image A/B is rejected after `batch-1783754244-300`.
+5. Improve WAIT/no-sync recovery. A timeout or no-sync after partial samples should cancel/drain deterministically before the next ARQ attempt.
+6. Only revisit double buffering or streaming TVM after RX state transitions are deterministic. Previous overlap experiments caused contention.
+7. Re-run a 300-image gate after any timing behavior change. Do not promote a profile from a single short run.
 
 ## Verification Before Commit
 
@@ -240,6 +247,17 @@ Latest diagnostic-code verification after adding `rx_server_*` fields:
 ```text
 USRP292x/test_analog_latent_link.py: 87 passed
 python -m py_compile USRP292x\RunAnalogLatentBatch.py: passed
+```
+
+Latest retry-fix verification:
+
+```text
+python -m pytest USRP292x/test_analog_latent_link.py::test_batch_runner_grants_one_extra_attempt_after_rx_health_stall USRP292x/test_analog_latent_link.py::test_batch_runner_recycles_rx_session_after_opt_in_rx_stall -q: 2 passed
+python -m pytest USRP292x/test_analog_latent_link.py -q: 127 passed
+batch-1783753807-300: 300/300, fallback 0, IQ median/p95 172.43/268.58 ms, TVM median/p95 240.38/242.90 ms
+batch-1783754244-300: rejected max_images=32 A/B, IQ p95 426.95 ms
+git diff -- USRP292x\RunQpskFileBatchSpoolArq.py: empty
+git diff --check: exit 0, line-ending warnings only
 ```
 
 Remove generated reports, raw logs, and run artifacts before committing unless the task explicitly requires preserving them as evidence.

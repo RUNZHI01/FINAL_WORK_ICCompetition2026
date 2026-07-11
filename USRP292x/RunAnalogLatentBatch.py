@@ -523,6 +523,13 @@ def record_has_rx_health_stall(record: dict[str, Any], args: argparse.Namespace)
     threshold = rx_health_stall_threshold_sec(args)
     if threshold <= 0.0:
         return False
+    error_text = str(record.get("error") or "")
+    if (
+        "RX CAPTURE did not arm" in error_text
+        or "RX_metadata_error" in error_text
+        or ("WAIT timeout=" in error_text and "written_samps=0" in error_text)
+    ):
+        return True
     for field in ("rx_wait_wall_sec", "rx_capture_wall_sec"):
         try:
             if float(record.get(field) or 0.0) >= threshold:
@@ -4891,6 +4898,30 @@ def main() -> int:
             else:
                 setattr(args, "rx_control_session", shared_rx_control_session)
                 rx_batch_session_control_active = True
+
+        def reset_rx_health_after_record(result: ImageRecord) -> bool:
+            nonlocal shared_rx_control_session, rx_batch_session_images_since_open, rx_health_reset_count
+            if not (
+                rx_batch_session_control_requested
+                and result.records
+                and record_has_rx_health_stall(result.records[-1], args)
+            ):
+                return False
+            record = result.records[-1]
+            if bool(record.get("rx_health_reset_after_stall")):
+                return False
+            record["rx_health_reset_after_stall"] = True
+            record["rx_health_stall_threshold_sec"] = rx_health_stall_threshold_sec(args)
+            current_session = getattr(args, "rx_control_session", None)
+            if current_session is not None:
+                close_preconnected_control(current_session)
+                clear_shared_rx_control_session(args, current_session)
+                if shared_rx_control_session is current_session:
+                    shared_rx_control_session = None
+                rx_batch_session_images_since_open = 0
+            rx_health_reset_count += 1
+            return True
+
         if pipeline_enabled:
             completed, pipeline_stats = _process_images_remote_decode_pipeline(
                 args,
@@ -4927,8 +4958,10 @@ def main() -> int:
                             rx_batch_session_control_active = True
                             rx_batch_session_images_since_open = 0
                 max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
+                extra_health_retries = 1 if rx_health_reset_on_stall_enabled(args) else 0
                 result = image
-                for attempt_index in range(max_attempts):
+                attempt_index = 0
+                while attempt_index < max_attempts:
                     setattr(args, "current_decode_attempt_index", attempt_index)
                     setattr(args, "current_decode_max_attempts", max_attempts)
                     result = process_image(args, image)
@@ -4936,8 +4969,13 @@ def main() -> int:
                         result.records[-1]["round"] = attempt_index
                         result.records[-1]["attempt"] = attempt_index + 1
                         result.records[-1]["max_attempts"] = max_attempts
+                    health_reset = reset_rx_health_after_record(result)
                     if result.passed:
                         break
+                    if health_reset and attempt_index + 1 >= max_attempts and extra_health_retries > 0:
+                        extra_health_retries -= 1
+                        max_attempts += 1
+                    attempt_index += 1
                 setattr(args, "current_decode_attempt_index", 0)
                 setattr(args, "current_decode_max_attempts", 1)
                 if rx_batch_session_control_requested and rx_batch_session_max_images > 0:
@@ -4950,21 +4988,6 @@ def main() -> int:
                         shared_rx_control_session = None
                         rx_batch_session_images_since_open = 0
                 completed.append(result)
-                if (
-                    rx_batch_session_control_requested
-                    and result.records
-                    and record_has_rx_health_stall(result.records[-1], args)
-                ):
-                    result.records[-1]["rx_health_reset_after_stall"] = True
-                    result.records[-1]["rx_health_stall_threshold_sec"] = rx_health_stall_threshold_sec(args)
-                    current_session = getattr(args, "rx_control_session", None)
-                    if current_session is not None:
-                        close_preconnected_control(current_session)
-                        clear_shared_rx_control_session(args, current_session)
-                        if shared_rx_control_session is current_session:
-                            shared_rx_control_session = None
-                        rx_batch_session_images_since_open = 0
-                    rx_health_reset_count += 1
                 if args.stop_on_fail and not result.passed:
                     break
             pipeline_stats["max_inflight"] = 1 if completed else 0
