@@ -326,6 +326,28 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--rx-health-reset-on-stall",
+        dest="rx_health_reset_on_stall",
+        action="store_true",
+        default=env_bool("ANALOG_RX_HEALTH_RESET_ON_STALL", False),
+        help=(
+            "Opt-in: recycle the shared RX batch control session after a successful image with "
+            "rx_wait/rx_capture wall time above --rx-health-stall-threshold-sec."
+        ),
+    )
+    parser.add_argument(
+        "--no-rx-health-reset-on-stall",
+        dest="rx_health_reset_on_stall",
+        action="store_false",
+        help="Disable RX health-based shared control-session recycling.",
+    )
+    parser.add_argument(
+        "--rx-health-stall-threshold-sec",
+        type=float,
+        default=env_float("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC", 1.0),
+        help="RX wait/capture wall-time threshold used by --rx-health-reset-on-stall.",
+    )
+    parser.add_argument(
         "--pipeline-depth",
         type=int,
         default=env_int("ANALOG_PIPELINE_DEPTH", 1),
@@ -485,6 +507,29 @@ def rx_batch_session_control_enabled(args: argparse.Namespace) -> bool:
         and bool(getattr(args, "rx_session_control", False))
         and not bool(getattr(args, "dry_run", False))
     )
+
+
+def rx_health_reset_on_stall_enabled(args: argparse.Namespace) -> bool:
+    return rx_batch_session_control_enabled(args) and bool(getattr(args, "rx_health_reset_on_stall", False))
+
+
+def rx_health_stall_threshold_sec(args: argparse.Namespace) -> float:
+    return max(0.0, float(getattr(args, "rx_health_stall_threshold_sec", 1.0) or 0.0))
+
+
+def record_has_rx_health_stall(record: dict[str, Any], args: argparse.Namespace) -> bool:
+    if not rx_health_reset_on_stall_enabled(args):
+        return False
+    threshold = rx_health_stall_threshold_sec(args)
+    if threshold <= 0.0:
+        return False
+    for field in ("rx_wait_wall_sec", "rx_capture_wall_sec"):
+        try:
+            if float(record.get(field) or 0.0) >= threshold:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def control_session_is_closed(session: Any | None) -> bool:
@@ -4771,6 +4816,7 @@ def main() -> int:
     rx_batch_session_control_requested = False
     rx_batch_session_control_active = False
     rx_batch_session_control_unavailable = False
+    rx_health_reset_count = 0
     remote_capture_dirs_precreated = False
     rx_batch_session_max_images = max(0, int(getattr(args, "rx_batch_session_max_images", 0) or 0))
     rx_batch_session_images_since_open = 0
@@ -4854,13 +4900,13 @@ def main() -> int:
             pipeline_stats["pipeline_enabled"] = True
         else:
             for image in images:
-                if (
-                    rx_batch_session_control_requested
-                    and rx_batch_session_max_images > 0
-                    and not rx_batch_session_control_unavailable
-                ):
+                if rx_batch_session_control_requested and not rx_batch_session_control_unavailable:
                     current_session = getattr(args, "rx_control_session", None)
-                    if current_session is not None and rx_batch_session_images_since_open >= rx_batch_session_max_images:
+                    if (
+                        current_session is not None
+                        and rx_batch_session_max_images > 0
+                        and rx_batch_session_images_since_open >= rx_batch_session_max_images
+                    ):
                         close_preconnected_control(current_session)
                         clear_shared_rx_control_session(args, current_session)
                         if shared_rx_control_session is current_session:
@@ -4904,6 +4950,21 @@ def main() -> int:
                         shared_rx_control_session = None
                         rx_batch_session_images_since_open = 0
                 completed.append(result)
+                if (
+                    rx_batch_session_control_requested
+                    and result.records
+                    and record_has_rx_health_stall(result.records[-1], args)
+                ):
+                    result.records[-1]["rx_health_reset_after_stall"] = True
+                    result.records[-1]["rx_health_stall_threshold_sec"] = rx_health_stall_threshold_sec(args)
+                    current_session = getattr(args, "rx_control_session", None)
+                    if current_session is not None:
+                        close_preconnected_control(current_session)
+                        clear_shared_rx_control_session(args, current_session)
+                        if shared_rx_control_session is current_session:
+                            shared_rx_control_session = None
+                        rx_batch_session_images_since_open = 0
+                    rx_health_reset_count += 1
                 if args.stop_on_fail and not result.passed:
                     break
             pipeline_stats["max_inflight"] = 1 if completed else 0
@@ -4988,6 +5049,9 @@ def main() -> int:
         "rx_batch_session_control_enabled": bool(rx_batch_session_control_active),
         "rx_batch_session_control_unavailable": bool(rx_batch_session_control_unavailable),
         "rx_batch_session_max_images": int(rx_batch_session_max_images),
+        "rx_health_reset_on_stall": bool(rx_health_reset_on_stall_enabled(args)),
+        "rx_health_stall_threshold_sec": rx_health_stall_threshold_sec(args),
+        "rx_health_reset_count": int(rx_health_reset_count),
         "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
         "rx_arm_status_poll_sec": rx_arm_status_poll_sec(args),
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
