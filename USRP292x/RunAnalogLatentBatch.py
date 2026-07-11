@@ -1753,16 +1753,27 @@ def precreate_remote_capture_dirs(
     if not remote_dirs:
         return False
     chunk_size = max(1, env_int("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK", 80))
+    retries = max(0, env_int("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_RETRIES", 2))
+    retry_delay_sec = max(0.0, env_float("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_RETRY_DELAY_SEC", 0.25))
     for chunk_index, start in enumerate(range(0, len(remote_dirs), chunk_size)):
         chunk = remote_dirs[start:start + chunk_size]
         mkdir_script = "mkdir -p -- " + " ".join(shlex.quote(path) for path in chunk)
-        run_remote_command(
-            target,
-            ["bash", "-lc", mkdir_script],
-            run_dir / f"remote_capture_dirs_{chunk_index:02d}.log",
-            control_socket=control_socket,
-            timeout=max(15.0, min(120.0, 5.0 + 0.1 * len(chunk))),
-        )
+        for attempt in range(retries + 1):
+            log_suffix = "" if attempt == 0 else f"_retry{attempt}"
+            try:
+                run_remote_command(
+                    target,
+                    ["bash", "-lc", mkdir_script],
+                    run_dir / f"remote_capture_dirs_{chunk_index:02d}{log_suffix}.log",
+                    control_socket=control_socket,
+                    timeout=max(15.0, min(120.0, 5.0 + 0.1 * len(chunk))),
+                )
+                break
+            except Exception:
+                if attempt >= retries:
+                    raise
+                if retry_delay_sec > 0.0:
+                    time.sleep(retry_delay_sec)
     return True
 
 
@@ -1943,6 +1954,7 @@ for line in sys.stdin:
         request = json.loads(line)
         cmd = str(request.get("cmd") or "probe").strip().lower()
         request_id = str(request.get("request_id") or "")
+        probe_id = str(request.get("probe_id") or "")
         if cmd in {"quit", "exit"}:
             print(json.dumps({"status": "bye", "request_id": request_id}), flush=True)
             break
@@ -1988,6 +2000,8 @@ for line in sys.stdin:
             }
         if request_id:
             response["request_id"] = request_id
+        if probe_id:
+            response["probe_id"] = probe_id
         print(json.dumps(response), flush=True)
     except Exception as exc:
         traceback.print_exc(file=sys.stderr)
@@ -2101,6 +2115,7 @@ for line in sys.stdin:
             "path": str(remote_output or ""),
             "summary": str(remote_summary or ""),
             "request_id": str(request_id or ""),
+            "probe_id": f"{time.monotonic_ns()}:{id(self)}",
         }
         try:
             self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
@@ -2112,16 +2127,17 @@ for line in sys.stdin:
                 if remaining <= 0.0:
                     return None
                 line = self._responses.get(timeout=max(0.01, remaining))
-                if not request_id:
-                    break
                 try:
                     response = json.loads(line)
                 except json.JSONDecodeError:
                     return None
                 if not isinstance(response, dict):
                     return None
-                if str(response.get("request_id") or "") == request_id:
-                    break
+                if request_id and str(response.get("request_id") or "") != request_id:
+                    continue
+                if str(response.get("probe_id") or "") != request["probe_id"]:
+                    continue
+                break
         except (BrokenPipeError, OSError, ValueError, queue.Empty):
             return None
         if log_path is not None:

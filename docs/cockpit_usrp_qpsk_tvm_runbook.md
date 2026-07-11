@@ -64,6 +64,8 @@ Remove-Item Env:ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT -ErrorAction SilentlyCon
 
 TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`、`ANALOG_PRECONNECT_CONTROL`、`ANALOG_RX_SESSION_CONTROL`、`ANALOG_RETRY_ON_BURST_MISS`、`ANALOG_RETRY_ON_LOW_SYNC` 或 remote decode request timeout/restart envs：这些路径已有实测数据，只保留给定向实验。
 
+2026-07-11 当前 Cockpit IQ 直传复现 profile 覆盖早期环境块中的旧建议：使用 Docker SSH/TX、`REMOTE_RX_RUN_ROOT=/tmp/usrp292x_remote_runs`、`ANALOG_RX_TAIL_SEC=0.040`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`RX_ARM_WAIT_MS=150`、`RX_STOP_WAIT_MS=8000`、`ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`。不要启用 short STOP、short RX WAIT、worker timeout/restart、tmpfs 或 streaming TVM，除非是在做单独 A/B。
+
 ## Start Cockpit Backend
 
 ```powershell
@@ -84,6 +86,7 @@ These runs were started through the same backend path used by the cockpit deskto
 
 | Link | Batch | Result | Transport metric | RF airtime | Decode / merge | TVM big.LITTLE |
 |---|---:|---:|---:|---:|---:|---:|
+| IQ direct, current 2026-07-11 profile with probe-id/precreate retry | `batch-1783730551-300` | 300/300, fallback 0 | median `155.66 ms`, p95 `274.33 ms`, max `11124.64 ms` | `9.58 ms` class | `.npy`, minimal/summary-only response, soft probes with `probe_id`; remaining tails are board publish/file-visibility | median `241.69 ms`, p95 `244.45 ms`, max `280.68 ms` |
 | IQ direct, async stall-snapshot diagnostic | `batch-1783642640-300` | 300/300, fail 0 | median `190.29 ms`, p95 `946.07 ms` | `9.58 ms` | mixed RX wait and decode-worker stalls; publish p95 `1.79 ms` | median `240.79 ms`, p95 `243.97 ms` |
 | IQ direct, fast-first sync recommended | `batch-1783626884-300` | 300/300, fail 0 | median `182.28 ms`, p95 `372.96 ms` | `9.58 ms` | decode median `62.96 ms` | median `242.41 ms`, p95 `245.77 ms` |
 | IQ direct, previous sequential-sync baseline | `batch-1783625337-300` | 300/300, fail 0 | median `189.10 ms`, p95 `642.66 ms` | `9.58 ms` | decode median `68.47 ms` | median `242.16 ms`, p95 `244.89 ms` |
@@ -151,6 +154,7 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 
 ## Verified Milestones
 
+- 2026-07-11 IQ direct probe-id/precreate retry validation: `batch-1783730551-300`, 300/300, fallback 0, TVM median/p95/max `241.69/244.45/280.68 ms`, IQ transport median/p95/max `155.66/274.33/11124.64 ms`, PSNR `37.0445`, SSIM `0.97494`. This fixes stale same-request path-probe responses and transient SSH kex failures during precreate. It is not final performance success because IQ p95 is still above TVM p95 and max is dominated by board `.npy` publish/file-visibility tails.
 - 2026-07-11 IQ direct worker-timing validation: `batch-1783726777-300`, 300/300, fallback 0, TVM median/p95 `241.78/244.73 ms`, IQ transport median/p95/max `158.38/333.24/10395.30 ms`, PSNR `37.0445`, SSIM `0.97494`. The soft-completion path-probe timeout fix capped worker response-wait max at `405.91 ms`; remaining tails were RX arm/capture and occasional board decode/write stalls.
 - 2026-07-11 rejected IQ timeout/STOP profiles: `ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` is now correctly passed through to the runner, but `batch-1783727897-300` worsened IQ p95 to `904.15 ms`. Short STOP defaults (`RX_STOP_WAIT_MS=200`, `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2`) failed 300-image gates (`296/300` and `299/300`). Keep these knobs opt-in and keep the stable Cockpit default at `RX_STOP_WAIT_MS=8000` / `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`.
 - 2026-07-10 IQ direct fast-first recommended profile: `batch-1783626884-300`, 300/300, fallback 0, transport median `182.28 ms`, transport p95 `372.96 ms`, RF airtime `9.58 ms`, RX capture median `97.23 ms`, board decode median `62.96 ms`, TVM median `242.41 ms`, TVM p95 `245.77 ms`, total cockpit batch wall `157.12 s`. All 300 decode summaries used `sync_pass=1`; fast sync median `21.07 ms`, p95 `61.51 ms`.

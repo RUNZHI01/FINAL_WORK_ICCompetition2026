@@ -8,6 +8,10 @@
 
 ## 2026-07-11 最新进展
 
+09:05 最新有效 Cockpit-button-equivalent 300 张是 `batch-1783730551-300`：`300/300`、fallback `0`。TVM median/p95/max `241.69/244.45/280.68 ms`；IQ total median/p95/max `155.66/274.33/11124.64 ms`；质量 PSNR `37.0445`、SSIM `0.97494`。这轮包含两个新可靠性修复：persistent path-probe 每次请求带唯一 `probe_id`，避免同一 `request_id` 下旧 probe 的 `missing/ok` 响应污染当前判断；远端 capture 目录预创建遇到瞬时 SSH `kex_exchange_identification` 时按 chunk 重试，避免整批直接 fallback。
+
+`batch-1783730551-300` 的结论：可靠性和画质通过，但性能还没最终达标。IQ median 已明显低于 TVM median，正常路径足够快；300 张 p95 仍比 TVM p95 高约 `29.9 ms`，max 被少数长尾拉到 `11.12 s`。主要尾巴包括真实板端 `.npy` 写入 stall（例如 `image_0172 write_npz` 约 `10.94 s`）和 soft-probe 已命中但文件可见/worker 响应仍延迟数秒的样本（例如 `image_0171`、`image_0237`、`image_0158`）。下一步应继续打板端 decoded-output publish/文件可见性和 RX capture 尾部，不要再动 QPSK。
+
 08:20 最新结论：decode-worker soft-probe timeout 修复有效，但 RX 侧长尾仍是主瓶颈。`batch-1783726777-300` 为 `300/300`、fallback `0`，TVM median/p95/max `241.78/244.73/277.54 ms`，IQ total median/p95/max `158.38/333.24/10395.30 ms`，PSNR `37.0445`、SSIM `0.97494`。新增 worker timing 显示 `remote_decode_worker_response_wait_ms` max 已从上一轮的 `8694 ms` 降到 `405.91 ms`，说明 soft-completion probe 不再被默认 3 秒探测拖住；剩余 p95/max 主要来自 RX arm/capture 和偶发板端 decode/write。
 
 08:35 三个新 A/B 都不能作为默认 profile。`ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` 已正确透传到每个 round，但 `batch-1783727897-300` 虽然 `300/300`，IQ p95/max 恶化到 `904.15/10540.47 ms`。再叠加短 STOP（`RX_STOP_WAIT_MS=200`、`ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2`、`ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC=0.0`）的 `batch-1783728580-300` 失败为 `296/300`；去掉 `rx_wait_timeout` 但保留短 STOP 的 `batch-1783728902-300` 仍失败为 `299/300`。短 STOP 会降低部分等待样本，但可能留下 `capture_already_running` 状态残留，所以默认保持稳定的 `RX_STOP_WAIT_MS=8000` / `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`。新代码只保留 `ANALOG_RX_WAIT_TIMEOUT_SEC` 和 `ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC` 的 opt-in 透传。

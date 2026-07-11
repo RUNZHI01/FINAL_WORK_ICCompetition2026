@@ -599,6 +599,101 @@ def test_remote_path_probe_worker_ignores_stale_response_for_previous_request(tm
     assert writes
 
 
+def test_remote_path_probe_worker_ignores_stale_probe_for_same_request(tmp_path):
+    writes: list[str] = []
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+    responses.put(json.dumps({
+        "status": "missing",
+        "request_id": "current",
+        "probe_id": "old-probe",
+    }))
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+            request = json.loads(text)
+            responses.put(json.dumps({
+                "status": "ok",
+                "request_id": request["request_id"],
+                "probe_id": request["probe_id"],
+                "summary": {"status": "ok", "out_npz": request["path"]},
+            }))
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    worker = analog_batch.RemotePathProbeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        0.0,
+    )
+
+    result = worker.probe(
+        "/tmp/current.npy",
+        "",
+        request_id="current",
+        timeout=0.1,
+        log_path=tmp_path / "path_probe.log",
+    )
+
+    assert result is not None
+    assert result["status"] == "ok"
+    sent_request = json.loads(writes[0])
+    assert sent_request["probe_id"]
+    assert result["probe_id"] == sent_request["probe_id"]
+
+
+def test_precreate_remote_capture_dirs_retries_transient_ssh_failure(tmp_path, monkeypatch):
+    args = Namespace(
+        dry_run=False,
+        rx_capture_mode="remote-decode",
+        remote_rx_run_root="/tmp/usrp292x_remote_runs",
+        run_id="run42",
+    )
+    images = [
+        analog_batch.ImageRecord(index=0, input_path=tmp_path / "0.bin", image_dir=tmp_path / "image_0000"),
+        analog_batch.ImageRecord(index=1, input_path=tmp_path / "1.bin", image_dir=tmp_path / "image_0001"),
+    ]
+    calls: list[Path] = []
+
+    def fake_run_remote_command(_target, _argv, log_path, **_kwargs):
+        calls.append(log_path)
+        if len(calls) == 1:
+            raise RuntimeError("kex_exchange_identification: Connection closed by remote host")
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setenv("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_RETRIES", "2")
+    monkeypatch.setenv("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_RETRY_DELAY_SEC", "0")
+    monkeypatch.setattr(analog_batch, "run_remote_command", fake_run_remote_command)
+
+    result = analog_batch.precreate_remote_capture_dirs(
+        args,
+        images,
+        "user@board",
+        tmp_path,
+    )
+
+    assert result is True
+    assert len(calls) == 2
+    assert calls[0].name == "remote_capture_dirs_00.log"
+    assert calls[1].name == "remote_capture_dirs_00_retry1.log"
+
+
 def test_remote_analog_decode_request_includes_request_id_without_summary_json():
     args = Namespace(
         sync_candidates=12,
