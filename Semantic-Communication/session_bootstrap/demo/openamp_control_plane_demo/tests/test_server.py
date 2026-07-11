@@ -3822,6 +3822,8 @@ class DashboardStateTest(unittest.TestCase):
                 "ANALOG_PRECONNECT_CONTROL": "1",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
             },
             clear=False,
         ):
@@ -3841,6 +3843,8 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env.get("ANALOG_PRECONNECT_CONTROL"), "1")
         self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_CONTROL"), "1")
         self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_MAX_IMAGES"), "16")
+        self.assertEqual(env.get("ANALOG_RX_HEALTH_RESET_ON_STALL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC"), "0.75")
 
     def test_session_board_access_rejects_unsupported_auth_sig_policy(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -3969,6 +3973,8 @@ class ServerMainTest(unittest.TestCase):
                 "ANALOG_RX_SESSION_CONTROL": "1",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
                 "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
@@ -4012,6 +4018,8 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["ANALOG_RX_SESSION_CONTROL"], "1")
         self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
         self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(overrides["ANALOG_RX_HEALTH_RESET_ON_STALL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC"], "0.75")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
         self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
         self.assertEqual(overrides["ANALOG_RX_WAIT_TIMEOUT_SEC"], "1.0")
@@ -4949,6 +4957,8 @@ class ServerMainTest(unittest.TestCase):
                     "ANALOG_RX_SESSION_CONTROL": "1",
                     "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
                     "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                    "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                    "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
                     "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.5",
                     "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
                     "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
@@ -4986,6 +4996,9 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--rx-batch-session-control", command)
         self.assertIn("--rx-batch-session-max-images", command)
         self.assertEqual(command[command.index("--rx-batch-session-max-images") + 1], "16")
+        self.assertIn("--rx-health-reset-on-stall", command)
+        self.assertIn("--rx-health-stall-threshold-sec", command)
+        self.assertEqual(command[command.index("--rx-health-stall-threshold-sec") + 1], "0.75")
         self.assertIn("--rx-arm-status-timeout-sec", command)
         self.assertEqual(command[command.index("--rx-arm-status-timeout-sec") + 1], "0.5")
         self.assertIn("--rx-arm-status-poll-sec", command)

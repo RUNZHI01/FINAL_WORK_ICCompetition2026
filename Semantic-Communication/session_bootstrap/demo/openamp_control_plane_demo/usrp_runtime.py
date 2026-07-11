@@ -133,6 +133,8 @@ ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
 ANALOG_RX_SESSION_CONTROL_KEYS = ("ANALOG_RX_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
+ANALOG_RX_HEALTH_RESET_ON_STALL_KEYS = ("ANALOG_RX_HEALTH_RESET_ON_STALL",)
+ANALOG_RX_HEALTH_STALL_THRESHOLD_KEYS = ("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC",)
 ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS = ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC",)
 ANALOG_RX_ARM_STATUS_POLL_KEYS = ("ANALOG_RX_ARM_STATUS_POLL_SEC",)
 ANALOG_RX_WAIT_TIMEOUT_KEYS = ("ANALOG_RX_WAIT_TIMEOUT_SEC",)
@@ -2711,6 +2713,19 @@ class UsrpBatchSpoolJob:
             args.extend([
                 "--rx-batch-session-max-images",
                 str(max(0, _parse_int(rx_batch_session_max_images, 0))),
+            ])
+        rx_health_reset = _first_value(env_values, ANALOG_RX_HEALTH_RESET_ON_STALL_KEYS)
+        if rx_health_reset:
+            args.append(
+                "--rx-health-reset-on-stall"
+                if _parse_bool(rx_health_reset, False)
+                else "--no-rx-health-reset-on-stall"
+            )
+        rx_health_threshold = _first_value(env_values, ANALOG_RX_HEALTH_STALL_THRESHOLD_KEYS)
+        if rx_health_threshold:
+            args.extend([
+                "--rx-health-stall-threshold-sec",
+                str(max(0.0, _parse_float(rx_health_threshold, 1.0))),
             ])
         rx_arm_status_timeout = _first_value(env_values, ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS)
         if rx_arm_status_timeout:
