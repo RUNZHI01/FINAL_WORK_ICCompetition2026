@@ -694,7 +694,8 @@ def test_precreate_remote_capture_dirs_retries_transient_ssh_failure(tmp_path, m
     assert calls[1].name == "remote_capture_dirs_00_retry1.log"
 
 
-def test_remote_analog_decode_request_includes_request_id_without_summary_json():
+def test_remote_analog_decode_request_includes_request_id_without_summary_json(monkeypatch):
+    monkeypatch.setenv("ANALOG_REMOTE_DECODE_PUBLISH_EVENT", "1")
     args = Namespace(
         sync_candidates=12,
         min_sync_metric=0.05,
@@ -731,6 +732,46 @@ def test_remote_analog_decode_request_includes_request_id_without_summary_json()
 
     assert request["summary_json"] == ""
     assert request["request_id"]
+    assert request["publish_event"] is True
+
+
+def test_remote_analog_decode_request_omits_publish_event_by_default(monkeypatch):
+    monkeypatch.delenv("ANALOG_REMOTE_DECODE_PUBLISH_EVENT", raising=False)
+    args = Namespace(
+        sync_candidates=12,
+        min_sync_metric=0.05,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=False,
+        sync_search_window_symbols=4096,
+        dry_run=False,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_decode_response_mode="minimal",
+        sync_profile="fast-first",
+        fast_sync_candidates=4,
+        fast_sync_search_window_symbols=1024,
+        fallback_sync_candidates=12,
+        fallback_sync_search_window_symbols=4096,
+        retry_on_burst_miss=False,
+        retry_on_low_sync=False,
+        low_sync_retry_threshold=0.08,
+        max_arq_rounds=2,
+        current_decode_attempt_index=0,
+        current_decode_max_attempts=3,
+    )
+
+    request = analog_batch.remote_analog_decode_request(
+        args,
+        "/tmp/run/image_0000/batch_rx.sc16",
+        "/tmp/run/image_0000/manifest.json",
+        "/home/user/cockpit_usrp_rx/run_rx/00000000.npz",
+        "",
+        "",
+    )
+
+    assert "publish_event" not in request
 
 
 def test_decode_worker_response_echoes_request_id():
@@ -743,6 +784,75 @@ def test_decode_worker_response_echoes_request_id():
 
     assert response["request_id"] == "decode-1"
     assert response["summary_json"] == ""
+
+
+def test_remote_decode_worker_returns_on_matching_publish_event(tmp_path):
+    writes: list[str] = []
+    responses: "queue.Queue[str]" = analog_batch.queue.Queue()
+
+    class FakeStdin:
+        def write(self, text: str) -> None:
+            writes.append(text)
+            request = json.loads(text)
+            responses.put(json.dumps({
+                "status": "published",
+                "request_id": request["request_id"],
+                "out_npz": request["out_npz"],
+                "summary_json": request["summary_json"],
+                "summary": {
+                    "status": "ok",
+                    "frame_complete": True,
+                    "sync_success": True,
+                    "out_npz": request["out_npz"],
+                },
+            }))
+            responses.put(json.dumps({
+                "status": "ok",
+                "request_id": request["request_id"],
+                "summary_json": request["summary_json"],
+                "summary": {"status": "ok", "decode_total_ms": 42.0},
+            }))
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProc:
+        stdin = FakeStdin()
+
+        def poll(self) -> None:
+            return None
+
+    class FakeHandle:
+        def close(self) -> None:
+            return None
+
+    worker = analog_batch.RemoteAnalogDecodeWorker(
+        FakeProc(),
+        FakeHandle(),
+        responses,
+        None,
+        {"status": "ready"},
+        0.0,
+    )
+
+    proc = worker.decode(
+        {
+            "request_id": "decode-1",
+            "out_npz": "/remote/out/00000001.npy",
+            "summary_json": "",
+        },
+        tmp_path / "remote_decode.log",
+        timeout=2.0,
+    )
+
+    response = json.loads(proc.stdout)
+    assert response["status"] == "ok"
+    assert response["soft_completed"] is True
+    assert response["summary"]["out_npz"] == "/remote/out/00000001.npy"
+    assert writes
 
 
 def test_remote_decode_worker_uses_soft_completion_when_response_lags(tmp_path):
@@ -1321,6 +1431,7 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path, monkeypa
         raise AssertionError("windowed decode should crop raw sc16 before complex conversion")
 
     monkeypatch.setattr(analog, "sc16_to_complex", reject_full_sc16_to_complex)
+    published: list[dict[str, object]] = []
 
     result = analog.decode_waveform(
         Namespace(
@@ -1339,9 +1450,21 @@ def test_decode_waveform_auto_centers_window_from_burst_power(tmp_path, monkeypa
             scramble_key="",
             scramble_key_hex="",
             scramble_context="",
-        )
+        ),
+        publish_callback=lambda payload: published.append({
+            **payload,
+            "exists": out_npz.is_file(),
+            "size": out_npz.stat().st_size if out_npz.is_file() else 0,
+        }),
     )
 
+    assert len(published) == 1
+    assert published[0]["out_npz"] == str(out_npz)
+    assert published[0]["exists"] is True
+    assert published[0]["size"] == out_npz.stat().st_size
+    assert published[0]["summary"]["sync_success"] is True
+    assert published[0]["summary"]["out_npz"] == str(out_npz)
+    assert "write_npz" in published[0]["summary"]["decode_timing_ms"]
     assert result["sync_success"] is True
     assert result["sync_search_window_enabled"] is True
     assert result["sync_search_raw_sc16_crop_enabled"] is True
@@ -4404,7 +4527,8 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
     assert result.records[0]["remote_decode_worker_call_wall_sec"] == 0.053
 
 
-def test_process_image_soft_completion_summaryless_request_checks_output_only(tmp_path, monkeypatch):
+def test_process_image_summaryless_request_uses_publish_event_without_path_probe(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANALOG_REMOTE_DECODE_PUBLISH_EVENT", "1")
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
     image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
@@ -4414,8 +4538,27 @@ def test_process_image_soft_completion_summaryless_request_checks_output_only(tm
         def decode(self, request, log_path, *, timeout, soft_timeout=0.0, soft_completion=None):
             del timeout, soft_timeout
             assert request.get("summary_json") in (None, "")
-            assert soft_completion is not None
-            response = soft_completion()
+            assert request.get("publish_event") is True
+            assert soft_completion is None
+            response = {
+                "status": "ok",
+                "soft_completed": True,
+                "summary_json": "",
+                "request_id": request["request_id"],
+                "summary": {
+                    "status": "ok",
+                    "frame_complete": True,
+                    "sync_success": True,
+                    "out_npz": request["out_npz"],
+                    "decode_total_ms": 42.0,
+                    "decode_timing_ms": {"write_npz": 1.0},
+                },
+                "runner_timing_ms": {
+                    "send_ms": 0.1,
+                    "response_wait_ms": 42.0,
+                    "call_ms": 42.1,
+                },
+            }
             log_path.write_text(json.dumps(response), encoding="utf-8")
             return subprocess.CompletedProcess(
                 args=["decode-server"],
@@ -4490,10 +4633,8 @@ def test_process_image_soft_completion_summaryless_request_checks_output_only(tm
 
     assert result.passed is True
     assert result.records[0]["remote_decode_soft_completed"] is True
-    assert soft_completion_calls
-    assert soft_completion_calls[0][0] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
-    assert soft_completion_calls[0][1] == ""
-    assert soft_completion_calls[0][2] == 0.25
+    assert result.records[0]["remote_decode_timing_ms"]["write_npz"] == 1.0
+    assert soft_completion_calls == []
 
 
 def test_process_image_restarts_remote_decode_worker_after_timeout(tmp_path, monkeypatch):

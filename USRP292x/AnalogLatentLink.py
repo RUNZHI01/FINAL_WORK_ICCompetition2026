@@ -1173,7 +1173,11 @@ def make_waveform(args: argparse.Namespace) -> dict[str, Any]:
     return manifest
 
 
-def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
+def decode_waveform(
+    args: argparse.Namespace,
+    *,
+    publish_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     decode_start = time.perf_counter()
     timing_last = decode_start
     decode_timing_ms: dict[str, float] = {}
@@ -1576,6 +1580,22 @@ def decode_waveform(args: argparse.Namespace) -> dict[str, Any]:
 
     atomic_savez(out_npz, **npz_items)
     mark_timing("write_npz")
+    if publish_callback is not None:
+        publish_summary: dict[str, Any] = {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "out_npz": str(out_npz),
+            "sync_search_mode": sync_search_mode,
+            "sync_metric": float(sync_final["sync_metric"]),
+            "estimated_cfo_hz": float(estimated_cfo_hz),
+            "detected_airtime_ms": float(1000.0 * int(manifest["tx_waveform_samples"]) / rate),
+            "rx_clipping_ratio": rx_clipping_ratio,
+            "decode_timing_ms": {key: round(value, 3) for key, value in decode_timing_ms.items()},
+            "decode_total_ms": round(float((time.perf_counter() - decode_start) * 1000.0), 3),
+        }
+        publish_summary.update(sync_pass_summary)
+        publish_callback({"out_npz": str(out_npz), "summary": publish_summary})
 
     summary: dict[str, Any] = {
         "status": "ok",
@@ -1819,7 +1839,33 @@ def run_decode_server() -> int:
             continue
         try:
             args = decode_namespace_from_request(request)
-            summary = decode_waveform(args)
+            publish_callback = None
+            if bool(request.get("publish_event", False)):
+                request_id = str(request.get("request_id") or "")
+
+                def publish_callback(payload: dict[str, Any]) -> None:
+                    out_npz = str(payload.get("out_npz") or args.out_npz)
+                    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+                    if not summary:
+                        summary = {
+                            "status": "ok",
+                            "frame_complete": True,
+                            "sync_success": True,
+                            "out_npz": out_npz,
+                        }
+                    else:
+                        summary = dict(summary)
+                        summary["out_npz"] = out_npz
+                    event = {
+                        "status": "published",
+                        "request_id": request_id,
+                        "out_npz": out_npz,
+                        "summary_json": args.summary_json,
+                        "summary": summary,
+                    }
+                    print(json.dumps(event, ensure_ascii=False), flush=True)
+
+            summary = decode_waveform(args, publish_callback=publish_callback)
             print(json.dumps(
                 decode_worker_response(
                     summary,

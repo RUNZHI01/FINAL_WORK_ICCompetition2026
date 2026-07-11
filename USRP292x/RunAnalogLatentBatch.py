@@ -1849,6 +1849,13 @@ def remote_decode_response_only_summary_enabled(args: argparse.Namespace) -> boo
     return bool(getattr(args, "remote_decode_response_only_summary", False))
 
 
+def remote_decode_publish_event_enabled(args: argparse.Namespace) -> bool:
+    return bool(
+        getattr(args, "remote_decode_publish_event", False)
+        or env_bool("ANALOG_REMOTE_DECODE_PUBLISH_EVENT", False)
+    )
+
+
 def try_remote_dir_decode_soft_completion(
     target: str,
     remote_output: str,
@@ -2263,6 +2270,25 @@ class RemoteAnalogDecodeWorker:
             if request_key and response_key and response_key != request_key:
                 self._pending_responses[response_key] = line
                 continue
+            if str(response.get("status") or "").strip().lower() == "published":
+                summary = response.get("summary") if isinstance(response.get("summary"), dict) else {}
+                if not summary:
+                    summary = {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "out_npz": response.get("out_npz"),
+                    }
+                response = {
+                    "status": "ok",
+                    "soft_completed": True,
+                    "summary_json": response.get("summary_json", ""),
+                    "sync_metric": summary.get("sync_metric"),
+                    "estimated_cfo_hz": summary.get("estimated_cfo_hz"),
+                    "summary": summary,
+                    "request_id": response.get("request_id", ""),
+                }
+                line = json.dumps(response, ensure_ascii=True) + "\n"
             return line, response
 
     @classmethod
@@ -2703,6 +2729,8 @@ def remote_analog_decode_request(
     response_mode = remote_decode_response_mode(args)
     if response_mode:
         request["response_mode"] = "minimal" if response_mode == "compact" else response_mode
+    if remote_decode_publish_event_enabled(args) and not remote_summary and not remote_wire:
+        request["publish_event"] = True
     return request
 
 
@@ -3263,6 +3291,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     if (
                         remote_decode_result_mode == "remote-dir"
                         and soft_complete_sec > 0.0
+                        and not bool(remote_request.get("publish_event"))
                     ):
                         decode_kwargs["soft_timeout"] = soft_complete_sec
                         decode_kwargs["soft_completion"] = (
@@ -3932,6 +3961,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
                 if (
                     remote_decode_result_mode == "remote-dir"
                     and soft_complete_sec > 0.0
+                    and not bool(remote_request.get("publish_event"))
                 ):
                     decode_kwargs["soft_timeout"] = soft_complete_sec
                     decode_kwargs["soft_completion"] = (
