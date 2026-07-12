@@ -47,6 +47,16 @@ TCP 安全信道实现位于 `mlkem_link/secure_channel.py`：
 
 这证明控制/认证面参与了 USRP 任务准入，但不代表 IQ payload 被 ML-KEM 加密。USRP IQ 数据面仍由 `launch_local_usrp_reconstruction_job()` 走无线链路，性能统计里的 IQ 传输/解包时间不是 ML-KEM 密文传输时间。
 
+## 状态字段与 UI 展示
+
+`/api/crypto-status` 现在显式返回安全作用范围：
+
+- `security_scope=control_gate`：USRP IQ 直传，安全信道用于控制/认证面准入。
+- `security_scope=tcp_payload`：TCP 路径，latent/ACK/结果经 ML-KEM 派生密钥与 SM4 保护。
+- `data_plane_encrypted`、`tcp_payload_encrypted`、`usrp_payload_encrypted` 分别标记当前数据面是否落在 ML-KEM/SM4 保护范围内。
+
+Cockpit 的“安全信道/配置项”会显示 `security_scope_label`。USRP IQ 默认显示“控制/认证面准入”，避免把无线 IQ payload 误描述为已加密。
+
 ## 已验证证据
 
 本次本机可运行验证：
@@ -65,6 +75,14 @@ python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_p
   Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_set_board_access_applies_auth_policy_overrides \
   Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_ensure_board_tcp_server_restarts_when_auth_status_mismatches -q
 # 3 passed
+
+python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_get_crypto_status_marks_usrp_security_as_control_gate \
+  Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_get_crypto_status_marks_tcp_security_as_payload_encryption -q
+# 2 passed
+
+cd Semantic-Communication/cockpit_desktop
+node --test src/renderer/src/pages/DashboardPageMinimal.layout.test.mjs
+# 20 passed
 ```
 
 本机直接跑 `mlkem_link/tests/test_session.py` 与 `scripts/test_fit.py` 失败，原因是当前 Windows 环境缺少 liboqs/Tongsuo KEM 运行库，且 `scripts/conftest.py` 调用 Unix-only `os.geteuid()`。这不是安全逻辑反证，只说明需要在容器或板端环境跑全量密码学测试。
@@ -72,6 +90,6 @@ python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_p
 ## 风险与建议
 
 1. UI 和汇报中应避免说“USRP IQ 数据面已被 ML-KEM/SM4 加密”。准确说法是“USRP 演示由 ML-KEM/SM4 安全控制信道准入，IQ 数据面走无线直传”。
-2. 建议在 `/api/crypto-status` 或 batch summary 增加显式字段：`security_scope=control_gate`、`data_plane_encrypted=false`、`tcp_payload_encrypted=true/false`。
+2. `/api/crypto-status` 已增加作用范围字段，后续若新增 IQ payload 认证或加密，应同步扩展这些字段。
 3. 如果比赛要求 USRP payload 也有密码学保护，需要新增 IQ payload 签名/认证标签或密文封装设计；这会改变帧大小、同步和性能，应作为独立实验。
 4. 建议补一条 live 负测：替换错误 peer public key 时，USRP Current 任务必须被 `_arm_mlkem_security_context()` 阻断。

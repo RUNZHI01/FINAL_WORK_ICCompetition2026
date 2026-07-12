@@ -4,6 +4,8 @@
 
 export type CryptoChannelState = 'idle' | 'handshaking' | 'ready' | 'closed' | 'disabled'
 
+export type CryptoSecurityScope = 'disabled' | 'control_gate' | 'tcp_payload'
+
 export type BenchmarkMetric = {
   n: number
   min_ms: number
@@ -109,6 +111,20 @@ export type CryptoStatusResponse = {
   enabled: boolean
   /** Whether board credentials have been entered */
   board_configured: boolean
+  /** Effective protection scope of the current secure-channel configuration */
+  security_scope?: CryptoSecurityScope
+  /** Presentation label for the effective protection scope */
+  security_scope_label?: string
+  /** Operator note explaining what the secure channel does and does not cover */
+  security_scope_note?: string
+  /** Whether the control/authentication plane is protected by the secure-channel gate */
+  control_plane_protected?: boolean
+  /** Whether the selected data plane is protected by ML-KEM/SM4 */
+  data_plane_encrypted?: boolean
+  /** Whether TCP payloads are protected by ML-KEM/SM4 */
+  tcp_payload_encrypted?: boolean
+  /** Whether USRP IQ payloads are protected by ML-KEM/SM4 */
+  usrp_payload_encrypted?: boolean
   /** Control-plane guard state snapshot from latest OpenAMP status */
   control_guard_state?: string
   /** Control-plane last fault snapshot */

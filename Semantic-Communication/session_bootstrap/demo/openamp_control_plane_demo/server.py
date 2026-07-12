@@ -3609,8 +3609,50 @@ class DashboardState:
         4. 请求失败 → 保留上次正常值，只更新 error 字段
         """
         result = self._get_crypto_status_core()
+        result.update(self._crypto_security_scope_summary(result))
         result["service_mode"] = self._service_mode_snapshot()
         return result
+
+    def _crypto_security_scope_summary(self, status: dict[str, Any]) -> dict[str, Any]:
+        """Expose what the current ML-KEM/auth channel actually protects."""
+        with self._lock:
+            board_access = self._board_access
+        env_values = board_access.build_env() if board_access else {}
+
+        enabled = bool(status.get("enabled"))
+        board_configured = bool(status.get("board_configured"))
+        if not enabled or not board_configured:
+            return {
+                "security_scope": "disabled",
+                "security_scope_label": "未启用",
+                "security_scope_note": "安全信道未启用。",
+                "control_plane_protected": False,
+                "data_plane_encrypted": False,
+                "tcp_payload_encrypted": False,
+                "usrp_payload_encrypted": False,
+            }
+
+        transport_mode = local_crypto_transport_mode(env_values)
+        if transport_mode == "usrp":
+            return {
+                "security_scope": "control_gate",
+                "security_scope_label": "控制/认证面准入",
+                "security_scope_note": "USRP IQ 数据面不经 ML-KEM/SM4 封装，安全信道用于准入与控制。",
+                "control_plane_protected": True,
+                "data_plane_encrypted": False,
+                "tcp_payload_encrypted": False,
+                "usrp_payload_encrypted": False,
+            }
+
+        return {
+            "security_scope": "tcp_payload",
+            "security_scope_label": "TCP 数据面加密",
+            "security_scope_note": "TCP latent/ACK/结果经 ML-KEM 派生密钥与 SM4 保护。",
+            "control_plane_protected": True,
+            "data_plane_encrypted": True,
+            "tcp_payload_encrypted": True,
+            "usrp_payload_encrypted": False,
+        }
 
     def _service_mode_snapshot(self) -> dict[str, Any]:
         """Compute service mode from the link director profile to drive the UI.

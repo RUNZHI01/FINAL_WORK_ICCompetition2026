@@ -253,6 +253,14 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   ]
   const authDisplay = resolveAuthDisplayState(authConfig?.enabled, data.auth_enabled)
 
+  if (data.security_scope_label) {
+    settingsItems.push({
+      label: '作用范围',
+      value: data.security_scope_label,
+      tone: 'mono',
+    })
+  }
+
   if (authDisplay.known) {
     settingsItems.push({
       label: '认证面',

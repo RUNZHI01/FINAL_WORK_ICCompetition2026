@@ -3931,6 +3931,80 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["sig_policy"], "DUAL_REQUIRED")
         self.assertEqual(payload["server_id"], "phytium-board")
 
+    def test_get_crypto_status_marks_usrp_security_as_control_gate(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_TRANSPORT_MODE": "usrp",
+                    "MLKEM_AUTH_ENABLED": "1",
+                }
+            ),
+        )
+
+        live_status = {
+            "channel_state": "ready",
+            "kem_backend": "tongsuo-ML-KEM-768",
+            "cipher_suite": "sm4-gcm",
+            "bytes_sent": 1024,
+            "bytes_received": 2048,
+        }
+
+        with patch("server.fetch_json_direct", return_value=live_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["security_scope"], "control_gate")
+        self.assertEqual(payload["security_scope_label"], "控制/认证面准入")
+        self.assertTrue(payload["control_plane_protected"])
+        self.assertFalse(payload["data_plane_encrypted"])
+        self.assertFalse(payload["tcp_payload_encrypted"])
+        self.assertFalse(payload["usrp_payload_encrypted"])
+        self.assertIn("USRP IQ", payload["security_scope_note"])
+
+    def test_get_crypto_status_marks_tcp_security_as_payload_encryption(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_TRANSPORT_MODE": "tcp",
+                    "MLKEM_AUTH_ENABLED": "1",
+                }
+            ),
+        )
+
+        live_status = {
+            "channel_state": "ready",
+            "kem_backend": "tongsuo-ML-KEM-768",
+            "cipher_suite": "sm4-gcm",
+            "bytes_sent": 1024,
+            "bytes_received": 2048,
+        }
+
+        with patch("server.fetch_json_direct", return_value=live_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["security_scope"], "tcp_payload")
+        self.assertEqual(payload["security_scope_label"], "TCP 数据面加密")
+        self.assertTrue(payload["control_plane_protected"])
+        self.assertTrue(payload["data_plane_encrypted"])
+        self.assertTrue(payload["tcp_payload_encrypted"])
+        self.assertFalse(payload["usrp_payload_encrypted"])
+        self.assertIn("latent", payload["security_scope_note"])
+
     def test_run_crypto_test_updates_status_cache_from_subprocess_metrics(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True

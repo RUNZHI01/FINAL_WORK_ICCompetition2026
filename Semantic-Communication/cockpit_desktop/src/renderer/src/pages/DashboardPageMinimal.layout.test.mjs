@@ -145,3 +145,9 @@ test('security runtime status handshake and traffic share one row with 1-1-2 col
   assert.match(runtimeBlock, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/)
   assert.match(halfBlock, /grid-column:\s*span 2;/)
 })
+
+test('security config shows the effective protection scope from crypto status', () => {
+  assert.match(cryptoPanelTsx, /label:\s*'作用范围'/)
+  assert.match(cryptoPanelTsx, /data\.security_scope_label/)
+  assert.doesNotMatch(cryptoPanelTsx, /security_scope_note/)
+})
