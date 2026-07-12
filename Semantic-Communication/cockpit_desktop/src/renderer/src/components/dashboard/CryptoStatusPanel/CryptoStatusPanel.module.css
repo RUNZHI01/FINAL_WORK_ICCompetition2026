@@ -428,6 +428,11 @@
   white-space: nowrap;
 }
 
+.benchRowEmphasis td {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
 @media (max-width: 1080px) {
   .settingsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

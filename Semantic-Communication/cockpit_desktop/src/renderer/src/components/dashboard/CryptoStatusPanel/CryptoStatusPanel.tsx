@@ -456,8 +456,9 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
               <tbody>
                 {validRows.map(({ label, metric }) => {
                   const m = metric!
+                  const emphasized = label === '传输/解包总计' || label === '推理侧总计'
                   return (
-                    <tr key={label}>
+                    <tr key={label} className={emphasized ? s.benchRowEmphasis : undefined}>
                       <td>{label}</td>
                       <td>{m.mean_ms} ms</td>
                       <td>{m.median_ms} ms</td>

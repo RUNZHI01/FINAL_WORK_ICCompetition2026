@@ -22,10 +22,12 @@ import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
 import type { BatchStageProgress } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
-import { buildBoardReadinessItems, type BoardReadinessTone } from '../hooks/boardReadiness'
+import { shouldDisplayDashboardBatch } from '../hooks/dashboardBatchDisplayState'
 import {
+  extractIqAuditTimeline,
   extractIqRadioMetrics,
   extractJsccLinkMode,
+  type IqAuditTimelineRow,
   type IqRadioMetrics,
   type JsccLinkMode,
   type JsonObject,
@@ -101,17 +103,27 @@ function normalizeBatchCountInput(rawValue: string, fallback: number): number {
   return Math.max(1, Math.min(Math.trunc(parsed), MAX_BATCH_COUNT))
 }
 
-function readinessToneClass(tone: BoardReadinessTone): string {
-  switch (tone) {
-    case 'ready':
-      return s.readinessItemReady
-    case 'blocked':
-      return s.readinessItemBlocked
-    case 'warn':
-      return s.readinessItemWarn
-    default:
-      return s.readinessItemInfo
+function formatCompactMs(value: number | undefined): string {
+  if (value == null) return '—'
+  if (value >= 100) return `${value.toFixed(0)} ms`
+  if (value >= 10) return `${value.toFixed(1)} ms`
+  return `${value.toFixed(2)} ms`
+}
+
+function formatMetricValue(value: number | undefined, decimals = 3): string | undefined {
+  return value == null ? undefined : value.toFixed(decimals)
+}
+
+function formatPercentValue(value: number | undefined): string | undefined {
+  return value == null ? undefined : `${value.toFixed(1)}%`
+}
+
+function timelineWidth(row: IqAuditTimelineRow, maxDurationMs: number): number {
+  if (row.percent != null) return Math.max(4, Math.min(row.percent, 100))
+  if (row.duration_ms != null && maxDurationMs > 0) {
+    return Math.max(4, Math.min((row.duration_ms / maxDurationMs) * 100, 100))
   }
+  return 4
 }
 
 type MainProgressTone = 'yellow' | 'green' | 'blue'
@@ -222,7 +234,7 @@ const GpsForwardStream = memo(function GpsForwardStream({
           持续传输
         </div>
       </div>
-      <div className={s.liveLogStream} style={{ marginTop: '8px' }}>
+      <div className={`${s.liveLogStream} ${s.alertModeLogStream}`} style={{ marginTop: '8px' }}>
         {gpsLogs.length > 0 ? gpsLogs.map((log, i) => (
           <div key={`gps-${i}`} className={s.logEntry} style={{ opacity: 0.3 + (i * 0.15), color: 'var(--color-error)' }}>
             {log}
@@ -471,8 +483,7 @@ export function DashboardPageMinimal() {
       : 'Live'
   const liveExpectedCount = Math.max(1, liveProgress?.expected_count ?? 1)
   const liveCompletedCount = Math.max(0, Math.min(liveProgress?.completed_count ?? 0, liveExpectedCount))
-  const isCurrentSessionBatch = Boolean(batch?.batch_job_id && pendingBatchJobId && batch.batch_job_id === pendingBatchJobId)
-  const activeBatch = batch && (isCurrentSessionBatch || batch.status === 'running' || batch.status === 'done')
+  const activeBatch = batch && shouldDisplayDashboardBatch(batch, pendingBatchJobId, currentMode)
     ? batch
     : undefined
   const batchServiceMode = activeBatch?.service_mode as string | undefined
@@ -585,8 +596,58 @@ export function DashboardPageMinimal() {
   const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
   const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
-  const linkModeLabel = activeLinkMode === 'iq-direct' ? 'IQ 直传' : 'QPSK 兜底'
-  const boardReadinessItems = buildBoardReadinessItems(boardAccess)
+  const iqAuditTimeline = extractIqAuditTimeline(currentWrapperSummary).slice(0, 6)
+  const iqAuditMaxDurationMs = Math.max(0, ...iqAuditTimeline.map((row) => row.duration_ms ?? 0))
+  const iqRadioMetricItems = [
+    iqRadioMetrics?.sample_count != null
+      ? { key: 'samples', label: '样本', value: iqRadioMetrics.sample_count.toLocaleString() }
+      : undefined,
+    iqRadioMetrics?.sync_success_ratio != null
+      ? { key: 'syncRatio', label: '同步率', value: formatPercentValue(iqRadioMetrics.sync_success_ratio * 100) }
+      : undefined,
+    iqRadioMetrics?.sync_metric?.mean != null
+      ? { key: 'sync', label: 'sync', value: formatMetricValue(iqRadioMetrics.sync_metric.mean, 4) }
+      : undefined,
+    iqRadioMetrics?.evm_rms?.mean != null
+      ? { key: 'evm', label: 'EVM', value: formatMetricValue(iqRadioMetrics.evm_rms.mean, 4) }
+      : undefined,
+    iqRadioMetrics?.estimated_cfo_hz?.mean != null
+      ? { key: 'cfo', label: 'CFO', value: `${iqRadioMetrics.estimated_cfo_hz.mean.toFixed(1)} Hz` }
+      : undefined,
+    iqRadioMetrics?.estimated_snr_db?.mean != null
+      ? { key: 'snr', label: 'SNR', value: `${iqRadioMetrics.estimated_snr_db.mean.toFixed(1)} dB` }
+      : undefined,
+    iqRadioMetrics?.rx_clipping_ratio?.mean != null
+      ? { key: 'clip', label: 'Clipping', value: formatPercentValue(iqRadioMetrics.rx_clipping_ratio.mean * 100) }
+      : undefined,
+    iqRadioMetrics?.latent_mse_vs_tx?.mean != null
+      ? { key: 'latentMse', label: 'Latent MSE', value: formatMetricValue(iqRadioMetrics.latent_mse_vs_tx.mean, 5) }
+      : undefined,
+  ].filter((item): item is { key: string; label: string; value: string } => Boolean(item?.value))
+  const showIqAuditPanel = activeTransport === 'usrp'
+    && activeLinkMode === 'iq-direct'
+    && (iqAuditTimeline.length > 0 || iqRadioMetricItems.length > 0)
+  const inputModeLabel = activeTransport === 'usrp'
+    ? activeLinkMode === 'iq-direct'
+      ? 'USRP-IQ直传'
+      : 'USRP-QPSK'
+    : '预录'
+  const inputModeBadgeClass = activeTransport === 'usrp'
+    ? activeLinkMode === 'iq-direct'
+      ? s.transportBadgeIq
+      : s.transportBadgeQpsk
+    : s.transportBadgeTcp
+  const configuredRemoteUsrPRxDir = String(boardAccess?.remote_usrp_rx_dir ?? '').trim()
+  const remoteUsrPRxDirInput = remoteUsrPRxDir.trim()
+  const remoteUsrPRxDirApplied = activeTransport === 'usrp'
+    && remoteUsrPRxDirInput.length > 0
+    && configuredRemoteUsrPRxDir === remoteUsrPRxDirInput
+  const remoteUsrPRxDirButtonLabel = boardAccessMut.isPending
+    ? '保存中...'
+    : remoteUsrPRxDirApplied
+      ? '已生效'
+      : '保存目录'
+  const boardSessionReady = Boolean(boardAccess?.connection_ready)
   const handleSaveRemoteUsrPRxDir = useCallback(
     () => {
       const remoteRxDir = remoteUsrPRxDir.trim()
@@ -649,7 +710,7 @@ export function DashboardPageMinimal() {
 
       {/* Metrics Bar */}
       <div className={s.metricsBar}>
-        <HeroMetrics system={system} inferenceProgress={inferenceProgress} batchState={batchState} />
+        <HeroMetrics system={system} inferenceProgress={inferenceProgress} batchState={batchState} currentMode={currentMode} />
         {currentMode && currentMode !== 'FULL_FRAME' && (
           <div className={s.modeBadgeTop} style={{
             background: currentMode === 'ALERT_ONLY' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
@@ -942,10 +1003,9 @@ export function DashboardPageMinimal() {
                   <div className={s.settingRow}>
                     <div className={s.settingMeta}>
                       <div className={s.settingLabel}>输入来源</div>
-                      <div className={s.settingCaption}>统一切换主 demo 的重建数据来源；USRP 模式下可选择 QPSK 或 IQ 直传链路。</div>
                     </div>
-                    <div className={`${s.transportBadge} ${activeTransport === 'usrp' ? s.transportBadgeUsr : s.transportBadgeTcp}`}>
-                      当前: {activeTransport === 'usrp' ? 'USRP' : '预录'}
+                    <div className={`${s.transportBadge} ${inputModeBadgeClass}`}>
+                      当前: {inputModeLabel}
                     </div>
                   </div>
                   <div className={s.modeSwitchStack}>
@@ -1004,97 +1064,53 @@ export function DashboardPageMinimal() {
                       </div>
                     )}
                   </div>
-                  <div className={s.readinessGrid} aria-label="链路就绪状态">
-                    {boardReadinessItems.map((item) => (
-                      <div
-                        key={item.key}
-                        className={`${s.readinessItem} ${readinessToneClass(item.tone)}`}
-                        title={item.detail}
-                      >
-                        <span className={s.readinessLabel}>{item.label}</span>
-                        <span className={s.readinessValue}>{item.value}</span>
-                        <span className={s.readinessDetail}>{item.detail}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {activeTransport === 'usrp' && (
-                    <div className={s.linkModeRow}>
-                      <div className={s.usrpRxConfig}>
-                        <label className={s.formLabel} htmlFor="remote-usrp-rx-dir">板端 USRP RX 目录</label>
-                        <div className={s.usrpRxInputRow}>
-                          <input
-                            id="remote-usrp-rx-dir"
-                            type="text"
-                            placeholder="/home/user/cockpit_usrp_rx"
-                            aria-label="板端 USRP RX 目录"
-                            value={remoteUsrPRxDir}
-                            onChange={(event) => {
-                              setRemoteUsrPRxDir(event.target.value)
-                              setRemoteUsrPRxDirDirty(true)
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') handleSaveRemoteUsrPRxDir()
-                            }}
-                            className={s.passwordInput}
-                          />
-                          <button
-                            type="button"
-                            className={s.btnFilledSm}
-                            onClick={handleSaveRemoteUsrPRxDir}
-                            disabled={boardAccessMut.isPending}
-                          >
-                            {boardAccessMut.isPending ? '保存中...' : '保存 RX'}
-                          </button>
+                  {showIqAuditPanel && (
+                    <div className={s.iqAuditPanel}>
+                      <div className={s.iqAuditHeader}>
+                        <div>
+                          <div className={s.iqAuditTitle}>IQ 直传链路审计</div>
+                          <div className={s.iqAuditCaption}>尾部时间数轴与射频质量指标</div>
                         </div>
-                        <div className={s.settingCaption}>板端 USRP 解包后的 payload 会从该目录进入 TVM/MNN 重建。</div>
+                        <span className={s.iqAuditBadge}>IQ 生效</span>
                       </div>
-                      <div
-                        className={`${s.linkModeBadge} ${activeLinkMode === 'iq-direct' ? s.linkModeBadgeIq : s.linkModeBadgeQpsk}`}
-                        title={
-                          activeLinkMode === 'iq-direct'
-                            ? 'IQ 直传链路：JSCC 论文实现，latent 直接以模拟 IQ 波形发射，无量化编码。'
-                            : 'QPSK 兜底链路：工程兜底方案，量化 latent 经 QPSK 调制 + ARQ 重传。'
-                        }
-                      >
-                        <span className={s.linkModeDot} />
-                        JSCC: {linkModeLabel}
-                      </div>
-                      {activeLinkMode && iqRadioMetrics && (
-                        <div className={s.linkModeMetrics}>
-                          {iqRadioMetrics.sample_count != null && (
-                            <span className={s.linkModeMetric}>
-                              <span className={s.linkModeMetricKey}>样本</span>
-                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.sample_count}</span>
-                            </span>
-                          )}
-                          {iqRadioMetrics.sync_success_ratio != null && (
-                            <span className={s.linkModeMetric}>
-                              <span className={s.linkModeMetricKey}>同步率</span>
-                              <span className={s.linkModeMetricVal}>
-                                {(iqRadioMetrics.sync_success_ratio * 100).toFixed(1)}%
-                              </span>
-                            </span>
-                          )}
-                          {iqRadioMetrics.sync_metric?.mean != null && (
-                            <span className={s.linkModeMetric}>
-                              <span className={s.linkModeMetricKey}>sync</span>
-                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.sync_metric.mean.toFixed(4)}</span>
-                            </span>
-                          )}
-                          {iqRadioMetrics.evm_rms?.mean != null && (
-                            <span className={s.linkModeMetric}>
-                              <span className={s.linkModeMetricKey}>EVM</span>
-                              <span className={s.linkModeMetricVal}>{iqRadioMetrics.evm_rms.mean.toFixed(4)}</span>
-                            </span>
-                          )}
-                          {iqRadioMetrics.estimated_cfo_hz?.mean != null && (
-                            <span className={s.linkModeMetric}>
-                              <span className={s.linkModeMetricKey}>CFO</span>
-                              <span className={s.linkModeMetricVal}>
-                                {iqRadioMetrics.estimated_cfo_hz.mean.toFixed(1)} Hz
-                              </span>
-                            </span>
-                          )}
+
+                      {iqAuditTimeline.length > 0 && (
+                        <div className={s.iqTimeline} aria-label="IQ 尾部审计时间数轴">
+                          {iqAuditTimeline.map((row) => (
+                            <div key={`${row.name}-${row.duration_ms ?? row.percent ?? 0}`} className={s.iqTimelineRow}>
+                              <div className={s.iqTimelineMeta}>
+                                <span className={s.iqTimelineName} title={row.name}>{row.name}</span>
+                                <span className={s.iqTimelineValue}>
+                                  {formatCompactMs(row.duration_ms)}
+                                  {row.percent != null && <span className={s.iqTimelinePercent}>{row.percent.toFixed(1)}%</span>}
+                                </span>
+                              </div>
+                              <div className={s.iqTimelineTrack}>
+                                <div
+                                  className={s.iqTimelineFill}
+                                  style={{ width: `${timelineWidth(row, iqAuditMaxDurationMs)}%` }}
+                                />
+                              </div>
+                              {(row.count != null || row.device || row.samples != null) && (
+                                <div className={s.iqTimelineDetail}>
+                                  {row.count != null && <span>调用 {row.count}</span>}
+                                  {row.samples != null && <span>样本 {row.samples}</span>}
+                                  {row.device && <span>{row.device}</span>}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {iqRadioMetricItems.length > 0 && (
+                        <div className={s.iqQualityGrid} aria-label="IQ 射频质量指标">
+                          {iqRadioMetricItems.map((item) => (
+                            <div key={item.key} className={s.iqQualityItem}>
+                              <span className={s.iqQualityLabel}>{item.label}</span>
+                              <span className={s.iqQualityValue}>{item.value}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -1104,10 +1120,39 @@ export function DashboardPageMinimal() {
                       <span className={s.pathLabel}>上位机输入目录</span>
                       <span className={s.pathValue}>{hostInputDir || (activeTransport === 'usrp' ? '未配置' : '预录模式不使用上位机输入')}</span>
                     </div>
-                    <div className={s.pathItem}>
-                      <span className={s.pathLabel}>板端输入目录</span>
-                      <span className={s.pathValue}>{boardInputDir || '未配置'}</span>
-                    </div>
+                    {activeTransport === 'usrp' ? (
+                      <div className={`${s.pathItem} ${s.pathItemEditable}`}>
+                        <label className={s.pathLabel} htmlFor="remote-usrp-rx-dir">板端输入/RX 目录</label>
+                        <input
+                          id="remote-usrp-rx-dir"
+                          type="text"
+                          placeholder="/home/user/cockpit_usrp_rx"
+                          aria-label="板端输入/RX 目录"
+                          value={remoteUsrPRxDir}
+                          onChange={(event) => {
+                            setRemoteUsrPRxDir(event.target.value)
+                            setRemoteUsrPRxDirDirty(event.target.value.trim() !== configuredRemoteUsrPRxDir)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !remoteUsrPRxDirApplied) handleSaveRemoteUsrPRxDir()
+                          }}
+                          className={s.pathInput}
+                        />
+                        <button
+                          type="button"
+                          className={remoteUsrPRxDirApplied ? s.btnAppliedSm : s.btnFilledSm}
+                          onClick={handleSaveRemoteUsrPRxDir}
+                          disabled={boardAccessMut.isPending || remoteUsrPRxDirApplied || remoteUsrPRxDirInput.length === 0}
+                        >
+                          {remoteUsrPRxDirButtonLabel}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={s.pathItem}>
+                        <span className={s.pathLabel}>板端输入目录</span>
+                        <span className={s.pathValue}>{boardInputDir || '未配置'}</span>
+                      </div>
+                    )}
                     <div className={s.pathItem}>
                       <span className={s.pathLabel}>板端重建输出目录</span>
                       <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
@@ -1136,7 +1181,15 @@ export function DashboardPageMinimal() {
           />
 
           <div className={s.sectionCard}>
-            <div className={s.sectionTitle}>板卡密码</div>
+            <div className={s.sectionTitleRow}>
+              <div className={s.sectionTitle}>板卡密码</div>
+              <div
+                className={`${s.boardSessionBadge} ${boardSessionReady ? s.boardSessionBadgeReady : s.boardSessionBadgeBlocked}`}
+                title={boardSessionReady ? 'SSH 会话字段已补齐' : '补齐板卡主机、用户和密码后才能执行 live/USRP 推理'}
+              >
+                {boardSessionReady ? '板卡就绪' : '板卡未就绪'}
+              </div>
+            </div>
             <div className={s.boardPasswordMeta}>
               <span>主机: {boardHostLabel}</span>
               <span>用户: {boardUserLabel}</span>

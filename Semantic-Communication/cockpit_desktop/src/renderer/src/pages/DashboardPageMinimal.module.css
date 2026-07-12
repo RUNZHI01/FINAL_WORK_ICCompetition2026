@@ -246,6 +246,13 @@
   letter-spacing: 0.05em;
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 /* ===== Result Card — grows to fill remaining space ===== */
 .resultCard {
   display: flex;
@@ -553,9 +560,14 @@
   justify-content: flex-end;
 }
 
+.alertModeLogStream {
+  height: 108px;
+}
+
 .logEntry {
   font-family: var(--font-family-mono);
   font-size: 11px;
+  line-height: 14px;
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -563,6 +575,7 @@
   animation: slideUpFadeIn 300ms var(--easing-standard);
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
 }
 
@@ -646,6 +659,17 @@
   font-weight: 500;
   padding: 0 20px;
   font-size: 13px;
+}
+
+.btnAppliedSm {
+  composes: btnFilledSm;
+  background: var(--color-success);
+}
+
+.btnAppliedSm:disabled {
+  opacity: 1;
+  cursor: default;
+  background: var(--color-success);
 }
 
 /* Tonal (secondary) — pill-style */
@@ -876,6 +900,30 @@
   overflow-wrap: anywhere;
 }
 
+.boardSessionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.boardSessionBadgeReady {
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border: 1px solid rgba(5, 150, 105, 0.18);
+}
+
+.boardSessionBadgeBlocked {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border: 1px solid rgba(217, 119, 6, 0.22);
+}
+
 .passwordInput {
   flex: 1;
   padding: 0 var(--space-md);
@@ -964,10 +1012,16 @@
   border: 1px solid rgba(26, 86, 219, 0.12);
 }
 
-.transportBadgeUsr {
+.transportBadgeIq {
   color: var(--color-success);
   background: var(--color-success-container);
   border: 1px solid rgba(5, 150, 105, 0.18);
+}
+
+.transportBadgeQpsk {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border: 1px solid rgba(217, 119, 6, 0.22);
 }
 
 .modeSwitchStack {
@@ -980,121 +1034,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.readinessGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.readinessItem {
-  min-width: 0;
-  padding: 9px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-light);
-  background: rgba(248, 250, 252, 0.72);
-}
-
-.readinessItemReady {
-  border-color: rgba(5, 150, 105, 0.20);
-  background: rgba(236, 253, 245, 0.70);
-}
-
-.readinessItemBlocked {
-  border-color: rgba(220, 38, 38, 0.20);
-  background: rgba(254, 242, 242, 0.72);
-}
-
-.readinessItemWarn {
-  border-color: rgba(217, 119, 6, 0.22);
-  background: rgba(255, 251, 235, 0.76);
-}
-
-.readinessItemInfo {
-  border-color: rgba(26, 86, 219, 0.16);
-  background: rgba(239, 246, 255, 0.68);
-}
-
-.readinessLabel {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.readinessValue {
-  display: block;
-  margin-top: 4px;
-  color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.3;
-  word-break: break-word;
-}
-
-.readinessDetail {
-  display: block;
-  margin-top: 3px;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.linkModeRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.usrpRxConfig {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.usrpRxInputRow {
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-}
-
-.linkModeBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.linkModeBadgeIq {
-  color: #6d28d9;
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.28);
-}
-
-.linkModeBadgeQpsk {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.28);
-}
-
-.linkModeDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.85;
 }
 
 .linkModeSwitch {
@@ -1154,30 +1093,154 @@
   color: var(--color-text-muted);
 }
 
-.linkModeMetrics {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
+.iqAuditPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(26, 86, 219, 0.16);
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.82), rgba(248, 250, 252, 0.92));
 }
 
-.linkModeMetric {
+.iqAuditHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.iqAuditTitle {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.iqAuditCaption {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.iqAuditBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border: 1px solid rgba(5, 150, 105, 0.18);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.iqTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.iqTimelineRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.iqTimelineMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.iqTimelineName {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iqTimelineValue {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-}
-
-.linkModeMetricKey {
-  font-weight: 700;
+  gap: 6px;
   color: var(--color-text-primary);
-  opacity: 0.75;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-.linkModeMetricVal {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+.iqTimelinePercent {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.iqTimelineTrack {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: rgba(203, 213, 225, 0.55);
+}
+
+.iqTimelineFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b 0%, #10b981 48%, #1a56db 100%);
+}
+
+.iqTimelineDetail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.iqQualityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.iqQualityItem {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.iqQualityLabel {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.iqQualityValue {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .transportSwitch {
@@ -1253,6 +1316,11 @@
   background: rgba(248, 250, 252, 0.72);
 }
 
+.pathItemEditable {
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 .pathLabel {
   color: var(--color-text-muted);
   font-size: 11px;
@@ -1266,6 +1334,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pathInput {
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pathInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.10);
 }
 
 /* ===== Result Comparison (Bento Box / Bar Chart) ===== */
@@ -1528,10 +1616,11 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .usrpRxInputRow {
-    flex-direction: column;
-  }
-  .readinessGrid {
+  .pathItemEditable {
     grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .iqQualityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
