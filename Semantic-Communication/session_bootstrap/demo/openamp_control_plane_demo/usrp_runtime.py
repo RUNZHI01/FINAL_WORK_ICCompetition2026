@@ -197,6 +197,7 @@ INFERENCE_ENGINE_NONE = "none"
 INFERENCE_ENGINE_TVM = "tvm"
 INFERENCE_ENGINE_MNN = "mnn"
 IQ_STREAMING_TVM_KEYS = ("OPENAMP_IQ_STREAMING_TVM", "USRP_IQ_STREAMING_TVM")
+IQ_STREAMING_MIN_READY_KEYS = ("OPENAMP_IQ_STREAMING_MIN_READY", "USRP_IQ_STREAMING_MIN_READY")
 DEFAULT_RX_CONTROL_PORT = "29220"
 DEFAULT_TX_CONTROL_PORT = "29221"
 DEFAULT_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
@@ -1529,7 +1530,17 @@ def _image_index_from_run_dir(image_dir: Path) -> int | None:
         return None
 
 
-def _iq_remote_decode_stage_manifest_from_image_dirs(run_dir: Path, remote_dir: str) -> dict[str, Any] | None:
+def _iq_remote_decoded_extension_from_env(env_values: dict[str, str]) -> str:
+    remote_decoded_format = _first_value(env_values, ANALOG_REMOTE_DECODED_FORMAT_KEYS).strip().lower()
+    return "npy" if remote_decoded_format == "npy" else "npz"
+
+
+def _iq_remote_decode_stage_manifest_from_image_dirs(
+    run_dir: Path,
+    remote_dir: str,
+    *,
+    decoded_extension: str = "npz",
+) -> dict[str, Any] | None:
     remote_dir = str(remote_dir or "").strip().rstrip("/")
     if not remote_dir:
         return None
@@ -1558,7 +1569,8 @@ def _iq_remote_decode_stage_manifest_from_image_dirs(run_dir: Path, remote_dir: 
             or ""
         ).strip()
         if not remote_npz:
-            remote_npz = f"{remote_dir}/{image_index:08d}.npz"
+            extension = "npy" if str(decoded_extension).strip().lower() == "npy" else "npz"
+            remote_npz = f"{remote_dir}/{image_index:08d}.{extension}"
         decoded_images.append(
             {
                 "index": image_index,
@@ -2221,6 +2233,10 @@ class UsrpBatchSpoolJob:
         self._iq_streaming_tvm_enabled = _parse_bool(
             _first_value(env_values, IQ_STREAMING_TVM_KEYS, "0"),
             False,
+        )
+        self._iq_streaming_min_ready = min(
+            self._expected_outputs,
+            max(1, _parse_int(_first_value(env_values, IQ_STREAMING_MIN_READY_KEYS, "1"), 1)),
         )
         runner_path = _resolve_existing_path(_first_value(env_values, RUNNER_SCRIPT_KEYS)) or DEFAULT_RUNNER
         input_dir = _resolve_existing_path(_first_value(env_values, INPUT_DIR_KEYS)) or DEFAULT_INPUT_DIR
@@ -2995,8 +3011,13 @@ class UsrpBatchSpoolJob:
         manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
             self._run_dir,
             remote_decoded_output_dir,
+            decoded_extension=_iq_remote_decoded_extension_from_env(self._env_values),
         )
         if manifest is None:
+            return False
+        decode_manifest = manifest.get("decode_manifest") if isinstance(manifest.get("decode_manifest"), dict) else {}
+        decoded_count = _parse_int(str(decode_manifest.get("decoded_count") or "0"), 0)
+        if decoded_count < self._iq_streaming_min_ready:
             return False
         thread = threading.Thread(
             target=lambda: self._run_inference_callback(manifest),
@@ -3464,6 +3485,7 @@ class UsrpBatchSpoolJob:
             iq_manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
                 self._run_dir,
                 remote_decoded_output_dir,
+                decoded_extension=_iq_remote_decoded_extension_from_env(self._env_values),
             )
             if iq_manifest is not None:
                 wrapper_summary["iq_remote_decode_manifest"] = iq_manifest

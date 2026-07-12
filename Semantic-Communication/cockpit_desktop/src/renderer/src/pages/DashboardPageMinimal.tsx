@@ -484,7 +484,8 @@ export function DashboardPageMinimal() {
   const batchFallback = Math.max(0, activeBatch?.fallback ?? 0)
   const isBatchRunning = activeBatch?.status === 'running'
   const isBatchDone = activeBatch?.status === 'done'
-  const hasStageProgress = !isSingleLiveRunning && Boolean(activeBatch?.host_preprocess_progress || activeBatch?.transport_progress || activeBatch?.inference_progress)
+  const useUsrpProgressLayout = !isSingleLiveRunning && activeTransport === 'usrp'
+  const hasStageProgress = useUsrpProgressLayout && Boolean(activeBatch?.host_preprocess_progress || activeBatch?.transport_progress || activeBatch?.inference_progress)
   const hostPreprocessStage = normalizeStageProgress(activeBatch?.host_preprocess_progress, batchTotalImages)
   const transportStage = normalizeStageProgress(activeBatch?.transport_progress, batchTotalImages)
   const inferenceStage = normalizeStageProgress(activeBatch?.inference_progress, batchTotalImages)
@@ -502,6 +503,7 @@ export function DashboardPageMinimal() {
   const modeTag = batchServiceMode === 'ROI_ONLY' ? ' (降采样 3:1)' : ''
   const totalImages = isSingleLiveRunning ? liveExpectedCount : batchTotalImages
   const progress = isSingleLiveRunning ? liveCompletedCount : batchProgress
+  const progressPercent = totalImages > 0 ? Math.round((progress / totalImages) * 100) : 0
   const progressEngineLabel = isSingleLiveRunning ? liveEngineLabel : batchEngineLabel
   const currentStage = isSingleLiveRunning
     ? (liveProgress?.current_stage || liveProgress?.label || `${liveEngineLabel} Live 执行中`)
@@ -688,65 +690,83 @@ export function DashboardPageMinimal() {
                   </div>
                 </div>
 
-                <div className={s.progressCount}>
-                  <strong className={s.progressStageText}>{mainProgressStageText}</strong>
-                  <span>{mainProgressStageDetail}</span>
-                </div>
+                {useUsrpProgressLayout ? (
+                  <>
+                    <div className={s.progressCount}>
+                      <strong className={s.progressStageText}>{mainProgressStageText}</strong>
+                      <span>{mainProgressStageDetail}</span>
+                    </div>
 
-                <div className={s.mainStageTrack} aria-label="推理阶段进度">
-                  {mainProgressStages.map((stage) => (
-                    <div
-                      key={stage.key}
-                      className={[
-                        s.mainStageSegment,
-                        mainProgressToneClass(stage.tone),
-                        mainProgressStateClass(stage.state),
-                      ].join(' ')}
-                      title={`${stage.label}: ${stage.state}`}
-                      aria-label={`${stage.label}: ${stage.state}`}
-                    />
-                  ))}
-                </div>
+                    <div className={s.mainStageTrack} aria-label="推理阶段进度">
+                      {mainProgressStages.map((stage) => (
+                        <div
+                          key={stage.key}
+                          className={[
+                            s.mainStageSegment,
+                            mainProgressToneClass(stage.tone),
+                            mainProgressStateClass(stage.state),
+                          ].join(' ')}
+                          title={`${stage.label}: ${stage.state}`}
+                          aria-label={`${stage.label}: ${stage.state}`}
+                        />
+                      ))}
+                    </div>
 
-                {hasStageProgress && (
-                  <div className={s.stageProgressGrid}>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>上位机图片→latent</span>
-                        <span className={s.stageProgressCount}>{hostPreprocessStage.completed} / {hostPreprocessStage.total} {stageProgressSuffix}</span>
+                    {hasStageProgress && (
+                      <div className={s.stageProgressGrid}>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>上位机图片→latent</span>
+                            <span className={s.stageProgressCount}>{hostPreprocessStage.completed} / {hostPreprocessStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.hostPreprocessFill}`}
+                              style={{ width: `${hostPreprocessStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>USRP 传输/解包</span>
+                            <span className={s.stageProgressCount}>{transportStage.completed} / {transportStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.transportFill}`}
+                              style={{ width: `${transportStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>{batchEngineLabel} 板端推理</span>
+                            <span className={s.stageProgressCount}>{inferenceStage.completed} / {inferenceStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.inferenceFill}`}
+                              style={{ width: `${inferenceStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className={s.progressTrack}>
-                        <div
-                          className={`${s.progressFill} ${s.hostPreprocessFill}`}
-                          style={{ width: `${hostPreprocessStage.percent}%` }}
-                        />
-                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className={s.progressCount}>
+                      <strong>{progress}</strong>
+                      <span>/ {totalImages} {progressSuffix}</span>
                     </div>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>USRP 传输/解包</span>
-                        <span className={s.stageProgressCount}>{transportStage.completed} / {transportStage.total} {stageProgressSuffix}</span>
-                      </div>
-                      <div className={s.progressTrack}>
-                        <div
-                          className={`${s.progressFill} ${s.transportFill}`}
-                          style={{ width: `${transportStage.percent}%` }}
-                        />
-                      </div>
+
+                    <div className={s.progressTrack}>
+                      <div
+                        className={s.progressFill}
+                        style={{ width: `${progressPercent}%` }}
+                      />
                     </div>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>{batchEngineLabel} 板端推理</span>
-                        <span className={s.stageProgressCount}>{inferenceStage.completed} / {inferenceStage.total} {stageProgressSuffix}</span>
-                      </div>
-                      <div className={s.progressTrack}>
-                        <div
-                          className={`${s.progressFill} ${s.inferenceFill}`}
-                          style={{ width: `${inferenceStage.percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  </>
                 )}
 
                 {batchIssueMessage && (

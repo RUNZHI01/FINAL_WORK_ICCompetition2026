@@ -116,6 +116,7 @@ from usrp_runtime import (
     INFERENCE_ENGINE_MNN,
     INFERENCE_ENGINE_NONE,
     INFERENCE_ENGINE_TVM,
+    IQ_STREAMING_MIN_READY_KEYS,
     RX_CONTROL_HOST_KEYS,
     RX_CONTROL_PORT_KEYS,
     SHUTDOWN_AFTER_TRANSPORT_KEYS,
@@ -3756,10 +3757,16 @@ class DashboardState:
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES",
                 "ANALOG_RX_HEALTH_RESET_ON_STALL",
                 "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC",
+                "ANALOG_PIPELINE_DEPTH",
+                "ANALOG_PIPELINE_RF_DECODE_OVERLAP",
+                "OPENAMP_IQ_STREAMING_TVM",
+                "OPENAMP_IQ_STREAMING_MIN_READY",
+                "BIG_LITTLE_INPUT_CHUNK_SIZE",
                 "ANALOG_REMOTE_DECODE_RESPONSE_MODE",
                 "ANALOG_REMOTE_DECODED_FORMAT",
                 "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY",
                 "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK",
                 "ANALOG_RX_SC16_MMAP",
@@ -3797,7 +3804,13 @@ class DashboardState:
                     ("ANALOG_PRECONNECT_CONTROL", "1"),
                     ("ANALOG_RX_SESSION_CONTROL", "1"),
                     ("ANALOG_RX_BATCH_SESSION_CONTROL", "1"),
-                    ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", "16"),
+                    ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", "10"),
+                    ("ANALOG_PIPELINE_DEPTH", "2"),
+                    ("ANALOG_PIPELINE_RF_DECODE_OVERLAP", "1"),
+                    ("OPENAMP_IQ_STREAMING_TVM", "0"),
+                    ("OPENAMP_IQ_STREAMING_MIN_READY", "10"),
+                    ("BIG_LITTLE_INPUT_CHUNK_SIZE", "10"),
+                    ("ANALOG_REMOTE_DECODE_WORKER_PREFIX", "taskset -c 0,1"),
                     ("ANALOG_RETRY_ON_BURST_MISS", "1"),
                     ("ANALOG_RETRY_ON_LOW_SYNC", "1"),
                     ("ANALOG_LOW_SYNC_RETRY_THRESHOLD", "0.08"),
@@ -6002,10 +6015,13 @@ class DashboardState:
         summary: dict[str, Any],
         message: str = "",
         source_label: str = "",
+        data_plane_label: str = "USRP 混合链路在线推进",
+        count_source: str = "usrp_batch",
     ) -> dict[str, Any]:
         payload = self._build_prerecorded_payload_safe(image_index=0, variant="current")
         engine_key = "mnn" if str(engine).lower() == "mnn" else "tvm"
         engine_label = "MNN" if engine_key == "mnn" else "TVM"
+        data_plane_label = str(data_plane_label or "USRP 混合链路在线推进").strip()
         processed = self._status_int(summary.get("processed_count")) or 0
         selected = self._status_int(
             summary.get("selected_input_count") or summary.get("input_count") or summary.get("max_inputs"),
@@ -6024,8 +6040,8 @@ class DashboardState:
                 "status_category": "success",
                 "variant": "current",
                 "job_id": job_id,
-                "source_label": source_label or f"USRP 混合链路在线推进 + {engine_label} 板端推理 + 归档样例图",
-                "message": message or f"USRP 模式已完成 {engine_label} 板端推理；图像质量指标沿用当前归档样例口径。",
+                "source_label": source_label or f"{data_plane_label} + {engine_label} 板端推理 + 归档样例图",
+                "message": message or f"{data_plane_label}已完成 {engine_label} 板端推理；图像质量指标沿用当前归档样例口径。",
                 "timings": {
                     "payload_ms": run_ms,
                     "prepare_ms": None,
@@ -6047,7 +6063,7 @@ class DashboardState:
                 },
                 "live_progress": {
                     "state": "completed",
-                    "label": f"USRP + {engine_label} 推理完成",
+                    "label": f"{data_plane_label} + {engine_label} 推理完成",
                     "tone": "online",
                     "percent": 100,
                     "phase_percent": 100,
@@ -6055,7 +6071,7 @@ class DashboardState:
                     "expected_count": total,
                     "remaining_count": 0,
                     "completion_ratio": 1.0,
-                    "count_source": "usrp_batch",
+                    "count_source": count_source,
                     "count_label": f"{processed or total} / {total}",
                     "current_stage": f"{engine_label} 板端推理完成",
                     "stages": [],
@@ -7168,13 +7184,23 @@ class DashboardState:
         def _callback(remote_stage_manifest: dict[str, Any], progress: Any) -> dict[str, Any]:
             access = self._usrp_stage_access(base_access, remote_stage_manifest, engine=INFERENCE_ENGINE_TVM)
             env_values = access.build_env()
+            usrp_link_mode = normalize_jscc_link_mode(
+                first_config_value(env_values, keys=("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE"), default=""),
+                default="qpsk",
+            )
+            env_overrides: dict[str, str] = {}
             if not str(env_values.get("BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC") or "").strip():
-                access = access.with_env_overrides(
+                env_overrides.update(
                     {
                         "BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC": str(max(60.0, float(max(1, count)))),
                         "BIG_LITTLE_INPUT_POLL_SEC": str(env_values.get("BIG_LITTLE_INPUT_POLL_SEC") or "0.05"),
                     }
                 )
+            if usrp_link_mode == "iq-direct" and not str(env_values.get("BIG_LITTLE_INPUT_CHUNK_SIZE") or "").strip():
+                chunk_size = max(1, parse_int_config(first_config_value(env_values, keys=IQ_STREAMING_MIN_READY_KEYS, default="10"), 10))
+                env_overrides["BIG_LITTLE_INPUT_CHUNK_SIZE"] = str(min(max(1, count), chunk_size))
+            if env_overrides:
+                access = access.with_env_overrides(env_overrides)
             progress_callback_to_use = progress_callback or progress
             progress_callback_to_use(0, max(1, count))
             result = self._run_tvm_batch_with_access(
@@ -8001,6 +8027,18 @@ class DashboardState:
                             summary=inference_summary,
                             message=str(last_result.get("message") or ""),
                             source_label=str(last_result.get("source_label") or ""),
+                        )
+                        self._update_last_inference_summary(current_payload, "current")
+                    elif is_live and not is_usrp_batch and tvm_summary:
+                        current_payload = self._build_live_payload_from_batch_summary(
+                            engine="tvm",
+                            job_id=live_job_id,
+                            count=effective_count,
+                            summary=tvm_summary,
+                            message=str(last_result.get("message") or ""),
+                            source_label=str(last_result.get("source_label") or ""),
+                            data_plane_label="预录输入",
+                            count_source="prerecorded_batch",
                         )
                         self._update_last_inference_summary(current_payload, "current")
             except Exception as exc:

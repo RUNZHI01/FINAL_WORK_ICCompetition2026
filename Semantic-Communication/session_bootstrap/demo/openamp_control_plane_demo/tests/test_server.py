@@ -899,6 +899,75 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(current["benchmark"]["total_ms"]["mean_ms"], 244.74)
         self.assertEqual(current["runner_summary"]["pipeline"]["little_cores"], [0, 1])
 
+    def test_start_batch_inference_publishes_prerecorded_tvm_summary_without_sample_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-prerecorded-biglittle-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "runner_summary": {
+                    "status": "ok",
+                    "mode": "big_little_pipeline",
+                    "execution_mode": "pipeline",
+                    "processed_count": 3,
+                    "input_count": 3,
+                    "run_samples_ms": [240.1, 240.2, 240.3],
+                    "run_median_ms": 240.2,
+                    "run_mean_ms": 240.2,
+                    "big_cores": [2],
+                    "little_cores": [0, 1],
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+            status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(state.get_batch_state()["benchmark"]["inference_ms"]["median_ms"], 240.2)
+        current = system_payload["recent_results"]["current"]
+        self.assertEqual(current["status"], "success")
+        self.assertEqual(current["execution_mode"], "live")
+        self.assertEqual(current["source_label"], "预录输入 + TVM 板端推理 + 归档样例图")
+        self.assertEqual(current["inference_benchmark"]["inference_ms"]["median_ms"], 240.2)
+        self.assertEqual(system_payload["last_inference"]["status"], "success")
+
     def test_run_tvm_batch_accepts_complete_summary_from_stale_wrapper_process(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         access = server.BoardAccessConfig(
@@ -1488,6 +1557,26 @@ class DashboardStateTest(unittest.TestCase):
             "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
         ])
         self.assertEqual([image["status"] for image in images], ["done", "done"])
+
+    def test_iq_partial_manifest_uses_configured_npy_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            run_dir = Path(temp_dir_name)
+            image_dir = run_dir / "image_0000"
+            image_dir.mkdir()
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps({"status": "ok", "frame_complete": True}),
+                encoding="utf-8",
+            )
+
+            manifest = usrp_runtime._iq_remote_decode_stage_manifest_from_image_dirs(
+                run_dir,
+                "/home/user/cockpit_usrp_rx/run_rx",
+                decoded_extension="npy",
+            )
+
+        self.assertIsNotNone(manifest)
+        files = manifest["decode_manifest"]["files"]
+        self.assertEqual(files, ["/home/user/cockpit_usrp_rx/run_rx/00000000.npy"])
 
     def test_start_batch_inference_marks_done_when_worker_raises(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -2115,6 +2204,9 @@ class DashboardStateTest(unittest.TestCase):
         base_access = state._board_access.with_env_overrides(
             {
                 "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "JSCC_LINK_MODE": "iq-direct",
+                "OPENAMP_IQ_STREAMING_TVM": "1",
+                "OPENAMP_IQ_STREAMING_MIN_READY": "10",
                 "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
             }
         )
@@ -2135,6 +2227,7 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(captured["BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC"], "300.0")
         self.assertEqual(captured["BIG_LITTLE_INPUT_POLL_SEC"], "0.05")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_CHUNK_SIZE"], "10")
 
     def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -4078,9 +4171,15 @@ class DashboardStateTest(unittest.TestCase):
                 "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
                 "ANALOG_PRECONNECT_CONTROL": "1",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
-                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "10",
                 "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
                 "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
+                "ANALOG_PIPELINE_DEPTH": "2",
+                "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "1",
+                "OPENAMP_IQ_STREAMING_TVM": "1",
+                "OPENAMP_IQ_STREAMING_MIN_READY": "10",
+                "BIG_LITTLE_INPUT_CHUNK_SIZE": "10",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 0,1",
             },
             clear=False,
         ):
@@ -4099,9 +4198,15 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env.get("ANALOG_REMOTE_DECODE_RESPONSE_MODE"), "minimal")
         self.assertEqual(env.get("ANALOG_PRECONNECT_CONTROL"), "1")
         self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_CONTROL"), "1")
-        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_MAX_IMAGES"), "16")
+        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_MAX_IMAGES"), "10")
         self.assertEqual(env.get("ANALOG_RX_HEALTH_RESET_ON_STALL"), "1")
         self.assertEqual(env.get("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC"), "0.75")
+        self.assertEqual(env.get("ANALOG_PIPELINE_DEPTH"), "2")
+        self.assertEqual(env.get("ANALOG_PIPELINE_RF_DECODE_OVERLAP"), "1")
+        self.assertEqual(env.get("OPENAMP_IQ_STREAMING_TVM"), "1")
+        self.assertEqual(env.get("OPENAMP_IQ_STREAMING_MIN_READY"), "10")
+        self.assertEqual(env.get("BIG_LITTLE_INPUT_CHUNK_SIZE"), "10")
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODE_WORKER_PREFIX"), "taskset -c 0,1")
 
     def test_session_board_access_rejects_unsupported_auth_sig_policy(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -5479,6 +5584,7 @@ class ServerMainTest(unittest.TestCase):
                     "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
                     "JSCC_LINK_MODE": "iq-direct",
                     "OPENAMP_IQ_STREAMING_TVM": "1",
+                    "OPENAMP_IQ_STREAMING_MIN_READY": "1",
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
                 },
                 source_summary="test",
@@ -5520,6 +5626,81 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
         self.assertEqual(job._inference_completed, 1)
         self.assertEqual(job._inference_total, 3)
+
+    def test_usrp_iq_remote_decode_streaming_tvm_waits_for_min_ready_count(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_IQ_STREAMING_TVM": "1",
+                    "OPENAMP_IQ_STREAMING_MIN_READY": "10",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=30,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=lambda *_args: {"status": "ok"},
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+
+            for index in range(9):
+                image_dir = job._run_dir / f"image_{index:04d}"
+                image_dir.mkdir(parents=True)
+                (image_dir / "decode_summary.json").write_text(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "frame_complete": True,
+                            "remote_received_latent_npz": (
+                                f"/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/{index:08d}.npz"
+                            ),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            self.assertFalse(job._maybe_start_iq_streaming_inference())
+            self.assertFalse(job._inference_started)
+
+            image_dir = job._run_dir / "image_0009"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000009.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertTrue(job._maybe_start_iq_streaming_inference())
+            self.assertTrue(job._inference_started)
+            self.assertEqual(job._remote_stage_manifest["decode_manifest"]["decoded_count"], 10)
 
     def test_usrp_iq_remote_decode_streaming_tvm_is_opt_in(self) -> None:
         class NoStartThread:

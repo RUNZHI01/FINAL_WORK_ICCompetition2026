@@ -115,6 +115,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=float(os.environ.get("BIG_LITTLE_INPUT_POLL_SEC", "0.05") or 0.05),
     )
+    parser.add_argument(
+        "--input-chunk-size",
+        type=int,
+        default=int(os.environ.get("BIG_LITTLE_INPUT_CHUNK_SIZE", "1") or 1),
+    )
     args = parser.parse_args()
     if args.max_inputs < 0:
         raise SystemExit(f"ERROR: --max-inputs must be >= 0 (got: {args.max_inputs})")
@@ -128,6 +133,8 @@ def parse_args() -> argparse.Namespace:
         raise SystemExit(f"ERROR: --input-wait-timeout-sec must be >= 0 (got: {args.input_wait_timeout_sec})")
     if args.input_poll_sec <= 0:
         raise SystemExit(f"ERROR: --input-poll-sec must be > 0 (got: {args.input_poll_sec})")
+    if args.input_chunk_size <= 0:
+        raise SystemExit(f"ERROR: --input-chunk-size must be > 0 (got: {args.input_chunk_size})")
     return args
 
 
@@ -355,13 +362,24 @@ def iter_input_files_dynamic(
     max_inputs: int,
     wait_timeout_sec: float = 0.0,
     poll_sec: float = 0.05,
+    chunk_size: int = 1,
 ):
     max_inputs = max(0, int(max_inputs or 0))
     wait_timeout_sec = max(0.0, float(wait_timeout_sec or 0.0))
     poll_sec = max(0.001, float(poll_sec or 0.05))
+    chunk_size = max(1, int(chunk_size or 1))
     deadline = time.monotonic() + wait_timeout_sec
     seen: set[Path] = set()
     yielded = 0
+    pending: list[Path] = []
+
+    def should_flush_pending() -> bool:
+        if not pending:
+            return False
+        if len(pending) >= chunk_size:
+            return True
+        return bool(max_inputs and yielded + len(pending) >= max_inputs)
+
     while True:
         input_files, _available_count = collect_input_files(input_dir=input_dir, max_inputs=0)
         for input_path in input_files:
@@ -369,13 +387,21 @@ def iter_input_files_dynamic(
             if resolved in seen:
                 continue
             seen.add(resolved)
-            yield input_path
-            yielded += 1
-            if max_inputs and yielded >= max_inputs:
-                return
+            pending.append(input_path)
+            if should_flush_pending():
+                for pending_path in pending:
+                    yield pending_path
+                    yielded += 1
+                    if max_inputs and yielded >= max_inputs:
+                        return
+                pending.clear()
         if not max_inputs:
+            for pending_path in pending:
+                yield pending_path
             return
         if wait_timeout_sec <= 0.0 or time.monotonic() >= deadline:
+            for pending_path in pending:
+                yield pending_path
             return
         time.sleep(poll_sec)
 
@@ -403,6 +429,7 @@ def preloader_worker(
     max_inputs: int,
     input_wait_timeout_sec: float,
     input_poll_sec: float,
+    input_chunk_size: int,
     snr: float,
     seed: int | None,
     little_cores: list[int],
@@ -424,6 +451,7 @@ def preloader_worker(
                 max_inputs=max_inputs,
                 wait_timeout_sec=input_wait_timeout_sec,
                 poll_sec=input_poll_sec,
+                chunk_size=input_chunk_size,
             )
         else:
             input_iter = (Path(raw_path) for raw_path in input_files)
@@ -453,6 +481,7 @@ def preloader_worker(
                 "available_input_count": queued,
                 "input_wait_timeout_sec": input_wait_timeout_sec,
                 "input_poll_sec": input_poll_sec,
+                "input_chunk_size": input_chunk_size,
                 "load_samples_ms": [round(value, 3) for value in load_samples_ms],
                 "awgn_samples_ms": [round(value, 3) for value in awgn_samples_ms],
                 "load_summary": summarize_samples(load_samples_ms),
@@ -879,6 +908,7 @@ def run_serial(args: argparse.Namespace) -> dict[str, Any]:
         "little_cores": little_cores,
         "input_queue_size": 0,
         "output_queue_size": 0,
+        "input_chunk_size": args.input_chunk_size,
         "save_format": "png" if Image is not None else "npy",
         "tvm_version": None,
         "affinity": {
@@ -929,6 +959,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                     "max_inputs": args.max_inputs,
                     "input_wait_timeout_sec": args.input_wait_timeout_sec if dynamic_input else 0.0,
                     "input_poll_sec": args.input_poll_sec,
+                    "input_chunk_size": args.input_chunk_size,
                     "snr": args.snr,
                     "seed": args.seed,
                     "little_cores": little_cores,
@@ -986,6 +1017,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
                     "max_inputs": args.max_inputs,
                     "input_wait_timeout_sec": args.input_wait_timeout_sec if dynamic_input else 0.0,
                     "input_poll_sec": args.input_poll_sec,
+                    "input_chunk_size": args.input_chunk_size,
                     "snr": args.snr,
                     "seed": args.seed,
                     "little_cores": little_cores,
@@ -1097,6 +1129,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
         "little_cores": little_cores,
         "input_queue_size": args.input_queue_size,
         "output_queue_size": args.output_queue_size,
+        "input_chunk_size": args.input_chunk_size,
         "save_format": "png" if Image is not None else "npy",
         "tvm_version": inferencer.get("tvm_version"),
         "affinity": {

@@ -176,6 +176,59 @@ class BigLittlePipelineTest(unittest.TestCase):
 
             self.assertEqual([path.name for path in files], ["00000000.npz"])
 
+    def test_dynamic_input_iterator_releases_inputs_in_chunks(self) -> None:
+        import threading
+        import time
+
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
+            input_dir = Path(temp_dir_raw) / "inputs"
+            input_dir.mkdir()
+            yielded: list[str] = []
+            errors: list[Exception] = []
+
+            def publish(index: int) -> None:
+                np.savez(input_dir / f"{index:08d}.npz", latent=np.zeros((1, 4, 4, 4), dtype=np.float32))
+
+            def consume_inputs() -> None:
+                try:
+                    for path in pipeline.iter_input_files_dynamic(
+                        input_dir=input_dir,
+                        max_inputs=5,
+                        wait_timeout_sec=3.0,
+                        poll_sec=0.02,
+                        chunk_size=3,
+                    ):
+                        yielded.append(path.name)
+                except Exception as exc:  # pragma: no cover - assertion reports unexpected worker errors.
+                    errors.append(exc)
+
+            consumer = threading.Thread(target=consume_inputs)
+            consumer.start()
+            try:
+                publish(0)
+                publish(1)
+                time.sleep(0.15)
+                self.assertEqual(errors, [])
+                self.assertEqual(yielded, [])
+
+                publish(2)
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline and len(yielded) < 3:
+                    time.sleep(0.02)
+                self.assertEqual(yielded[:3], ["00000000.npz", "00000001.npz", "00000002.npz"])
+
+                publish(3)
+                publish(4)
+            finally:
+                consumer.join(timeout=4.0)
+
+            self.assertFalse(consumer.is_alive(), "dynamic iterator did not flush final partial chunk")
+            self.assertEqual(errors, [])
+            self.assertEqual(
+                yielded,
+                ["00000000.npz", "00000001.npz", "00000002.npz", "00000003.npz", "00000004.npz"],
+            )
+
     def test_wrapper_local_env_dry_run_emits_report(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

@@ -59,6 +59,17 @@ if (-not $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON) {
 if (-not $env:JSCC_LINK_MODE) {
     $env:JSCC_LINK_MODE = "iq-direct"
 }
+if ($env:JSCC_LINK_MODE -eq "iq-direct") {
+    if (-not $env:OPENAMP_IQ_STREAMING_TVM) {
+        $env:OPENAMP_IQ_STREAMING_TVM = "0"
+    }
+    if (-not $env:OPENAMP_IQ_STREAMING_MIN_READY) {
+        $env:OPENAMP_IQ_STREAMING_MIN_READY = "10"
+    }
+    if (-not $env:BIG_LITTLE_INPUT_CHUNK_SIZE) {
+        $env:BIG_LITTLE_INPUT_CHUNK_SIZE = "10"
+    }
+}
 if (-not $env:ANALOG_REMOTE_DECODE_RESULT_MODE) {
     $env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"
 }
@@ -74,13 +85,25 @@ if (-not $env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC) {
 if (-not $env:ANALOG_REMOTE_DECODED_FORMAT) {
     $env:ANALOG_REMOTE_DECODED_FORMAT = "npy"
 }
+if ($env:JSCC_LINK_MODE -eq "iq-direct") {
+    if (-not $env:ANALOG_REMOTE_DECODE_WORKER_PREFIX) {
+        $env:ANALOG_REMOTE_DECODE_WORKER_PREFIX = "taskset -c 0,1"
+    }
+}
 if (-not $env:RX_ARM_WAIT_MS) {
     $env:RX_ARM_WAIT_MS = "500"
 }
 if (-not $env:RX_STOP_WAIT_MS) {
     $env:RX_STOP_WAIT_MS = "8000"
 }
-if (-not $env:ANALOG_PIPELINE_DEPTH) {
+if ($env:JSCC_LINK_MODE -eq "iq-direct") {
+    if (-not $env:ANALOG_PIPELINE_DEPTH) {
+        $env:ANALOG_PIPELINE_DEPTH = "2"
+    }
+    if (-not $env:ANALOG_PIPELINE_RF_DECODE_OVERLAP) {
+        $env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "1"
+    }
+} elseif (-not $env:ANALOG_PIPELINE_DEPTH) {
     $env:ANALOG_PIPELINE_DEPTH = "1"
 }
 if (-not $env:ANALOG_SPS) {
@@ -143,7 +166,11 @@ if (-not $env:ANALOG_RX_SESSION_CONTROL) {
 if (-not $env:ANALOG_RX_BATCH_SESSION_CONTROL) {
     $env:ANALOG_RX_BATCH_SESSION_CONTROL = "1"
 }
-if (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
+if ($env:JSCC_LINK_MODE -eq "iq-direct") {
+    if (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
+        $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "10"
+    }
+} elseif (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
     $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "16"
 }
 if (-not $env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS) {
