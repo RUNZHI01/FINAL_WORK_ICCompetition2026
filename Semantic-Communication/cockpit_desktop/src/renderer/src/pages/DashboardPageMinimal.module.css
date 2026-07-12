@@ -1138,83 +1138,125 @@
   white-space: nowrap;
 }
 
-.iqTimeline {
+.iqAuditSection {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.iqAuditSectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.iqTimelineRow {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.iqTimelineMeta {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.iqTimelineName {
-  min-width: 0;
+.iqAuditSectionTitle {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.iqTailReference {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.iqTailAxis {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.iqTailAxis::before {
+  content: '';
+  position: absolute;
+  top: 17px;
+  left: 9%;
+  right: 9%;
+  height: 2px;
+  background: rgba(100, 116, 139, 0.28);
+}
+
+.iqTailAxisItem {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 16px 8px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.76);
+  text-align: center;
+}
+
+.iqTailAxisItem::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-success);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.iqTailAxisItemFail {
+  border-color: rgba(203, 213, 225, 0.74);
+  background: transparent;
+}
+
+.iqTailAxisItemFail::before {
+  background: var(--color-text-tertiary);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.12);
+}
+
+.iqTailAxisItemOk {
+  border-color: rgba(5, 150, 105, 0.18);
+}
+
+.iqTailAxisTick {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.iqTailAxisValue,
+.iqTailAxisValueFail {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.iqTimelineValue {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
+.iqTailAxisValueFail {
+  color: var(--color-error);
 }
 
-.iqTimelinePercent {
-  color: var(--color-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.iqTimelineTrack {
-  position: relative;
-  width: 100%;
-  height: 7px;
-  overflow: hidden;
-  border-radius: var(--radius-full);
-  background: rgba(203, 213, 225, 0.55);
-}
-
-.iqTimelineFill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #f59e0b 0%, #10b981 48%, #1a56db 100%);
-}
-
-.iqTimelineDetail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--color-text-muted);
-  font-size: 10px;
-  line-height: 1.2;
-}
-
+.iqTailGrid,
 .iqQualityGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
+.iqTailItem,
 .iqQualityItem {
   min-width: 0;
   padding: 7px 8px;
@@ -1223,14 +1265,27 @@
   background: rgba(255, 255, 255, 0.68);
 }
 
+.iqTailItemFail {
+  border-color: rgba(203, 213, 225, 0.74);
+  background: transparent;
+}
+
+.iqTailItemOk {
+  border-color: rgba(5, 150, 105, 0.18);
+  background: rgba(236, 253, 245, 0.72);
+}
+
+.iqTailLabel,
 .iqQualityLabel {
   display: block;
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
+.iqTailValue,
+.iqTailValueFail,
 .iqQualityValue {
   display: block;
   margin-top: 3px;
@@ -1241,6 +1296,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.iqTailValueFail {
+  color: var(--color-error);
 }
 
 .transportSwitch {

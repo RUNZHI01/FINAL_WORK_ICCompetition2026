@@ -56,8 +56,23 @@ if (-not $env:REMOTE_USRP_DECODE_PYTHON) {
 if (-not $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON) {
     $env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"
 }
+if (-not $env:MLKEM_TRANSPORT_MODE) {
+    $env:MLKEM_TRANSPORT_MODE = "usrp"
+}
+if (-not $env:MLKEM_USRP_MODE) {
+    $env:MLKEM_USRP_MODE = "ota"
+}
+if (-not $env:OPENAMP_DEMO_INPUT_SOURCE_MODE) {
+    $env:OPENAMP_DEMO_INPUT_SOURCE_MODE = "usrp"
+}
 if (-not $env:JSCC_LINK_MODE) {
     $env:JSCC_LINK_MODE = "iq-direct"
+}
+if (-not $env:OPENAMP_DEMO_LINK_MODE) {
+    $env:OPENAMP_DEMO_LINK_MODE = "iq-direct"
+}
+if (-not $env:MLKEM_CIPHER_SUITE) {
+    $env:MLKEM_CIPHER_SUITE = "SM4_GCM"
 }
 if ($env:JSCC_LINK_MODE -eq "iq-direct") {
     if (-not $env:OPENAMP_IQ_STREAMING_TVM) {
@@ -85,11 +100,6 @@ if (-not $env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC) {
 if (-not $env:ANALOG_REMOTE_DECODED_FORMAT) {
     $env:ANALOG_REMOTE_DECODED_FORMAT = "npy"
 }
-if ($env:JSCC_LINK_MODE -eq "iq-direct") {
-    if (-not $env:ANALOG_REMOTE_DECODE_WORKER_PREFIX) {
-        $env:ANALOG_REMOTE_DECODE_WORKER_PREFIX = "taskset -c 0,1"
-    }
-}
 if (-not $env:RX_ARM_WAIT_MS) {
     $env:RX_ARM_WAIT_MS = "500"
 }
@@ -98,10 +108,10 @@ if (-not $env:RX_STOP_WAIT_MS) {
 }
 if ($env:JSCC_LINK_MODE -eq "iq-direct") {
     if (-not $env:ANALOG_PIPELINE_DEPTH) {
-        $env:ANALOG_PIPELINE_DEPTH = "2"
+        $env:ANALOG_PIPELINE_DEPTH = "1"
     }
     if (-not $env:ANALOG_PIPELINE_RF_DECODE_OVERLAP) {
-        $env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "1"
+        $env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "0"
     }
 } elseif (-not $env:ANALOG_PIPELINE_DEPTH) {
     $env:ANALOG_PIPELINE_DEPTH = "1"
@@ -152,7 +162,7 @@ if (-not $env:ANALOG_ROBUST_SYNC) {
     $env:ANALOG_ROBUST_SYNC = "0"
 }
 if (-not $env:ANALOG_REMOTE_CLEANUP_MODE) {
-    $env:ANALOG_REMOTE_CLEANUP_MODE = "async"
+    $env:ANALOG_REMOTE_CLEANUP_MODE = "skip"
 }
 if (-not $env:ANALOG_PRECONNECT_CONTROL) {
     $env:ANALOG_PRECONNECT_CONTROL = "1"
@@ -168,7 +178,7 @@ if (-not $env:ANALOG_RX_BATCH_SESSION_CONTROL) {
 }
 if ($env:JSCC_LINK_MODE -eq "iq-direct") {
     if (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
-        $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "10"
+        $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "16"
     }
 } elseif (-not $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES) {
     $env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "16"

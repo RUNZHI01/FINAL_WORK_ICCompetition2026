@@ -8396,6 +8396,9 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "ANALOG_RX_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
+                "ANALOG_PIPELINE_DEPTH": "",
+                "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "",
                 "ANALOG_RETRY_ON_BURST_MISS": "",
                 "ANALOG_RETRY_ON_LOW_SYNC": "",
                 "ANALOG_LOW_SYNC_RETRY_THRESHOLD": "",
@@ -8427,7 +8430,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
         self.assertEqual(env["REMOTE_RX_RUN_ROOT"], "/dev/shm/usrp292x_remote_runs")
         self.assertEqual(env["ANALOG_PRECONNECT_CONTROL"], "1")
-        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "async")
+        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "skip")
         self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
         self.assertEqual(env["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
         self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
@@ -8439,6 +8442,9 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["ANALOG_RX_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(env["ANALOG_PIPELINE_DEPTH"], "1")
+        self.assertEqual(env["ANALOG_PIPELINE_RF_DECODE_OVERLAP"], "0")
+        self.assertNotIn("ANALOG_REMOTE_DECODE_WORKER_PREFIX", env)
         self.assertEqual(env["ANALOG_RETRY_ON_BURST_MISS"], "1")
         self.assertEqual(env["ANALOG_RETRY_ON_LOW_SYNC"], "1")
         self.assertEqual(env["ANALOG_LOW_SYNC_RETRY_THRESHOLD"], "0.08")

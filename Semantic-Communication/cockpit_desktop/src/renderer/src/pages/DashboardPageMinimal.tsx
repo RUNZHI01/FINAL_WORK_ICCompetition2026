@@ -20,14 +20,12 @@ import { FlightPanel } from '../components/dashboard/FlightPanel'
 import { PageTransition, StaggeredList, AnimatedListItem } from '../components/animations'
 import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
-import type { BatchStageProgress } from '../api/types/crypto'
+import type { BatchStageProgress, IqTailAudit } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
 import { shouldDisplayDashboardBatch } from '../hooks/dashboardBatchDisplayState'
 import {
-  extractIqAuditTimeline,
   extractIqRadioMetrics,
   extractJsccLinkMode,
-  type IqAuditTimelineRow,
   type IqRadioMetrics,
   type JsccLinkMode,
   type JsonObject,
@@ -103,13 +101,6 @@ function normalizeBatchCountInput(rawValue: string, fallback: number): number {
   return Math.max(1, Math.min(Math.trunc(parsed), MAX_BATCH_COUNT))
 }
 
-function formatCompactMs(value: number | undefined): string {
-  if (value == null) return '—'
-  if (value >= 100) return `${value.toFixed(0)} ms`
-  if (value >= 10) return `${value.toFixed(1)} ms`
-  return `${value.toFixed(2)} ms`
-}
-
 function formatMetricValue(value: number | undefined, decimals = 3): string | undefined {
   return value == null ? undefined : value.toFixed(decimals)
 }
@@ -118,12 +109,94 @@ function formatPercentValue(value: number | undefined): string | undefined {
   return value == null ? undefined : `${value.toFixed(1)}%`
 }
 
-function timelineWidth(row: IqAuditTimelineRow, maxDurationMs: number): number {
-  if (row.percent != null) return Math.max(4, Math.min(row.percent, 100))
-  if (row.duration_ms != null && maxDurationMs > 0) {
-    return Math.max(4, Math.min((row.duration_ms / maxDurationMs) * 100, 100))
+type IqTailAuditItem = {
+  key: string
+  label: string
+  value: string
+  tone: 'ok' | 'fail' | 'mono'
+}
+
+type IqTailDistributionItem = {
+  key: string
+  label: string
+  value: string
+  tone: 'ok' | 'fail'
+}
+
+function iqTailCount(audit: IqTailAudit | null | undefined, key: keyof IqTailAudit): number | null {
+  const value = audit?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function buildIqTailAuditItems(
+  audit: IqTailAudit | null | undefined,
+  sampleCount: number | null | undefined,
+): IqTailAuditItem[] {
+  const items: IqTailAuditItem[] = []
+
+  if (sampleCount != null) {
+    items.push({ key: 'sample_count', label: '样本数', value: sampleCount.toLocaleString(), tone: 'mono' })
   }
-  return 4
+  if (!audit) return items
+
+  const referenceMs = iqTailCount(audit, 'reference_ms')
+  const overReference = iqTailCount(audit, 'over_reference_count')
+
+  if (referenceMs != null && overReference != null) {
+    items.push({
+      key: 'over_reference_count',
+      label: `>${referenceMs.toFixed(1)}ms`,
+      value: overReference.toLocaleString(),
+      tone: overReference > 0 ? 'fail' : 'ok',
+    })
+  }
+
+  const tailRows: [keyof IqTailAudit, string][] = [
+    ['rx_control_overhead_gt_50ms_count', 'RX控制尾部'],
+    ['server_capture_gt_100ms_count', 'RX采集尾部'],
+    ['decode_gt_160ms_count', '解码尾部'],
+    ['worker_over_reported_gt_80ms_count', 'Worker响应'],
+    ['write_gt_100ms_count', '写入尾部'],
+    ['soft_completed_count', 'Soft完成'],
+  ]
+
+  for (const [key, label] of tailRows) {
+    const value = iqTailCount(audit, key)
+    if (value != null) {
+      items.push({
+        key: String(key),
+        label,
+        value: value.toLocaleString(),
+        tone: value > 0 && key !== 'soft_completed_count' ? 'fail' : 'mono',
+      })
+    }
+  }
+
+  return items
+}
+
+function buildIqTailDistributionItems(audit: IqTailAudit | null | undefined): IqTailDistributionItem[] {
+  if (!audit) return []
+
+  const thresholdRows: [keyof IqTailAudit, string][] = [
+    ['total_gt_250ms_count', '>250ms'],
+    ['total_gt_275ms_count', '>275ms'],
+    ['total_gt_500ms_count', '>500ms'],
+  ]
+
+  const items: IqTailDistributionItem[] = []
+  for (const [key, label] of thresholdRows) {
+    const value = iqTailCount(audit, key)
+    if (value != null) {
+      items.push({
+        key: String(key),
+        label,
+        value: value.toLocaleString(),
+        tone: value > 0 ? 'fail' : 'ok',
+      })
+    }
+  }
+  return items
 }
 
 type MainProgressTone = 'yellow' | 'green' | 'blue'
@@ -571,13 +644,13 @@ export function DashboardPageMinimal() {
   })
   const activeMainStage = mainProgressStages.find((stage) => stage.state === 'active')
   const mainProgressStageText = isRunning
-    ? `当前阶段：${activeMainStage?.label ?? currentStage}`
+    ? activeMainStage?.label ?? currentStage
     : isDone
       ? currentStage
-      : '当前阶段：等待启动'
-  const mainProgressStageDetail = isRunning || isDone
+      : '就绪'
+  const mainProgressStageDetail = isRunning
     ? `进度 ${progress}/${totalImages}`
-    : progressSuffix
+    : ''
   const boardOnline = status?.live?.board_online ?? false
   const hostInputDir = boardAccess?.local_usrp_image_dir
     || boardAccess?.local_usrp_input_dir
@@ -596,12 +669,12 @@ export function DashboardPageMinimal() {
   const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
   const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
-  const iqAuditTimeline = extractIqAuditTimeline(currentWrapperSummary).slice(0, 6)
-  const iqAuditMaxDurationMs = Math.max(0, ...iqAuditTimeline.map((row) => row.duration_ms ?? 0))
+  const iqTailAudit = cryptoData?.batch_iq_tail_audit ?? null
+  const iqTailSampleCount = iqTailCount(iqTailAudit, 'record_count') ?? iqRadioMetrics?.sample_count ?? null
+  const iqTailReferenceMs = iqTailCount(iqTailAudit, 'reference_ms')
+  const iqTailAuditItems = buildIqTailAuditItems(iqTailAudit, iqTailSampleCount)
+  const iqTailDistributionItems = buildIqTailDistributionItems(iqTailAudit)
   const iqRadioMetricItems = [
-    iqRadioMetrics?.sample_count != null
-      ? { key: 'samples', label: '样本', value: iqRadioMetrics.sample_count.toLocaleString() }
-      : undefined,
     iqRadioMetrics?.sync_success_ratio != null
       ? { key: 'syncRatio', label: '同步率', value: formatPercentValue(iqRadioMetrics.sync_success_ratio * 100) }
       : undefined,
@@ -626,7 +699,7 @@ export function DashboardPageMinimal() {
   ].filter((item): item is { key: string; label: string; value: string } => Boolean(item?.value))
   const showIqAuditPanel = activeTransport === 'usrp'
     && activeLinkMode === 'iq-direct'
-    && (iqAuditTimeline.length > 0 || iqRadioMetricItems.length > 0)
+    && (iqTailAuditItems.length > 0 || iqTailDistributionItems.length > 0 || iqRadioMetricItems.length > 0)
   const inputModeLabel = activeTransport === 'usrp'
     ? activeLinkMode === 'iq-direct'
       ? 'USRP-IQ直传'
@@ -755,7 +828,7 @@ export function DashboardPageMinimal() {
                   <>
                     <div className={s.progressCount}>
                       <strong className={s.progressStageText}>{mainProgressStageText}</strong>
-                      <span>{mainProgressStageDetail}</span>
+                      {mainProgressStageDetail && <span>{mainProgressStageDetail}</span>}
                     </div>
 
                     <div className={s.mainStageTrack} aria-label="推理阶段进度">
@@ -1068,49 +1141,62 @@ export function DashboardPageMinimal() {
                     <div className={s.iqAuditPanel}>
                       <div className={s.iqAuditHeader}>
                         <div>
-                          <div className={s.iqAuditTitle}>IQ 直传链路审计</div>
-                          <div className={s.iqAuditCaption}>尾部时间数轴与射频质量指标</div>
+                          <div className={s.iqAuditTitle}>IQ直传链路诊断</div>
+                          <div className={s.iqAuditCaption}>链路质量、尾部计数与耗时阈值分布</div>
                         </div>
                         <span className={s.iqAuditBadge}>IQ 生效</span>
                       </div>
 
-                      {iqAuditTimeline.length > 0 && (
-                        <div className={s.iqTimeline} aria-label="IQ 尾部审计时间数轴">
-                          {iqAuditTimeline.map((row) => (
-                            <div key={`${row.name}-${row.duration_ms ?? row.percent ?? 0}`} className={s.iqTimelineRow}>
-                              <div className={s.iqTimelineMeta}>
-                                <span className={s.iqTimelineName} title={row.name}>{row.name}</span>
-                                <span className={s.iqTimelineValue}>
-                                  {formatCompactMs(row.duration_ms)}
-                                  {row.percent != null && <span className={s.iqTimelinePercent}>{row.percent.toFixed(1)}%</span>}
-                                </span>
+                      {iqRadioMetricItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionTitle}>链路质量</div>
+                          <div className={s.iqQualityGrid} aria-label="IQ 射频质量指标">
+                            {iqRadioMetricItems.map((item) => (
+                              <div key={item.key} className={s.iqQualityItem}>
+                                <span className={s.iqQualityLabel}>{item.label}</span>
+                                <span className={s.iqQualityValue}>{item.value}</span>
                               </div>
-                              <div className={s.iqTimelineTrack}>
-                                <div
-                                  className={s.iqTimelineFill}
-                                  style={{ width: `${timelineWidth(row, iqAuditMaxDurationMs)}%` }}
-                                />
-                              </div>
-                              {(row.count != null || row.device || row.samples != null) && (
-                                <div className={s.iqTimelineDetail}>
-                                  {row.count != null && <span>调用 {row.count}</span>}
-                                  {row.samples != null && <span>样本 {row.samples}</span>}
-                                  {row.device && <span>{row.device}</span>}
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
 
-                      {iqRadioMetricItems.length > 0 && (
-                        <div className={s.iqQualityGrid} aria-label="IQ 射频质量指标">
-                          {iqRadioMetricItems.map((item) => (
-                            <div key={item.key} className={s.iqQualityItem}>
-                              <span className={s.iqQualityLabel}>{item.label}</span>
-                              <span className={s.iqQualityValue}>{item.value}</span>
-                            </div>
-                          ))}
+                      {iqTailDistributionItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionHeader}>
+                            <div className={s.iqAuditSectionTitle}>尾部时间分布</div>
+                            {iqTailReferenceMs != null && (
+                              <div className={s.iqTailReference}>参考 {iqTailReferenceMs.toFixed(1)}ms</div>
+                            )}
+                          </div>
+                          <div className={s.iqTailAxis} aria-label="IQ 尾部耗时阈值分布">
+                            {iqTailDistributionItems.map((item) => (
+                              <div
+                                key={item.key}
+                                className={`${s.iqTailAxisItem} ${item.tone === 'fail' ? s.iqTailAxisItemFail : s.iqTailAxisItemOk}`}
+                              >
+                                <span className={s.iqTailAxisTick}>{item.label}</span>
+                                <span className={item.tone === 'fail' ? s.iqTailAxisValueFail : s.iqTailAxisValue}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {iqTailAuditItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionTitle}>尾部统计</div>
+                          <div className={s.iqTailGrid} aria-label="IQ 尾部统计指标">
+                            {iqTailAuditItems.map((item) => (
+                              <div
+                                key={item.key}
+                                className={`${s.iqTailItem} ${item.tone === 'fail' ? s.iqTailItemFail : item.tone === 'ok' ? s.iqTailItemOk : ''}`}
+                              >
+                                <span className={s.iqTailLabel}>{item.label}</span>
+                                <span className={item.tone === 'fail' ? s.iqTailValueFail : s.iqTailValue}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -7,7 +7,7 @@ test('auth control state overrides stale crypto status for display', () => {
   assert.deepEqual(resolveAuthDisplayState(true, false), {
     known: true,
     enabled: true,
-    label: '已启用 / ML-DSA + SM2',
+    label: 'ML-DSA + SM2',
   })
 })
 

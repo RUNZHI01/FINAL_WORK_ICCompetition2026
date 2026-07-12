@@ -334,25 +334,12 @@ export type IqRadioMetrics = {
   latent_mse_vs_tx?: IqRadioMetricAggregate
 }
 
-export type IqAuditTimelineRow = {
-  name: string
-  duration_ms?: number
-  percent?: number
-  count?: number
-  device?: string
-  samples?: number
-}
-
 function normalizeJsccLinkMode(value: unknown): JsccLinkMode | undefined {
   if (value == null) return undefined
   const raw = String(value).trim().toLowerCase()
   if (raw === 'iq-direct' || raw === 'iq' || raw === 'analog') return 'iq-direct'
   if (raw === 'qpsk') return 'qpsk'
   return undefined
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -362,20 +349,6 @@ function asNumber(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined
   }
   return undefined
-}
-
-function asText(value: unknown): string | undefined {
-  if (value == null) return undefined
-  const text = String(value).trim()
-  return text ? text : undefined
-}
-
-function asArray(value: unknown): unknown[] | undefined {
-  return Array.isArray(value) ? value : undefined
-}
-
-function roundMillis(value: number): number {
-  return Math.round(value * 1000) / 1000
 }
 
 function asMetricAggregate(value: unknown): IqRadioMetricAggregate | undefined {
@@ -390,86 +363,9 @@ function asMetricAggregate(value: unknown): IqRadioMetricAggregate | undefined {
   return result
 }
 
-function normalizeIqAuditRows(rawRows: unknown): IqAuditTimelineRow[] {
-  const rows = asArray(rawRows)
-  if (!rows) return []
-
-  return rows.flatMap((rawRow) => {
-    const row = asRecord(rawRow)
-    if (!row) return []
-
-    const name = asText(row.name)
-      ?? asText(row.label)
-      ?? asText(row.stage)
-      ?? asText(row.op_name)
-      ?? asText(row.operator)
-      ?? asText(row.op)
-      ?? asText(row.funcname)
-    if (!name) return []
-
-    const durationUs = asNumber(row.mean_duration_us) ?? asNumber(row.duration_us)
-    const durationMs = durationUs != null
-      ? durationUs / 1000
-      : asNumber(row.mean_duration_ms)
-        ?? asNumber(row.duration_ms)
-        ?? asNumber(row.elapsed_ms)
-        ?? asNumber(row.ms)
-
-    const percent = asNumber(row.mean_percent)
-      ?? asNumber(row.percent)
-      ?? asNumber(row.percentage)
-    const count = asNumber(row.mean_count)
-      ?? asNumber(row.count)
-      ?? asNumber(row.calls)
-      ?? asNumber(row.num_calls)
-    const samples = asNumber(row.samples)
-    const device = asText(row.device)
-      ?? asText(row.device_type)
-      ?? asArray(row.devices)?.map((deviceValue) => asText(deviceValue)).filter(Boolean).join(', ')
-
-    const normalized: IqAuditTimelineRow = { name }
-    if (durationMs != null) normalized.duration_ms = roundMillis(durationMs)
-    if (percent != null) normalized.percent = percent
-    if (count != null) normalized.count = count
-    if (device) normalized.device = device
-    if (samples != null) normalized.samples = samples
-    return normalized.duration_ms != null || normalized.percent != null ? [normalized] : []
-  })
-}
-
 export function extractJsccLinkMode(summary: JsonObject | undefined): JsccLinkMode | undefined {
   if (!summary) return undefined
   return normalizeJsccLinkMode(summary.link_mode)
-}
-
-export function extractIqAuditTimeline(summary: JsonObject | undefined): IqAuditTimelineRow[] {
-  if (!summary) return []
-
-  const runtimeProfiling = asRecord(summary.runtime_profiling)
-  const directCandidates = [
-    runtimeProfiling?.top_ops,
-    runtimeProfiling?.rows,
-    asRecord(summary.runtime_profile)?.rows,
-    asRecord(summary.profile)?.rows,
-    asRecord(summary.timing_profile)?.rows,
-    asRecord(summary.iq_tail_audit)?.timeline,
-    asRecord(summary.iq_tail_audit)?.rows,
-    asRecord(summary.tail_audit)?.timeline,
-    asRecord(summary.tail_audit)?.rows,
-  ]
-
-  for (const candidate of directCandidates) {
-    const rows = normalizeIqAuditRows(candidate)
-    if (rows.length > 0) return rows
-  }
-
-  const sampleResults = asArray(runtimeProfiling?.sample_results)
-  for (const rawSample of sampleResults ?? []) {
-    const rows = normalizeIqAuditRows(asRecord(rawSample)?.rows)
-    if (rows.length > 0) return rows
-  }
-
-  return []
 }
 
 export function extractIqRadioMetrics(summary: JsonObject | undefined): IqRadioMetrics | undefined {

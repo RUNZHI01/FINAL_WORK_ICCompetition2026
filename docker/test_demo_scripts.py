@@ -46,6 +46,7 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
     )
 
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"' in script
+    assert 'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"' in script
     for name in (
         "MLKEM_AUTH_SERVER_SM2_KEY",
         "MLKEM_AUTH_SERVER_SM2_PUB",
@@ -119,6 +120,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "USRP_MAX_ARQ_ROUNDS",
         "MLKEM_USRP_MAX_ARQ_ROUNDS",
         "MLKEM_TRANSPORT_MODE",
+        "MLKEM_USRP_MODE",
+        "MLKEM_CIPHER_SUITE",
         "MLKEM_AUTH_ENABLED",
         "MLKEM_AUTH_SIG_POLICY",
         "OPENAMP_SSH_RUNNER",
@@ -156,7 +159,12 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"',
         'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"',
         'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"',
+        'MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-usrp}"',
+        'MLKEM_USRP_MODE="${MLKEM_USRP_MODE:-ota}"',
+        'OPENAMP_DEMO_INPUT_SOURCE_MODE="${OPENAMP_DEMO_INPUT_SOURCE_MODE:-usrp}"',
         'JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"',
+        'OPENAMP_DEMO_LINK_MODE="${OPENAMP_DEMO_LINK_MODE:-iq-direct}"',
+        'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"',
         'OPENAMP_IQ_STREAMING_TVM="${OPENAMP_IQ_STREAMING_TVM:-0}"',
         'OPENAMP_IQ_STREAMING_MIN_READY="${OPENAMP_IQ_STREAMING_MIN_READY:-10}"',
         'BIG_LITTLE_INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-10}"',
@@ -165,12 +173,10 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY="${ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY:-1}"',
         'ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC="${ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC:-0.05}"',
         'ANALOG_REMOTE_DECODED_FORMAT="${ANALOG_REMOTE_DECODED_FORMAT:-npy}"',
-        'ANALOG_REMOTE_DECODE_WORKER_PREFIX="${ANALOG_REMOTE_DECODE_WORKER_PREFIX:-taskset -c 0,1}"',
         'RX_ARM_WAIT_MS="${RX_ARM_WAIT_MS:-500}"',
         'RX_STOP_WAIT_MS="${RX_STOP_WAIT_MS:-8000}"',
-        'ANALOG_PIPELINE_DEPTH="${ANALOG_PIPELINE_DEPTH:-2}"',
-        'ANALOG_PIPELINE_RF_DECODE_OVERLAP="${ANALOG_PIPELINE_RF_DECODE_OVERLAP:-1}"',
         'ANALOG_PIPELINE_DEPTH="${ANALOG_PIPELINE_DEPTH:-1}"',
+        'ANALOG_PIPELINE_RF_DECODE_OVERLAP="${ANALOG_PIPELINE_RF_DECODE_OVERLAP:-0}"',
         'ANALOG_SPS="${ANALOG_SPS:-2}"',
         'ANALOG_AMPLITUDE="${ANALOG_AMPLITUDE:-6000}"',
         'ANALOG_RX_POST_QUANTIZE="${ANALOG_RX_POST_QUANTIZE:-0}"',
@@ -186,12 +192,11 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'PERSISTENT_RX_TX_DELAY="${PERSISTENT_RX_TX_DELAY:-0}"',
         'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"',
         'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"',
-        'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"',
+        'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"',
         'ANALOG_PRECONNECT_CONTROL="${ANALOG_PRECONNECT_CONTROL:-1}"',
         'ANALOG_PRECONNECT_RX_CAPTURE_CONTROL="${ANALOG_PRECONNECT_RX_CAPTURE_CONTROL:-0}"',
         'ANALOG_RX_SESSION_CONTROL="${ANALOG_RX_SESSION_CONTROL:-1}"',
         'ANALOG_RX_BATCH_SESSION_CONTROL="${ANALOG_RX_BATCH_SESSION_CONTROL:-1}"',
-        'ANALOG_RX_BATCH_SESSION_MAX_IMAGES="${ANALOG_RX_BATCH_SESSION_MAX_IMAGES:-10}"',
         'ANALOG_RX_BATCH_SESSION_MAX_IMAGES="${ANALOG_RX_BATCH_SESSION_MAX_IMAGES:-16}"',
         'ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS="${ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS:-1}"',
         'ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK="${ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK:-80}"',
@@ -220,7 +225,12 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:REMOTE_USRP_PROJECT_ROOT = "/home/user"',
         '$env:REMOTE_USRP_DECODE_PYTHON = "/home/user/venv/bin/python"',
         '$env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"',
+        '$env:MLKEM_TRANSPORT_MODE = "usrp"',
+        '$env:MLKEM_USRP_MODE = "ota"',
+        '$env:OPENAMP_DEMO_INPUT_SOURCE_MODE = "usrp"',
         '$env:JSCC_LINK_MODE = "iq-direct"',
+        '$env:OPENAMP_DEMO_LINK_MODE = "iq-direct"',
+        '$env:MLKEM_CIPHER_SUITE = "SM4_GCM"',
         '$env:OPENAMP_IQ_STREAMING_TVM = "0"',
         '$env:OPENAMP_IQ_STREAMING_MIN_READY = "10"',
         '$env:BIG_LITTLE_INPUT_CHUNK_SIZE = "10"',
@@ -229,12 +239,10 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY = "1"',
         '$env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC = "0.05"',
         '$env:ANALOG_REMOTE_DECODED_FORMAT = "npy"',
-        '$env:ANALOG_REMOTE_DECODE_WORKER_PREFIX = "taskset -c 0,1"',
         '$env:RX_ARM_WAIT_MS = "500"',
         '$env:RX_STOP_WAIT_MS = "8000"',
-        '$env:ANALOG_PIPELINE_DEPTH = "2"',
-        '$env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "1"',
         '$env:ANALOG_PIPELINE_DEPTH = "1"',
+        '$env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "0"',
         '$env:ANALOG_SPS = "2"',
         '$env:ANALOG_AMPLITUDE = "6000"',
         '$env:ANALOG_RX_POST_QUANTIZE = "0"',
@@ -250,12 +258,11 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:PERSISTENT_RX_TX_DELAY = "0"',
         '$env:ANALOG_MIN_SYNC_METRIC = "0.05"',
         '$env:ANALOG_ROBUST_SYNC = "0"',
-        '$env:ANALOG_REMOTE_CLEANUP_MODE = "async"',
+        '$env:ANALOG_REMOTE_CLEANUP_MODE = "skip"',
         '$env:ANALOG_PRECONNECT_CONTROL = "1"',
         '$env:ANALOG_PRECONNECT_RX_CAPTURE_CONTROL = "0"',
         '$env:ANALOG_RX_SESSION_CONTROL = "1"',
         '$env:ANALOG_RX_BATCH_SESSION_CONTROL = "1"',
-        '$env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "10"',
         '$env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "16"',
         '$env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS = "1"',
         '$env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK = "80"',
@@ -274,6 +281,20 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         assert expected in shell_script
     for expected in powershell_defaults:
         assert expected in powershell_script
+    for rejected in (
+        'ANALOG_REMOTE_DECODE_WORKER_PREFIX="${ANALOG_REMOTE_DECODE_WORKER_PREFIX:-taskset -c 0,1}"',
+        'ANALOG_PIPELINE_DEPTH="${ANALOG_PIPELINE_DEPTH:-2}"',
+        'ANALOG_PIPELINE_RF_DECODE_OVERLAP="${ANALOG_PIPELINE_RF_DECODE_OVERLAP:-1}"',
+        'ANALOG_RX_BATCH_SESSION_MAX_IMAGES="${ANALOG_RX_BATCH_SESSION_MAX_IMAGES:-10}"',
+    ):
+        assert rejected not in shell_script
+    for rejected in (
+        '$env:ANALOG_REMOTE_DECODE_WORKER_PREFIX = "taskset -c 0,1"',
+        '$env:ANALOG_PIPELINE_DEPTH = "2"',
+        '$env:ANALOG_PIPELINE_RF_DECODE_OVERLAP = "1"',
+        '$env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES = "10"',
+    ):
+        assert rejected not in powershell_script
 
 
 def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_all_files() -> None:

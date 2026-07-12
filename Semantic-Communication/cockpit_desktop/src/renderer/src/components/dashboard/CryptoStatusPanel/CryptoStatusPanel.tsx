@@ -3,7 +3,7 @@ import { postCryptoReset, postCryptoTest, postCryptoToggle } from '../../../api/
 import { resolveAuthDisplayState } from './authDisplayState'
 import s from './CryptoStatusPanel.module.css'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { BenchmarkMetric, IqTailAudit } from '../../../api/types/crypto'
+import type { BenchmarkMetric } from '../../../api/types/crypto'
 
 const STATE_LABEL: Record<string, { label: string; tone: string }> = {
   idle: { label: '空闲', tone: 'neutral' },
@@ -19,6 +19,7 @@ type MetricItem = {
   label: string
   value: ReactNode
   tone?: MetricTone
+  half?: boolean
   wide?: boolean
 }
 
@@ -30,11 +31,6 @@ type SecurityAuthConfig = {
 
 type CryptoStatusPanelProps = {
   authConfig?: SecurityAuthConfig
-}
-
-function countValue(audit: IqTailAudit, key: keyof IqTailAudit): number | null {
-  const value = audit[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function ToggleSwitch({
@@ -280,6 +276,14 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   if (data.handshake_ms != null) {
     runtimeItems.push({ label: '握手耗时', value: `${data.handshake_ms.toFixed(1)} ms`, tone: 'mono' })
   }
+  if (data.bytes_sent != null || data.bytes_received != null) {
+    runtimeItems.push({
+      label: '加密流量',
+      value: `↑${data.bytes_sent ?? 0}B / ↓${data.bytes_received ?? 0}B`,
+      tone: 'mono',
+      half: true,
+    })
+  }
   if (data.encrypt_ms != null) {
     runtimeItems.push({ label: '加密发送', value: `${data.encrypt_ms.toFixed(1)} ms`, tone: 'mono' })
   }
@@ -288,13 +292,6 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   }
   if (data.inference_ms != null) {
     runtimeItems.push({ label: 'TVM 推理', value: `${data.inference_ms.toFixed(1)} ms`, tone: 'mono' })
-  }
-  if (data.bytes_sent != null || data.bytes_received != null) {
-    runtimeItems.push({
-      label: '加密流量',
-      value: `↑${data.bytes_sent ?? 0}B / ↓${data.bytes_received ?? 0}B`,
-      tone: 'mono',
-    })
   }
   if (data.last_sha256_match != null) {
     runtimeItems.push({
@@ -313,44 +310,6 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
       tone: 'mono',
       wide: true,
     })
-  }
-
-  const iqTailAudit = data.batch_iq_tail_audit
-  const iqTailAuditItems: MetricItem[] = []
-  if (data.batch_status === 'done' && iqTailAudit) {
-    const totalCount = countValue(iqTailAudit, 'record_count')
-    const referenceMs = countValue(iqTailAudit, 'reference_ms')
-    const overReference = countValue(iqTailAudit, 'over_reference_count')
-    if (totalCount != null) {
-      iqTailAuditItems.push({ label: '记录数', value: totalCount, tone: 'mono' })
-    }
-    if (referenceMs != null && overReference != null) {
-      iqTailAuditItems.push({
-        label: `>${referenceMs.toFixed(1)}ms`,
-        value: overReference,
-        tone: overReference > 0 ? 'fail' : 'ok',
-      })
-    }
-    const tailRows: [keyof IqTailAudit, string][] = [
-      ['total_gt_250ms_count', '>250ms'],
-      ['total_gt_275ms_count', '>275ms'],
-      ['total_gt_500ms_count', '>500ms'],
-      ['rx_control_overhead_gt_50ms_count', 'RX控制尾部'],
-      ['server_capture_gt_100ms_count', 'RX采集尾部'],
-      ['decode_gt_160ms_count', '解码尾部'],
-      ['worker_over_reported_gt_80ms_count', 'Worker响应'],
-      ['soft_completed_count', 'Soft完成'],
-    ]
-    for (const [key, label] of tailRows) {
-      const value = countValue(iqTailAudit, key)
-      if (value != null) {
-        iqTailAuditItems.push({
-          label,
-          value,
-          tone: value > 0 && key !== 'soft_completed_count' ? 'fail' : 'mono',
-        })
-      }
-    }
   }
 
   const infoItems: MetricItem[] = []
@@ -404,11 +363,11 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
 
       <div className={s.subSection}>
         <div className={s.subSectionTitle}>运行状态</div>
-        <div className={s.metricGrid}>
+        <div className={`${s.metricGrid} ${s.runtimeGrid}`}>
           {runtimeItems.map((item) => (
             <div
               key={item.label}
-              className={`${s.metricCard}${item.wide ? ` ${s.metricWide}` : ''}`}
+              className={`${s.metricCard}${item.half ? ` ${s.metricHalf}` : ''}${item.wide ? ` ${s.metricWide}` : ''}`}
             >
               <div className={s.metricLabel}>{item.label}</div>
               <div className={metricValueClass(item.tone)}>{item.value}</div>
@@ -427,14 +386,14 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
         if (transportBm?.decode_ms) rows.push({ label: '板端解码', metric: transportBm.decode_ms })
         if (transportBm?.merge_ms) rows.push({ label: '文件合并', metric: transportBm.merge_ms })
         if (transportBm?.total_ms) rows.push({ label: '传输/解包总计', metric: transportBm.total_ms })
-        if (iqStageBm?.rx_arm_ms) rows.push({ label: 'RX arm', metric: iqStageBm.rx_arm_ms })
-        if (iqStageBm?.rx_session_open_ms) rows.push({ label: 'RX连接', metric: iqStageBm.rx_session_open_ms })
-        if (iqStageBm?.rx_capture_command_ms) rows.push({ label: 'CAPTURE命令', metric: iqStageBm.rx_capture_command_ms })
-        if (iqStageBm?.rx_capture_ms) rows.push({ label: 'RX capture', metric: iqStageBm.rx_capture_ms })
-        if (iqStageBm?.rx_wait_ms) rows.push({ label: 'RX wait', metric: iqStageBm.rx_wait_ms })
-        if (iqStageBm?.rx_arm_control_overhead_ms) rows.push({ label: 'RX arm控制', metric: iqStageBm.rx_arm_control_overhead_ms })
-        if (iqStageBm?.rx_wait_response_overhead_ms) rows.push({ label: 'WAIT响应', metric: iqStageBm.rx_wait_response_overhead_ms })
-        if (iqStageBm?.remote_decode_response_overhead_ms) rows.push({ label: 'Decode响应', metric: iqStageBm.remote_decode_response_overhead_ms })
+        if (iqStageBm?.rx_arm_ms) rows.push({ label: '接收就绪', metric: iqStageBm.rx_arm_ms })
+        if (iqStageBm?.rx_session_open_ms) rows.push({ label: '接收会话', metric: iqStageBm.rx_session_open_ms })
+        if (iqStageBm?.rx_capture_command_ms) rows.push({ label: '采集命令', metric: iqStageBm.rx_capture_command_ms })
+        if (iqStageBm?.rx_capture_ms) rows.push({ label: '接收采集', metric: iqStageBm.rx_capture_ms })
+        if (iqStageBm?.rx_wait_ms) rows.push({ label: '接收等待', metric: iqStageBm.rx_wait_ms })
+        if (iqStageBm?.rx_arm_control_overhead_ms) rows.push({ label: '接收就绪控制', metric: iqStageBm.rx_arm_control_overhead_ms })
+        if (iqStageBm?.rx_wait_response_overhead_ms) rows.push({ label: '等待响应', metric: iqStageBm.rx_wait_response_overhead_ms })
+        if (iqStageBm?.remote_decode_response_overhead_ms) rows.push({ label: '解码响应', metric: iqStageBm.remote_decode_response_overhead_ms })
         if (inferenceBm?.inference_ms) rows.push({ label: '推理重建', metric: inferenceBm.inference_ms })
         if (inferenceBm?.total_ms && inferenceBm.total_ms !== inferenceBm.inference_ms) rows.push({ label: '推理侧总计', metric: inferenceBm.total_ms })
         const validRows = rows.filter((row) => row.metric != null)
@@ -471,23 +430,6 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
           </div>
         )
       })()}
-
-      {iqTailAuditItems.length > 0 && (
-        <div className={s.subSection}>
-          <div className={s.subSectionTitle}>IQ尾部审计</div>
-          <div className={s.metricGrid}>
-            {iqTailAuditItems.map((item) => (
-              <div
-                key={item.label}
-                className={`${s.metricCard}${item.wide ? ` ${s.metricWide}` : ''}`}
-              >
-                <div className={s.metricLabel}>{item.label}</div>
-                <div className={metricValueClass(item.tone)}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className={s.testSection}>
         <div className={s.actionRow}>

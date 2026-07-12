@@ -14,6 +14,6 @@ export function resolveAuthDisplayState(
   return {
     known,
     enabled,
-    label: enabled ? '已启用 / ML-DSA + SM2' : '未启用',
+    label: enabled ? 'ML-DSA + SM2' : '未启用',
   }
 }
