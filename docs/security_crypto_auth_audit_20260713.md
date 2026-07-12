@@ -38,6 +38,7 @@ TCP 安全信道实现位于 `mlkem_link/secure_channel.py`：
 - 服务端对 transcript 做 SM2、ML-DSA 签名。
 - 客户端用本地公钥验签。
 - `DUAL_REQUIRED` 会拒绝策略降级。
+- 客户端配置了错误 peer public key 时，SM2 与 ML-DSA 验签均失败。
 - Finished 消息用派生 key 加密验证，确认双方 transcript 与共享密钥一致。
 - 缺少密钥或验签失败会抛错，daemon 无法 ready，Cockpit 当前任务会被阻断。
 
@@ -68,7 +69,7 @@ python -m pytest mlkem_link/tests/test_auth.py::TestTranscript \
   mlkem_link/tests/test_auth.py::TestWireCodec \
   mlkem_link/tests/test_auth.py::TestSignVerify \
   mlkem_link/tests/test_auth.py::TestFinished -q
-# 7 passed
+# 8 passed
 
 python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_crypto_runtime.py -q
 # 28 passed
