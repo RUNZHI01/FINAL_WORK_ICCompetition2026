@@ -35,7 +35,9 @@ def test_persistent_rx_startup_drain_can_be_stopped_before_stream_start():
 
     assert "stop_requested_.load()" in drain_block
     assert "drain_deadline" in drain_block
-    assert "recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0)" in drain_block
+    assert "state_.phase = \"drain\"" in drain_block
+    assert "recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.001)" in drain_block
+    assert "recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.0)" not in drain_block
 
 
 def test_persistent_rx_capture_arm_wait_is_configurable():
@@ -66,6 +68,8 @@ def test_persistent_rx_snapshot_reports_server_stage_timings():
     source = OTA_RX_SERVER.read_text(encoding="utf-8")
     format_block = source[source.index("std::string format_snapshot"):source.index("bool has_sensor")]
 
+    assert "std::string phase" in source
+    assert '<< " phase="' in format_block
     for field in (
         "arm_wait_sec",
         "drain_sec",
@@ -2627,13 +2631,13 @@ def test_process_image_records_rx_server_stage_timings(tmp_path, monkeypatch):
     def fake_run_control(_host, _port, line, _log_path, _timeout):
         if line.startswith("CAPTURE "):
             return (
-                "OK busy=1 started=1 done=0 ok=1 job_id=7 target_samps=107584 written_samps=0 "
+                "OK busy=1 started=1 done=0 ok=1 job_id=7 phase=receiving target_samps=107584 written_samps=0 "
                 "arm_wait_sec=0.012 drain_sec=0.004 stream_cmd_sec=0.006 receive_sec=0.000 "
                 "stop_cmd_sec=0.000 stop_wait_sec=0.000 wall_sec=0.000"
             )
         if line.startswith("WAIT "):
             return (
-                "OK busy=0 started=1 done=1 ok=1 job_id=7 target_samps=107584 written_samps=107584 "
+                "OK busy=0 started=1 done=1 ok=1 job_id=7 phase=done target_samps=107584 written_samps=107584 "
                 "arm_wait_sec=0.012 drain_sec=0.004 stream_cmd_sec=0.006 receive_sec=0.041 "
                 "stop_cmd_sec=0.000 stop_wait_sec=0.000 wall_sec=0.052"
             )
@@ -2652,6 +2656,8 @@ def test_process_image_records_rx_server_stage_timings(tmp_path, monkeypatch):
     assert record["rx_server_stream_cmd_wall_sec"] == 0.006
     assert record["rx_server_receive_wall_sec"] == 0.041
     assert record["rx_server_capture_wall_sec"] == 0.052
+    assert record["rx_server_job_id"] == 7
+    assert record["rx_server_phase"] == "done"
     assert record["rx_server_target_samps"] == 107584
     assert record["rx_server_written_samps"] == 107584
 
@@ -2788,6 +2794,38 @@ def test_stop_rx_capture_allows_full_drain_budget(tmp_path, monkeypatch):
     assert timeouts == pytest.approx([8.5])
 
 
+def test_arm_failure_stop_uses_bounded_full_drain_when_capture_never_started(tmp_path, monkeypatch):
+    args = Namespace(
+        rx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+    )
+    control_lines: list[str] = []
+
+    def fake_run_control(_host, _port, line, _log_path, _timeout):
+        control_lines.append(line)
+        if line == "STOP timeout=0.010000":
+            return "OK busy=1 started=0 done=0 ok=1 written_samps=0 stop_wait_sec=0.010"
+        if line == "STATUS":
+            return "OK busy=1 started=0 done=0 ok=1 written_samps=0"
+        if line == "STOP timeout=1.500000":
+            return "OK busy=0 started=0 done=1 ok=0 written_samps=0 stop_wait_sec=1.400"
+        if line == "STOP":
+            return "OK busy=0 started=0 done=1 ok=0 written_samps=0 stop_wait_sec=7.800"
+        return "OK"
+
+    monkeypatch.setenv("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", "0.01")
+    monkeypatch.setenv("ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC", "1.5")
+    monkeypatch.setenv("ANALOG_RX_STOP_DRAIN_POLL_SEC", "0.001")
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    response = analog_batch.stop_rx_capture_after_arm_failure(args, tmp_path / "rx_stop.log")
+
+    assert "STOP timeout=1.500000" in control_lines
+    assert "STOP" not in control_lines
+    assert "stop_wait_sec=1.400" in response
+
+
 def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
     input_path = tmp_path / "case0.bin"
     input_path.write_bytes(b"payload")
@@ -2826,7 +2864,7 @@ def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
         control_lines.append(line)
         if line.startswith("CAPTURE "):
             return "OK busy=1 started=0 done=0 ok=1 job_id=1"
-        if line == "STATUS":
+        if line.startswith("STATUS"):
             return "OK busy=1 started=1 done=0 ok=1 job_id=1"
         return "OK"
 
@@ -2837,7 +2875,9 @@ def test_process_image_waits_for_rx_started_before_tx(tmp_path, monkeypatch):
     result = analog_batch.process_image(args, image)
 
     assert result.passed is True
-    assert control_lines.index("STATUS") < next(i for i, line in enumerate(control_lines) if line.startswith("SEND "))
+    status_index = next(i for i, line in enumerate(control_lines) if line.startswith("STATUS"))
+    assert status_index < next(i for i, line in enumerate(control_lines) if line.startswith("SEND "))
+    assert any(line.startswith("WAIT ") and "job_id=1" in line for line in control_lines)
 
 
 def test_wait_for_rx_capture_armed_falls_back_after_sent_session_status_timeout(tmp_path, monkeypatch):
@@ -2874,9 +2914,41 @@ def test_wait_for_rx_capture_armed_falls_back_after_sent_session_status_timeout(
     )
 
     assert "started=1" in response
-    assert "session:STATUS" in events
+    assert "session:STATUS job_id=42" in events
     assert "session:close" in events
-    assert "direct:STATUS" in events
+    assert "direct:STATUS job_id=42" in events
+
+
+def test_wait_for_rx_capture_armed_ignores_status_from_different_job_id(tmp_path, monkeypatch):
+    args = Namespace(
+        rx_arm_status_timeout_sec=0.003,
+        rx_arm_status_poll_sec=0.001,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+    )
+    control_lines: list[str] = []
+
+    def fake_run_control(_host, _port, line, log_path, _timeout):
+        control_lines.append(line)
+        response = "OK busy=1 started=1 done=0 ok=1 job_id=41"
+        log_path.write_text(response + "\n", encoding="utf-8")
+        return response
+
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    with pytest.raises(RuntimeError, match="RX CAPTURE did not arm before TX"):
+        analog_batch.wait_for_rx_capture_armed(
+            args,
+            "OK busy=1 started=0 done=0 ok=1 job_id=42",
+            tmp_path / "rx_arm_status.log",
+            30.0,
+        )
+
+    assert control_lines
+    assert all(line == "STATUS job_id=42" for line in control_lines)
+    log_text = (tmp_path / "rx_arm_status.log").read_text(encoding="utf-8")
+    assert "job_id=41" in log_text
+    assert "job_id=42" in log_text
 
 
 def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, monkeypatch):
@@ -2912,7 +2984,7 @@ def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, mo
         control_lines.append(line)
         if line.startswith("CAPTURE "):
             return "OK busy=1 started=0 done=0 ok=1 job_id=1"
-        if line == "STATUS":
+        if line.startswith("STATUS"):
             raise RuntimeError("control command failed: STATUS\nERR_TIMEOUT host=board port=29220")
         return "OK"
 
@@ -2922,7 +2994,7 @@ def test_process_image_stops_rx_when_arm_status_times_out_before_tx(tmp_path, mo
     result = analog_batch.process_image(args, image)
 
     assert result.passed is False
-    assert any(line == "STOP timeout=0.200000" for line in control_lines)
+    assert any(line == "STOP timeout=0.200000 job_id=1" for line in control_lines)
     assert not any(line.startswith("SEND ") for line in control_lines)
 
 
@@ -3023,7 +3095,7 @@ def test_pipeline_session_capture_arm_failure_closes_session_before_stop(tmp_pat
             log_path.write_text("OK\n", encoding="utf-8")
             if line.startswith("CAPTURE "):
                 return "OK busy=1 started=0 done=0 ok=1 job_id=150"
-            if line == "STATUS":
+            if line.startswith("STATUS"):
                 return "OK busy=1 started=0 done=0 ok=1 job_id=150"
             return "OK"
 
@@ -3216,9 +3288,9 @@ def test_process_image_escalates_arm_failure_stop_when_rx_remains_busy(tmp_path,
         control_lines.append(line)
         if line.startswith("CAPTURE "):
             return "OK busy=1 started=0 done=0 ok=1 job_id=1"
-        if line == "STOP timeout=0.000000":
+        if line == "STOP timeout=0.000000 job_id=1":
             return "OK busy=1 started=0 done=0 ok=1 job_id=1"
-        if line == "STOP":
+        if line == "STOP job_id=1":
             return "OK busy=0 started=0 done=1 ok=0 error=stopped"
         return "OK busy=1 started=0 done=0 ok=1 job_id=1"
 
@@ -3229,9 +3301,9 @@ def test_process_image_escalates_arm_failure_stop_when_rx_remains_busy(tmp_path,
     result = analog_batch.process_image(args, image)
 
     assert result.passed is False
-    assert "STOP timeout=0.000000" in control_lines
-    assert "STOP" in control_lines
-    assert control_lines.index("STOP") > control_lines.index("STOP timeout=0.000000")
+    assert "STOP timeout=0.000000 job_id=1" in control_lines
+    assert "STOP job_id=1" in control_lines
+    assert control_lines.index("STOP job_id=1") > control_lines.index("STOP timeout=0.000000 job_id=1")
     assert not any(line.startswith("SEND ") for line in control_lines)
 
 

@@ -45,7 +45,7 @@ if (-not $env:REMOTE_USRP_RX_DIR) {
     $env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"
 }
 if (-not $env:REMOTE_RX_RUN_ROOT) {
-    $env:REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"
+    $env:REMOTE_RX_RUN_ROOT = "/dev/shm/usrp292x_remote_runs"
 }
 if (-not $env:REMOTE_USRP_PROJECT_ROOT) {
     $env:REMOTE_USRP_PROJECT_ROOT = "/home/user"
@@ -75,7 +75,7 @@ if (-not $env:ANALOG_REMOTE_DECODED_FORMAT) {
     $env:ANALOG_REMOTE_DECODED_FORMAT = "npy"
 }
 if (-not $env:RX_ARM_WAIT_MS) {
-    $env:RX_ARM_WAIT_MS = "150"
+    $env:RX_ARM_WAIT_MS = "500"
 }
 if (-not $env:RX_STOP_WAIT_MS) {
     $env:RX_STOP_WAIT_MS = "8000"
@@ -116,6 +116,9 @@ if (-not $env:ANALOG_RX_ARM_STATUS_POLL_SEC) {
 if (-not $env:ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC) {
     $env:ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC = "8.0"
 }
+if (-not $env:ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC) {
+    $env:ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC = "1.5"
+}
 if (-not $env:PERSISTENT_RX_TX_DELAY) {
     $env:PERSISTENT_RX_TX_DELAY = "0"
 }
@@ -126,7 +129,7 @@ if (-not $env:ANALOG_ROBUST_SYNC) {
     $env:ANALOG_ROBUST_SYNC = "0"
 }
 if (-not $env:ANALOG_REMOTE_CLEANUP_MODE) {
-    $env:ANALOG_REMOTE_CLEANUP_MODE = "skip"
+    $env:ANALOG_REMOTE_CLEANUP_MODE = "async"
 }
 if (-not $env:ANALOG_PRECONNECT_CONTROL) {
     $env:ANALOG_PRECONNECT_CONTROL = "1"
@@ -155,14 +158,38 @@ if (-not $env:ANALOG_DECODE_PIPELINE_WARMUP) {
 if (-not $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT) {
     $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"
 }
+if (-not $env:MLKEM_USRP_MAX_ARQ_ROUNDS) {
+    $env:MLKEM_USRP_MAX_ARQ_ROUNDS = "5"
+}
 if (-not $env:USRP_MAX_ARQ_ROUNDS) {
-    $env:USRP_MAX_ARQ_ROUNDS = "2"
+    $env:USRP_MAX_ARQ_ROUNDS = "5"
+}
+if (-not $env:ANALOG_RETRY_ON_BURST_MISS) {
+    $env:ANALOG_RETRY_ON_BURST_MISS = "1"
+}
+if (-not $env:ANALOG_RETRY_ON_LOW_SYNC) {
+    $env:ANALOG_RETRY_ON_LOW_SYNC = "1"
+}
+if (-not $env:ANALOG_LOW_SYNC_RETRY_THRESHOLD) {
+    $env:ANALOG_LOW_SYNC_RETRY_THRESHOLD = "0.08"
+}
+if (-not $env:ANALOG_FALLBACK_SYNC_CANDIDATES) {
+    $env:ANALOG_FALLBACK_SYNC_CANDIDATES = "4"
+}
+if (-not $env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS) {
+    $env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = "1024"
 }
 if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
     $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"
 }
 if (-not $env:OPENAMP_DEMO_TVM_BATCH_RUNNER) {
     $env:OPENAMP_DEMO_TVM_BATCH_RUNNER = "biglittle"
+}
+if (-not $env:MLKEM_AUTH_ENABLED) {
+    $env:MLKEM_AUTH_ENABLED = "1"
+}
+if (-not $env:MLKEM_AUTH_SIG_POLICY) {
+    $env:MLKEM_AUTH_SIG_POLICY = "DUAL_REQUIRED"
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

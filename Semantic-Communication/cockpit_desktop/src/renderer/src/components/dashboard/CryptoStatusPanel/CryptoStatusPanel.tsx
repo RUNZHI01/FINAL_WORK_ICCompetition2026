@@ -1,5 +1,6 @@
 import { useCryptoStatus } from '../../../hooks/useCryptoStatus'
 import { postCryptoReset, postCryptoTest, postCryptoToggle } from '../../../api/client'
+import { resolveAuthDisplayState } from './authDisplayState'
 import s from './CryptoStatusPanel.module.css'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { BenchmarkMetric, IqTailAudit } from '../../../api/types/crypto'
@@ -21,12 +22,84 @@ type MetricItem = {
   wide?: boolean
 }
 
+type SecurityAuthConfig = {
+  enabled: boolean
+  disabled: boolean
+  onToggle: (enabled: boolean) => void
+}
+
+type CryptoStatusPanelProps = {
+  authConfig?: SecurityAuthConfig
+}
+
 function countValue(audit: IqTailAudit, key: keyof IqTailAudit): number | null {
   const value = audit[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-export function CryptoStatusPanel() {
+function ToggleSwitch({
+  checked,
+  disabled,
+  title,
+  onToggle,
+}: {
+  checked: boolean
+  disabled?: boolean
+  title: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      className={`${s.toggle} ${checked ? s.toggleOn : ''}`}
+      disabled={disabled}
+      onClick={onToggle}
+      role="switch"
+      aria-checked={checked}
+      title={title}
+      type="button"
+    >
+      <span className={s.toggleThumb} />
+    </button>
+  )
+}
+
+function SecuritySwitchRow({
+  label,
+  caption,
+  status,
+  checked,
+  disabled,
+  title,
+  onToggle,
+}: {
+  label: string
+  caption: string
+  status: string
+  checked: boolean
+  disabled?: boolean
+  title: string
+  onToggle: () => void
+}) {
+  return (
+    <div className={s.securitySwitchRow}>
+      <div className={s.securitySwitchMain}>
+        <div className={s.securitySwitchLabel}>{label}</div>
+        <div className={s.securitySwitchCaption}>{caption}</div>
+        <div className={s.securitySwitchStatus}>{status}</div>
+      </div>
+      <div className={s.securitySwitchControl}>
+        <ToggleSwitch
+          checked={checked}
+          disabled={disabled}
+          title={title}
+          onToggle={onToggle}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   const { data, isLoading, isError, refetch } = useCryptoStatus()
   const [testing, setTesting] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -89,25 +162,44 @@ export function CryptoStatusPanel() {
     }
   }
 
+  function renderSecurityControls(encryptionStatus: string, encryptionDisabled = false) {
+    return (
+      <div className={s.securitySwitchGroup}>
+        <SecuritySwitchRow
+          label="加密: ML-KEM + SM4"
+          caption="ML-KEM 协商会话密钥，SM4 保护控制面数据，降低明文暴露风险。"
+          status={encryptionStatus}
+          checked={enabled}
+          disabled={encryptionDisabled}
+          title={encryptionDisabled ? '请先输入板卡密码' : enabled ? '关闭加密通道' : '启用加密通道'}
+          onToggle={handleToggle}
+        />
+        {authConfig && (
+          <SecuritySwitchRow
+            label="认证: ML-DSA + SM2"
+            caption="ML-DSA 与 SM2 双重签名确认对端身份，降低冒充与中间人风险。"
+            status={authConfig.enabled ? '已启用' : '未启用'}
+            checked={authConfig.enabled}
+            disabled={authConfig.disabled}
+            title={authConfig.enabled ? '关闭身份认证' : '启用身份认证'}
+            onToggle={() => authConfig.onToggle(!authConfig.enabled)}
+          />
+        )}
+      </div>
+    )
+  }
+
   // 1) Board not configured — show prompt
   if (!boardConfigured && !enabled) {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={s.toggle}
-            disabled
-            role="switch"
-            aria-checked={false}
-            title="请先输入板卡密码"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('等待板卡密码', true)}
         <div className={s.disabledRow}>
           <span className={`${s.dot} ${s.dotOff}`} />
-          <span className={s.muted}>请先在下方输入板卡密码</span>
+          <span className={s.muted}>请先在上方输入板卡密码</span>
         </div>
       </div>
     )
@@ -118,21 +210,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={s.toggle}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={false}
-            title="点击启用 ML-KEM 加密通道"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
-        <div className={s.disabledRow}>
-          <span className={`${s.dot} ${s.dotOff}`} />
-          <span className={s.muted}>ML-KEM 加密通道未启用</span>
-        </div>
+        {renderSecurityControls('未启用')}
       </div>
     )
   }
@@ -142,17 +222,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={`${s.toggle} ${s.toggleOn}`}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={true}
-            title="点击关闭 ML-KEM"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('通道未连接')}
         <div className={s.errorRow}>
           <span className={`${s.dot} ${s.dotOff}`} />
           <span className={s.errorText}>后量子加密通道未连接</span>
@@ -166,16 +238,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={`${s.toggle} ${s.toggleOn}`}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={true}
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('检测中')}
         <div className={s.loadingRow}>
           <span className={s.spinner} />
           <span className={s.muted}>正在检测...</span>
@@ -190,16 +255,17 @@ export function CryptoStatusPanel() {
     { label: 'KEM 后端', value: data.kem_backend, tone: 'mono' },
     { label: '密码套件', value: data.cipher_suite, tone: 'mono' },
   ]
+  const authDisplay = resolveAuthDisplayState(authConfig?.enabled, data.auth_enabled)
 
-  if (data.auth_enabled != null) {
+  if (authDisplay.known) {
     settingsItems.push({
       label: '认证面',
-      value: data.auth_enabled ? `已启用 / ${data.sig_policy || 'UNKNOWN'}` : '未启用',
+      value: authDisplay.label,
       tone: 'mono',
     })
   }
 
-  if (data.auth_enabled && data.server_id) {
+  if (authDisplay.enabled && data.server_id) {
     settingsItems.push({
       label: '服务端标识',
       value: data.server_id,
@@ -316,17 +382,10 @@ export function CryptoStatusPanel() {
   return (
     <div className={s.card}>
       <div className={s.titleRow}>
-        <span className={s.title}>ML-KEM 安全信道</span>
-        <button
-          className={`${s.toggle} ${s.toggleOn}`}
-          onClick={handleToggle}
-          role="switch"
-          aria-checked={true}
-          title="点击关闭 ML-KEM"
-        >
-          <span className={s.toggleThumb} />
-        </button>
+        <span className={s.title}>安全信道</span>
       </div>
+
+      {renderSecurityControls(`通道状态: ${st.label}`)}
 
       <div className={s.subSection}>
         <div className={s.subSectionTitle}>配置项</div>

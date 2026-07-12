@@ -75,9 +75,11 @@ LINK_MODE_QPSK = "qpsk"
 LINK_MODE_IQ_DIRECT = "iq-direct"
 DEFAULT_IQ_DIRECT_SPS = 2
 DEFAULT_IQ_DIRECT_AMPLITUDE = 6000
+DEFAULT_IQ_DIRECT_MAX_ARQ_ROUNDS = 5
 DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.05
 DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
 DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
+DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD = 0.08
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
@@ -127,6 +129,8 @@ ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FAST_SYNC_SEARCH_WINDOW_S
 ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS = ("ANALOG_FALLBACK_SYNC_CANDIDATES",)
 ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_RETRY_ON_BURST_MISS_KEYS = ("ANALOG_RETRY_ON_BURST_MISS",)
+ANALOG_RETRY_ON_LOW_SYNC_KEYS = ("ANALOG_RETRY_ON_LOW_SYNC",)
+ANALOG_LOW_SYNC_RETRY_THRESHOLD_KEYS = ("ANALOG_LOW_SYNC_RETRY_THRESHOLD",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
@@ -2475,7 +2479,7 @@ class UsrpBatchSpoolJob:
         if self._link_mode == LINK_MODE_IQ_DIRECT:
             command.extend([
                 "--max-arq-rounds",
-                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), DEFAULT_IQ_DIRECT_MAX_ARQ_ROUNDS))),
             ])
             command.extend(self._build_analog_link_args(env_values))
             remote_decode_result_mode = str(
@@ -2658,6 +2662,23 @@ class UsrpBatchSpoolJob:
                 if _parse_bool(retry_on_burst_miss_raw, False)
                 else "--no-retry-on-burst-miss"
             )
+        retry_on_low_sync_raw = _first_value(env_values, ANALOG_RETRY_ON_LOW_SYNC_KEYS)
+        if retry_on_low_sync_raw:
+            args.append(
+                "--retry-on-low-sync"
+                if _parse_bool(retry_on_low_sync_raw, False)
+                else "--no-retry-on-low-sync"
+            )
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.append("--retry-on-low-sync")
+        low_sync_retry_threshold = _first_value(env_values, ANALOG_LOW_SYNC_RETRY_THRESHOLD_KEYS)
+        if low_sync_retry_threshold:
+            args.extend([
+                "--low-sync-retry-threshold",
+                str(_parse_float(low_sync_retry_threshold, DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--low-sync-retry-threshold", str(DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD)])
         sync_candidates = _first_value(env_values, ANALOG_SYNC_CANDIDATES_KEYS)
         if sync_candidates:
             args.extend(["--sync-candidates", str(_parse_int(sync_candidates, 12))])

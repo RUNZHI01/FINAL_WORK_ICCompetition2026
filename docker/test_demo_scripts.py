@@ -18,7 +18,7 @@ def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     assert "tvm250-prerecorded" in script
     assert 'OPENAMP_DEMO_INPUT_SOURCE_MODE="${OPENAMP_DEMO_INPUT_SOURCE_MODE:-prerecorded}"' in script
     assert 'MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-tcp}"' in script
-    assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-0}"' in script
+    assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"' in script
     assert 'MLKEM_AUTH_SIG_POLICY="${MLKEM_AUTH_SIG_POLICY:-DUAL_REQUIRED}"' in script
     assert 'JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"' in script
     assert 'ANALOG_REMOTE_DECODE_RESULT_MODE="${ANALOG_REMOTE_DECODE_RESULT_MODE:-remote-dir}"' in script
@@ -31,13 +31,28 @@ def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     assert 'PERSISTENT_RX_TX_DELAY="${PERSISTENT_RX_TX_DELAY:-0}"' in script
     assert 'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"' in script
     assert 'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"' in script
-    assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"' in script
+    assert 'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"' in script
     assert 'ANALOG_REMOTE_DECODE_WORKER="${ANALOG_REMOTE_DECODE_WORKER:-1}"' in script
     assert 'ANALOG_DECODE_PIPELINE_WARMUP="${ANALOG_DECODE_PIPELINE_WARMUP:-1}"' in script
     assert 'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"' in script
-    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-2}"' in script
+    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-5}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
+
+
+def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys() -> None:
+    script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-dev.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"' in script
+    for name in (
+        "MLKEM_AUTH_SERVER_SM2_KEY",
+        "MLKEM_AUTH_SERVER_SM2_PUB",
+        "MLKEM_AUTH_SERVER_MLDSA_KEY",
+        "MLKEM_AUTH_SERVER_MLDSA_PUB",
+    ):
+        assert name in script.split('msys_env_exclusions="', 1)[1].split('"', 1)[0]
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -76,6 +91,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC",
         "ANALOG_RX_ARM_STATUS_POLL_SEC",
         "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC",
+        "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC",
         "ANALOG_RX_STOP_DRAIN_POLL_SEC",
         "PERSISTENT_RX_TX_DELAY",
         "ANALOG_REMOTE_CLEANUP_MODE",
@@ -135,7 +151,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"',
         'OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="${OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET:-/host_workspace}"',
         'REMOTE_USRP_RX_DIR="${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}"',
-        'REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/tmp/usrp292x_remote_runs}"',
+        'REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/dev/shm/usrp292x_remote_runs}"',
         'REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"',
         'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"',
         'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"',
@@ -145,7 +161,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY="${ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY:-1}"',
         'ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC="${ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC:-0.05}"',
         'ANALOG_REMOTE_DECODED_FORMAT="${ANALOG_REMOTE_DECODED_FORMAT:-npy}"',
-        'RX_ARM_WAIT_MS="${RX_ARM_WAIT_MS:-150}"',
+        'RX_ARM_WAIT_MS="${RX_ARM_WAIT_MS:-500}"',
         'RX_STOP_WAIT_MS="${RX_STOP_WAIT_MS:-8000}"',
         'ANALOG_PIPELINE_DEPTH="${ANALOG_PIPELINE_DEPTH:-1}"',
         'ANALOG_SPS="${ANALOG_SPS:-2}"',
@@ -159,10 +175,11 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_RX_ARM_STATUS_TIMEOUT_SEC="${ANALOG_RX_ARM_STATUS_TIMEOUT_SEC:-0.5}"',
         'ANALOG_RX_ARM_STATUS_POLL_SEC="${ANALOG_RX_ARM_STATUS_POLL_SEC:-0.025}"',
         'ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC="${ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC:-8.0}"',
+        'ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC="${ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC:-1.5}"',
         'PERSISTENT_RX_TX_DELAY="${PERSISTENT_RX_TX_DELAY:-0}"',
         'ANALOG_MIN_SYNC_METRIC="${ANALOG_MIN_SYNC_METRIC:-0.05}"',
         'ANALOG_ROBUST_SYNC="${ANALOG_ROBUST_SYNC:-0}"',
-        'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-skip}"',
+        'ANALOG_REMOTE_CLEANUP_MODE="${ANALOG_REMOTE_CLEANUP_MODE:-async}"',
         'ANALOG_PRECONNECT_CONTROL="${ANALOG_PRECONNECT_CONTROL:-1}"',
         'ANALOG_PRECONNECT_RX_CAPTURE_CONTROL="${ANALOG_PRECONNECT_RX_CAPTURE_CONTROL:-0}"',
         'ANALOG_RX_SESSION_CONTROL="${ANALOG_RX_SESSION_CONTROL:-1}"',
@@ -172,9 +189,13 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK="${ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK:-80}"',
         'ANALOG_DECODE_PIPELINE_WARMUP="${ANALOG_DECODE_PIPELINE_WARMUP:-1}"',
         'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"',
-        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-2}"',
+        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-5}"',
+        'ANALOG_FALLBACK_SYNC_CANDIDATES="${ANALOG_FALLBACK_SYNC_CANDIDATES:-4}"',
+        'ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"',
         'OPENAMP_TVM_BATCH_RUNNER="${OPENAMP_TVM_BATCH_RUNNER:-biglittle}"',
         'OPENAMP_DEMO_TVM_BATCH_RUNNER="${OPENAMP_DEMO_TVM_BATCH_RUNNER:-biglittle}"',
+        'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"',
+        'MLKEM_AUTH_SIG_POLICY="${MLKEM_AUTH_SIG_POLICY:-DUAL_REQUIRED}"',
     )
     powershell_defaults = (
         '$env:REMOTE_HOST = "100.121.87.73"',
@@ -187,7 +208,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:OPENAMP_USRP_TX_DOCKER_IMAGE = "iccomp-usrp-tx:latest"',
         '$env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"',
         '$env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"',
-        '$env:REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"',
+        '$env:REMOTE_RX_RUN_ROOT = "/dev/shm/usrp292x_remote_runs"',
         '$env:REMOTE_USRP_PROJECT_ROOT = "/home/user"',
         '$env:REMOTE_USRP_DECODE_PYTHON = "/home/user/venv/bin/python"',
         '$env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"',
@@ -197,7 +218,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY = "1"',
         '$env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC = "0.05"',
         '$env:ANALOG_REMOTE_DECODED_FORMAT = "npy"',
-        '$env:RX_ARM_WAIT_MS = "150"',
+        '$env:RX_ARM_WAIT_MS = "500"',
         '$env:RX_STOP_WAIT_MS = "8000"',
         '$env:ANALOG_PIPELINE_DEPTH = "1"',
         '$env:ANALOG_SPS = "2"',
@@ -211,10 +232,11 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_RX_ARM_STATUS_TIMEOUT_SEC = "0.5"',
         '$env:ANALOG_RX_ARM_STATUS_POLL_SEC = "0.025"',
         '$env:ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC = "8.0"',
+        '$env:ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC = "1.5"',
         '$env:PERSISTENT_RX_TX_DELAY = "0"',
         '$env:ANALOG_MIN_SYNC_METRIC = "0.05"',
         '$env:ANALOG_ROBUST_SYNC = "0"',
-        '$env:ANALOG_REMOTE_CLEANUP_MODE = "skip"',
+        '$env:ANALOG_REMOTE_CLEANUP_MODE = "async"',
         '$env:ANALOG_PRECONNECT_CONTROL = "1"',
         '$env:ANALOG_PRECONNECT_RX_CAPTURE_CONTROL = "0"',
         '$env:ANALOG_RX_SESSION_CONTROL = "1"',
@@ -224,9 +246,13 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK = "80"',
         '$env:ANALOG_DECODE_PIPELINE_WARMUP = "1"',
         '$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"',
-        '$env:USRP_MAX_ARQ_ROUNDS = "2"',
+        '$env:USRP_MAX_ARQ_ROUNDS = "5"',
+        '$env:ANALOG_FALLBACK_SYNC_CANDIDATES = "4"',
+        '$env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = "1024"',
         '$env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"',
         '$env:OPENAMP_DEMO_TVM_BATCH_RUNNER = "biglittle"',
+        '$env:MLKEM_AUTH_ENABLED = "1"',
+        '$env:MLKEM_AUTH_SIG_POLICY = "DUAL_REQUIRED"',
     )
 
     for expected in shell_defaults:

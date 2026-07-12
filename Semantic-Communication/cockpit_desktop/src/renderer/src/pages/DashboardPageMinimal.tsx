@@ -34,20 +34,7 @@ import s from './DashboardPageMinimal.module.css'
 
 const LIVE_LOG_ACTIONS = ['Processing block', 'Allocating memory', 'Optimizing tensor', 'Compiling kernel', 'Syncing device']
 
-type AuthSigPolicy = 'DUAL_REQUIRED' | 'SM2_ONLY' | 'MLDSA_ONLY'
 type TransportMode = 'tcp' | 'usrp'
-
-const AUTH_POLICY_OPTIONS: { value: AuthSigPolicy; label: string }[] = [
-  { value: 'DUAL_REQUIRED', label: '双因子: SM2 + ML-DSA' },
-  { value: 'SM2_ONLY', label: '仅 SM2' },
-  { value: 'MLDSA_ONLY', label: '仅 ML-DSA' },
-]
-
-const AUTH_POLICY_HINTS: Record<AuthSigPolicy, string> = {
-  DUAL_REQUIRED: '同时校验 SM2 与 ML-DSA 标识，最接近当前完整认证链路。',
-  SM2_ONLY: '仅保留国密签名身份校验，便于单独验证 SM2 链路。',
-  MLDSA_ONLY: '仅保留后量子签名身份校验，便于单独验证 ML-DSA 链路。',
-}
 
 const TRANSPORT_OPTIONS: { mode: TransportMode; label: string; caption: string }[] = [
   {
@@ -97,14 +84,6 @@ function normalizeStageProgress(stage: BatchStageProgress | null | undefined, fa
   }
 }
 
-function normalizeAuthSigPolicy(rawValue: string | undefined): AuthSigPolicy {
-  const normalized = String(rawValue || '').trim().toUpperCase()
-  if (normalized === 'SM2_ONLY' || normalized === 'MLDSA_ONLY') {
-    return normalized
-  }
-  return 'DUAL_REQUIRED'
-}
-
 function normalizeTransportMode(rawValue: unknown): TransportMode {
   return String(rawValue || '').trim().toLowerCase() === 'usrp' ? 'usrp' : 'tcp'
 }
@@ -133,6 +112,21 @@ function readinessToneClass(tone: BoardReadinessTone): string {
     default:
       return s.readinessItemInfo
   }
+}
+
+type MainProgressTone = 'yellow' | 'green' | 'blue'
+type MainProgressState = 'done' | 'active' | 'pending'
+
+function mainProgressToneClass(tone: MainProgressTone): string {
+  if (tone === 'yellow') return s.mainStageYellow
+  if (tone === 'green') return s.mainStageGreen
+  return s.mainStageBlue
+}
+
+function mainProgressStateClass(state: MainProgressState): string {
+  if (state === 'done') return s.mainStageDone
+  if (state === 'active') return s.mainStageActive
+  return s.mainStagePending
 }
 
 const LiveLogStream = memo(function LiveLogStream({ isRunning }: { isRunning: boolean }) {
@@ -262,8 +256,6 @@ export function DashboardPageMinimal() {
   const setChinaTheater = useAppStore((s) => s.setChinaTheater)
   const [boardPassword, setBoardPassword] = useState('')
   const [authEnabled, setAuthEnabled] = useState(true)
-  const [authSigPolicy, setAuthSigPolicy] = useState<AuthSigPolicy>('DUAL_REQUIRED')
-  const [authDirty, setAuthDirty] = useState(false)
   const [remoteUsrPRxDir, setRemoteUsrPRxDir] = useState('')
   const [remoteUsrPRxDirDirty, setRemoteUsrPRxDirDirty] = useState(false)
   const [batchCount, setBatchCount] = useState<number>(300)
@@ -303,14 +295,12 @@ export function DashboardPageMinimal() {
   }, [clearComparisonResults, setLastCompletedInference, setLastSettledBatchToken, setPendingBatchJobId])
 
   useEffect(() => {
-    if (authDirty) return
     setAuthEnabled(Boolean(cryptoData?.auth_enabled))
-    setAuthSigPolicy(normalizeAuthSigPolicy(cryptoData?.sig_policy))
-  }, [cryptoData?.auth_enabled, cryptoData?.sig_policy, authDirty])
+  }, [cryptoData?.auth_enabled])
 
   useEffect(() => {
     if (batchCountTouched) return
-    setBatchCount(activeTransport === 'usrp' ? 20 : 300)
+    setBatchCount(300)
   }, [activeTransport, batchCountTouched])
 
   useEffect(() => {
@@ -377,25 +367,26 @@ export function DashboardPageMinimal() {
     [boardPassword, boardAccessMut, showToast],
   )
 
-  const handleSaveAuth = useMemo(
-    () => () => {
+  const handleToggleAuth = useCallback(
+    (enabled: boolean) => {
+      setAuthEnabled(enabled)
       boardAccessMut.mutate(
         {
-          auth_enabled: authEnabled,
-          auth_sig_policy: authSigPolicy,
+          auth_enabled: enabled,
+          auth_sig_policy: 'DUAL_REQUIRED',
         },
         {
           onSuccess: () => {
-            setAuthDirty(false)
-            showToast(authEnabled ? `认证策略已保存: ${authSigPolicy}` : '认证面已关闭', 'success')
+            showToast(enabled ? '认证已启用: ML-DSA + SM2' : '认证已关闭', 'success')
           },
           onError: (error) => {
-            showToast(`保存认证设置失败: ${error.message}`, 'error')
+            setAuthEnabled(Boolean(cryptoData?.auth_enabled))
+            showToast(`切换认证失败: ${error.message}`, 'error')
           },
         },
       )
     },
-    [authEnabled, authSigPolicy, boardAccessMut, showToast],
+    [boardAccessMut, cryptoData?.auth_enabled, showToast],
   )
 
   const handleSelectTransport = useCallback(
@@ -480,17 +471,6 @@ export function DashboardPageMinimal() {
       : 'Live'
   const liveExpectedCount = Math.max(1, liveProgress?.expected_count ?? 1)
   const liveCompletedCount = Math.max(0, Math.min(liveProgress?.completed_count ?? 0, liveExpectedCount))
-  const liveCountPercent = liveProgress?.completion_ratio != null
-    ? liveProgress.completion_ratio * 100
-    : (liveProgress?.percent ?? (liveCompletedCount / liveExpectedCount) * 100)
-  const liveStagePercent = liveProgress?.phase_percent
-  const livePercentSource = liveExpectedCount <= 1 && liveStagePercent != null
-    ? Math.max(liveCountPercent, liveStagePercent)
-    : liveCountPercent
-  const livePercent = Math.max(
-    0,
-    Math.min(livePercentSource, 100),
-  )
   const isCurrentSessionBatch = Boolean(batch?.batch_job_id && pendingBatchJobId && batch.batch_job_id === pendingBatchJobId)
   const activeBatch = batch && (isCurrentSessionBatch || batch.status === 'running' || batch.status === 'done')
     ? batch
@@ -522,7 +502,6 @@ export function DashboardPageMinimal() {
   const modeTag = batchServiceMode === 'ROI_ONLY' ? ' (降采样 3:1)' : ''
   const totalImages = isSingleLiveRunning ? liveExpectedCount : batchTotalImages
   const progress = isSingleLiveRunning ? liveCompletedCount : batchProgress
-  const progressPercent = isSingleLiveRunning ? livePercent : (progress / totalImages) * 100
   const progressEngineLabel = isSingleLiveRunning ? liveEngineLabel : batchEngineLabel
   const currentStage = isSingleLiveRunning
     ? (liveProgress?.current_stage || liveProgress?.label || `${liveEngineLabel} Live 执行中`)
@@ -553,6 +532,39 @@ export function DashboardPageMinimal() {
         : `${batchTotalImages} 张 TVM 图像在线推进`
   const progressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
   const stageProgressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
+  const mainProgressRows = [
+    { key: 'host', label: activeTransport === 'usrp' ? '上位机图片→latent' : '预录输入准备', tone: 'yellow' as const, stage: hostPreprocessStage },
+    { key: 'transport', label: activeTransport === 'usrp' ? 'USRP 传输/解包' : '预录数据装载', tone: 'green' as const, stage: transportStage },
+    { key: 'inference', label: `${batchEngineLabel} 板端推理`, tone: 'blue' as const, stage: inferenceStage },
+  ]
+  const stageDoneFlags = hasStageProgress
+    ? mainProgressRows.map((row) => row.stage.completed >= row.stage.total || row.stage.status === 'completed' || row.stage.status === 'done')
+    : [
+        isRunning || isDone,
+        isRunning || isDone,
+        isDone,
+      ]
+  const firstIncompleteStageIndex = stageDoneFlags.findIndex((done) => !done)
+  const activeMainStageIndex = isRunning && firstIncompleteStageIndex >= 0
+    ? firstIncompleteStageIndex
+    : -1
+  const mainProgressStages = mainProgressRows.map((row, index) => {
+    const state: MainProgressState = stageDoneFlags[index]
+      ? 'done'
+      : index === activeMainStageIndex
+        ? 'active'
+        : 'pending'
+    return { ...row, state }
+  })
+  const activeMainStage = mainProgressStages.find((stage) => stage.state === 'active')
+  const mainProgressStageText = isRunning
+    ? `当前阶段：${activeMainStage?.label ?? currentStage}`
+    : isDone
+      ? currentStage
+      : '当前阶段：等待启动'
+  const mainProgressStageDetail = isRunning || isDone
+    ? `进度 ${progress}/${totalImages}`
+    : progressSuffix
   const boardOnline = status?.live?.board_online ?? false
   const hostInputDir = boardAccess?.local_usrp_image_dir
     || boardAccess?.local_usrp_input_dir
@@ -600,18 +612,19 @@ export function DashboardPageMinimal() {
     [activeLinkMode, boardAccessMut, remoteUsrPRxDir, showToast],
   )
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
-  const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
-    ? '20 张快演'
-    : `${batchCount} 张`
-  const batchPresetHint = activeTransport === 'usrp'
-    ? 'USRP 模式推荐先跑 20 张快演，视频录制更紧凑；需要完整留证时再切回 300 张。'
-    : '默认可跑 300 张全量；如需快速演示，也可以先切到 20 张。'
-  const authHint = authEnabled
-    ? AUTH_POLICY_HINTS[authSigPolicy]
-    : '当前只保留 ML-KEM + SM4，会跳过 ML-DSA / SM2 身份认证。'
-  const authStatusLabel = cryptoData?.auth_enabled
-    ? `已保存: ${normalizeAuthSigPolicy(cryptoData?.sig_policy)}`
-    : '已保存: 未启用'
+  const batchTargetLabel = `${batchCount} 张`
+  const boardHostLabel = typeof boardAccess?.host === 'string' && boardAccess.host.trim()
+    ? boardAccess.host
+    : '未配置'
+  const boardUserLabel = typeof boardAccess?.user === 'string' && boardAccess.user.trim()
+    ? boardAccess.user
+    : '未配置'
+  const boardPasswordSaved = Boolean(boardAccess?.has_password)
+  const authConfig = {
+    enabled: authEnabled,
+    disabled: boardAccessMut.isPending,
+    onToggle: handleToggleAuth,
+  }
 
   return (
     <PageTransition className={s.root}>
@@ -675,7 +688,27 @@ export function DashboardPageMinimal() {
                   </div>
                 </div>
 
-                {hasStageProgress ? (
+                <div className={s.progressCount}>
+                  <strong className={s.progressStageText}>{mainProgressStageText}</strong>
+                  <span>{mainProgressStageDetail}</span>
+                </div>
+
+                <div className={s.mainStageTrack} aria-label="推理阶段进度">
+                  {mainProgressStages.map((stage) => (
+                    <div
+                      key={stage.key}
+                      className={[
+                        s.mainStageSegment,
+                        mainProgressToneClass(stage.tone),
+                        mainProgressStateClass(stage.state),
+                      ].join(' ')}
+                      title={`${stage.label}: ${stage.state}`}
+                      aria-label={`${stage.label}: ${stage.state}`}
+                    />
+                  ))}
+                </div>
+
+                {hasStageProgress && (
                   <div className={s.stageProgressGrid}>
                     <div className={s.stageProgressRow}>
                       <div className={s.stageProgressTopline}>
@@ -714,27 +747,7 @@ export function DashboardPageMinimal() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <div className={s.progressCount}>
-                      <strong>{progress}</strong>
-                      <span>/ {totalImages} {progressSuffix}</span>
-                    </div>
-
-                    <div className={s.progressTrack}>
-                      <div
-                        className={s.progressFill}
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </>
                 )}
-
-                <div className={s.progressMeta}>
-                  当前阶段：{hasStageProgress
-                    ? `USRP ${transportStage.status} · ${batchEngineLabel} ${inferenceStage.status}`
-                    : currentStage}
-                </div>
 
                 {batchIssueMessage && (
                   <div className={s.progressIssue}>
@@ -763,16 +776,6 @@ export function DashboardPageMinimal() {
               <div className={s.sectionCard}>
                 <div className={s.sectionTitle}>执行操作</div>
 
-                <div className={s.batchPresetMeta}>
-                  <div>
-                    <div className={s.batchPresetTitle}>批量规模</div>
-                    <div className={s.batchPresetHint}>{batchPresetHint}</div>
-                  </div>
-                  <div className={`${s.batchPresetBadge} ${activeTransport === 'usrp' ? s.batchPresetBadgeUsr : s.batchPresetBadgeTcp}`}>
-                    当前: {batchTargetLabel}
-                  </div>
-                </div>
-
                 <div className={s.batchInputRow}>
                   <label className={s.batchInputField}>
                     <span className={s.batchInputLabel}>图像数量</span>
@@ -786,14 +789,11 @@ export function DashboardPageMinimal() {
                       value={batchCount}
                       disabled={isRunning || batchMut.isPending || mnnBatchMut.isPending || baselineMut.isPending}
                       onChange={(e) => {
-                        setBatchCount(normalizeBatchCountInput(e.target.value, activeTransport === 'usrp' ? 20 : 300))
+                        setBatchCount(normalizeBatchCountInput(e.target.value, 300))
                         setBatchCountTouched(true)
                       }}
                     />
                   </label>
-                  <div className={s.batchInputHint}>
-                    预录模式默认 300，USRP 模式默认 20，最大 300。
-                  </div>
                 </div>
 
                 <button
@@ -915,86 +915,74 @@ export function DashboardPageMinimal() {
             </AnimatedListItem>
 
             <AnimatedListItem>
-              {/* Board Password */}
+              {/* Data Plane */}
               <div className={s.sectionCard}>
-                <div className={s.sectionTitle}>板卡连接设置</div>
-                <div className={s.passwordRow}>
-                  <input
-                    type="password"
-                    placeholder="输入板卡密码"
-                    aria-label="板卡密码"
-                    autoComplete="current-password"
-                    value={boardPassword}
-                    onChange={(e) => setBoardPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSavePassword() }}
-                    className={s.passwordInput}
-                  />
-                  <button
-                    className={s.btnFilledSm}
-                    onClick={handleSavePassword}
-                    disabled={boardAccessMut.isPending}
-                  >
-                    {boardAccessMut.isPending ? '保存中...' : '保存'}
-                  </button>
-                </div>
+                <div className={s.sectionTitle}>数据面输入模式</div>
                 <div className={s.settingGroup}>
                   <div className={s.settingRow}>
                     <div className={s.settingMeta}>
-                      <div className={s.settingLabel}>认证面配置</div>
-                      <div className={s.settingCaption}>控制当前 ML-KEM 信道是否叠加 ML-DSA / SM2 身份认证。</div>
-                    </div>
-                    <label className={s.authCheck}>
-                      <input
-                        type="checkbox"
-                        checked={authEnabled}
-                        onChange={(e) => {
-                          setAuthEnabled(e.target.checked)
-                          setAuthDirty(true)
-                        }}
-                      />
-                      <span>启用认证</span>
-                    </label>
-                  </div>
-                  <div className={s.settingStack}>
-                    <label className={s.formLabel} htmlFor="auth-sig-policy">认证策略</label>
-                    <select
-                      id="auth-sig-policy"
-                      className={s.selectInput}
-                      value={authSigPolicy}
-                      disabled={!authEnabled || boardAccessMut.isPending}
-                      onChange={(e) => {
-                        setAuthSigPolicy(normalizeAuthSigPolicy(e.target.value))
-                        setAuthDirty(true)
-                      }}
-                    >
-                      {AUTH_POLICY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={s.settingCaption}>{authHint}</div>
-                  <div className={s.settingStatus}>{authStatusLabel}</div>
-                  <div className={s.settingActions}>
-                    <button
-                      className={s.btnFilledSm}
-                      onClick={handleSaveAuth}
-                      disabled={boardAccessMut.isPending}
-                    >
-                      {boardAccessMut.isPending ? '保存中...' : '保存认证设置'}
-                    </button>
-                  </div>
-                </div>
-                <div className={s.settingGroup}>
-                  <div className={s.settingRow}>
-                    <div className={s.settingMeta}>
-                      <div className={s.settingLabel}>数据面输入模式</div>
-                      <div className={s.settingCaption}>认证面配置下方统一切换主 demo 的重建数据来源。</div>
+                      <div className={s.settingLabel}>输入来源</div>
+                      <div className={s.settingCaption}>统一切换主 demo 的重建数据来源；USRP 模式下可选择 QPSK 或 IQ 直传链路。</div>
                     </div>
                     <div className={`${s.transportBadge} ${activeTransport === 'usrp' ? s.transportBadgeUsr : s.transportBadgeTcp}`}>
                       当前: {activeTransport === 'usrp' ? 'USRP' : '预录'}
                     </div>
+                  </div>
+                  <div className={s.modeSwitchStack}>
+                    <div className={s.modeSwitchBlock}>
+                      <div className={s.formLabel}>数据来源</div>
+                      <div className={s.transportSwitch}>
+                        {TRANSPORT_OPTIONS.map((option) => {
+                          const isActive = activeTransport === option.mode
+                          const isPending = boardAccessMut.isPending && pendingTransportMode === option.mode
+                          return (
+                            <button
+                              key={option.mode}
+                              type="button"
+                              className={`${s.transportOption} ${isActive ? s.transportOptionActive : ''}`}
+                              aria-pressed={isActive}
+                              disabled={boardAccessMut.isPending}
+                              onClick={() => {
+                                if (!isActive) handleSelectTransport(option.mode)
+                              }}
+                            >
+                              <span className={s.transportOptionLabel}>
+                                {isPending ? '切换中...' : option.label}
+                              </span>
+                              <span className={s.transportOptionCaption}>{option.caption}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {activeTransport === 'usrp' && (
+                      <div className={s.modeSwitchBlock}>
+                        <div className={s.formLabel}>USRP JSCC 链路</div>
+                        <div className={s.linkModeSwitch}>
+                          {LINK_MODE_OPTIONS.map((option) => {
+                            const isActive = configuredLinkMode === option.mode
+                            const isPending = boardAccessMut.isPending && pendingJsccLinkMode === option.mode
+                            return (
+                              <button
+                                key={option.mode}
+                                type="button"
+                                className={`${s.linkModeOption} ${isActive ? s.linkModeOptionActive : ''}`}
+                                aria-pressed={isActive}
+                                disabled={boardAccessMut.isPending}
+                                onClick={() => {
+                                  if (!isActive) handleSelectLinkMode(option.mode)
+                                }}
+                              >
+                                <span className={s.linkModeOptionLabel}>
+                                  {isPending ? '切换中...' : option.label}
+                                </span>
+                                <span className={s.linkModeOptionCaption}>{option.caption}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className={s.readinessGrid} aria-label="链路就绪状态">
                     {boardReadinessItems.map((item) => (
@@ -1051,29 +1039,6 @@ export function DashboardPageMinimal() {
                         <span className={s.linkModeDot} />
                         JSCC: {linkModeLabel}
                       </div>
-                      <div className={s.linkModeSwitch}>
-                        {LINK_MODE_OPTIONS.map((option) => {
-                          const isActive = configuredLinkMode === option.mode
-                          const isPending = boardAccessMut.isPending && pendingJsccLinkMode === option.mode
-                          return (
-                            <button
-                              key={option.mode}
-                              type="button"
-                              className={`${s.linkModeOption} ${isActive ? s.linkModeOptionActive : ''}`}
-                              aria-pressed={isActive}
-                              disabled={boardAccessMut.isPending}
-                              onClick={() => {
-                                if (!isActive) handleSelectLinkMode(option.mode)
-                              }}
-                            >
-                              <span className={s.linkModeOptionLabel}>
-                                {isPending ? '切换中...' : option.label}
-                              </span>
-                              <span className={s.linkModeOptionCaption}>{option.caption}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
                       {activeLinkMode && iqRadioMetrics && (
                         <div className={s.linkModeMetrics}>
                           {iqRadioMetrics.sample_count != null && (
@@ -1114,29 +1079,6 @@ export function DashboardPageMinimal() {
                       )}
                     </div>
                   )}
-                  <div className={s.transportSwitch}>
-                    {TRANSPORT_OPTIONS.map((option) => {
-                      const isActive = activeTransport === option.mode
-                      const isPending = boardAccessMut.isPending && pendingTransportMode === option.mode
-                      return (
-                        <button
-                          key={option.mode}
-                          type="button"
-                          className={`${s.transportOption} ${isActive ? s.transportOptionActive : ''}`}
-                          aria-pressed={isActive}
-                          disabled={boardAccessMut.isPending}
-                          onClick={() => {
-                            if (!isActive) handleSelectTransport(option.mode)
-                          }}
-                        >
-                          <span className={s.transportOptionLabel}>
-                            {isPending ? '切换中...' : option.label}
-                          </span>
-                          <span className={s.transportOptionCaption}>{option.caption}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
                   <div className={s.pathGrid}>
                     <div className={s.pathItem}>
                       <span className={s.pathLabel}>上位机输入目录</span>
@@ -1173,7 +1115,35 @@ export function DashboardPageMinimal() {
             activeJobId={activeJobId}
           />
 
-          <CryptoStatusPanel />
+          <div className={s.sectionCard}>
+            <div className={s.sectionTitle}>板卡密码</div>
+            <div className={s.boardPasswordMeta}>
+              <span>主机: {boardHostLabel}</span>
+              <span>用户: {boardUserLabel}</span>
+              <span>{boardPasswordSaved ? '当前会话已保存密码' : '当前会话缺少密码'}</span>
+            </div>
+            <div className={s.passwordRow}>
+              <input
+                type="password"
+                placeholder="输入板卡密码"
+                aria-label="板卡密码"
+                autoComplete="current-password"
+                value={boardPassword}
+                onChange={(e) => setBoardPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSavePassword() }}
+                className={s.passwordInput}
+              />
+              <button
+                className={s.btnFilledSm}
+                onClick={handleSavePassword}
+                disabled={boardAccessMut.isPending}
+              >
+                {boardAccessMut.isPending ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+
+          <CryptoStatusPanel authConfig={authConfig} />
         </div>
       </div>
     </PageTransition>

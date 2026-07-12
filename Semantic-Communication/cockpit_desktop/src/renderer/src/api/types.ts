@@ -49,8 +49,10 @@ export type LivePayload = {
 export type BoardTelemetryPayload = {
   status?: string
   stale?: boolean
+  refreshing?: boolean
   source?: string
   collected_at?: string
+  age_sec?: number
   compute_label?: string
   compute_pct?: number | null
   memory_pct?: number | null

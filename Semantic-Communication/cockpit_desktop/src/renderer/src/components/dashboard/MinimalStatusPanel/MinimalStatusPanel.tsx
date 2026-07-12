@@ -1,5 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query'
-import type { SystemStatusResponse } from '../../../api/types'
+import type { BoardTelemetryPayload, SystemStatusResponse } from '../../../api/types'
 import { Icons } from '../../icons'
 import s from './MinimalStatusPanel.module.css'
 
@@ -11,6 +11,31 @@ function aircraftPositionStatusLabel(rawStatus: unknown): string {
   if (status === 'fallback') return 'FALLBACK'
   if (status === 'absent') return 'ABSENT'
   return status ? status.toUpperCase() : 'UNKNOWN'
+}
+
+function formatTelemetrySampleTime(rawTime: unknown): string {
+  const value = String(rawTime ?? '').trim()
+  if (!value) return '—'
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+  const match = value.match(/(\d{1,2}:\d{2}:\d{2})/)
+  return match?.[1] ?? value
+}
+
+function telemetryStatusLabel(telemetry: BoardTelemetryPayload | undefined): string {
+  const status = String(telemetry?.status ?? 'unavailable').toUpperCase()
+  const note = String(telemetry?.note ?? '')
+  if (note.includes('暂缓')) return 'PAUSED'
+  if (telemetry?.refreshing) return `${status} · REFRESH`
+  if (telemetry?.stale) return `${status} · STALE`
+  return status
 }
 
 function CircularGauge({ value, color, label }: { value: number, color: string, label: string }) {
@@ -68,6 +93,8 @@ export function MinimalStatusPanel({ system }: MinimalStatusPanelProps) {
   const computeUsage = telemetry?.compute_pct ?? 0
   const memUsage = telemetry?.memory_pct ?? 0
   const telemetryStatus = telemetry?.status ?? 'unavailable'
+  const telemetryDisplayStatus = telemetryStatusLabel(telemetry)
+  const telemetrySampleTime = formatTelemetrySampleTime(telemetry?.collected_at)
   const memorySummary = telemetry?.memory_used_mb != null && telemetry?.memory_total_mb != null
     ? `${Math.round(telemetry.memory_used_mb)} / ${Math.round(telemetry.memory_total_mb)} MB`
     : '—'
@@ -132,8 +159,15 @@ export function MinimalStatusPanel({ system }: MinimalStatusPanelProps) {
 
         <div className={s.detailRow}>
           <span className={s.detailLabel}>Telemetry</span>
-          <span className={telemetryStatus === 'ok' ? s.detailValueAccent : s.detailValue}>
-            {telemetryStatus.toUpperCase()}
+          <span className={telemetryStatus === 'ok' && !telemetry?.stale ? s.detailValueAccent : s.detailValueWarning}>
+            {telemetryDisplayStatus}
+          </span>
+        </div>
+
+        <div className={s.detailRow}>
+          <span className={s.detailLabel}>Sample</span>
+          <span className={s.detailValue}>
+            {telemetrySampleTime}
           </span>
         </div>
 

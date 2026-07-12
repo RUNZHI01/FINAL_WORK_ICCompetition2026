@@ -152,7 +152,7 @@ def parse_args() -> argparse.Namespace:
         help="How to remove temporary RX files from the board after remote-pull/remote-decode.",
     )
     parser.add_argument("--remote-rx-ssh-target", default=os.environ.get("REMOTE_RX_SSH_TARGET", ""))
-    parser.add_argument("--remote-rx-run-root", default=os.environ.get("REMOTE_RX_RUN_ROOT", "/tmp/usrp292x_remote_runs"))
+    parser.add_argument("--remote-rx-run-root", default=os.environ.get("REMOTE_RX_RUN_ROOT", "/dev/shm/usrp292x_remote_runs"))
     parser.add_argument("--remote-decode-bin", default=os.environ.get("REMOTE_DECODE_BIN", ""))
     parser.add_argument(
         "--remote-decode-result-mode",
@@ -587,6 +587,49 @@ def rx_control_response_bool(response: str, key: str) -> bool | None:
     return None
 
 
+def rx_control_response_latest_bool(response: str, key: str) -> bool | None:
+    latest: bool | None = None
+    prefix = f"{key}="
+    for token in str(response or "").replace("\n", " ").split():
+        if token.startswith(prefix):
+            value = token.split("=", 1)[1].strip()
+            latest = value not in {"0", "false", "False"}
+    return latest
+
+
+def rx_control_response_latest_int(response: str, key: str) -> int | None:
+    latest: int | None = None
+    prefix = f"{key}="
+    for token in str(response or "").replace("\n", " ").split():
+        if token.startswith(prefix):
+            value = token.split("=", 1)[1].strip()
+            try:
+                latest = int(value)
+            except ValueError:
+                continue
+    return latest
+
+
+def rx_control_response_capture_never_started(response: str) -> bool:
+    started = rx_control_response_latest_bool(response, "started")
+    done = rx_control_response_latest_bool(response, "done")
+    written_samps = rx_control_response_latest_int(response, "written_samps")
+    return started is False and done is False and written_samps == 0
+
+
+def rx_control_response_matches_job_id(response: str, expected_job_id: int | None) -> bool:
+    if expected_job_id is None:
+        return True
+    actual_job_id = rx_control_response_latest_int(response, "job_id")
+    return actual_job_id is None or actual_job_id == expected_job_id
+
+
+def rx_control_line_with_job_id(line: str, expected_job_id: int | None) -> str:
+    if expected_job_id is None or "job_id=" in line:
+        return line
+    return f"{line.rstrip()} job_id={expected_job_id}"
+
+
 RX_CONTROL_FLOAT_FIELDS = {
     "wall_sec": "rx_server_capture_wall_sec",
     "arm_wait_sec": "rx_server_arm_wait_wall_sec",
@@ -598,10 +641,15 @@ RX_CONTROL_FLOAT_FIELDS = {
 }
 
 RX_CONTROL_INT_FIELDS = {
+    "job_id": "rx_server_job_id",
     "target_samps": "rx_server_target_samps",
     "written_samps": "rx_server_written_samps",
     "timeouts": "rx_server_timeouts",
     "overflows": "rx_server_overflows",
+}
+
+RX_CONTROL_TEXT_FIELDS = {
+    "phase": "rx_server_phase",
 }
 
 
@@ -611,7 +659,9 @@ def parse_rx_control_snapshot_fields(response: str) -> dict[str, Any]:
         if "=" not in token:
             continue
         key, value = token.split("=", 1)
-        if key in RX_CONTROL_FLOAT_FIELDS:
+        if key in RX_CONTROL_TEXT_FIELDS:
+            fields[RX_CONTROL_TEXT_FIELDS[key]] = value
+        elif key in RX_CONTROL_FLOAT_FIELDS:
             try:
                 fields[RX_CONTROL_FLOAT_FIELDS[key]] = float(value)
             except ValueError:
@@ -624,7 +674,9 @@ def parse_rx_control_snapshot_fields(response: str) -> dict[str, Any]:
     return fields
 
 
-def rx_capture_response_armed(response: str) -> bool:
+def rx_capture_response_armed(response: str, *, expected_job_id: int | None = None) -> bool:
+    if not rx_control_response_matches_job_id(response, expected_job_id):
+        return False
     started = rx_control_response_bool(response, "started")
     done = rx_control_response_bool(response, "done")
     if started is None and done is None:
@@ -644,7 +696,8 @@ def wait_for_rx_capture_armed(
     *,
     session: Any | None = None,
 ) -> str:
-    if rx_capture_response_armed(initial_response):
+    expected_job_id = rx_control_response_latest_int(initial_response, "job_id")
+    if rx_capture_response_armed(initial_response, expected_job_id=expected_job_id):
         return initial_response
 
     arm_timeout = rx_arm_status_timeout_sec(args)
@@ -655,11 +708,12 @@ def wait_for_rx_capture_armed(
     while arm_timeout > 0.0 and time.monotonic() < deadline:
         time.sleep(arm_poll)
         try:
+            status_line = rx_control_line_with_job_id("STATUS", expected_job_id)
             status = run_control_maybe_session(
                 session,
                 str(getattr(args, "rx_control_host", "")),
                 int(getattr(args, "rx_control_port", 0)),
-                "STATUS",
+                status_line,
                 log_path,
                 min(float(timeout), max(0.1, arm_poll + 0.1)),
                 allow_sent_fallback=True,
@@ -671,7 +725,7 @@ def wait_for_rx_capture_armed(
             raise RuntimeError(f"RX CAPTURE did not arm before TX\n{exc}") from exc
         entries.append(f"$ STATUS\n{status}")
         last_response = status
-        if rx_capture_response_armed(status):
+        if rx_capture_response_armed(status, expected_job_id=expected_job_id):
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
             return status
@@ -685,11 +739,16 @@ def rx_stop_arm_failure_timeout_sec() -> float:
     return max(0.0, env_float("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", 0.2))
 
 
+def rx_stop_arm_failure_full_drain_timeout_sec() -> float:
+    return max(0.0, env_float("ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC", 1.5))
+
+
 def stop_rx_capture(
     args: argparse.Namespace,
     log_path: Path,
     *,
     drain_timeout: float | None = None,
+    job_id: int | None = None,
 ) -> str:
     explicit_drain_timeout = drain_timeout is not None
     drain_timeout = (
@@ -702,6 +761,7 @@ def stop_rx_capture(
     timeout = max(base_timeout, drain_timeout + 0.5)
     entries: list[str] = []
     stop_line = f"STOP timeout={drain_timeout:.6f}" if explicit_drain_timeout else "STOP"
+    stop_line = rx_control_line_with_job_id(stop_line, job_id)
     try:
         response = run_control(
             str(getattr(args, "rx_control_host", "")),
@@ -717,7 +777,7 @@ def stop_rx_capture(
                 status = run_control(
                     str(getattr(args, "rx_control_host", "")),
                     int(getattr(args, "rx_control_port", 0)),
-                    "STATUS",
+                    rx_control_line_with_job_id("STATUS", job_id),
                     log_path,
                     min(timeout, max(0.1, drain_poll + 0.1)),
                 )
@@ -734,7 +794,7 @@ def stop_rx_capture(
                     status = run_control(
                         str(getattr(args, "rx_control_host", "")),
                         int(getattr(args, "rx_control_port", 0)),
-                        "STATUS",
+                        rx_control_line_with_job_id("STATUS", job_id),
                         log_path,
                         min(timeout, max(0.1, drain_poll + 0.1)),
                     )
@@ -752,17 +812,26 @@ def stop_rx_capture(
     return "\n".join(entries)
 
 
-def stop_rx_capture_after_arm_failure(args: argparse.Namespace, log_path: Path) -> str:
+def stop_rx_capture_after_arm_failure(args: argparse.Namespace, log_path: Path, *, job_id: int | None = None) -> str:
     response = stop_rx_capture(
         args,
         log_path,
         drain_timeout=rx_stop_arm_failure_timeout_sec(),
+        job_id=job_id,
     )
     if not rx_control_response_busy(response):
         return response
 
     full_log_path = log_path.with_name(f"{log_path.stem}_full_drain{log_path.suffix}")
-    full_response = stop_rx_capture(args, full_log_path)
+    if rx_control_response_capture_never_started(response):
+        full_response = stop_rx_capture(
+            args,
+            full_log_path,
+            drain_timeout=rx_stop_arm_failure_full_drain_timeout_sec(),
+            job_id=job_id,
+        )
+    else:
+        full_response = stop_rx_capture(args, full_log_path, job_id=job_id)
     combined = "\n".join(part.rstrip() for part in (response, full_response) if part).rstrip()
     if combined:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2809,7 +2878,7 @@ def remote_decoded_output_dir(args: argparse.Namespace) -> str:
     configured = str(getattr(args, "remote_decoded_output_dir", "") or "").strip().rstrip("/")
     if configured:
         return configured
-    return f"{str(getattr(args, 'remote_rx_run_root', '/tmp/usrp292x_remote_runs')).rstrip('/')}/{args.run_id}_rx"
+    return f"{str(getattr(args, 'remote_rx_run_root', '/dev/shm/usrp292x_remote_runs')).rstrip('/')}/{args.run_id}_rx"
 
 
 def remote_decoded_format(args: argparse.Namespace) -> str:
@@ -3031,6 +3100,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     remote_decode_response_only_summary = False
     worker_response: dict[str, Any] = {}
     rx_server_snapshot: dict[str, Any] = {}
+    rx_capture_job_id: int | None = None
     rx_capture_control = None
     rx_needs_failure_stop = False
     rx_failure_stop_done = False
@@ -3193,6 +3263,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                     finally:
                         rx_capture_command_wall_sec = time.monotonic() - rx_capture_command_started
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
+                    rx_capture_job_id = rx_control_response_latest_int(capture_response, "job_id")
                     capture_response = wait_for_rx_capture_armed(
                         args,
                         capture_response,
@@ -3213,11 +3284,13 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             stop_response = stop_rx_capture_after_arm_failure(
                                 args,
                                 image.image_dir / "rx_stop_after_capture_busy.log",
+                                job_id=rx_capture_job_id,
                             )
                         else:
                             stop_response = stop_rx_capture(
                                 args,
                                 image.image_dir / "rx_stop_after_capture_busy.log",
+                                job_id=rx_capture_job_id,
                             )
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                         rx_failure_stop_done = True
@@ -3254,7 +3327,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             rx_session,
                             args.rx_control_host,
                             args.rx_control_port,
-                            f"WAIT timeout={wait_timeout:.6f}",
+                            rx_control_line_with_job_id(f"WAIT timeout={wait_timeout:.6f}", rx_capture_job_id),
                             image.image_dir / "rx_wait.log",
                             wait_control_timeout,
                             allow_sent_fallback=True,
@@ -3269,10 +3342,12 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             rx_wait_control,
                             args.rx_control_host,
                             args.rx_control_port,
-                            f"WAIT timeout={wait_timeout:.6f}",
+                            rx_control_line_with_job_id(f"WAIT timeout={wait_timeout:.6f}", rx_capture_job_id),
                             image.image_dir / "rx_wait.log",
                             wait_control_timeout,
                         )
+                    if not rx_control_response_matches_job_id(wait_response, rx_capture_job_id):
+                        raise RuntimeError(f"RX WAIT returned mismatched job_id\n{wait_response}")
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(wait_response))
                 except Exception as exc:
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
@@ -3282,7 +3357,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                             if rx_session_shared:
                                 clear_shared_rx_control_session(args, rx_session)
                             rx_session = None
-                        stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                        stop_response = stop_rx_capture(
+                            args,
+                            image.image_dir / "rx_stop_after_wait_timeout.log",
+                            job_id=rx_capture_job_id,
+                        )
                         rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                         rx_failure_stop_done = True
                     raise
@@ -3467,7 +3546,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             if not image.passed and rx_needs_failure_stop and not rx_failure_stop_done:
                 try:
                     close_shared_rx_control_session(args)
-                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_failure.log")
+                    stop_response = stop_rx_capture(
+                        args,
+                        image.image_dir / "rx_stop_after_decode_failure.log",
+                        job_id=rx_capture_job_id,
+                    )
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                     rx_failure_stop_done = True
                 except Exception as stop_exc:
@@ -3579,7 +3662,11 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
         if rx_needs_failure_stop and not rx_failure_stop_done:
             try:
                 close_shared_rx_control_session(args)
-                stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_decode_error.log")
+                stop_response = stop_rx_capture(
+                    args,
+                    image.image_dir / "rx_stop_after_decode_error.log",
+                    job_id=rx_capture_job_id,
+                )
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 rx_failure_stop_done = True
             except Exception as stop_exc:
@@ -3732,6 +3819,7 @@ def _capture_remote_decode_pipeline_attempt(
     if remote_decode_result_mode not in {"pull", "remote-dir"}:
         remote_decode_result_mode = "pull"
     remote_decoded_dir = remote_decoded_output_dir(args) if remote_decode_result_mode == "remote-dir" else ""
+    rx_capture_job_id: int | None = None
 
     rx_capture_control = None
     if preconnect_rx_capture_control_enabled(args):
@@ -3824,6 +3912,7 @@ def _capture_remote_decode_pipeline_attempt(
                 finally:
                     rx_capture_command_wall_sec = time.monotonic() - rx_capture_command_started
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(capture_response))
+                rx_capture_job_id = rx_control_response_latest_int(capture_response, "job_id")
                 capture_response = wait_for_rx_capture_armed(
                     args,
                     capture_response,
@@ -3842,11 +3931,13 @@ def _capture_remote_decode_pipeline_attempt(
                         stop_response = stop_rx_capture_after_arm_failure(
                             args,
                             image.image_dir / "rx_stop_after_capture_busy.log",
+                            job_id=rx_capture_job_id,
                         )
                     else:
                         stop_response = stop_rx_capture(
                             args,
                             image.image_dir / "rx_stop_after_capture_busy.log",
+                            job_id=rx_capture_job_id,
                         )
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
@@ -3881,7 +3972,7 @@ def _capture_remote_decode_pipeline_attempt(
                         rx_session,
                         args.rx_control_host,
                         args.rx_control_port,
-                        f"WAIT timeout={wait_timeout:.6f}",
+                        rx_control_line_with_job_id(f"WAIT timeout={wait_timeout:.6f}", rx_capture_job_id),
                         image.image_dir / "rx_wait.log",
                         wait_control_timeout,
                         allow_sent_fallback=True,
@@ -3892,10 +3983,12 @@ def _capture_remote_decode_pipeline_attempt(
                         rx_wait_control,
                         args.rx_control_host,
                         args.rx_control_port,
-                        f"WAIT timeout={wait_timeout:.6f}",
+                        rx_control_line_with_job_id(f"WAIT timeout={wait_timeout:.6f}", rx_capture_job_id),
                         image.image_dir / "rx_wait.log",
                         wait_control_timeout,
                     )
+                if not rx_control_response_matches_job_id(wait_response, rx_capture_job_id):
+                    raise RuntimeError(f"RX WAIT returned mismatched job_id\n{wait_response}")
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(wait_response))
             except Exception as exc:
                 rx_server_snapshot.update(parse_rx_control_snapshot_fields(str(exc)))
@@ -3903,7 +3996,11 @@ def _capture_remote_decode_pipeline_attempt(
                     if rx_session is not None:
                         close_preconnected_control(rx_session)
                         rx_session = None
-                    stop_response = stop_rx_capture(args, image.image_dir / "rx_stop_after_wait_timeout.log")
+                    stop_response = stop_rx_capture(
+                        args,
+                        image.image_dir / "rx_stop_after_wait_timeout.log",
+                        job_id=rx_capture_job_id,
+                    )
                     rx_server_snapshot.update(parse_rx_control_snapshot_fields(stop_response))
                 raise
             rx_wait_control = None

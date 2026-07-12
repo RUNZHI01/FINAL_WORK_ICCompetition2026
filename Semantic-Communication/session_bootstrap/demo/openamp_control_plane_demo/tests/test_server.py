@@ -1872,6 +1872,60 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "mnn")
         self.assertEqual(system_payload["recent_results"]["current"]["quality"]["ssim"], server.build_prerecorded_inference_result(0, "current")["quality"]["ssim"])
 
+    def test_start_mnn_usrp_batch_arms_security_outside_state_lock(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+
+        def fake_arm_security_context(**_kwargs):
+            acquired = state._lock.acquire(timeout=0.05)
+            self.assertTrue(acquired, "security arm called while DashboardState lock is held")
+            state._lock.release()
+            return None, None
+
+        def fake_register_live_job(*, live_job, variant: str, image_index: int, security_context=None):
+            del security_context
+            record = {"job": live_job, "job_id": live_job.job_id, "variant": variant, "image_index": image_index}
+            return record, {"job_id": live_job.job_id}
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "live_progress": {"completed_count": 1, "expected_count": 1},
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "mnn",
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 1,
+                            "selected_input_count": 1,
+                            "sample_stats": {
+                                "run_ms": {"count": 1, "mean_ms": 10.0, "median_ms": 10.0},
+                                "total_ms": {"count": 1, "mean_ms": 12.0, "median_ms": 12.0},
+                            },
+                        },
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                        "transport": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                        "inference": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                    },
+                },
+            }
+
+        fake_live_job = Mock(job_id="usrp-mnn-lock-001")
+        with (
+            patch.object(state, "_arm_mlkem_security_context", side_effect=fake_arm_security_context),
+            patch("server.launch_local_usrp_reconstruction_job", return_value=fake_live_job),
+            patch.object(state, "_register_live_job", side_effect=fake_register_live_job),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_mnn_batch_inference(count=1)
+
+        self.assertEqual(payload["status"], "started")
+
     def test_start_mnn_batch_inference_updates_progress_while_running(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         progress_seen = threading.Event()
@@ -2233,6 +2287,27 @@ class DashboardStateTest(unittest.TestCase):
         security = payload.get("live_attempt", {}).get("security", {})
         self.assertEqual(security.get("protocol"), "mlkem_control")
         self.assertEqual(security.get("handshake_ms"), 8.5)
+
+    def test_run_baseline_in_usrp_mode_keeps_pytorch_prerecorded_reference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_arm_mlkem_security_context", side_effect=AssertionError("PyTorch reference should not arm USRP security")),
+            patch("server.launch_local_usrp_reconstruction_job", side_effect=AssertionError("PyTorch reference should not launch USRP transport")) as launch_usrp_job,
+        ):
+            payload = state.run_demo_inference(variant="baseline", image_index=0)
+
+        launch_usrp_job.assert_not_called()
+        self.assertEqual(payload["variant"], "baseline")
+        self.assertEqual(payload["execution_mode"], "prerecorded")
+        self.assertEqual(payload["data_transport"], "prerecorded")
+        self.assertIn("不走 USRP", str(payload["source_label"]))
 
     def test_run_demo_inference_blocks_nontrusted_current_when_admission_stays_legacy_sha(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -3246,6 +3321,60 @@ class DashboardStateTest(unittest.TestCase):
         self.assertIn("pkill -f 'tcp_server.py' || true", captured)
         self.assertIn("echo restart-remote-server", captured)
 
+    def test_ensure_board_tcp_server_restarts_when_auth_status_mismatches(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "MLKEM_AUTH_ENABLED": "1",
+                    "MLKEM_AUTH_SIG_POLICY": "DUAL_REQUIRED",
+                    "MLKEM_AUTH_SERVER_ID": "phytium-board",
+                }
+            ),
+        )
+        captured: list[str] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            captured.append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch(
+                "server.fetch_json_direct",
+                side_effect=[
+                    {
+                        "cipher_suite": "sm4-gcm",
+                        "auth_enabled": False,
+                        "sig_policy": "",
+                        "server_id": "",
+                    },
+                    {
+                        "cipher_suite": "sm4-gcm",
+                        "auth_enabled": True,
+                        "sig_policy": "DUAL_REQUIRED",
+                        "server_id": "phytium-board",
+                    },
+                ],
+            ),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertIn("pkill -f 'tcp_server.py' || true", captured)
+        self.assertIn("echo restart-remote-server", captured)
+
     def test_ensure_board_tcp_server_keeps_running_process_when_normalized_tvm_python_matches(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
@@ -3638,6 +3767,40 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["status_source"], "probe_error")
         self.assertEqual(payload["status_note"], "rpmsg unavailable")
 
+    def test_get_crypto_status_uses_board_access_auth_over_status_endpoint_stale_value(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_AUTH_ENABLED": "1",
+                    "MLKEM_AUTH_SIG_POLICY": "DUAL_REQUIRED",
+                    "MLKEM_AUTH_SERVER_ID": "phytium-board",
+                }
+            ),
+        )
+
+        stale_status = {
+            "channel_state": "idle",
+            "kem_backend": "mock-backend",
+            "cipher_suite": "sm4-gcm",
+            "auth_enabled": False,
+            "sig_policy": "",
+            "server_id": "",
+        }
+        with patch("server.fetch_json_direct", return_value=stale_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["auth_enabled"], True)
+        self.assertEqual(payload["sig_policy"], "DUAL_REQUIRED")
+        self.assertEqual(payload["server_id"], "phytium-board")
+
     def test_run_crypto_test_updates_status_cache_from_subprocess_metrics(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True
@@ -3719,6 +3882,89 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["control_heartbeat_ok"], 1)
         self.assertEqual(payload["control_total_fault_count"], 0)
         self.assertIsNone(payload["error"])
+
+    def test_run_crypto_test_starts_control_tcp_server_in_usrp_transport_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"}),
+        )
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None) as ensure_server,
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch(
+                "server.subprocess.run",
+                return_value=server.subprocess.CompletedProcess(
+                    ["fake-python", "tcp_client.py"],
+                    0,
+                    stdout="✓ 传输成功\n  对端 SHA256 匹配: 是\n",
+                    stderr="",
+                ),
+            ),
+            patch("server.query_live_status", return_value={}),
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        ensure_server.assert_called_once_with(state._board_access)
+
+    def test_run_crypto_test_uses_utf8_replacement_for_local_client_output(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> server.subprocess.CompletedProcess[str]:
+            captured.update(kwargs)
+            return server.subprocess.CompletedProcess(
+                args[0],
+                0,
+                stdout="✓ 传输成功\n  对端 SHA256 匹配: 是\n",
+                stderr="",
+            )
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch("server.subprocess.run", side_effect=fake_run),
+            patch("server.query_live_status", return_value={}),
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["encoding"], "utf-8")
+        self.assertEqual(captured["errors"], "replace")
 
     def test_get_crypto_status_reuses_last_successful_crypto_test_when_status_probe_is_unreachable(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -3810,6 +4056,17 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env.get("MLKEM_AUTH_ENABLED"), "1")
         self.assertEqual(env.get("MLKEM_AUTH_SIG_POLICY"), "MLDSA_ONLY")
         self.assertEqual(env.get("MLKEM_AUTH_SERVER_ID"), "phytium-board")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_SM2_KEY"), "/home/user/keys/server_sm2_identity.key")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_SM2_PUB"), "/home/user/keys/server_sm2_identity.pub")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_MLDSA_KEY"), "/home/user/keys/server_mldsa_identity.key")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_MLDSA_PUB"), "/home/user/keys/server_mldsa_identity.pub")
+        self.assertEqual(env.get("MLKEM_AUTH_PEER_SM2_PUB"), str(server.PACKAGE_ROOT / "keys" / "server_sm2_identity.pub"))
+        self.assertEqual(
+            env.get("MLKEM_AUTH_PEER_MLDSA_PUB"),
+            str(server.PACKAGE_ROOT / "keys" / "server_mldsa_identity.pub"),
+        )
+        self.assertEqual(env.get("MLKEM_REMOTE_TONGSUO_SIG_BRIDGE"), "/home/user/libtongsuo_sig_bridge.so")
+        self.assertEqual(env.get("MLKEM_REMOTE_OQS_INSTALL_PATH"), "/home/user/liboqs-dist")
 
     def test_set_board_access_preserves_usrp_iq_runtime_env_from_process(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -3937,6 +4194,38 @@ class ServerMainTest(unittest.TestCase):
         )
         self.assertEqual(overrides["AIRCRAFT_POSITION_LATITUDE_PATH"], "content.point.y")
 
+    def test_demo_startup_env_overrides_forwards_board_connection_env(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "REMOTE_HOST": "192.168.50.23",
+                "PHYTIUM_PI_HOST": "192.168.50.23",
+                "REMOTE_USER": "user",
+                "PHYTIUM_PI_USER": "user",
+                "REMOTE_SSH_PORT": "2202",
+                "PHYTIUM_PI_PORT": "2202",
+            },
+            clear=False,
+        ):
+            overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["REMOTE_HOST"], "192.168.50.23")
+        self.assertEqual(overrides["PHYTIUM_PI_HOST"], "192.168.50.23")
+        self.assertEqual(overrides["REMOTE_USER"], "user")
+        self.assertEqual(overrides["PHYTIUM_PI_USER"], "user")
+        self.assertEqual(overrides["REMOTE_SSH_PORT"], "2202")
+        self.assertEqual(overrides["PHYTIUM_PI_PORT"], "2202")
+
     def test_demo_startup_env_overrides_keeps_usrp_runtime_env(self) -> None:
         args = Namespace(
             aircraft_position_env="",
@@ -3980,6 +4269,7 @@ class ServerMainTest(unittest.TestCase):
                 "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
                 "ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC": "1.0",
                 "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "0.0",
+                "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC": "2.5",
                 "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0",
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC": "0.05",
                 "ANALOG_PIPELINE_DEPTH": "1",
@@ -4025,6 +4315,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(overrides["ANALOG_RX_WAIT_TIMEOUT_SEC"], "1.0")
         self.assertEqual(overrides["ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC"], "1.0")
         self.assertEqual(overrides["ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC"], "0.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC"], "2.5")
         self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
         self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
         self.assertEqual(overrides["ANALOG_PIPELINE_DEPTH"], "1")
@@ -4829,7 +5120,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--amp", command)
         self.assertEqual(command[command.index("--amp") + 1], "6000")
         self.assertIn("--max-arq-rounds", command)
-        self.assertEqual(command[command.index("--max-arq-rounds") + 1], "2")
+        self.assertEqual(command[command.index("--max-arq-rounds") + 1], "5")
         self.assertIn("--sync-search-window-symbols", command)
         self.assertEqual(command[command.index("--sync-search-window-symbols") + 1], "4096")
         self.assertIn("--min-sync-metric", command)
@@ -4845,6 +5136,9 @@ class ServerMainTest(unittest.TestCase):
         self.assertIn("--fallback-sync-search-window-symbols", command)
         self.assertEqual(command[command.index("--fallback-sync-search-window-symbols") + 1], "4096")
         self.assertIn("--retry-on-burst-miss", command)
+        self.assertIn("--retry-on-low-sync", command)
+        self.assertIn("--low-sync-retry-threshold", command)
+        self.assertEqual(command[command.index("--low-sync-retry-threshold") + 1], "0.08")
         self.assertIn("--remote-decoded-format", command)
         self.assertEqual(command[command.index("--remote-decoded-format") + 1], "npy")
         self.assertIn("--no-robust-sync", command)
@@ -6653,6 +6947,19 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertAlmostEqual(telemetry["memory_total_mb"], 2000.0, places=1)
         self.assertEqual(telemetry["cpu_cores"], 4)
 
+    def test_board_telemetry_remote_command_uses_stable_cpu_sample_window(self) -> None:
+        with patch.dict(os.environ, {"BOARD_TELEMETRY_CPU_SAMPLE_SEC": ""}, clear=False):
+            command = server._board_telemetry_remote_command()
+
+        self.assertIn("sleep 1.000", command)
+        self.assertNotIn("sleep 0.1", command)
+
+    def test_board_telemetry_remote_command_allows_cpu_sample_window_override(self) -> None:
+        with patch.dict(os.environ, {"BOARD_TELEMETRY_CPU_SAMPLE_SEC": "0.5"}, clear=False):
+            command = server._board_telemetry_remote_command()
+
+        self.assertIn("sleep 0.500", command)
+
     def test_system_status_endpoint_exposes_board_telemetry(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         request_json(
@@ -6662,24 +6969,23 @@ class DemoHTTPServerTest(unittest.TestCase):
             body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
         )
         state._last_live_probe = live_probe_payload("2026-04-11T03:33:00+0800", "board reachable")
+        state._board_telemetry_cache = {
+            "status": "ok",
+            "stale": False,
+            "source": "ssh_procfs",
+            "collected_at": "2026-04-11T03:33:05+0800",
+            "compute_label": "CPU",
+            "compute_pct": 48.5,
+            "memory_pct": 61.2,
+            "memory_used_mb": 1254.0,
+            "memory_available_mb": 796.0,
+            "memory_total_mb": 2050.0,
+            "loadavg_1m": 1.42,
+            "cpu_cores": 4,
+        }
+        state._board_telemetry_cache_ts = time.monotonic()
 
-        with patch(
-            "server.query_board_telemetry",
-            return_value={
-                "status": "ok",
-                "stale": False,
-                "source": "ssh_procfs",
-                "collected_at": "2026-04-11T03:33:05+0800",
-                "compute_label": "CPU",
-                "compute_pct": 48.5,
-                "memory_pct": 61.2,
-                "memory_used_mb": 1254.0,
-                "memory_available_mb": 796.0,
-                "memory_total_mb": 2050.0,
-                "loadavg_1m": 1.42,
-                "cpu_cores": 4,
-            },
-        ), patch.object(
+        with patch.object(
             state,
             "_aircraft_position_upstream_probe_snapshot",
             return_value={
@@ -6689,6 +6995,10 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
                 "results": [],
             },
+        ), patch.object(
+            state,
+            "_start_board_telemetry_refresh",
+            side_effect=AssertionError("fresh telemetry cache should not refresh"),
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
@@ -6750,9 +7060,12 @@ class DemoHTTPServerTest(unittest.TestCase):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
+        self.assertEqual(payload["live"]["telemetry"]["status"], "ok")
+        self.assertFalse(payload["live"]["telemetry"]["stale"])
+        self.assertTrue(payload["live"]["telemetry"]["refreshing"])
         self.assertAlmostEqual(payload["live"]["telemetry"]["memory_pct"], 61.2)
         self.assertIn("后台刷新中", payload["live"]["telemetry"]["note"])
+        self.assertGreater(payload["live"]["telemetry"]["age_sec"], server.BOARD_TELEMETRY_TTL_SEC)
         start_telemetry_refresh.assert_called_once()
 
     def test_board_telemetry_snapshot_returns_refreshing_without_sync_on_cold_online_board(self) -> None:
@@ -6837,7 +7150,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertIn("后台探测", payload["note"])
         start_refresh.assert_called_once()
 
-    def test_system_status_defers_remote_refreshes_for_cold_usrp_session(self) -> None:
+    def test_system_status_refreshes_board_telemetry_for_idle_usrp_session(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         request_json(
             state,
@@ -6880,7 +7193,8 @@ class DemoHTTPServerTest(unittest.TestCase):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["live"]["telemetry"]["status"], "deferred")
+        self.assertEqual(payload["live"]["telemetry"]["status"], "refreshing")
+        self.assertIn("后台刷新", payload["live"]["telemetry"]["note"])
         self.assertEqual(payload["live"]["aircraft_bridge"]["upstream_probe"]["status"], "deferred")
         self.assertEqual(payload["live"]["board_position_api"]["status"], "deferred")
         self.assertTrue(payload["live"]["board_position_api"]["stale"])
@@ -6889,7 +7203,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertTrue(payload["live"]["usrp_control"]["stale"])
         self.assertIn("暂缓", payload["live"]["usrp_control"]["message"])
         start_upstream_refresh.assert_not_called()
-        start_telemetry_refresh.assert_not_called()
+        start_telemetry_refresh.assert_called_once()
         start_position_refresh.assert_not_called()
         start_usrp_refresh.assert_not_called()
 
@@ -7793,14 +8107,22 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "ANALOG_RX_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_CONTROL": "",
                 "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
+                "ANALOG_RETRY_ON_BURST_MISS": "",
+                "ANALOG_RETRY_ON_LOW_SYNC": "",
+                "ANALOG_LOW_SYNC_RETRY_THRESHOLD": "",
+                "ANALOG_FALLBACK_SYNC_CANDIDATES": "",
+                "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS": "",
+                "MLKEM_USRP_MAX_ARQ_ROUNDS": "",
                 "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "",
                 "ANALOG_RX_ARM_STATUS_POLL_SEC": "",
                 "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "",
+                "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC": "",
                 "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "",
                 "ANALOG_RX_STOP_DRAIN_POLL_SEC": "",
                 "RX_ARM_WAIT_MS": "",
                 "RX_STOP_WAIT_MS": "",
                 "REMOTE_USRP_RX_DIR": "",
+                "REMOTE_RX_RUN_ROOT": "",
             },
             clear=False,
         ):
@@ -7814,8 +8136,9 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         env = state._board_access.build_env()
         self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(env["REMOTE_RX_RUN_ROOT"], "/dev/shm/usrp292x_remote_runs")
         self.assertEqual(env["ANALOG_PRECONNECT_CONTROL"], "1")
-        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "skip")
+        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "async")
         self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
         self.assertEqual(env["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
         self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
@@ -7827,12 +8150,19 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(env["ANALOG_RX_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
         self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(env["ANALOG_RETRY_ON_BURST_MISS"], "1")
+        self.assertEqual(env["ANALOG_RETRY_ON_LOW_SYNC"], "1")
+        self.assertEqual(env["ANALOG_LOW_SYNC_RETRY_THRESHOLD"], "0.08")
+        self.assertEqual(env["ANALOG_FALLBACK_SYNC_CANDIDATES"], "4")
+        self.assertEqual(env["ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS"], "1024")
+        self.assertEqual(env["MLKEM_USRP_MAX_ARQ_ROUNDS"], "5")
         self.assertEqual(env["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.5")
         self.assertEqual(env["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
         self.assertNotIn("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", env)
+        self.assertEqual(env["ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC"], "1.5")
         self.assertEqual(env["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
         self.assertEqual(env["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
-        self.assertEqual(env["RX_ARM_WAIT_MS"], "150")
+        self.assertEqual(env["RX_ARM_WAIT_MS"], "500")
         self.assertEqual(env["RX_STOP_WAIT_MS"], "8000")
 
     def test_board_access_endpoint_accepts_jscc_link_mode_override(self) -> None:

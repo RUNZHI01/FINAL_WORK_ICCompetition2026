@@ -49,8 +49,10 @@ def parse_args() -> argparse.Namespace:
 
     sub = parser.add_subparsers(dest='cmd', required=True)
     sub.add_parser('ping')
-    sub.add_parser('status')
-    sub.add_parser('stop')
+    status = sub.add_parser('status')
+    status.add_argument('--job-id', type=int, default=0)
+    stop = sub.add_parser('stop')
+    stop.add_argument('--job-id', type=int, default=0)
     sub.add_parser('quit')
 
     capture = sub.add_parser('capture')
@@ -60,6 +62,7 @@ def parse_args() -> argparse.Namespace:
 
     wait = sub.add_parser('wait')
     wait.add_argument('--wait-timeout', type=float, default=0.0)
+    wait.add_argument('--job-id', type=int, default=0)
 
     return parser.parse_args()
 
@@ -70,8 +73,12 @@ def main() -> int:
         line = 'PING'
     elif args.cmd == 'status':
         line = 'STATUS'
+        if args.job_id:
+            line += f' job_id={args.job_id}'
     elif args.cmd == 'stop':
         line = 'STOP'
+        if args.job_id:
+            line += f' job_id={args.job_id}'
     elif args.cmd == 'quit':
         line = 'QUIT'
     elif args.cmd == 'capture':
@@ -80,6 +87,8 @@ def main() -> int:
         line = f'CAPTURE file={args.file} duration={args.duration} nsamps={args.nsamps}'
     elif args.cmd == 'wait':
         line = f'WAIT timeout={args.wait_timeout}'
+        if args.job_id:
+            line += f' job_id={args.job_id}'
         args.timeout = max(args.timeout, args.wait_timeout + 5.0)
     else:
         raise RuntimeError(f'unknown command: {args.cmd}')
