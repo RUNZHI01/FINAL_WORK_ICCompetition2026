@@ -2105,6 +2105,7 @@ class DashboardStateTest(unittest.TestCase):
 
             with (
                 patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.resolve_bash_executable", return_value="bash"),
                 patch("server.subprocess.Popen", side_effect=fake_popen),
             ):
                 payload = state._run_mnn_batch(count=3)
@@ -2166,6 +2167,7 @@ class DashboardStateTest(unittest.TestCase):
 
             with (
                 patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.resolve_bash_executable", return_value="bash"),
                 patch("server.subprocess.Popen", side_effect=fake_popen),
             ):
                 payload = state._run_mnn_batch(count=3)
@@ -2173,6 +2175,41 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(captured_env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(captured_env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+
+    def test_prerecorded_mnn_batch_success_updates_recent_results(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        mnn_summary = {
+            "status": "ok",
+            "variant": "current",
+            "selected_input_count": 2,
+            "processed_count": 2,
+            "sample_stats": {
+                "run_ms": {"count": 2, "median_ms": 128.0, "mean_ms": 129.0},
+                "total_ms": {"count": 2, "median_ms": 550.0, "mean_ms": 552.0},
+            },
+            "errors": [],
+        }
+
+        with patch.object(state, "_run_mnn_batch", return_value=mnn_summary):
+            payload = state.start_mnn_batch_inference(count=2)
+
+        self.assertEqual(payload["status"], "started")
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            batch_state = state.get_batch_state()
+            if batch_state.get("status") == "done":
+                break
+            time.sleep(0.02)
+        else:
+            self.fail(f"mnn batch did not finish: {state.get_batch_state()}")
+
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(system_payload["recent_results"]["mnn"]["job_id"], payload["batch_job_id"])
+        self.assertEqual(system_payload["recent_results"]["current"]["job_id"], payload["batch_job_id"])
+        self.assertEqual(system_payload["recent_results"]["mnn"]["wrapper_summary"]["inference_engine"], "mnn")
+        self.assertEqual(system_payload["last_inference"]["variant"], "current")
 
     def test_usrp_stage_access_uses_run_specific_tvm_output_prefix(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -7799,6 +7836,77 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["recent_results"]["tvm"]["job_id"], "usrp-tvm-001")
         self.assertEqual(payload["recent_results"]["mnn"]["job_id"], "usrp-mnn-001")
         self.assertEqual(payload["recent_results"]["pytorch"]["job_id"], "baseline-usrp-001")
+
+    def test_system_status_endpoint_harvests_completed_baseline_job_for_refresh_hydration(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "baseline",
+                "job_id": "baseline-live-001",
+                "message": "PyTorch baseline completed.",
+            }
+        )
+        running_job = FakeInferenceJob([baseline_payload], job_id="baseline-live-001")
+        state._inference_jobs[running_job.job_id] = {
+            "job": running_job,
+            "job_id": running_job.job_id,
+            "variant": "baseline",
+            "image_index": 0,
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["active_inference"]["running"])
+        self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-live-001")
+        self.assertEqual(payload["recent_results"]["pytorch"]["job_id"], "baseline-live-001")
+        self.assertEqual(payload["last_inference"]["variant"], "baseline")
+
+    def test_completed_job_harvest_does_not_overwrite_newer_last_inference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "baseline",
+                "job_id": "baseline-live-001",
+            }
+        )
+        baseline_job = FakeInferenceJob([baseline_payload], job_id="baseline-live-001")
+        state._inference_jobs[baseline_job.job_id] = {
+            "job": baseline_job,
+            "job_id": baseline_job.job_id,
+            "variant": "baseline",
+            "image_index": 0,
+        }
+        request_json(state, "GET", "/api/system-status")
+        current_payload = server.build_prerecorded_inference_result(0, "current")
+        current_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "current",
+                "job_id": "mnn-current-001",
+                "wrapper_summary": {"inference_engine": "mnn"},
+            }
+        )
+        state._update_last_inference_summary(current_payload, "current")
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["last_inference"]["variant"], "current")
+        self.assertEqual(payload["recent_results"]["mnn"]["job_id"], "mnn-current-001")
 
     def test_operator_readiness_smoke_state_covers_required_page_modules(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

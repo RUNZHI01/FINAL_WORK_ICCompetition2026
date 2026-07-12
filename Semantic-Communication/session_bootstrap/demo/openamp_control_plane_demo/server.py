@@ -5537,6 +5537,7 @@ class DashboardState:
         ).start()
 
     def current_system_status(self) -> dict[str, Any]:
+        self._harvest_completed_inference_jobs()
         with self._lock:
             live_probe = self._last_live_probe
             board_access = self._board_access
@@ -5733,6 +5734,33 @@ class DashboardState:
             "operator_cue": operator_cue,
             "event_spine": event_spine_payload,
         }
+
+    def _harvest_completed_inference_jobs(self) -> None:
+        with self._lock:
+            records = list(self._inference_jobs.values())
+        for record in records:
+            job_id = str(record.get("job_id") or "")
+            if not job_id or record.get("_recent_results_harvested"):
+                continue
+            try:
+                snapshot = record["job"].snapshot()
+            except Exception:
+                snapshot = record.get("last_snapshot")
+            if not isinstance(snapshot, dict) or snapshot.get("request_state") != "completed":
+                continue
+            payload = self._build_inference_response(record, snapshot)
+            event_record = record
+            with self._lock:
+                current_record = self._inference_jobs.get(job_id)
+                if current_record is None:
+                    continue
+                if current_record.get("_recent_results_harvested"):
+                    continue
+                current_record["last_snapshot"] = snapshot
+                self._update_last_inference_summary(payload, str(current_record.get("variant") or record.get("variant") or ""))
+                current_record["_recent_results_harvested"] = True
+                event_record = current_record
+            self._emit_inference_record_events(event_record, payload)
 
     def current_event_spine(self, *, limit: int = 25) -> dict[str, Any]:
         return self._event_spine.summary(limit=limit)
@@ -6238,7 +6266,13 @@ class DashboardState:
             return payload
 
         if live_attempt.get("status") == "success":
-            summary = live_attempt["runner_summary"]
+            summary = live_attempt.get("runner_summary") if isinstance(live_attempt.get("runner_summary"), dict) else {}
+            if not summary:
+                payload.update(live_attempt)
+                payload.setdefault("job_id", record["job_id"])
+                payload.setdefault("request_state", "completed")
+                payload.setdefault("live_progress", progress)
+                return payload
             wrapper_summary = live_attempt.get("wrapper_summary", {})
             board_summary = self._extract_board_runner_summary(summary)
             pipeline_summary_used = board_summary is not summary
@@ -6874,6 +6908,10 @@ class DashboardState:
                 "errors": [f"{type(exc).__name__}: {detail}"],
                 "selected_input_count": count,
                 "processed_count": 0,
+                "returncode": proc.returncode,
+                "stdout_tail": stdout[-4000:],
+                "stderr_tail": stderr[-4000:],
+                "output_prefix": output_prefix,
             }
 
         if progress_callback is not None:
@@ -7487,6 +7525,17 @@ class DashboardState:
                 state["runner_summary"] = summary
                 if error_text:
                     state["error"] = error_text
+                if succeeded:
+                    current_payload = self._build_live_payload_from_batch_summary(
+                        engine="mnn",
+                        job_id=batch_job_id,
+                        count=batch_count,
+                        summary=summary,
+                        message="预录模式 MNN 批量推理已完成；图像质量指标沿用当前归档样例口径。",
+                        data_plane_label="预录输入",
+                        count_source="mnn_prerecorded_batch",
+                    )
+                    self._update_last_inference_summary(current_payload, "current")
 
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()
