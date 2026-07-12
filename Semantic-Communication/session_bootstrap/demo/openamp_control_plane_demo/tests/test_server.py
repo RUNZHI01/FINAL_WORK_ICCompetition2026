@@ -2418,6 +2418,43 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(security.get("protocol"), "mlkem_control")
         self.assertEqual(security.get("handshake_ms"), 8.5)
 
+    def test_run_demo_inference_with_usrp_transport_blocks_when_mlkem_control_unavailable(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+        blocked_payload = state._build_blocked_inference_payload(
+            variant="current",
+            image_index=0,
+            status_category="crypto_unavailable",
+            source_label="ML-KEM 安全协议未就绪，回退展示（归档样例）",
+            message="ML-KEM 安全协议未建立，本次按安全策略不发起 Current live 重建。",
+            detail="auth verification failed",
+            diagnostics={"crypto_enabled": True},
+            expected_count=300,
+        )
+
+        with (
+            patch.object(state, "_arm_mlkem_security_context", return_value=(None, blocked_payload)) as arm_security,
+            patch("server.launch_local_usrp_reconstruction_job", side_effect=AssertionError("USRP data plane must not start without ML-KEM gate")) as launch_usrp_job,
+            patch("server.launch_remote_reconstruction_job", side_effect=AssertionError("OpenAMP fallback should not launch for USRP crypto block")),
+            patch("server.expected_sha_for_variant", side_effect=AssertionError("USRP mode should not inspect OpenAMP artifact sha gate")),
+            patch("server.describe_demo_variant_support", side_effect=AssertionError("USRP mode should not inspect OpenAMP variant support")),
+        ):
+            payload = state.run_demo_inference(variant="current", image_index=0)
+
+        arm_security.assert_called_once()
+        launch_usrp_job.assert_not_called()
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["request_state"], "completed")
+        self.assertEqual(payload["status_category"], "crypto_unavailable")
+        self.assertEqual(payload["live_attempt"]["status"], "blocked")
+        self.assertIn("不发起 Current live 重建", str(payload["message"]))
+
     def test_run_baseline_in_usrp_mode_keeps_pytorch_prerecorded_reference(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         request_json(

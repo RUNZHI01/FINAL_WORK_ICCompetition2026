@@ -47,6 +47,8 @@ TCP 安全信道实现位于 `mlkem_link/secure_channel.py`：
 
 这证明控制/认证面参与了 USRP 任务准入，但不代表 IQ payload 被 ML-KEM 加密。USRP IQ 数据面仍由 `launch_local_usrp_reconstruction_job()` 走无线链路，性能统计里的 IQ 传输/解包时间不是 ML-KEM 密文传输时间。
 
+负向阻断也已覆盖：当 `_arm_mlkem_security_context()` 返回 `crypto_unavailable` 阻断 payload 时，`run_demo_inference(... variant="current")` 不会调用 `launch_local_usrp_reconstruction_job()`，即 USRP 数据面不会绕过安全 gate 启动。
+
 ## 状态字段与 UI 展示
 
 `/api/crypto-status` 现在显式返回安全作用范围：
@@ -79,6 +81,9 @@ python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_p
 python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_get_crypto_status_marks_usrp_security_as_control_gate \
   Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_get_crypto_status_marks_tcp_security_as_payload_encryption -q
 # 2 passed
+
+python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/test_server.py::DashboardStateTest::test_run_demo_inference_with_usrp_transport_blocks_when_mlkem_control_unavailable -q
+# 1 passed
 
 cd Semantic-Communication/cockpit_desktop
 node --test src/renderer/src/pages/DashboardPageMinimal.layout.test.mjs
