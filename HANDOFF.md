@@ -15,6 +15,32 @@
 - 板卡密码行显示主机、用户、会话密码状态和服务端标识。
 - 安全信道显示加密、认证、作用范围和运行状态。
 
+## 相对 FINAL WORK 初版的主要变化
+
+这几天的改动已经不只是参数微调。接手时按下面这些差异理解当前系统：
+
+| 方向 | 初版状态 | 当前状态 |
+|---|---|---|
+| 主数据面 | 以预录/传统 live 路径为主，USRP 更接近验证链路 | 默认 USRP IQ 直传，QPSK 作为稳定 fallback |
+| TVM 指标 | 需要恢复约 250 ms 的 big.LITTLE 预录指标 | 预录 TVM 已恢复，300 张 median `243.30 ms`，mean `252.91 ms` |
+| IQ 直传 | 不是主演示路径 | 已接入 Cockpit、板端 remote-dir、TVM big.LITTLE；accepted 300 张 IQ transport p95 `198.46 ms` |
+| QPSK | 还在调试和性能对比 | 已能 300/300 跑通，但约 `2.96 s/image`，不再继续优化 |
+| 推理引擎 | TVM 主线，MNN/PyTorch 状态不稳定 | TVM 是主路径；MNN 预录和 USRP remote-dir 已恢复；PyTorch 在 USRP 下保留预录参考 |
+| Cockpit UI | 控件堆叠，左右栏职责不清，USRP 指标展示不完整 | 左栏管数据面和 IQ 诊断，右栏管地图、硬件、板卡密码、安全信道；USRP 有三阶段进度和独立 benchmark |
+| 结果对比 | USRP/批量结果有时不刷新或显示旧状态 | USRP 三种模式会更新推理结果对比框，切换模式会清理旧进度状态 |
+| IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 默认 ARQ5、burst-miss retry、low-sync retry；仍需注意现场 RF 环境和天线位置 |
+| 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
+| 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
+| 启动环境 | 偏真机 Fedora/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数 |
+| 板卡会话 | 地址、密码、目录参数容易散落在脚本里 | Cockpit 可写入 board access；板卡地址、RX 目录、链路模式向参数化收敛 |
+| 文档和测试 | 资料分散在运行日志和零散报告里 | 新增/更新 runbook、安全审计、HANDOFF、layout tests、crypto scope/gate/auth 负测 |
+
+几个重要取舍：
+
+- 流水线 TVM 试过，当前实现比串行慢，所以默认关闭。
+- tmpfs、decode worker restart、short STOP、short RX wait 都保留为实验开关，不作为默认演示参数。
+- Git Bash 目前只作为 Windows 一键启动外壳，USRP TX/SSH 热路径默认走 Docker。赛前不建议再大改启动体系。
+
 ## 启动方式
 
 当前仍保留 Git Bash 启动外壳，Bash/SSH 热路径优先走 Docker，不用 WSL。
