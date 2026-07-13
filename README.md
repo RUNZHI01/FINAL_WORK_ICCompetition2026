@@ -35,6 +35,8 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 
 写材料时优先引用这些典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；板端 TVM 重建 median `241.20 ms`、p95 `242.59 ms`；预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
+当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧的 `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md` 只作为历史参考。
+
 ## 主要目录
 
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
