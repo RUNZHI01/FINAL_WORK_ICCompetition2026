@@ -37,6 +37,18 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 
 当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧的 `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md` 只作为历史参考。
 
+如果要抽查原图和重建图误差，不需要接入主 demo，直接跑独立脚本：
+
+```powershell
+python scripts/audit_reconstruction_error.py `
+  --original-dir path\to\originals `
+  --recon-dir path\to\reconstructions `
+  --sample-size 20 `
+  --seed 0 `
+  --output-json artifacts\recon_error_audit.json `
+  --output-csv artifacts\recon_error_audit.csv
+```
+
 ## 主要目录
 
 - `Semantic-Communication/cockpit_desktop/`：Electron 上位机界面。
