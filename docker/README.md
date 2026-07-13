@@ -47,7 +47,7 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=docker`、`OPENAMP_USRP_TX_RUNNER=docker`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`ANALOG_RX_TAIL_SEC=0.040`、`RX_ARM_WAIT_MS=500`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`MLKEM_USRP_MAX_ARQ_ROUNDS=5`、`USRP_MAX_ARQ_ROUNDS=5`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
+`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=docker`、`OPENAMP_USRP_TX_RUNNER=docker`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`ANALOG_RX_TAIL_SEC=0.040`、`RX_ARM_WAIT_MS=500`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`MLKEM_USRP_MAX_ARQ_ROUNDS=5`、`USRP_MAX_ARQ_ROUNDS=5`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
 
 名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。USRP 数据面应由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不能把 IQ/latent 主数据绕到 Tailscale 文件传输。默认 `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 会在板端解码后再取结果，避免把原始 IQ 捕获文件拉回控制面。快速 IQ profile 使用 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0` 保持 TX/RX 常驻，使用 `RX_ARM_WAIT_MS=500` 等待 RX capture 真正启动，使用 `ANALOG_DECODE_PIPELINE_WARMUP=1` 预热板端 decode-server，并用 `ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5` 限制“未开始接收”的恢复长尾；正常 `STOP` drain 仍保持 8 秒保护。`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O；演示后可清理板端 `/tmp/usrp292x_remote_runs`。USRP 后接重建当前支持 TVM 和 MNN；PyTorch 只作为预录参考对照，不走 USRP 数据面。USRP transport 结果卡片使用 raw round records 的 median/p95，避免 RF/RX 单次离群值污染典型时延。
 
@@ -58,6 +58,8 @@ $env:MLKEM_TRANSPORT_MODE="usrp"
 $env:OPENAMP_DEMO_INPUT_SOURCE_MODE="usrp"
 $env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
 $env:JSCC_LINK_MODE="iq-direct"
+$env:MLKEM_AUTH_ENABLED="1"
+$env:MLKEM_AUTH_SIG_POLICY="DUAL_REQUIRED"
 $env:ANALOG_SPS="2"
 $env:ANALOG_AMPLITUDE="6000"
 $env:ANALOG_RX_TAIL_SEC="0.040"
@@ -82,18 +84,19 @@ $env:ANALOG_LOW_SYNC_RETRY_THRESHOLD="0.08"
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 仍默认设置 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`。该 profile 固定为预录 latent 输入、TCP/Tailscale 控制连接，并默认关闭 ML-KEM auth gate：
+`run-demo-tailscale.*` 仍默认设置 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本会先显式设置 USRP IQ 和认证默认值：
 
 ```text
-OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded
-MLKEM_TRANSPORT_MODE=tcp
-MLKEM_AUTH_ENABLED=0
+OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp
+MLKEM_TRANSPORT_MODE=usrp
+JSCC_LINK_MODE=iq-direct
+MLKEM_AUTH_ENABLED=1
 MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 ```
 
-普通 `start-electron-prod-demo.sh` profile 仍默认 `MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`；上面的关闭只用于复现 TVM 重建性能指标，避免把未配置完整的认证 gate 混入 250 ms 口径。
+如果只想复现预录 TVM 250 ms，请在运行前临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并在记录里说明是否启用认证 gate。
 
-这一路用于恢复 cockpit desktop 下的 handwritten TVM + big.LITTLE 300 张测速口径。2026-07-09 的 Windows cockpit 真机验证结果为 `300/300`、fallback `0`、mean `244.44 ms`、median `243.77 ms`、p95 `248.31 ms`；报告位于 `Semantic-Communication/session_bootstrap/reports/openamp3_handwritten_mean4_v7_big_little_current_20260709_020321.*`。
+这一路用于当前 cockpit desktop 下的 USRP IQ 直传 + handwritten TVM + big.LITTLE 300 张演示口径。典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；后接 TVM median `241.20 ms`、p95 `242.59 ms`。预录 TVM 250 ms 参考线为 300 张 median `243.30 ms`、mean `252.91 ms`。
 
 如果不走 Docker cockpit、而是在 Windows 原生后端里临时调试，请不要调用 WSL 的 `bash.exe`。使用 Git Bash 作为脚本解释器，并优先让 SSH helper 和本机 TX 都走 Docker：
 

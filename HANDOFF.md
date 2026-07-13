@@ -75,31 +75,49 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
+| `REMOTE_HOST` | `100.121.87.73` | 当前验证环境板卡地址，比赛现场可覆盖 |
+| `REMOTE_USER` | `user` | 板卡 SSH 用户 |
 | `MLKEM_TRANSPORT_MODE` | `usrp` | Cockpit 默认进入 USRP 模式 |
+| `OPENAMP_DEMO_INPUT_SOURCE_MODE` | `usrp` | 默认从 USRP 数据面取输入 |
 | `JSCC_LINK_MODE` | `iq-direct` | USRP 数据面默认 IQ 直传 |
+| `OPENAMP_DEMO_LINK_MODE` | `iq-direct` | 后端 runner 选择 IQ 直传 |
 | `MLKEM_AUTH_ENABLED` | `1` | 默认开启认证面 |
 | `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | SM2 和 ML-DSA 都要通过 |
+| `MLKEM_AUTH_SERVER_ID` | `phytium-board` | UI 中显示的服务端标识 |
 | `MLKEM_CIPHER_SUITE` | `SM4_GCM` | TCP 安全信道默认密码套件 |
 | `MLKEM_USRP_MAX_ARQ_ROUNDS` | `5` | IQ 弱同步/漏帧兜底重试 |
 | `REMOTE_USRP_RX_DIR` | `/home/user/cockpit_usrp_rx` | TVM/MNN 消费的板端 decoded latent 目录 |
 | `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
 | `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
+| `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT` | `0` | 保持 TX/RX 常驻，减少反复初始化 |
+| `ANALOG_SPS` | `2` | IQ 直传每符号采样数 |
+| `ANALOG_AMPLITUDE` | `6000` | 当前验证环境下的 TX 幅度 |
+| `ANALOG_RX_TAIL_SEC` | `0.040` | RX capture 尾部保护 |
+| `ANALOG_MIN_SYNC_METRIC` | `0.05` | IQ 同步通过阈值 |
 | `OPENAMP_IQ_STREAMING_TVM` | `0` | 默认不边收边跑 TVM |
 | `ANALOG_PIPELINE_DEPTH` | `1` | 默认串行推进，避免队列尾部扩大 |
 | `ANALOG_PIPELINE_RF_DECODE_OVERLAP` | `0` | 默认不让 RF/decode 重叠 |
+| `RX_ARM_WAIT_MS` | `500` | 等 RX capture 就绪的确认窗口 |
 | `ANALOG_PRECONNECT_CONTROL` | `1` | 预连接控制面，减少反复建连 |
 | `ANALOG_RX_SESSION_CONTROL` | `1` | 保持 RX 控制会话，当前启动脚本默认开启 |
 | `ANALOG_RX_BATCH_SESSION_CONTROL` | `1` | 批量复用 RX 会话 |
 | `ANALOG_RETRY_ON_BURST_MISS` | `1` | 捕获突发缺失时重试 |
 | `ANALOG_RETRY_ON_LOW_SYNC` | `1` | sync metric 低于阈值时重试 |
 | `ANALOG_LOW_SYNC_RETRY_THRESHOLD` | `0.08` | low-sync retry 阈值 |
+| `ANALOG_REMOTE_DECODE_RESULT_MODE` | `remote-dir` | 板端就地解码并通过目录交付 latent |
 | `ANALOG_REMOTE_DECODE_RESPONSE_MODE` | `minimal` | 减小 decode worker 响应体 |
+| `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY` | `1` | 响应只带 summary，降低控制面负载 |
+| `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` | `0.05` | decode 结果软完成等待 |
 | `ANALOG_REMOTE_DECODED_FORMAT` | `npy` | decoded latent 默认写 `.npy` |
+| `ANALOG_DECODE_PIPELINE_WARMUP` | `1` | 启动时预热板端 decode worker |
+| `ANALOG_REMOTE_CLEANUP_MODE` | `skip` | 热路径不做后台清理，演示后手动清 |
 | `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS` | `1` | 提前建目录，减少热路径 SSH 抖动 |
 | `ANALOG_RX_SC16_MMAP` | `1` | RX sc16 读取使用 mmap |
 | `ANALOG_RX_CLIPPING_DECIMATION` | `8` | clipping 统计降采样 |
 | `ANALOG_RX_POST_QUANTIZE` | `0` | 不写旧 quant/scale/zero_point 诊断数组 |
 | `ANALOG_ROBUST_SYNC` | `0` | 不默认启用慢速 robust CFO fallback |
+| `ANALOG_RX_WAIT_TIMEOUT_SEC` | `1.0` | RX WAIT 当前超时预算 |
+| `ANALOG_RX_ARM_STATUS_TIMEOUT_SEC` | `0.5` | RX arm 状态确认超时 |
 | `RX_STOP_WAIT_MS` | `8000` | 保守 STOP 等待 |
 | `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC` | `8.0` | 保守 RX drain |
 
@@ -119,7 +137,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `REMOTE_USRP_RX_DIR=/dev/shm/...` | tmpfs 能降低文件写尾部，但容量、清理和重启一致性风险更高 |
 | `RX_STOP_WAIT_MS=200` 等 short STOP | 已失败过 300 张 gate，不能做默认 |
 | `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2` 等 short drain | 容易留下 RX 残留状态，影响下一轮 |
-| `ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` | 更快暴露等待超时，但实测 p95 变差 |
+| `ANALOG_RX_WAIT_TIMEOUT_SEC<1.0` | 会更快暴露等待超时，但容易放大 retry 和 p95；当前默认保留 `1.0` |
 | `ANALOG_ROBUST_SYNC=1` | 可以救部分弱同步帧，但慢速 CFO fallback 会明显拖慢尾部 |
 
 注意：`ANALOG_PRECONNECT_CONTROL=1`、`ANALOG_RX_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_CONTROL=1` 现在是启动脚本默认值，不再按早期 runbook 的“纯实验”口径处理。若要改它们，必须重新跑 20/300 张硬件回归。
@@ -133,6 +151,18 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | 预录 TVM big.LITTLE | 300 | 无 USRP | median `243.30 ms`, mean `252.91 ms`, p95 `311.88 ms` | 250 ms 参考线 |
 | USRP IQ 直传 accepted profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 当前速度结果，max 是已恢复的 RF/RX outlier |
 | QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
+
+给写文档同学的典型值口径：
+
+| 可写项 | 推荐写法 |
+|---|---|
+| 主链路 | USRP IQ 直传 + 板端 TVM big.LITTLE 重建 |
+| IQ 传输/解包 | median `166.63 ms`，p95 `198.46 ms`；不要用单次 max 表示典型体验 |
+| TVM 重建 | median `241.20 ms`，p95 `242.59 ms` |
+| 250 ms 参考线 | 预录 TVM 300 张 median `243.30 ms`，mean `252.91 ms` |
+| QPSK 对照 | 约 `2.96 s/image`，作为稳定 fallback，不作为速度主线 |
+| 图像质量 | PSNR `37.0445`，SSIM `0.97494`，artifact SHA matched |
+| 安全口径 | ML-KEM+SM4 和 ML-DSA+SM2 用于控制/认证面准入；USRP IQ payload 不宣称已加密 |
 
 图像质量按当前 accepted IQ/TVM 路径保持：
 

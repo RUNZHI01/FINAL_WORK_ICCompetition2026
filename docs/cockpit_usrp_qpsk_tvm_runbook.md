@@ -2,70 +2,46 @@
 
 本记录用于 Windows cockpit desktop 现场复现。Bash/SSH 优先走 Docker；需要本机 Bash 时使用 Git Bash，不使用 WSL。
 
-## Host Environment
+## Quick Start
+
+日常拉起 Cockpit Desktop 用仓库内一键脚本。Windows 上 Git Bash 只作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
 
 ```powershell
-$env:OPENAMP_BASH="E:\Software\Scoop\apps\git\current\bin\bash.exe"
-$env:GIT_BASH=$env:OPENAMP_BASH
-$env:OPENAMP_SSH_RUNNER="docker"
-$env:OPENAMP_SSH_DOCKER_IMAGE="iccomp-usrp-tx:latest"
-$env:SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER="1"
-$env:OPENAMP_USRP_TX_RUNNER="docker"
-$env:OPENAMP_USRP_TX_DOCKER_IMAGE="iccomp-usrp-tx:latest"
-$env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="/host_workspace"
-$env:REMOTE_HOST="100.121.87.73"
-$env:REMOTE_USER="user"
-$env:REMOTE_PASS="user"
-$env:REMOTE_SSH_PORT="22"
-$env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
-$env:REMOTE_RX_RUN_ROOT="/tmp/usrp292x_remote_runs"
-$env:REMOTE_USRP_PROJECT_ROOT="/home/user"
-$env:REMOTE_USRP_DECODE_PYTHON="/home/user/venv/bin/python"
-$env:OPENAMP_DEMO_REMOTE_DECODE_PYTHON="/home/user/venv/bin/python"
-$env:JSCC_LINK_MODE="iq-direct"
-$env:ANALOG_SPS="2"
-$env:ANALOG_AMPLITUDE="6000"
-$env:ANALOG_RX_TAIL_SEC="0.05"
-$env:ANALOG_RX_POST_QUANTIZE="0"
-# Optional write-path experiment only; not the recommended default yet.
-# $env:ANALOG_REMOTE_DECODED_FORMAT="npy"
-# Use board access remote_usrp_rx_dir="/dev/shm/cockpit_usrp_rx" to test tmpfs.
-$env:ANALOG_REMOTE_CLEANUP_MODE="skip"
-$env:ANALOG_REMOTE_DECODE_WORKER="1"
-$env:ANALOG_REMOTE_DECODE_RESULT_MODE="remote-dir"
-$env:ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC="90"
-$env:ANALOG_DECODE_PIPELINE_WARMUP="1"
-$env:ANALOG_PIPELINE_DEPTH="2"
-$env:ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
-$env:ANALOG_SYNC_PROFILE="fast-first"
-$env:ANALOG_FAST_SYNC_CANDIDATES="4"
-$env:ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS="1024"
-$env:ANALOG_FALLBACK_SYNC_CANDIDATES="12"
-$env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="4096"
-$env:ANALOG_MIN_SYNC_METRIC="0.05"
-$env:ANALOG_ROBUST_SYNC="0"
-$env:MLKEM_USRP_MAX_ARQ_ROUNDS="5"
-$env:USRP_MAX_ARQ_ROUNDS="5"
-$env:ANALOG_RETRY_ON_BURST_MISS="1"
-$env:ANALOG_RETRY_ON_LOW_SYNC="1"
-$env:ANALOG_LOW_SYNC_RETRY_THRESHOLD="0.08"
-$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="0"
-$env:ICCOMP_COCKPIT_PROFILE="tvm250-prerecorded"
-$env:OPENAMP_TVM_BATCH_RUNNER="biglittle"
-$env:OPENAMP_DEMO_TVM_BATCH_RUNNER="biglittle"
-$env:OPENAMP_TVM_BATCH_EXIT_GRACE_SEC="0.5"
-$env:MLKEM_AUTH_ENABLED="0"
-Remove-Item Env:OPENAMP_IQ_STREAMING_TVM -ErrorAction SilentlyContinue
-Remove-Item Env:USRP_IQ_STREAMING_TVM -ErrorAction SilentlyContinue
-Remove-Item Env:ANALOG_PRECONNECT_CONTROL -ErrorAction SilentlyContinue
-Remove-Item Env:ANALOG_RX_SESSION_CONTROL -ErrorAction SilentlyContinue
-Remove-Item Env:ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC -ErrorAction SilentlyContinue
-Remove-Item Env:ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT -ErrorAction SilentlyContinue
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+& 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 
-TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner，避免 WSL/Git Bash shell 状态污染。板端用户名和密码均为 `user`，板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认设置 `OPENAMP_IQ_STREAMING_TVM`、`ANALOG_PRECONNECT_CONTROL`、short STOP、short RX WAIT 或 remote decode request timeout/restart envs：这些路径已有实测数据，只保留给定向实验。
+交付包入口可用：
 
-2026-07-11 当前 Cockpit IQ 直传复现 profile 覆盖早期环境块中的旧建议：使用 Docker SSH/TX、`REMOTE_RX_RUN_ROOT=/tmp/usrp292x_remote_runs`、`ANALOG_RX_TAIL_SEC=0.040`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`MLKEM_USRP_MAX_ARQ_ROUNDS=5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`RX_ARM_WAIT_MS=500`、`RX_STOP_WAIT_MS=8000`、`ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`。不要启用 tmpfs、publish-event、worker timeout/restart 或 streaming TVM，除非是在做单独 A/B。
+```powershell
+.\docker\run-demo-tailscale.ps1
+```
+
+当前默认 profile：
+
+| 参数 | 默认值 |
+|---|---|
+| `REMOTE_HOST` | `100.121.87.73` |
+| `REMOTE_USER` / password | `user` / `user` |
+| `MLKEM_TRANSPORT_MODE` | `usrp` |
+| `OPENAMP_DEMO_INPUT_SOURCE_MODE` | `usrp` |
+| `JSCC_LINK_MODE` / `OPENAMP_DEMO_LINK_MODE` | `iq-direct` |
+| `MLKEM_AUTH_ENABLED` / `MLKEM_AUTH_SIG_POLICY` | `1` / `DUAL_REQUIRED` |
+| `REMOTE_USRP_RX_DIR` | `/home/user/cockpit_usrp_rx` |
+| `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` |
+| `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` |
+| `ANALOG_SPS` / `ANALOG_AMPLITUDE` | `2` / `6000` |
+| `ANALOG_RX_TAIL_SEC` / `RX_ARM_WAIT_MS` | `0.040` / `500` |
+| `ANALOG_REMOTE_DECODED_FORMAT` | `npy` |
+| `ANALOG_REMOTE_DECODE_RESPONSE_MODE` | `minimal` |
+| `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY` | `1` |
+| `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` | `0.05` |
+| `ANALOG_PIPELINE_DEPTH` / `ANALOG_PIPELINE_RF_DECODE_OVERLAP` | `1` / `0` |
+| `ANALOG_PRECONNECT_CONTROL` / `ANALOG_RX_SESSION_CONTROL` / `ANALOG_RX_BATCH_SESSION_CONTROL` | `1` / `1` / `1` |
+| `MLKEM_USRP_MAX_ARQ_ROUNDS` | `5` |
+| `OPENAMP_IQ_STREAMING_TVM` | `0` |
+
+TX bash/USRP 发送在 Docker 中运行；Windows cockpit 到板端 SSH 默认也走 Docker runner。板端 IQ decode 使用 `/home/user/venv/bin/python`；TVM 重建使用 big.LITTLE wrapper 和 `/home/user/anaconda3/envs/tvm310_safe/bin/python`。不要默认启用 streaming TVM、RF/decode overlap、tmpfs RX 输出、publish-event、worker timeout/restart、short STOP 或 short drain；这些只用于单独 A/B。
 
 ## Start Cockpit Backend
 
@@ -175,23 +151,23 @@ Compared with the older QPSK notes below, the QPSK path improved from tens of se
 - `ANALOG_RX_POST_QUANTIZE=0` is the default IQ direct profile. It preserves the `latent` array consumed by TVM while avoiding extra diagnostic arrays in the remote-dir `.npz`.
 - `ANALOG_REMOTE_DECODED_FORMAT=npy` is the current decoded-output format. tmpfs remains diagnostic only: it proves publish I/O can be kept near 1 ms, while the remaining p95 failures come from RX arm/wait, no-sync retries, and decode queue propagation.
 - Status polling must stay isolated during live runs. The backend currently defers telemetry/USRP/position refresh while batches run; reintroducing SSH polling in the hot path can hide the RF improvements.
-- The security-on path is not this performance number. ML-KEM/auth is configured, but the crypto toggle was off for these latency runs. Measure security-on separately after the IQ data plane is stable.
+- Record security settings with each benchmark. The current demo defaults to `MLKEM_AUTH_ENABLED=1`, but older latency batches may have been run with different security toggles. In USRP IQ mode, the security channel gates control/auth; it does not encrypt the RF IQ payload.
 - The container-to-board migration is still sensitive to environment state: `/home/user/venv`, `/home/user/USRP292x/AnalogLatentLink.py`, persistent TX/RX ports, Docker TX image, and `REMOTE_USRP_RX_DIR` must all match the runbook.
 
 ## Verified Milestones
 
 - 2026-07-11 publish-event diagnostic: `ANALOG_REMOTE_DECODE_PUBLISH_EVENT=1` adds a board-side `published` event after decoded latent `atomic_savez`, with runner-side matching and partial decode timing. `batch-1783732029-20` stayed 20/20 with IQ p95 `236.94 ms` below TVM p95 `259.66 ms`, but `batch-1783732287-50` stayed 50/50 with IQ p95 `363.37 ms` above TVM p95 `247.02 ms`. Keep it opt-in; the 50-image tail was RX capture/wait, one low-sync retry, and true weak-sync decode rather than only stdout latency.
-- 2026-07-11 weak-sync incident and retry default: `cockpit_usrp_usrp-1783772592` completed 300 capture requests but failed the all-pass gate at `299/300`; `image_0163` had sync metric about `0.0324` below the `0.05` minimum. The current code now defaults IQ direct to ARQ5 plus burst-miss and low-sync retry (`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`). This is a reliability change awaiting a fresh 300-image hardware gate.
+- 2026-07-11 weak-sync incident and retry default: `cockpit_usrp_usrp-1783772592` completed 300 capture requests but failed the all-pass gate at `299/300`; `image_0163` had sync metric about `0.0324` below the `0.05` minimum. The current code now defaults IQ direct to ARQ5 plus burst-miss and low-sync retry (`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`). The later accepted 500 ms RX arm-wait profile is the current 300-image speed reference.
 - 2026-07-11 low-sync early-retry diagnostic: `ANALOG_RETRY_ON_LOW_SYNC=1` with threshold `0.06` stayed 50/50 in `batch-1783732885-50`, but IQ p95/max was `273.66/518.02 ms` while TVM p95 was `243.78 ms`. This did not prove a p95 win; its current role is to avoid weak-sync fallback decode when ARQ retries remain.
 - 2026-07-11 IQ direct probe-id/precreate retry validation: `batch-1783730551-300`, 300/300, fallback 0, TVM median/p95/max `241.69/244.45/280.68 ms`, IQ transport median/p95/max `155.66/274.33/11124.64 ms`, PSNR `37.0445`, SSIM `0.97494`. This fixes stale same-request path-probe responses and transient SSH kex failures during precreate. It is not final performance success because IQ p95 is still above TVM p95 and max is dominated by board `.npy` publish/file-visibility tails.
 - 2026-07-11 IQ direct worker-timing validation: `batch-1783726777-300`, 300/300, fallback 0, TVM median/p95 `241.78/244.73 ms`, IQ transport median/p95/max `158.38/333.24/10395.30 ms`, PSNR `37.0445`, SSIM `0.97494`. The soft-completion path-probe timeout fix capped worker response-wait max at `405.91 ms`; remaining tails were RX arm/capture and occasional board decode/write stalls.
-- 2026-07-11 rejected IQ timeout/STOP profiles: `ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` is now correctly passed through to the runner, but `batch-1783727897-300` worsened IQ p95 to `904.15 ms`. Short STOP defaults (`RX_STOP_WAIT_MS=200`, `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2`) failed 300-image gates (`296/300` and `299/300`). Keep these knobs opt-in and keep the stable Cockpit default at `RX_STOP_WAIT_MS=8000` / `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`.
+- 2026-07-11 rejected IQ timeout/STOP profiles: `ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` is the current WAIT budget, but the standalone timeout experiment `batch-1783727897-300` worsened IQ p95 to `904.15 ms`. Short STOP defaults (`RX_STOP_WAIT_MS=200`, `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2`) failed 300-image gates (`296/300` and `299/300`). Keep shorter WAIT/STOP/drain variants opt-in and keep the stable Cockpit STOP defaults at `RX_STOP_WAIT_MS=8000` / `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=8.0`.
 - 2026-07-11 bounded arm-failure drain: IQ direct keeps the stable 8-second normal STOP drain, but when arm status proves `started=0`, `done=0`, and `written_samps=0`, the second arm-failure STOP now uses `ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`. This targets recovered 10-second outliers such as `RX CAPTURE did not arm before TX` without weakening cleanup after a real receive has started.
 - 2026-07-11 accepted 500 ms RX arm-wait profile: after explicit USRP control restart, `batch-1783782559-300` completed transport and TVM at `300/300`, fallback `0`. IQ transport median/p95/max was `166.63/198.46/15934.08 ms`; TVM median/p95/max was `241.20/242.59/259.35 ms`. Use IQ p95 below TVM p95 as the current speed result; the max is still a recovered RF/RX outlier.
-- 2026-07-10 IQ direct fast-first recommended profile: `batch-1783626884-300`, 300/300, fallback 0, transport median `182.28 ms`, transport p95 `372.96 ms`, RF airtime `9.58 ms`, RX capture median `97.23 ms`, board decode median `62.96 ms`, TVM median `242.41 ms`, TVM p95 `245.77 ms`, total cockpit batch wall `157.12 s`. All 300 decode summaries used `sync_pass=1`; fast sync median `21.07 ms`, p95 `61.51 ms`.
-- 2026-07-10 IQ direct post-quantize-off profile: `batch-1783638234-300`, 300/300, fallback 0, transport median `186.83 ms`, p95 `351.67 ms`, max `6368.37 ms`, TVM median `241.28 ms`, TVM p95 `244.10 ms`, quality PSNR `37.0445`, SSIM `0.97494`. This is the recommended profile when using the Docker/cockpit defaults after this update.
+- 2026-07-10 IQ direct fast-first historical profile: `batch-1783626884-300`, 300/300, fallback 0, transport median `182.28 ms`, transport p95 `372.96 ms`, RF airtime `9.58 ms`, RX capture median `97.23 ms`, board decode median `62.96 ms`, TVM median `242.41 ms`, TVM p95 `245.77 ms`, total cockpit batch wall `157.12 s`. All 300 decode summaries used `sync_pass=1`; fast sync median `21.07 ms`, p95 `61.51 ms`.
+- 2026-07-10 IQ direct post-quantize-off historical profile: `batch-1783638234-300`, 300/300, fallback 0, transport median `186.83 ms`, p95 `351.67 ms`, max `6368.37 ms`, TVM median `241.28 ms`, TVM p95 `244.10 ms`, quality PSNR `37.0445`, SSIM `0.97494`. This was superseded by the 2026-07-11 accepted 500 ms RX arm-wait profile.
 - 2026-07-10 IQ direct `.npy` remote-dir diagnostics: `/home/user/cockpit_usrp_rx` run `batch-1783640049-300` stayed 300/300 with transport median `189.19 ms`, p95 `383.88 ms`, TVM median `241.49 ms`, p95 `248.64 ms`, and `.npy` write p95 `1.64 ms`. tmpfs run `batch-1783640401-300` stayed 300/300 with write max `3.43 ms` and TVM p95 `244.97 ms`, but transport p95 worsened to `1013.67 ms` because RX/no-sync stalls dominated.
-- 2026-07-10 decode-worker and pipeline diagnostics: timeout/restart `batch-1783635568-300` stayed 300/300 but worsened p95 to `865.77 ms`; depth-1 `batch-1783636039-300` stayed 300/300 with p95 `318.43 ms` but wall `104.43 s`; RX tail `0.02` failed `28/50`, and tail `0.04` stayed 50/50 but worsened p95 to `1169.05 ms`. Recommended cockpit remains tail `0.05`, depth `2`, timeout unset.
+- 2026-07-10 decode-worker and pipeline diagnostics: timeout/restart `batch-1783635568-300` stayed 300/300 but worsened p95 to `865.77 ms`; depth-1 `batch-1783636039-300` stayed 300/300 with p95 `318.43 ms` but wall `104.43 s`; RX tail `0.02` failed `28/50`, and tail `0.04` stayed 50/50 but worsened p95 to `1169.05 ms`. This historical conclusion was superseded; current Cockpit defaults are tail `0.040`, depth `1`, and no RF/decode overlap.
 - 2026-07-10 burst-miss retry diagnostic: `batch-1783628596-50`, 50/50, fallback 0, `ANALOG_RETRY_ON_BURST_MISS=1`, transport median `199.90 ms`, p95 `783.40 ms`, decode max `197.08 ms`, `remote_decode_queue_ms` median `0.05 ms`, p95 `48.91 ms`. Compared with `batch-1783627996-50` without the guard, decode max improved but RX capture p95 worsened. It is now kept as a reliability guard, not a p95 optimization.
 - 2026-07-10 IQ direct previous sequential-sync profile after a clean restart: `batch-1783625337-300`, 300/300, fallback 0, transport median `189.10 ms`, transport p95 `642.66 ms`, RF airtime `9.58 ms`, RX capture median `97.40 ms`, board decode median `68.47 ms`, TVM median `242.16 ms`, TVM p95 `244.89 ms`, total cockpit batch wall `161.17 s`. Polling showed inference remained `0/300 pending` until transport was `300/300 completed`; this was the recommended default before fast-first sync.
 - 2026-07-10 IQ streaming TVM experiment: `batch-1783624303-300`, 300/300, fallback 0, but total wall `233.76 s`, transport median `338.90 ms`, transport p95 `694.20 ms`, decode median `158.52 ms`, TVM median `248.29 ms`, TVM p95 `322.37 ms`. Keep `OPENAMP_IQ_STREAMING_TVM` / `USRP_IQ_STREAMING_TVM` unset unless explicitly testing overlap.
