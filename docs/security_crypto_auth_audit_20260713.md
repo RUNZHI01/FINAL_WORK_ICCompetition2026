@@ -58,7 +58,7 @@ TCP 安全信道实现位于 `mlkem_link/secure_channel.py`：
 - `security_scope=tcp_payload`：TCP 路径，latent/ACK/结果经 ML-KEM 派生密钥与 SM4 保护。
 - `data_plane_encrypted`、`tcp_payload_encrypted`、`usrp_payload_encrypted` 分别标记当前数据面是否落在 ML-KEM/SM4 保护范围内。
 
-Cockpit 的“安全信道/配置项”会显示 `security_scope_label`。USRP IQ 默认显示“控制/认证面准入”，避免把无线 IQ payload 误描述为已加密。
+Cockpit 的“安全信道/配置项”会显示 `security_scope_label`。USRP IQ 默认显示“控制/认证面准入”，避免把无线 IQ payload 误描述为已加密。`server_id` 不再占用安全信道配置卡片；开启认证后，它显示在“板卡密码”辅助信息行，和主机、用户、会话密码状态放在一起。
 
 ## 已验证证据
 
@@ -88,7 +88,7 @@ python -m pytest Semantic-Communication/session_bootstrap/demo/openamp_control_p
 
 cd Semantic-Communication/cockpit_desktop
 node --test src/renderer/src/pages/DashboardPageMinimal.layout.test.mjs
-# 20 passed
+# 21 passed
 ```
 
 本机直接跑 `mlkem_link/tests/test_session.py` 与 `scripts/test_fit.py` 失败，原因是当前 Windows 环境缺少 liboqs/Tongsuo KEM 运行库，且 `scripts/conftest.py` 调用 Unix-only `os.geteuid()`。这不是安全逻辑反证，只说明需要在容器或板端环境跑全量密码学测试。

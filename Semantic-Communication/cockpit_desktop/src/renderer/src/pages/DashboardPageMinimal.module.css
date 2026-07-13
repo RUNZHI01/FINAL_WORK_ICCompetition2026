@@ -890,7 +890,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 10px;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 11px;
   line-height: 1.4;
 }

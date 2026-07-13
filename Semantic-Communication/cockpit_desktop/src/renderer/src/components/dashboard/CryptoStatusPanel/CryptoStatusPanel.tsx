@@ -269,14 +269,6 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
     })
   }
 
-  if (authDisplay.enabled && data.server_id) {
-    settingsItems.push({
-      label: '服务端标识',
-      value: data.server_id,
-      tone: 'mono',
-    })
-  }
-
   const runtimeItems: MetricItem[] = [
     { label: '通道状态', value: st.label },
   ]

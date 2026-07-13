@@ -151,3 +151,12 @@ test('security config shows the effective protection scope from crypto status', 
   assert.match(cryptoPanelTsx, /data\.security_scope_label/)
   assert.doesNotMatch(cryptoPanelTsx, /security_scope_note/)
 })
+
+test('server identity is shown with board password metadata instead of security config', () => {
+  assert.match(tsx, /const cryptoServerId\s*=/)
+  assert.match(tsx, /className=\{s\.boardPasswordMeta\}[\s\S]*服务端标识:\s*\{cryptoServerId\}/)
+  assert.doesNotMatch(cryptoPanelTsx, /label:\s*'服务端标识'/)
+
+  const metaBlock = cssBlock('.boardPasswordMeta')
+  assert.match(metaBlock, /color:\s*var\(--color-text-secondary\);/)
+})

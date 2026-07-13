@@ -755,6 +755,9 @@ export function DashboardPageMinimal() {
   const boardUserLabel = typeof boardAccess?.user === 'string' && boardAccess.user.trim()
     ? boardAccess.user
     : '未配置'
+  const cryptoServerId = authEnabled && typeof cryptoData?.server_id === 'string' && cryptoData.server_id.trim()
+    ? cryptoData.server_id.trim()
+    : ''
   const boardPasswordSaved = Boolean(boardAccess?.has_password)
   const authConfig = {
     enabled: authEnabled,
@@ -1280,6 +1283,7 @@ export function DashboardPageMinimal() {
               <span>主机: {boardHostLabel}</span>
               <span>用户: {boardUserLabel}</span>
               <span>{boardPasswordSaved ? '当前会话已保存密码' : '当前会话缺少密码'}</span>
+              {cryptoServerId && <span>服务端标识: {cryptoServerId}</span>}
             </div>
             <div className={s.passwordRow}>
               <input

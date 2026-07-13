@@ -81,6 +81,20 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8079/api/session/board-access `
   -Body '{"host":"100.121.87.73","user":"user","password":"user","port":"22","transport_mode":"usrp","remote_usrp_rx_dir":"/home/user/cockpit_usrp_rx","jscc_link_mode":"iq-direct"}'
 ```
 
+## Windows Startup Without Git Bash
+
+当前 `Semantic-Communication/cockpit_desktop/start-dev.sh` 仍是 Bash 脚本。它负责设置默认环境变量、清理旧端口、启动 Python 后端、启动 Electron/Vite，并做健康检查。热路径里的 SSH/TX 已默认走 Docker runner；Git Bash 主要还承担“本机一键启动脚本”的外壳。
+
+去掉 Git Bash 可以分三档：
+
+| Scope | Estimate | Work |
+|---|---:|---|
+| 日常 Cockpit 启动不依赖 Git Bash | 2-4 小时 | 新增 `start-dev.ps1` / `stop-dev.ps1`，复刻端口清理、环境默认值、后端/前端启动、健康检查和日志路径。 |
+| 演示脚本 Windows 入口统一 PowerShell | 0.5-1 天 | 把 `docker/run-demo*.ps1` 与 Cockpit 启动参数对齐，补 board session 写入和默认 USRP IQ/认证参数。 |
+| 完全移除本机 Bash 依赖 | 1-2 天以上 | 排查所有 `*.sh` 调用、`nohup/env/cygpath/MSYS2_*` 假设和 Windows 路径转换；需要 20/300 张硬件 smoke 证明没有引入启动或路径回归。 |
+
+建议先做第一档。这样日常双击/PowerShell 启动不需要 Git Bash，但 Docker 容器内部仍可使用 Bash，不影响现有 USRP TX/SSH runner。
+
 ## Latest 300-Image Cockpit Evidence
 
 These runs were started through the same backend path used by the cockpit desktop test button: `POST /api/session/board-access` to select the link mode, then `POST /api/run-inference-batch` with `{"count":300,"allow_preflight_degraded":true}`. ML-KEM/auth was configured on the board but the crypto toggle was off for the performance run.
