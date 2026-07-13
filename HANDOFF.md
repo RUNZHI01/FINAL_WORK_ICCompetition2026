@@ -2,7 +2,7 @@
 
 更新时间：2026-07-13
 当前分支：`feat/restore-248`
-交接前代码保存点：`7c23ded docs(cockpit): record security identity layout`
+交接前代码保存点：以当前分支最新提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
 
 ## 当前主线
 
@@ -34,12 +34,6 @@
 | 启动环境 | 偏真机 Fedora/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数 |
 | 板卡会话 | 地址、密码、目录参数容易散落在脚本里 | Cockpit 可写入 board access；板卡地址、RX 目录、链路模式向参数化收敛 |
 | 文档和测试 | 资料分散在运行日志和零散报告里 | 新增/更新 runbook、安全审计、HANDOFF、layout tests、crypto scope/gate/auth 负测 |
-
-几个重要取舍：
-
-- 流水线 TVM 试过，当前实现比串行慢，所以默认关闭。
-- tmpfs、decode worker restart、short STOP、short RX wait 都保留为实验开关，不作为默认演示参数。
-- Git Bash 目前只作为 Windows 一键启动外壳，USRP TX/SSH 热路径默认走 Docker。赛前不建议再大改启动体系。
 
 ## 启动方式
 
@@ -77,24 +71,58 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 
 ## 推荐运行参数
 
-`start-dev.sh` 已默认设置：
+`start-dev.sh` 当前默认值如下，接手时以这里为准：
 
-```text
-MLKEM_TRANSPORT_MODE=usrp
-JSCC_LINK_MODE=iq-direct
-MLKEM_AUTH_ENABLED=1
-MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
-MLKEM_CIPHER_SUITE=SM4_GCM
-MLKEM_USRP_MAX_ARQ_ROUNDS=5
-REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx
-REMOTE_RX_RUN_ROOT=/dev/shm/usrp292x_remote_runs
-OPENAMP_DEMO_REMOTE_DECODE_PYTHON=/home/user/venv/bin/python
-OPENAMP_IQ_STREAMING_TVM=0
-ANALOG_PIPELINE_DEPTH=1
-ANALOG_PIPELINE_RF_DECODE_OVERLAP=0
-```
+| 参数 | 默认值 | 用途 |
+|---|---|---|
+| `MLKEM_TRANSPORT_MODE` | `usrp` | Cockpit 默认进入 USRP 模式 |
+| `JSCC_LINK_MODE` | `iq-direct` | USRP 数据面默认 IQ 直传 |
+| `MLKEM_AUTH_ENABLED` | `1` | 默认开启认证面 |
+| `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | SM2 和 ML-DSA 都要通过 |
+| `MLKEM_CIPHER_SUITE` | `SM4_GCM` | TCP 安全信道默认密码套件 |
+| `MLKEM_USRP_MAX_ARQ_ROUNDS` | `5` | IQ 弱同步/漏帧兜底重试 |
+| `REMOTE_USRP_RX_DIR` | `/home/user/cockpit_usrp_rx` | TVM/MNN 消费的板端 decoded latent 目录 |
+| `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
+| `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
+| `OPENAMP_IQ_STREAMING_TVM` | `0` | 默认不边收边跑 TVM |
+| `ANALOG_PIPELINE_DEPTH` | `1` | 默认串行推进，避免队列尾部扩大 |
+| `ANALOG_PIPELINE_RF_DECODE_OVERLAP` | `0` | 默认不让 RF/decode 重叠 |
+| `ANALOG_PRECONNECT_CONTROL` | `1` | 预连接控制面，减少反复建连 |
+| `ANALOG_RX_SESSION_CONTROL` | `1` | 保持 RX 控制会话，当前启动脚本默认开启 |
+| `ANALOG_RX_BATCH_SESSION_CONTROL` | `1` | 批量复用 RX 会话 |
+| `ANALOG_RETRY_ON_BURST_MISS` | `1` | 捕获突发缺失时重试 |
+| `ANALOG_RETRY_ON_LOW_SYNC` | `1` | sync metric 低于阈值时重试 |
+| `ANALOG_LOW_SYNC_RETRY_THRESHOLD` | `0.08` | low-sync retry 阈值 |
+| `ANALOG_REMOTE_DECODE_RESPONSE_MODE` | `minimal` | 减小 decode worker 响应体 |
+| `ANALOG_REMOTE_DECODED_FORMAT` | `npy` | decoded latent 默认写 `.npy` |
+| `ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS` | `1` | 提前建目录，减少热路径 SSH 抖动 |
+| `ANALOG_RX_SC16_MMAP` | `1` | RX sc16 读取使用 mmap |
+| `ANALOG_RX_CLIPPING_DECIMATION` | `8` | clipping 统计降采样 |
+| `ANALOG_RX_POST_QUANTIZE` | `0` | 不写旧 quant/scale/zero_point 诊断数组 |
+| `ANALOG_ROBUST_SYNC` | `0` | 不默认启用慢速 robust CFO fallback |
+| `RX_STOP_WAIT_MS` | `8000` | 保守 STOP 等待 |
+| `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC` | `8.0` | 保守 RX drain |
 
-不要默认打开 streaming TVM、tmpfs 目录实验、decode worker restart、short STOP、short RX wait。这些路径都测过，不适合作为演示默认。
+## 实验开关
+
+以下开关不能作为演示默认。要做 A/B 时单独开启，并记录批次号。
+
+| 开关 | 不默认启用的原因 |
+|---|---|
+| `OPENAMP_IQ_STREAMING_TVM=1` / `USRP_IQ_STREAMING_TVM=1` | 已试过边收边推理，板端 CPU/IO 争用使总耗时和 p95 变差 |
+| `ANALOG_PIPELINE_RF_DECODE_OVERLAP=1` | 目标是“收下一批时解上一批”，但当前收益不稳，容易扩大尾部 |
+| `ANALOG_PIPELINE_DEPTH>1` | 深队列增加并发复杂度；之前未形成稳定收益 |
+| `ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC` | 适合定位 decode worker 卡顿；默认开启会把 timeout/restart 成本带入 p95 |
+| `ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT=1` | 能恢复卡住的 worker，但 restart 会拖长尾部 |
+| `ANALOG_REMOTE_DECODE_PUBLISH_EVENT=1` | 用于观察板端文件发布细节；热路径不需要 |
+| `ANALOG_REMOTE_STALL_SNAPSHOT=1` | 用于抓 stall 快照；演示时会增加诊断动作和日志噪声 |
+| `REMOTE_USRP_RX_DIR=/dev/shm/...` | tmpfs 能降低文件写尾部，但容量、清理和重启一致性风险更高 |
+| `RX_STOP_WAIT_MS=200` 等 short STOP | 已失败过 300 张 gate，不能做默认 |
+| `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2` 等 short drain | 容易留下 RX 残留状态，影响下一轮 |
+| `ANALOG_RX_WAIT_TIMEOUT_SEC=1.0` | 更快暴露等待超时，但实测 p95 变差 |
+| `ANALOG_ROBUST_SYNC=1` | 可以救部分弱同步帧，但慢速 CFO fallback 会明显拖慢尾部 |
+
+注意：`ANALOG_PRECONNECT_CONTROL=1`、`ANALOG_RX_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_CONTROL=1` 现在是启动脚本默认值，不再按早期 runbook 的“纯实验”口径处理。若要改它们，必须重新跑 20/300 张硬件回归。
 
 ## 当前指标
 
@@ -159,6 +187,26 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 - 不要缩短 STOP/RX drain 超时。
 - 不要把 `REMOTE_USRP_RX_DIR` 改到 tmpfs 当默认。
 - 不要把运行日志、`keys/`、`nul`、`cockpit_desktop/logs/` 提交进 git。
+
+## 文件组织现状
+
+源码边界还算清楚，但根目录历史交接文档和运行残留偏多。接手时按下面划分：
+
+| 路径 | 状态 |
+|---|---|
+| `Semantic-Communication/cockpit_desktop/` | Cockpit Electron/React 主 UI |
+| `Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/` | Cockpit 后端和 OpenAMP/USRP 编排入口 |
+| `USRP292x/` | QPSK/IQ USRP 数据面、persistent TX/RX、analog latent runner |
+| `mlkem_link/` | ML-KEM/SM4 安全信道和认证实现 |
+| `scripts/` | TCP client/server、TVM/MNN/PyTorch 辅助脚本 |
+| `docker/` | Docker/演示启动脚本 |
+| `docs/` | 现在应该优先看这里的 runbook 和安全审计 |
+| `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md`、`plan_20260710.md` | 历史交接和计划，保留参考，不是当前入口 |
+| `logs/`、`runtime_logs/`、`local_logs/`、`.logs/`、`tmp/`、`artifacts/` | 运行输出或临时产物，不作为源码入口 |
+| `keys/` | 本地认证公钥/密钥材料，不要提交私钥 |
+| `nul` | Windows 误生成文件，保持不提交 |
+
+目前不建议赛前重排文件树。真正需要清理时，先只归档旧 handoff 文档和运行日志，不要移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些路径，很多脚本仍依赖现有相对路径。
 
 ## 验证命令
 
