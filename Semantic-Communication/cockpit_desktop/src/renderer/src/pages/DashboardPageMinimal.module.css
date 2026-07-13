@@ -246,6 +246,13 @@
   letter-spacing: 0.05em;
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 /* ===== Result Card — grows to fill remaining space ===== */
 .resultCard {
   display: flex;
@@ -361,6 +368,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .progressCount strong {
@@ -376,6 +384,68 @@
   font-size: 14px;
   color: var(--color-text-secondary);
   font-weight: 500;
+}
+
+.progressCount .progressStageText {
+  max-width: 100%;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-feature-settings: normal;
+  overflow-wrap: anywhere;
+}
+
+.mainStageTrack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  height: 12px;
+}
+
+.mainStageSegment {
+  --main-stage-rgb: 43, 94, 212;
+  min-width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(var(--main-stage-rgb), 0.14);
+  transition: background 200ms var(--easing-emphasized), opacity 200ms var(--easing-emphasized);
+}
+
+.mainStageYellow {
+  --main-stage-rgb: 234, 179, 8;
+}
+
+.mainStageGreen {
+  --main-stage-rgb: 34, 197, 94;
+}
+
+.mainStageBlue {
+  --main-stage-rgb: 43, 94, 212;
+}
+
+.mainStagePending {
+  background: rgba(var(--main-stage-rgb), 0.14);
+}
+
+.mainStageDone {
+  background: rgb(var(--main-stage-rgb));
+  box-shadow: 0 0 10px rgba(var(--main-stage-rgb), 0.26);
+  opacity: 1;
+}
+
+.mainStageActive {
+  background: rgb(var(--main-stage-rgb));
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--main-stage-rgb), 0.85),
+    0 0 10px rgba(var(--main-stage-rgb), 0.22);
+  animation: mainStageActivePulse 1s steps(2, end) infinite;
+}
+
+@keyframes mainStageActivePulse {
+  from { opacity: 0.25; }
+  to { opacity: 0.75; }
 }
 
 /* Refined Segmented Matrix Progress Track */
@@ -396,13 +466,7 @@
 
 .progressFill {
   height: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-primary) 0px,
-    var(--color-primary) 4px,
-    transparent 4px,
-    transparent 6px
-  );
+  background: linear-gradient(90deg, #2b5ed4 0%, #3a76f0 55%, #62a0ff 100%);
   border-radius: 2px;
   transition: width 500ms var(--easing-emphasized);
   position: relative;
@@ -410,61 +474,18 @@
 }
 
 .hostPreprocessFill {
-  background: repeating-linear-gradient(
-    90deg,
-    #facc15 0px,
-    #facc15 4px,
-    transparent 4px,
-    transparent 6px
-  );
-  box-shadow: 4px 0 12px rgba(250, 204, 21, 0.45);
+  background: linear-gradient(90deg, #d99b06 0%, #facc15 55%, #fde68a 100%);
+  box-shadow: 4px 0 12px rgba(250, 204, 21, 0.5);
 }
 
 .transportFill {
-  background: repeating-linear-gradient(
-    90deg,
-    #22c55e 0px,
-    #22c55e 4px,
-    transparent 4px,
-    transparent 6px
-  );
+  background: linear-gradient(90deg, #168a45 0%, #22c55e 55%, #86efac 100%);
   box-shadow: 4px 0 12px rgba(34, 197, 94, 0.5);
 }
 
 .inferenceFill {
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-primary) 0px,
-    var(--color-primary) 4px,
-    transparent 4px,
-    transparent 6px
-  );
+  background: linear-gradient(90deg, #2b5ed4 0%, #3a76f0 55%, #62a0ff 100%);
   box-shadow: 4px 0 12px rgba(26, 86, 219, 0.6);
-}
-
-/* Processing head effect */
-.progressFill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 12px;
-  bottom: 0;
-  background: #FFFFFF;
-  opacity: 0.8;
-  filter: blur(2px);
-  animation: processingHead 1s infinite alternate;
-}
-
-@keyframes processingHead {
-  0% { opacity: 0.4; }
-  100% { opacity: 1; }
-}
-
-.progressMeta {
-  font-size: 13px;
-  color: var(--color-text-tertiary);
-  font-weight: 400;
 }
 
 .stageProgressGrid {
@@ -539,9 +560,14 @@
   justify-content: flex-end;
 }
 
+.alertModeLogStream {
+  height: 108px;
+}
+
 .logEntry {
   font-family: var(--font-family-mono);
   font-size: 11px;
+  line-height: 14px;
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -549,6 +575,7 @@
   animation: slideUpFadeIn 300ms var(--easing-standard);
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
 }
 
@@ -634,6 +661,17 @@
   font-size: 13px;
 }
 
+.btnAppliedSm {
+  composes: btnFilledSm;
+  background: var(--color-success);
+}
+
+.btnAppliedSm:disabled {
+  opacity: 1;
+  cursor: default;
+  background: var(--color-success);
+}
+
 /* Tonal (secondary) — pill-style */
 .btnTonal {
   display: flex;
@@ -676,103 +714,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
-}
-
-.batchPresetMeta {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.batchPresetTitle {
-  color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.batchPresetHint {
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1.55;
-  margin-top: 4px;
-}
-
-.batchPresetBadge {
-  padding: 5px 10px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.batchPresetBadgeTcp {
-  color: var(--color-primary);
-  background: var(--color-primary-container);
-  border: 1px solid rgba(26, 86, 219, 0.12);
-}
-
-.batchPresetBadgeUsr {
-  color: #92400E;
-  background: rgba(250, 204, 21, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.28);
-}
-
-.batchPresetRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.batchPresetButton {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  min-height: 68px;
-  padding: 12px;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  text-align: left;
-  cursor: pointer;
-  transition: all 200ms var(--easing-standard);
-}
-
-.batchPresetButton:hover:not(:disabled) {
-  border-color: rgba(26, 86, 219, 0.35);
-  background: rgba(26, 86, 219, 0.05);
-}
-
-.batchPresetButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.18);
-}
-
-.batchPresetButton:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.batchPresetButtonActive {
-  color: var(--color-primary);
-  background: linear-gradient(135deg, rgba(26, 86, 219, 0.12), rgba(255, 255, 255, 0.92));
-  border-color: rgba(26, 86, 219, 0.42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.batchPresetLabel {
-  color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.batchPresetCaption {
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .batchInputRow {
@@ -818,12 +759,6 @@
   color: var(--color-text-muted);
   background: rgba(148, 163, 184, 0.08);
   cursor: not-allowed;
-}
-
-.batchInputHint {
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1.5;
 }
 
 /* Action Status Dots */
@@ -951,6 +886,44 @@
   gap: 8px;
 }
 
+.boardPasswordMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.boardPasswordMeta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.boardSessionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.boardSessionBadgeReady {
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border: 1px solid rgba(5, 150, 105, 0.18);
+}
+
+.boardSessionBadgeBlocked {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border: 1px solid rgba(217, 119, 6, 0.22);
+}
+
 .passwordInput {
   flex: 1;
   padding: 0 var(--space-md);
@@ -1010,12 +983,6 @@
   line-height: 1.55;
 }
 
-.settingStack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .formLabel {
   color: var(--color-text-secondary);
   font-size: 11px;
@@ -1024,59 +991,10 @@
   text-transform: uppercase;
 }
 
-.selectInput {
-  width: 100%;
-  padding: 0 var(--space-md);
-  height: 40px;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  outline: none;
-  transition: border-color 200ms var(--easing-standard), box-shadow 200ms var(--easing-standard);
-  box-sizing: border-box;
-}
-
-.selectInput:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.10);
-}
-
-.selectInput:disabled {
-  color: var(--color-text-muted);
-  background: rgba(148, 163, 184, 0.08);
-  cursor: not-allowed;
-}
-
-.authCheck {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.authCheck input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--color-primary);
-}
-
 .settingStatus {
   color: var(--color-primary);
   font-size: 12px;
   font-weight: 700;
-}
-
-.settingActions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .transportBadge {
@@ -1094,10 +1012,294 @@
   border: 1px solid rgba(26, 86, 219, 0.12);
 }
 
-.transportBadgeUsr {
+.transportBadgeIq {
   color: var(--color-success);
   background: var(--color-success-container);
   border: 1px solid rgba(5, 150, 105, 0.18);
+}
+
+.transportBadgeQpsk {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border: 1px solid rgba(217, 119, 6, 0.22);
+}
+
+.modeSwitchStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modeSwitchBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.linkModeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.linkModeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 72px;
+  padding: 12px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: all 200ms var(--easing-standard);
+}
+
+.linkModeOption:hover:not(:disabled) {
+  border-color: rgba(26, 86, 219, 0.35);
+  background: var(--color-primary-container);
+}
+
+.linkModeOption:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.18);
+}
+
+.linkModeOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.linkModeOptionActive {
+  border-color: rgba(26, 86, 219, 0.42);
+  background: linear-gradient(135deg, rgba(26, 86, 219, 0.12), rgba(255, 255, 255, 0.92));
+  color: var(--color-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.linkModeOptionLabel {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.linkModeOptionCaption {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.iqAuditPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(26, 86, 219, 0.16);
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.82), rgba(248, 250, 252, 0.92));
+}
+
+.iqAuditHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.iqAuditTitle {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.iqAuditCaption {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.iqAuditBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border: 1px solid rgba(5, 150, 105, 0.18);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.iqAuditSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.iqAuditSectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.iqAuditSectionTitle {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.iqTailReference {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.iqTailAxis {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.iqTailAxis::before {
+  content: '';
+  position: absolute;
+  top: 17px;
+  left: 9%;
+  right: 9%;
+  height: 2px;
+  background: rgba(100, 116, 139, 0.28);
+}
+
+.iqTailAxisItem {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 16px 8px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.76);
+  text-align: center;
+}
+
+.iqTailAxisItem::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-success);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.iqTailAxisItemFail {
+  border-color: rgba(203, 213, 225, 0.74);
+  background: transparent;
+}
+
+.iqTailAxisItemFail::before {
+  background: var(--color-text-tertiary);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.12);
+}
+
+.iqTailAxisItemOk {
+  border-color: rgba(5, 150, 105, 0.18);
+}
+
+.iqTailAxisTick {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.iqTailAxisValue,
+.iqTailAxisValueFail {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iqTailAxisValueFail {
+  color: var(--color-error);
+}
+
+.iqTailGrid,
+.iqQualityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.iqTailItem,
+.iqQualityItem {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.74);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.iqTailItemFail {
+  border-color: rgba(203, 213, 225, 0.74);
+  background: transparent;
+}
+
+.iqTailItemOk {
+  border-color: rgba(5, 150, 105, 0.18);
+  background: rgba(236, 253, 245, 0.72);
+}
+
+.iqTailLabel,
+.iqQualityLabel {
+  display: block;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.iqTailValue,
+.iqTailValueFail,
+.iqQualityValue {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iqTailValueFail {
+  color: var(--color-error);
 }
 
 .transportSwitch {
@@ -1173,6 +1375,11 @@
   background: rgba(248, 250, 252, 0.72);
 }
 
+.pathItemEditable {
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 .pathLabel {
   color: var(--color-text-muted);
   font-size: 11px;
@@ -1186,6 +1393,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pathInput {
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pathInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.10);
 }
 
 /* ===== Result Comparison (Bento Box / Bar Chart) ===== */
@@ -1417,9 +1644,6 @@
   .actionRow {
     grid-template-columns: 1fr 1fr;
   }
-  .batchPresetRow {
-    grid-template-columns: 1fr 1fr;
-  }
   .faultGrid {
     grid-template-columns: 1fr 1fr;
   }
@@ -1433,10 +1657,6 @@
   .sectionCard {
     padding: var(--space-md);
   }
-  .batchPresetMeta {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .batchInputField {
     flex-direction: column;
     align-items: stretch;
@@ -1444,9 +1664,6 @@
   }
   .batchInput {
     width: 100%;
-  }
-  .batchPresetRow {
-    grid-template-columns: 1fr;
   }
   .actionRow {
     grid-template-columns: 1fr;
@@ -1458,10 +1675,11 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .settingActions {
-    justify-content: stretch;
+  .pathItemEditable {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
-  .settingActions > button {
-    width: 100%;
+  .iqQualityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

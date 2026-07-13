@@ -166,6 +166,36 @@ class TestSignVerify:
         )
         assert not result.verified
 
+    def test_wrong_peer_public_keys_are_rejected(self) -> None:
+        sm2_be, mldsa_be = _mock_pair()
+        _sm2_pk, sm2_sk = sm2_be.keygen()
+        _mldsa_pk, mldsa_sk = mldsa_be.keygen()
+        wrong_sm2_pk, _ = sm2_be.keygen()
+        wrong_mldsa_pk, _ = mldsa_be.keygen()
+        transcript = b"server transcript"
+
+        sm2_sig, mldsa_sig = sign_transcript(
+            sm2_be,
+            mldsa_be,
+            sm2_sk,
+            mldsa_sk,
+            transcript,
+            SigPolicy.DUAL_REQUIRED,
+        )
+        result = verify_transcript(
+            sm2_be,
+            mldsa_be,
+            wrong_sm2_pk,
+            wrong_mldsa_pk,
+            transcript,
+            sm2_sig,
+            mldsa_sig,
+            SigPolicy.DUAL_REQUIRED,
+        )
+        assert not result.verified
+        assert not result.sm2_ok
+        assert not result.mldsa_ok
+
 
 class TestFinished:
     def test_finished_roundtrip(self) -> None:

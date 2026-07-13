@@ -3,18 +3,23 @@ import { useEffect } from 'react'
 import type { BatchStateResponse } from '../api/types/crypto'
 import type { InferenceQuality } from '../api/types'
 import { getBatchState, getSystemStatus } from '../api/client'
+import type { ComparisonResult } from '../stores/appStore'
 import { useAppStore } from '../stores/appStore'
-import { buildBatchCompletionToken, shouldHydrateRecentCurrentForBatch, shouldRefreshCompletedBatch } from './inferenceStateMachine'
+import {
+  buildBatchCompletionToken,
+  shouldHydrateRecentCurrentForBatch,
+  shouldRecordCompletedBatchComparison,
+  shouldRefreshCompletedBatch,
+} from './inferenceStateMachine'
 import { getBatchStateRefetchInterval } from './pollingPolicy'
 import { recordComparisonResult } from './useInferenceProgress'
 
-function recordCompletedBatchComparison(
+function completedBatchComparison(
   payload: BatchStateResponse,
-  setComparisonResult: ReturnType<typeof useAppStore.getState>['setComparisonResult'],
   quality?: InferenceQuality,
-) {
+): ComparisonResult | undefined {
   if (payload.status !== 'done') {
-    return
+    return undefined
   }
   const engine = payload.engine === 'mnn' ? 'mnn' : 'tvm'
   const batchBenchmark = payload.benchmark
@@ -26,9 +31,9 @@ function recordCompletedBatchComparison(
     : (totalMetric ?? inferenceMetric)
   const reconstructionMs = reconstructionMetric?.median_ms ?? reconstructionMetric?.mean_ms
   if (reconstructionMs == null) {
-    return
+    return undefined
   }
-  setComparisonResult(engine, {
+  return {
     engine,
     label: engine === 'mnn' ? 'MNN重建' : 'TVM重建',
     reconstructionMs,
@@ -36,7 +41,19 @@ function recordCompletedBatchComparison(
     sampleCount: reconstructionMetric?.n ?? inferenceMetric?.n ?? totalMetric?.n ?? payload.completed,
     quality,
     updatedAt: Date.now(),
-  })
+  }
+}
+
+function sameComparisonMetric(left: ComparisonResult | undefined, right: ComparisonResult | undefined): boolean {
+  if (!left || !right) {
+    return false
+  }
+  return (
+    left.engine === right.engine
+    && left.sampleCount === right.sampleCount
+    && Math.abs(left.reconstructionMs - right.reconstructionMs) < 0.005
+    && Math.abs((left.runMs ?? -1) - (right.runMs ?? -1)) < 0.005
+  )
 }
 
 export function useBatchStatePoll() {
@@ -45,6 +62,7 @@ export function useBatchStatePoll() {
   const lastSettledBatchToken = useAppStore((s) => s.lastSettledBatchToken)
   const setLastSettledBatchToken = useAppStore((s) => s.setLastSettledBatchToken)
   const pendingBatchJobId = useAppStore((s) => s.pendingBatchJobId)
+  const comparisonResults = useAppStore((s) => s.comparisonResults)
   const setComparisonResult = useAppStore((s) => s.setComparisonResult)
 
   const query = useQuery({
@@ -60,30 +78,37 @@ export function useBatchStatePoll() {
       }
       const completionToken = buildBatchCompletionToken(query.data)
       setLastSettledBatchToken(completionToken)
-      const completedBatchJobId = query.data.batch_job_id ?? null
-      const isCurrentSessionBatch = Boolean(
-        completedBatchJobId && (!pendingBatchJobId || pendingBatchJobId === completedBatchJobId),
-      )
-      if (isCurrentSessionBatch) {
-        recordCompletedBatchComparison(query.data, setComparisonResult, query.data.quality)
+      const batchComparison = completedBatchComparison(query.data, query.data.quality)
+      const shouldRecordBatch = shouldRecordCompletedBatchComparison(pendingBatchJobId, query.data)
+      if (shouldRecordBatch && batchComparison) {
+        setComparisonResult(batchComparison.engine, batchComparison)
         if (shouldHydrateRecentCurrentForBatch(query.data)) {
           void qc.fetchQuery({
             queryKey: ['system-status'],
             queryFn: getSystemStatus,
           }).then((payload) => {
-            const current = payload?.recent_results?.current
+            const current = payload?.recent_results?.[batchComparison.engine] ?? payload?.recent_results?.current
             if (current?.execution_mode === 'live' && current?.status === 'success') {
               setLastCompletedInference(current)
               recordComparisonResult(current, setComparisonResult)
               const quality = current.quality ?? query.data?.quality
               if (query.data) {
-                recordCompletedBatchComparison(query.data, setComparisonResult, quality)
+                const hydratedBatchComparison = completedBatchComparison(query.data, quality)
+                if (hydratedBatchComparison) {
+                  setComparisonResult(hydratedBatchComparison.engine, hydratedBatchComparison)
+                }
               }
             }
           }).catch(() => undefined)
         }
       }
       void qc.invalidateQueries({ queryKey: ['snapshot'] })
+    } else if (query.data && shouldRecordCompletedBatchComparison(pendingBatchJobId, query.data)) {
+      const batchComparison = completedBatchComparison(query.data, query.data?.quality)
+      const currentComparison = batchComparison ? comparisonResults[batchComparison.engine] : undefined
+      if (batchComparison && !sameComparisonMetric(currentComparison, batchComparison)) {
+        setComparisonResult(batchComparison.engine, batchComparison)
+      }
     }
   }, [
     query.data,
@@ -92,6 +117,7 @@ export function useBatchStatePoll() {
     lastSettledBatchToken,
     setLastSettledBatchToken,
     pendingBatchJobId,
+    comparisonResults,
     setComparisonResult,
   ])
 

@@ -40,6 +40,21 @@ export type RunningBackend = {
   config: BackendRuntimeConfig
 }
 
+export function buildBackendEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...baseEnv }
+
+  if (process.platform === 'win32') {
+    env.OPENAMP_SSH_RUNNER = env.OPENAMP_SSH_RUNNER?.trim() || 'docker'
+    if (env.OPENAMP_SSH_RUNNER === 'docker') {
+      env.OPENAMP_SSH_DOCKER_IMAGE = env.OPENAMP_SSH_DOCKER_IMAGE?.trim() || 'iccomp-usrp-tx:latest'
+    }
+    env.ANALOG_RX_HEALTH_RESET_ON_STALL = env.ANALOG_RX_HEALTH_RESET_ON_STALL?.trim() || '1'
+    env.ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC = env.ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC?.trim() || '0.25'
+  }
+
+  return env
+}
+
 function parsePort(rawPort: string | undefined, fallback: number): number {
   const trimmed = rawPort?.trim()
   if (!trimmed) {
@@ -225,7 +240,7 @@ export function startPythonBackend(runtimeConfig: BackendRuntimeConfig): Running
     {
       cwd: runtimeConfig.cwd,
       stdio: 'inherit',
-      env: { ...process.env },
+      env: buildBackendEnv(),
     },
   )
 

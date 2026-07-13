@@ -13,7 +13,7 @@ if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
 from board_access import BoardAccessConfig  # noqa: E402
-from fault_injector import query_live_status, run_fault_action, run_recover_action  # noqa: E402
+from fault_injector import query_live_status, run_fault_action, run_proxy_phase, run_recover_action  # noqa: E402
 
 
 def make_access() -> BoardAccessConfig:
@@ -110,6 +110,28 @@ def safe_stop_response(*, last_fault: str, transport_status: str = "safe_stop_st
 
 
 class RunFaultActionTest(unittest.TestCase):
+    def test_proxy_phase_decodes_remote_diagnostics_as_utf8_on_windows_hosts(self) -> None:
+        access = make_access()
+        completed = subprocess.CompletedProcess(
+            ["python3", "openamp_remote_hook_proxy.py"],
+            0,
+            stdout=status_response(guard="READY", last_fault="NONE") + "\n",
+            stderr="远端 bridge 启动失败\n",
+        )
+
+        with patch("fault_injector.subprocess.run", return_value=completed) as run:
+            payload = run_proxy_phase(
+                access,
+                phase="STATUS_REQ",
+                payload={"trusted_sha": "a" * 64},
+                timeout_sec=8.0,
+                remote_output_root="/tmp/openamp_demo_hook",
+            )
+
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "replace")
+
     def test_auth_failure_maps_to_operator_message_with_diagnostics(self) -> None:
         access = make_access()
         completed = subprocess.CompletedProcess(

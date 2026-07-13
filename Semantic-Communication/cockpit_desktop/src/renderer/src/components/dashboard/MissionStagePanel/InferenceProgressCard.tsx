@@ -17,14 +17,30 @@ interface InferenceProgressCardProps {
   system: UseQueryResult<SystemStatusResponse>
 }
 
+function engineRecentResultKey(result: RunInferenceResponse | null): string | null {
+  if (!result) return null
+  if (result.variant === 'baseline') return 'pytorch'
+  if (result.variant !== 'current') return null
+  const wrapperSummary = result.wrapper_summary as Record<string, unknown> | undefined
+  const runnerSummary = result.runner_summary as Record<string, unknown> | undefined
+  const engine = String(
+    result.inference_engine
+    ?? wrapperSummary?.inference_engine
+    ?? runnerSummary?.inference_engine
+    ?? '',
+  ).trim().toLowerCase()
+  return engine === 'mnn' ? 'mnn' : 'tvm'
+}
+
 export function InferenceProgressCard({ activeJobId, inferenceProgress, system }: InferenceProgressCardProps) {
   const status = system.data
   const lastCompleted = useAppStore((s) => s.lastCompletedInference)
   const setLastCompletedInference = useAppStore((s) => s.setLastCompletedInference)
+  const lastCompletedEngineKey = engineRecentResultKey(lastCompleted)
   const mergedResults = {
     ...(status?.recent_results ?? {}),
     ...(lastCompleted?.variant === 'current' && lastCompleted?.execution_mode === 'live' && lastCompleted?.status === 'success'
-      ? { current: lastCompleted }
+      ? { current: lastCompleted, ...(lastCompletedEngineKey ? { [lastCompletedEngineKey]: lastCompleted } : {}) }
       : {}),
   }
 

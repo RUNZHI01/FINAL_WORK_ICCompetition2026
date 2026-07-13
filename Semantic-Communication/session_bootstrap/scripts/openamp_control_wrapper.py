@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import shlex
 import signal
 import subprocess
@@ -70,6 +71,88 @@ LINK_HEALTH_PROFILES = {
         "effective_throughput_kbps": 0,
     },
 }
+
+BASH_ENV_KEYS = ("OPENAMP_BASH", "GIT_BASH", "BASH")
+
+
+def _is_windows_wsl_bash(path: str) -> bool:
+    text = str(path or "").replace("/", "\\").lower()
+    return text.endswith("\\windows\\system32\\bash.exe") or "\\appdata\\local\\microsoft\\windowsapps\\bash.exe" in text
+
+
+def _git_bash_candidates_from_exec_path(git_exe: str) -> list[Path]:
+    try:
+        proc = subprocess.run(
+            [git_exe, "--exec-path"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:
+        return []
+    raw = proc.stdout.strip()
+    if not raw:
+        return []
+    exec_path = Path(raw).resolve()
+    candidates: list[Path] = []
+    for root in (exec_path, *exec_path.parents):
+        candidates.extend(
+            [
+                root / "usr" / "bin" / "bash.exe",
+                root / "bin" / "bash.exe",
+            ]
+        )
+    return candidates
+
+
+def resolve_bash_executable() -> str:
+    for key in BASH_ENV_KEYS:
+        raw = str(os.environ.get(key, "") or "").strip()
+        if raw and Path(raw).is_file() and not _is_windows_wsl_bash(raw):
+            return raw
+
+    if os.name == "nt":
+        git_exe = shutil.which("git")
+        if git_exe:
+            for candidate in _git_bash_candidates_from_exec_path(git_exe):
+                if candidate.is_file():
+                    return str(candidate)
+            git_root = Path(git_exe).resolve().parents[1]
+            for candidate in (
+                git_root / "usr" / "bin" / "bash.exe",
+                git_root / "bin" / "bash.exe",
+            ):
+                if candidate.is_file():
+                    return str(candidate)
+        for raw in (
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            r"C:\Program Files\Git\bin\bash.exe",
+        ):
+            candidate = Path(raw)
+            if candidate.is_file():
+                return str(candidate)
+
+    bash = shutil.which("bash")
+    if bash and not (os.name == "nt" and _is_windows_wsl_bash(bash)):
+        return bash
+    return "bash"
+
+
+def terminate_process(process: subprocess.Popen[Any]) -> int:
+    if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        time.sleep(1.0)
+        if process.poll() is None:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        return int(process.wait(timeout=5))
+    process.terminate()
+    time.sleep(1.0)
+    if process.poll() is None:
+        process.kill()
+    return int(process.wait(timeout=5))
 
 
 def parse_args() -> argparse.Namespace:
@@ -364,7 +447,7 @@ def emit_event(
         hook_started = time.monotonic()
         try:
             result = subprocess.run(
-                ["bash", "-lc", hook_cmd],
+                [resolve_bash_executable(), "-lc", hook_cmd],
                 check=False,
                 input=json.dumps(event, ensure_ascii=False),
                 text=True,
@@ -446,7 +529,7 @@ def build_manifest(
         "variant": variant,
         "job_flags": job_flags,
         "runner_cmd": args.runner_cmd,
-        "runner_cmd_shell_quoted": shlex.join(["bash", "-lc", args.runner_cmd]),
+        "runner_cmd_shell_quoted": shlex.join([resolve_bash_executable(), "-lc", args.runner_cmd]),
         "expected_sha256": expected_sha256,
         "expected_outputs": expected_outputs,
         "deadline_ms": deadline_ms,
@@ -896,12 +979,12 @@ def main() -> int:
         logfile.write(f"runner_cmd={args.runner_cmd}\n")
         logfile.flush()
         process = subprocess.Popen(
-            ["bash", "-lc", args.runner_cmd],
+            [resolve_bash_executable(), "-lc", args.runner_cmd],
             cwd=PROJECT_ROOT,
             stdout=logfile,
             stderr=subprocess.STDOUT,
             text=True,
-            preexec_fn=os.setsid,
+            preexec_fn=os.setsid if hasattr(os, "setsid") else None,
         )
         try:
             last_heartbeat = start_time
@@ -913,11 +996,7 @@ def main() -> int:
                     break
                 if args.runner_timeout_sec > 0 and elapsed > args.runner_timeout_sec:
                     timed_out = True
-                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-                    time.sleep(1.0)
-                    if process.poll() is None:
-                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                    return_code = process.wait(timeout=5)
+                    return_code = terminate_process(process)
                     break
                 if time.monotonic() - last_heartbeat >= args.heartbeat_interval_sec:
                     emit_event(

@@ -66,8 +66,47 @@ def _torch_load(path: str) -> Any:
         return torch.load(path, map_location='cpu')
 
 
+def _torch_load(path: str) -> Any:
+    try:
+        import torch  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(f'读取 .pt latent 需要 torch: {path}') from exc
+
+    try:
+        return torch.load(path, map_location='cpu', weights_only=False)
+    except TypeError:
+        return torch.load(path, map_location='cpu')
+
+
 def _load_float32_latent(path: str) -> tuple[np.ndarray, dict[str, Any]]:
     """加载旧路径可用的 float32 latent。"""
+    if path.endswith('.pt'):
+        payload = _torch_load(path)
+        if not isinstance(payload, dict):
+            raise ValueError(f'{path} 不包含 raw float latent 字段 "latent"')
+        if 'latent' in payload:
+            arr = payload['latent']
+        elif {'quant', 'scale', 'zero_point'}.issubset(payload.keys()):
+            quant = payload['quant']
+            scale = payload['scale']
+            zero_point = payload['zero_point']
+            if hasattr(quant, 'detach'):
+                quant = quant.detach().cpu().numpy()
+            if hasattr(scale, 'detach'):
+                scale = scale.detach().cpu().numpy()
+            if hasattr(zero_point, 'detach'):
+                zero_point = zero_point.detach().cpu().numpy()
+            arr = (np.asarray(quant, dtype=np.float32) - np.asarray(zero_point, dtype=np.float32)) * np.asarray(
+                scale,
+                dtype=np.float32,
+            )
+        else:
+            raise ValueError(f'{path} 不包含 raw float latent 字段 "latent"')
+        if hasattr(arr, 'detach'):
+            arr = arr.detach().cpu().numpy()
+        arr = np.asarray(arr, dtype=np.float32)
+        return arr.astype(np.float32, copy=False), {'shape': list(arr.shape), 'dtype': 'float32'}
+
     if path.endswith('.bin'):
         raw = Path(path).read_bytes()
         n = len(raw) // 4
@@ -95,7 +134,7 @@ def _load_float32_latent(path: str) -> tuple[np.ndarray, dict[str, Any]]:
     elif path.endswith('.npy'):
         arr = np.load(path).astype(np.float32)
     else:
-        raise ValueError(f'不支持的文件格式: {path}（需要 .npz / .npy / .bin）')
+        raise ValueError(f'不支持的文件格式: {path}（需要 .pt / .npz / .npy / .bin）')
 
     return arr.astype(np.float32, copy=False), {'shape': list(arr.shape), 'dtype': 'float32'}
 

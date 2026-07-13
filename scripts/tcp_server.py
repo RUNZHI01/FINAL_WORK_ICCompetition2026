@@ -22,9 +22,11 @@
 """
 
 import argparse
+import base64
 import hashlib
 import json
 import os
+import select
 import subprocess
 import sys
 import threading
@@ -391,14 +393,190 @@ def handle_client(channel: SecureChannel, output_dir: str,
 def run_tvm_inference(latent_bytes: bytes, meta: dict,
                       output_dir: str, conn_id: int,
                       config: dict) -> dict | None:
-    """通过子进程调用 TVM 推理
+    """通过子进程调用 TVM 推理（守护进程模式优先，单次回退）。"""
 
-    config 包含: tvm_python, artifact_path, snr, tvm_env
-    """
+    if config.get("tvm_daemon_proc") is not None:
+        result = _run_tvm_inference_daemon(latent_bytes, meta, output_dir, conn_id, config)
+        if result is not None:
+            return result
+        print(f"[连接 #{conn_id}] daemon 不可用，回退到 one-shot 模式")
+        _stop_tvm_daemon(config)
+
+    return _run_tvm_inference_oneshot(latent_bytes, meta, output_dir, conn_id, config)
+
+
+# ── 守护进程管理 ──
+
+
+def _start_tvm_daemon(config: dict) -> None:
+    """启动 TVM 推理守护进程并确认就绪。"""
     tvm_python = config["tvm_python"]
     artifact_path = config["artifact_path"]
     snr = config.get("snr", 10.0)
     tvm_env = config.get("tvm_env", {})
+    channel_mode = config.get("tvm_channel_mode", "sim-awgn")
+    big_core = config.get("tvm_big_core")
+
+    helper_script = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "tvm_inference_helper.py")
+
+    cmd = [tvm_python, helper_script,
+           "--artifact-path", artifact_path,
+           "--snr", str(snr),
+           "--channel-mode", channel_mode,
+           "--daemon"]
+    if big_core is not None:
+        cmd.extend(["--cpu-affinity", str(big_core)])
+
+    env = {**os.environ, **tvm_env}
+    print(f"[tvm_daemon] 启动: {' '.join(cmd)}")
+
+    try:
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, bufsize=1, env=env)
+    except Exception as exc:
+        print(f"[tvm_daemon] 启动失败: {exc}，将使用 one-shot 模式")
+        return
+
+    config["tvm_daemon_proc"] = proc
+
+    ready_line = proc.stdout.readline()
+    try:
+        ready_msg = json.loads(ready_line.strip())
+    except (json.JSONDecodeError, ValueError):
+        ready_msg = {}
+
+    if ready_msg.get("status") == "ready":
+        print(f"[tvm_daemon] 就绪 load_ms={ready_msg.get('load_ms', '?')}ms "
+              f"affinity={big_core}")
+    else:
+        print(f"[tvm_daemon] 启动异常: {ready_line[:200]}, stderr={_read_stderr_nonblock(proc)[:200]}")
+        config["tvm_daemon_proc"] = None
+        proc.kill()
+        proc.wait()
+
+
+def _stop_tvm_daemon(config: dict) -> None:
+    """关闭 TVM 守护进程。"""
+    proc = config.get("tvm_daemon_proc")
+    if proc is None:
+        return
+    config["tvm_daemon_proc"] = None
+    try:
+        proc.stdin.write(json.dumps({"action": "quit"}, ensure_ascii=False) + "\n")
+        proc.stdin.flush()
+        proc.wait(timeout=5)
+    except Exception:
+        proc.kill()
+        proc.wait()
+    print("[tvm_daemon] 已关闭")
+
+
+def _read_stderr_nonblock(proc) -> str:
+    """非阻塞读取 stderr。"""
+    try:
+        readable, _, _ = select.select([proc.stderr], [], [], 0.1)
+        if readable:
+            return proc.stderr.read(4096) or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _run_tvm_inference_daemon(latent_bytes: bytes, meta: dict,
+                               output_dir: str, conn_id: int,
+                               config: dict) -> dict | None:
+    """通过守护进程 (stdin/stdout JSON) 执行 TVM 推理。"""
+    proc = config.get("tvm_daemon_proc")
+    lock: threading.Lock = config.get("tvm_daemon_lock")
+    if proc is None or proc.poll() is not None:
+        return None
+
+    snr = config.get("snr", 10.0)
+    channel_mode = config.get("tvm_channel_mode", "sim-awgn")
+
+    try:
+        decoded = decode_transport_payload(meta, latent_bytes)
+    except Exception as e:
+        print(f"[连接 #{conn_id}] transport payload 解码失败: {e}")
+        return None
+
+    try:
+        job_id = meta.get("job_id", f"job-{conn_id}")
+    except Exception:
+        job_id = f"job-{conn_id}"
+    input_npz = os.path.join(output_dir, f"{job_id}_input.npz")
+    output_npy = os.path.join(output_dir, f"{job_id}_output.npy")
+
+    import io as _io_module
+    buf = _io_module.BytesIO()
+    np_items = getattr(decoded, "npz_items", None)
+    if np_items is not None:
+        import numpy as _np
+        _np.savez(buf, **np_items)
+    else:
+        import numpy as _np
+        _np.savez(buf, latent=getattr(decoded, "latent", None) or _np.frombuffer(latent_bytes, dtype=_np.float32))
+    input_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    request = {
+        "action": "infer",
+        "input_b64": input_b64,
+        "snr": float(snr),
+        "channel_mode": channel_mode,
+        "expect_result": True,
+    }
+
+    t1 = time.perf_counter()
+    with lock:
+        proc.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
+        proc.stdin.flush()
+        response_line = proc.stdout.readline()
+    t2 = time.perf_counter()
+
+    if not response_line:
+        stderr_tail = _read_stderr_nonblock(proc)
+        print(f"[连接 #{conn_id}] daemon 无响应, stderr={stderr_tail[:200]}")
+        _stop_tvm_daemon(config)
+        return None
+
+    try:
+        result = json.loads(response_line.strip())
+    except json.JSONDecodeError:
+        print(f"[连接 #{conn_id}] daemon 输出解析失败: {response_line[:200]}")
+        return None
+
+    if result.get("status") != "ok":
+        print(f"[连接 #{conn_id}] daemon 错误: {result.get('message', result)}")
+        return None
+
+    output_b64 = result.get("output_npy_b64")
+    if output_b64:
+        with open(output_npy, "wb") as f:
+            f.write(base64.b64decode(output_b64.encode("ascii")))
+
+    result["output_path"] = output_npy
+    wall_ms = (t2 - t1) * 1000
+    print(
+        f"[连接 #{conn_id}] TVM(daemon) 完成: "
+        f"{result.get('inference_ms', 0):.1f}ms (推理), "
+        f"{wall_ms:.1f}ms (含IPC), "
+        f"shape={result.get('output_shape')}"
+    )
+    return result
+
+
+def _run_tvm_inference_oneshot(latent_bytes: bytes, meta: dict,
+                                output_dir: str, conn_id: int,
+                                config: dict) -> dict | None:
+    """通过一次性子进程调用 TVM 推理（原始回退路径）。"""
+    tvm_python = config["tvm_python"]
+    artifact_path = config["artifact_path"]
+    snr = config.get("snr", 10.0)
+    tvm_env = config.get("tvm_env", {})
+    channel_mode = config.get("tvm_channel_mode", "sim-awgn")
 
     # 保存解码后的 latent/quant npz 供 TVM 进程读取
     try:
@@ -426,6 +604,7 @@ def run_tvm_inference(latent_bytes: bytes, meta: dict,
         "--input", input_npz,
         "--output", output_npy,
         "--snr", str(snr),
+        "--channel-mode", channel_mode,
     ]
 
     print(
@@ -503,6 +682,15 @@ def main():
                         help="JSCC/AWGN 仿真 SNR (dB, 默认 10)")
     parser.add_argument("--status-port", type=int, default=8080,
                         help="HTTP 状态端口 (默认 8080, 0=关闭)")
+    # TVM 守护进程参数
+    parser.add_argument("--tvm-daemon", action="store_true",
+                        help="以守护进程模式运行 TVM（加载一次模型，stdin/stdout 通信）")
+    parser.add_argument("--tvm-big-core", type=int,
+                        default=int(os.environ.get("BIG_LITTLE_BIG_CORES", "2") or 2),
+                        help="TVM 守护进程绑定的大核 CPU (默认 2，从 BIG_LITTLE_BIG_CORES 读取)")
+    parser.add_argument("--tvm-channel-mode", default="sim-awgn",
+                        choices=["sim-awgn", "real-usrp", "none"],
+                        help="信道模式: sim-awgn=软件AWGN, real-usrp/none=直通 (默认 sim-awgn)")
     args = parser.parse_args()
 
     suite = CipherSuite[args.suite]
@@ -525,6 +713,11 @@ def main():
             "artifact_path": args.artifact_path,
             "snr": args.snr,
             "tvm_env": tvm_env,
+            "tvm_channel_mode": args.tvm_channel_mode,
+            "tvm_daemon": args.tvm_daemon,
+            "tvm_big_core": args.tvm_big_core,
+            "tvm_daemon_proc": None,
+            "tvm_daemon_lock": threading.Lock(),
         }
 
     print("=" * 60)
@@ -541,10 +734,14 @@ def main():
     else:
         print("身份认证:  未启用")
     if tvm_config:
-        print(f"TVM 推理:  启用")
+        daemon_label = "守护进程" if args.tvm_daemon else "one-shot"
+        print(f"TVM 推理:  启用 ({daemon_label})")
         print(f"  模型:    {args.artifact_path}")
         print(f"  SNR:     {args.snr} dB")
+        print(f"  信道:    {args.tvm_channel_mode}")
         print(f"  Python:  {args.tvm_python}")
+        if args.tvm_daemon:
+            print(f"  大核:    CPU{args.tvm_big_core}")
     else:
         print(f"TVM 推理:  未启用（纯接收模式）")
     print()
@@ -567,6 +764,10 @@ def main():
         status_http = ThreadingHTTPServer(('', args.status_port), _StatusHTTPHandler)
         threading.Thread(target=status_http.serve_forever, daemon=True).start()
         print(f"状态 HTTP: http://0.0.0.0:{args.status_port}/status")
+
+    # ── 启动 TVM 守护进程（如果启用）──
+    if tvm_config and tvm_config["tvm_daemon"]:
+        _start_tvm_daemon(tvm_config)
 
     import socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -605,6 +806,8 @@ def main():
         print("\n服务停止")
     finally:
         server.close()
+        if tvm_config:
+            _stop_tvm_daemon(tvm_config)
         logger.close()
 
 

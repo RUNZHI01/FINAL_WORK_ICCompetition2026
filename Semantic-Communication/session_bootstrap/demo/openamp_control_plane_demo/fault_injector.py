@@ -122,6 +122,8 @@ def run_proxy_phase(
             cwd=PROJECT_ROOT,
             check=False,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             input=json.dumps(event, ensure_ascii=False),
             capture_output=True,
             timeout=timeout_sec,

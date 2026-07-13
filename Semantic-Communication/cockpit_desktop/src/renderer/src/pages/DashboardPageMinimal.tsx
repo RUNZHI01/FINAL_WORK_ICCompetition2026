@@ -20,26 +20,21 @@ import { FlightPanel } from '../components/dashboard/FlightPanel'
 import { PageTransition, StaggeredList, AnimatedListItem } from '../components/animations'
 import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
-import type { BatchStageProgress } from '../api/types/crypto'
+import type { BatchStageProgress, IqTailAudit } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
+import { shouldDisplayDashboardBatch } from '../hooks/dashboardBatchDisplayState'
+import {
+  extractIqRadioMetrics,
+  extractJsccLinkMode,
+  type IqRadioMetrics,
+  type JsccLinkMode,
+  type JsonObject,
+} from '../api/types'
 import s from './DashboardPageMinimal.module.css'
 
 const LIVE_LOG_ACTIONS = ['Processing block', 'Allocating memory', 'Optimizing tensor', 'Compiling kernel', 'Syncing device']
 
-type AuthSigPolicy = 'DUAL_REQUIRED' | 'SM2_ONLY' | 'MLDSA_ONLY'
 type TransportMode = 'tcp' | 'usrp'
-
-const AUTH_POLICY_OPTIONS: { value: AuthSigPolicy; label: string }[] = [
-  { value: 'DUAL_REQUIRED', label: '双因子: SM2 + ML-DSA' },
-  { value: 'SM2_ONLY', label: '仅 SM2' },
-  { value: 'MLDSA_ONLY', label: '仅 ML-DSA' },
-]
-
-const AUTH_POLICY_HINTS: Record<AuthSigPolicy, string> = {
-  DUAL_REQUIRED: '同时校验 SM2 与 ML-DSA 标识，最接近当前完整认证链路。',
-  SM2_ONLY: '仅保留国密签名身份校验，便于单独验证 SM2 链路。',
-  MLDSA_ONLY: '仅保留后量子签名身份校验，便于单独验证 ML-DSA 链路。',
-}
 
 const TRANSPORT_OPTIONS: { mode: TransportMode; label: string; caption: string }[] = [
   {
@@ -51,6 +46,19 @@ const TRANSPORT_OPTIONS: { mode: TransportMode; label: string; caption: string }
     mode: 'usrp',
     label: 'USRP 模式',
     caption: '上位机 latent 转 bin 后走 USRP OTA，板端从 RX 目录进入重建。',
+  },
+]
+
+const LINK_MODE_OPTIONS: { mode: JsccLinkMode; label: string; caption: string }[] = [
+  {
+    mode: 'qpsk',
+    label: 'QPSK',
+    caption: '可靠字节链路，保留 CRC/ARQ 兜底。',
+  },
+  {
+    mode: 'iq-direct',
+    label: 'IQ 直传',
+    caption: 'JSCC latent 直接映射模拟 IQ 波形。',
   },
 ]
 
@@ -76,16 +84,13 @@ function normalizeStageProgress(stage: BatchStageProgress | null | undefined, fa
   }
 }
 
-function normalizeAuthSigPolicy(rawValue: string | undefined): AuthSigPolicy {
-  const normalized = String(rawValue || '').trim().toUpperCase()
-  if (normalized === 'SM2_ONLY' || normalized === 'MLDSA_ONLY') {
-    return normalized
-  }
-  return 'DUAL_REQUIRED'
-}
-
 function normalizeTransportMode(rawValue: unknown): TransportMode {
   return String(rawValue || '').trim().toLowerCase() === 'usrp' ? 'usrp' : 'tcp'
+}
+
+function normalizeJsccLinkModeValue(rawValue: unknown): JsccLinkMode {
+  const normalized = String(rawValue || '').trim().toLowerCase()
+  return normalized === 'iq-direct' || normalized === 'iq' || normalized === 'analog' ? 'iq-direct' : 'qpsk'
 }
 
 function normalizeBatchCountInput(rawValue: string, fallback: number): number {
@@ -94,6 +99,119 @@ function normalizeBatchCountInput(rawValue: string, fallback: number): number {
     return fallback
   }
   return Math.max(1, Math.min(Math.trunc(parsed), MAX_BATCH_COUNT))
+}
+
+function formatMetricValue(value: number | undefined, decimals = 3): string | undefined {
+  return value == null ? undefined : value.toFixed(decimals)
+}
+
+function formatPercentValue(value: number | undefined): string | undefined {
+  return value == null ? undefined : `${value.toFixed(1)}%`
+}
+
+type IqTailAuditItem = {
+  key: string
+  label: string
+  value: string
+  tone: 'ok' | 'fail' | 'mono'
+}
+
+type IqTailDistributionItem = {
+  key: string
+  label: string
+  value: string
+  tone: 'ok' | 'fail'
+}
+
+function iqTailCount(audit: IqTailAudit | null | undefined, key: keyof IqTailAudit): number | null {
+  const value = audit?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function buildIqTailAuditItems(
+  audit: IqTailAudit | null | undefined,
+  sampleCount: number | null | undefined,
+): IqTailAuditItem[] {
+  const items: IqTailAuditItem[] = []
+
+  if (sampleCount != null) {
+    items.push({ key: 'sample_count', label: '样本数', value: sampleCount.toLocaleString(), tone: 'mono' })
+  }
+  if (!audit) return items
+
+  const referenceMs = iqTailCount(audit, 'reference_ms')
+  const overReference = iqTailCount(audit, 'over_reference_count')
+
+  if (referenceMs != null && overReference != null) {
+    items.push({
+      key: 'over_reference_count',
+      label: `>${referenceMs.toFixed(1)}ms`,
+      value: overReference.toLocaleString(),
+      tone: overReference > 0 ? 'fail' : 'ok',
+    })
+  }
+
+  const tailRows: [keyof IqTailAudit, string][] = [
+    ['rx_control_overhead_gt_50ms_count', 'RX控制尾部'],
+    ['server_capture_gt_100ms_count', 'RX采集尾部'],
+    ['decode_gt_160ms_count', '解码尾部'],
+    ['worker_over_reported_gt_80ms_count', 'Worker响应'],
+    ['write_gt_100ms_count', '写入尾部'],
+    ['soft_completed_count', 'Soft完成'],
+  ]
+
+  for (const [key, label] of tailRows) {
+    const value = iqTailCount(audit, key)
+    if (value != null) {
+      items.push({
+        key: String(key),
+        label,
+        value: value.toLocaleString(),
+        tone: value > 0 && key !== 'soft_completed_count' ? 'fail' : 'mono',
+      })
+    }
+  }
+
+  return items
+}
+
+function buildIqTailDistributionItems(audit: IqTailAudit | null | undefined): IqTailDistributionItem[] {
+  if (!audit) return []
+
+  const thresholdRows: [keyof IqTailAudit, string][] = [
+    ['total_gt_250ms_count', '>250ms'],
+    ['total_gt_275ms_count', '>275ms'],
+    ['total_gt_500ms_count', '>500ms'],
+  ]
+
+  const items: IqTailDistributionItem[] = []
+  for (const [key, label] of thresholdRows) {
+    const value = iqTailCount(audit, key)
+    if (value != null) {
+      items.push({
+        key: String(key),
+        label,
+        value: value.toLocaleString(),
+        tone: value > 0 ? 'fail' : 'ok',
+      })
+    }
+  }
+  return items
+}
+
+type MainProgressTone = 'yellow' | 'green' | 'blue'
+type MainProgressState = 'done' | 'active' | 'pending'
+
+function mainProgressToneClass(tone: MainProgressTone): string {
+  if (tone === 'yellow') return s.mainStageYellow
+  if (tone === 'green') return s.mainStageGreen
+  return s.mainStageBlue
+}
+
+function mainProgressStateClass(state: MainProgressState): string {
+  if (state === 'done') return s.mainStageDone
+  if (state === 'active') return s.mainStageActive
+  return s.mainStagePending
 }
 
 const LiveLogStream = memo(function LiveLogStream({ isRunning }: { isRunning: boolean }) {
@@ -189,7 +307,7 @@ const GpsForwardStream = memo(function GpsForwardStream({
           持续传输
         </div>
       </div>
-      <div className={s.liveLogStream} style={{ marginTop: '8px' }}>
+      <div className={`${s.liveLogStream} ${s.alertModeLogStream}`} style={{ marginTop: '8px' }}>
         {gpsLogs.length > 0 ? gpsLogs.map((log, i) => (
           <div key={`gps-${i}`} className={s.logEntry} style={{ opacity: 0.3 + (i * 0.15), color: 'var(--color-error)' }}>
             {log}
@@ -222,9 +340,9 @@ export function DashboardPageMinimal() {
   const chinaTheater = useAppStore((s) => s.chinaTheater)
   const setChinaTheater = useAppStore((s) => s.setChinaTheater)
   const [boardPassword, setBoardPassword] = useState('')
-  const [authEnabled, setAuthEnabled] = useState(false)
-  const [authSigPolicy, setAuthSigPolicy] = useState<AuthSigPolicy>('DUAL_REQUIRED')
-  const [authDirty, setAuthDirty] = useState(false)
+  const [authEnabled, setAuthEnabled] = useState(true)
+  const [remoteUsrPRxDir, setRemoteUsrPRxDir] = useState('')
+  const [remoteUsrPRxDirDirty, setRemoteUsrPRxDirDirty] = useState(false)
   const [batchCount, setBatchCount] = useState<number>(300)
   const [batchCountTouched, setBatchCountTouched] = useState(false)
   const [toasts, setToasts] = useState<{ id: number; text: string; type: 'success' | 'error' }[]>([])
@@ -262,15 +380,18 @@ export function DashboardPageMinimal() {
   }, [clearComparisonResults, setLastCompletedInference, setLastSettledBatchToken, setPendingBatchJobId])
 
   useEffect(() => {
-    if (authDirty) return
     setAuthEnabled(Boolean(cryptoData?.auth_enabled))
-    setAuthSigPolicy(normalizeAuthSigPolicy(cryptoData?.sig_policy))
-  }, [cryptoData?.auth_enabled, cryptoData?.sig_policy, authDirty])
+  }, [cryptoData?.auth_enabled])
 
   useEffect(() => {
     if (batchCountTouched) return
-    setBatchCount(activeTransport === 'usrp' ? 20 : 300)
+    setBatchCount(300)
   }, [activeTransport, batchCountTouched])
+
+  useEffect(() => {
+    if (remoteUsrPRxDirDirty) return
+    setRemoteUsrPRxDir(String(boardAccess?.remote_usrp_rx_dir || ''))
+  }, [boardAccess?.remote_usrp_rx_dir, remoteUsrPRxDirDirty])
 
   const handleRunInference = useCallback(
     (count: number = batchCount) => {
@@ -331,25 +452,26 @@ export function DashboardPageMinimal() {
     [boardPassword, boardAccessMut, showToast],
   )
 
-  const handleSaveAuth = useMemo(
-    () => () => {
+  const handleToggleAuth = useCallback(
+    (enabled: boolean) => {
+      setAuthEnabled(enabled)
       boardAccessMut.mutate(
         {
-          auth_enabled: authEnabled,
-          auth_sig_policy: authSigPolicy,
+          auth_enabled: enabled,
+          auth_sig_policy: 'DUAL_REQUIRED',
         },
         {
           onSuccess: () => {
-            setAuthDirty(false)
-            showToast(authEnabled ? `认证策略已保存: ${authSigPolicy}` : '认证面已关闭', 'success')
+            showToast(enabled ? '认证已启用: ML-DSA + SM2' : '认证已关闭', 'success')
           },
           onError: (error) => {
-            showToast(`保存认证设置失败: ${error.message}`, 'error')
+            setAuthEnabled(Boolean(cryptoData?.auth_enabled))
+            showToast(`切换认证失败: ${error.message}`, 'error')
           },
         },
       )
     },
-    [authEnabled, authSigPolicy, boardAccessMut, showToast],
+    [boardAccessMut, cryptoData?.auth_enabled, showToast],
   )
 
   const handleSelectTransport = useCallback(
@@ -371,22 +493,47 @@ export function DashboardPageMinimal() {
     [boardAccessMut, showToast],
   )
 
+  const handleSelectLinkMode = useCallback(
+    (mode: JsccLinkMode) => {
+      const selected = LINK_MODE_OPTIONS.find((option) => option.mode === mode)
+      boardAccessMut.mutate(
+        { transport_mode: 'usrp', jscc_link_mode: mode },
+        {
+          onSuccess: () => {
+            showToast(`JSCC 链路已切换: ${selected?.label ?? mode}`, 'success')
+          },
+          onError: (error) => {
+            showToast(`切换 JSCC 链路失败: ${error.message}`, 'error')
+          },
+        },
+      )
+    },
+    [boardAccessMut, showToast],
+  )
+
   // Derived data
   const recentResults = status?.recent_results
   const currentResultFromStore = lastCompletedInference?.variant === 'current' ? lastCompletedInference : undefined
-  const currentResult = currentResultFromStore ?? recentResults?.current
+  const currentResult = currentResultFromStore ?? recentResults?.current ?? recentResults?.tvm ?? recentResults?.mnn
   const baselineResultFromStore = lastCompletedInference?.variant === 'baseline' ? lastCompletedInference : undefined
-  const baselineResult = baselineResultFromStore ?? recentResults?.baseline
-  const currentComparisonFromPayload = comparisonResultFromInferencePayload(currentResult)
+  const baselineResult = baselineResultFromStore ?? recentResults?.pytorch ?? recentResults?.baseline
+  const currentComparisonFromStore = comparisonResultFromInferencePayload(currentResultFromStore)
+  const tvmComparisonFromPayloadRaw = comparisonResultFromInferencePayload(recentResults?.tvm ?? recentResults?.current)
+  const tvmComparisonFromPayload = tvmComparisonFromPayloadRaw?.engine === 'tvm' ? tvmComparisonFromPayloadRaw : undefined
+  const mnnComparisonFromPayloadRaw = comparisonResultFromInferencePayload(recentResults?.mnn ?? recentResults?.current)
+  const mnnComparisonFromPayload = mnnComparisonFromPayloadRaw?.engine === 'mnn' ? mnnComparisonFromPayloadRaw : undefined
   const baselineComparisonFromPayload = comparisonResultFromInferencePayload(baselineResult)
   const pytorchComparison =
     baselineComparisonFromPayload
     ?? comparisonResults.pytorch
   const tvmComparison =
-    currentComparisonFromPayload
-    ?? comparisonResults.tvm
+    comparisonResults.tvm
+    ?? (currentComparisonFromStore?.engine === 'tvm' ? currentComparisonFromStore : undefined)
+    ?? tvmComparisonFromPayload
   const mnnComparison =
     comparisonResults.mnn
+    ?? (currentComparisonFromStore?.engine === 'mnn' ? currentComparisonFromStore : undefined)
+    ?? mnnComparisonFromPayload
   const comparisonRows = [pytorchComparison, tvmComparison, mnnComparison]
     .filter((item): item is ComparisonResult => Boolean(item))
   const maxComparisonMs = Math.max(...comparisonRows.map((item) => item.reconstructionMs), 1)
@@ -409,19 +556,7 @@ export function DashboardPageMinimal() {
       : 'Live'
   const liveExpectedCount = Math.max(1, liveProgress?.expected_count ?? 1)
   const liveCompletedCount = Math.max(0, Math.min(liveProgress?.completed_count ?? 0, liveExpectedCount))
-  const liveCountPercent = liveProgress?.completion_ratio != null
-    ? liveProgress.completion_ratio * 100
-    : (liveProgress?.percent ?? (liveCompletedCount / liveExpectedCount) * 100)
-  const liveStagePercent = liveProgress?.phase_percent
-  const livePercentSource = liveExpectedCount <= 1 && liveStagePercent != null
-    ? Math.max(liveCountPercent, liveStagePercent)
-    : liveCountPercent
-  const livePercent = Math.max(
-    0,
-    Math.min(livePercentSource, 100),
-  )
-  const isCurrentSessionBatch = Boolean(batch?.batch_job_id && pendingBatchJobId && batch.batch_job_id === pendingBatchJobId)
-  const activeBatch = batch && (isCurrentSessionBatch || batch.status === 'running' || batch.status === 'done')
+  const activeBatch = batch && shouldDisplayDashboardBatch(batch, pendingBatchJobId, currentMode)
     ? batch
     : undefined
   const batchServiceMode = activeBatch?.service_mode as string | undefined
@@ -433,7 +568,8 @@ export function DashboardPageMinimal() {
   const batchFallback = Math.max(0, activeBatch?.fallback ?? 0)
   const isBatchRunning = activeBatch?.status === 'running'
   const isBatchDone = activeBatch?.status === 'done'
-  const hasStageProgress = !isSingleLiveRunning && Boolean(activeBatch?.host_preprocess_progress || activeBatch?.transport_progress || activeBatch?.inference_progress)
+  const useUsrpProgressLayout = !isSingleLiveRunning && activeTransport === 'usrp'
+  const hasStageProgress = useUsrpProgressLayout && Boolean(activeBatch?.host_preprocess_progress || activeBatch?.transport_progress || activeBatch?.inference_progress)
   const hostPreprocessStage = normalizeStageProgress(activeBatch?.host_preprocess_progress, batchTotalImages)
   const transportStage = normalizeStageProgress(activeBatch?.transport_progress, batchTotalImages)
   const inferenceStage = normalizeStageProgress(activeBatch?.inference_progress, batchTotalImages)
@@ -451,7 +587,7 @@ export function DashboardPageMinimal() {
   const modeTag = batchServiceMode === 'ROI_ONLY' ? ' (降采样 3:1)' : ''
   const totalImages = isSingleLiveRunning ? liveExpectedCount : batchTotalImages
   const progress = isSingleLiveRunning ? liveCompletedCount : batchProgress
-  const progressPercent = isSingleLiveRunning ? livePercent : (progress / totalImages) * 100
+  const progressPercent = totalImages > 0 ? Math.round((progress / totalImages) * 100) : 0
   const progressEngineLabel = isSingleLiveRunning ? liveEngineLabel : batchEngineLabel
   const currentStage = isSingleLiveRunning
     ? (liveProgress?.current_stage || liveProgress?.label || `${liveEngineLabel} Live 执行中`)
@@ -482,6 +618,39 @@ export function DashboardPageMinimal() {
         : `${batchTotalImages} 张 TVM 图像在线推进`
   const progressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
   const stageProgressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
+  const mainProgressRows = [
+    { key: 'host', label: activeTransport === 'usrp' ? '上位机图片→latent' : '预录输入准备', tone: 'yellow' as const, stage: hostPreprocessStage },
+    { key: 'transport', label: activeTransport === 'usrp' ? 'USRP 传输/解包' : '预录数据装载', tone: 'green' as const, stage: transportStage },
+    { key: 'inference', label: `${batchEngineLabel} 板端推理`, tone: 'blue' as const, stage: inferenceStage },
+  ]
+  const stageDoneFlags = hasStageProgress
+    ? mainProgressRows.map((row) => row.stage.completed >= row.stage.total || row.stage.status === 'completed' || row.stage.status === 'done')
+    : [
+        isRunning || isDone,
+        isRunning || isDone,
+        isDone,
+      ]
+  const firstIncompleteStageIndex = stageDoneFlags.findIndex((done) => !done)
+  const activeMainStageIndex = isRunning && firstIncompleteStageIndex >= 0
+    ? firstIncompleteStageIndex
+    : -1
+  const mainProgressStages = mainProgressRows.map((row, index) => {
+    const state: MainProgressState = stageDoneFlags[index]
+      ? 'done'
+      : index === activeMainStageIndex
+        ? 'active'
+        : 'pending'
+    return { ...row, state }
+  })
+  const activeMainStage = mainProgressStages.find((stage) => stage.state === 'active')
+  const mainProgressStageText = isRunning
+    ? activeMainStage?.label ?? currentStage
+    : isDone
+      ? currentStage
+      : '就绪'
+  const mainProgressStageDetail = isRunning
+    ? `进度 ${progress}/${totalImages}`
+    : ''
   const boardOnline = status?.live?.board_online ?? false
   const hostInputDir = boardAccess?.local_usrp_image_dir
     || boardAccess?.local_usrp_input_dir
@@ -493,19 +662,108 @@ export function DashboardPageMinimal() {
   const pendingTransportMode = boardAccessMut.variables?.transport_mode
     ? normalizeTransportMode(boardAccessMut.variables.transport_mode)
     : undefined
+  const configuredLinkMode = normalizeJsccLinkModeValue(boardAccess?.jscc_link_mode)
+  const pendingJsccLinkMode = boardAccessMut.variables?.jscc_link_mode
+    ? normalizeJsccLinkModeValue(boardAccessMut.variables.jscc_link_mode)
+    : undefined
+  const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
+  const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
+  const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
+  const iqTailAudit = cryptoData?.batch_iq_tail_audit ?? null
+  const iqTailSampleCount = iqTailCount(iqTailAudit, 'record_count') ?? iqRadioMetrics?.sample_count ?? null
+  const iqTailReferenceMs = iqTailCount(iqTailAudit, 'reference_ms')
+  const iqTailAuditItems = buildIqTailAuditItems(iqTailAudit, iqTailSampleCount)
+  const iqTailDistributionItems = buildIqTailDistributionItems(iqTailAudit)
+  const iqRadioMetricItems = [
+    iqRadioMetrics?.sync_success_ratio != null
+      ? { key: 'syncRatio', label: '同步率', value: formatPercentValue(iqRadioMetrics.sync_success_ratio * 100) }
+      : undefined,
+    iqRadioMetrics?.sync_metric?.mean != null
+      ? { key: 'sync', label: 'sync', value: formatMetricValue(iqRadioMetrics.sync_metric.mean, 4) }
+      : undefined,
+    iqRadioMetrics?.evm_rms?.mean != null
+      ? { key: 'evm', label: 'EVM', value: formatMetricValue(iqRadioMetrics.evm_rms.mean, 4) }
+      : undefined,
+    iqRadioMetrics?.estimated_cfo_hz?.mean != null
+      ? { key: 'cfo', label: 'CFO', value: `${iqRadioMetrics.estimated_cfo_hz.mean.toFixed(1)} Hz` }
+      : undefined,
+    iqRadioMetrics?.estimated_snr_db?.mean != null
+      ? { key: 'snr', label: 'SNR', value: `${iqRadioMetrics.estimated_snr_db.mean.toFixed(1)} dB` }
+      : undefined,
+    iqRadioMetrics?.rx_clipping_ratio?.mean != null
+      ? { key: 'clip', label: 'Clipping', value: formatPercentValue(iqRadioMetrics.rx_clipping_ratio.mean * 100) }
+      : undefined,
+    iqRadioMetrics?.latent_mse_vs_tx?.mean != null
+      ? { key: 'latentMse', label: 'Latent MSE', value: formatMetricValue(iqRadioMetrics.latent_mse_vs_tx.mean, 5) }
+      : undefined,
+  ].filter((item): item is { key: string; label: string; value: string } => Boolean(item?.value))
+  const showIqAuditPanel = activeTransport === 'usrp'
+    && activeLinkMode === 'iq-direct'
+    && (iqTailAuditItems.length > 0 || iqTailDistributionItems.length > 0 || iqRadioMetricItems.length > 0)
+  const inputModeLabel = activeTransport === 'usrp'
+    ? activeLinkMode === 'iq-direct'
+      ? 'USRP-IQ直传'
+      : 'USRP-QPSK'
+    : '预录'
+  const inputModeBadgeClass = activeTransport === 'usrp'
+    ? activeLinkMode === 'iq-direct'
+      ? s.transportBadgeIq
+      : s.transportBadgeQpsk
+    : s.transportBadgeTcp
+  const configuredRemoteUsrPRxDir = String(boardAccess?.remote_usrp_rx_dir ?? '').trim()
+  const remoteUsrPRxDirInput = remoteUsrPRxDir.trim()
+  const remoteUsrPRxDirApplied = activeTransport === 'usrp'
+    && remoteUsrPRxDirInput.length > 0
+    && configuredRemoteUsrPRxDir === remoteUsrPRxDirInput
+  const remoteUsrPRxDirButtonLabel = boardAccessMut.isPending
+    ? '保存中...'
+    : remoteUsrPRxDirApplied
+      ? '已生效'
+      : '保存目录'
+  const boardSessionReady = Boolean(boardAccess?.connection_ready)
+  const handleSaveRemoteUsrPRxDir = useCallback(
+    () => {
+      const remoteRxDir = remoteUsrPRxDir.trim()
+      if (!remoteRxDir) {
+        showToast('请输入板端 USRP RX 目录', 'error')
+        return
+      }
+      boardAccessMut.mutate(
+        {
+          transport_mode: 'usrp',
+          jscc_link_mode: activeLinkMode,
+          remote_usrp_rx_dir: remoteRxDir,
+        },
+        {
+          onSuccess: () => {
+            setRemoteUsrPRxDirDirty(false)
+            showToast('USRP RX 目录已保存', 'success')
+          },
+          onError: (error) => {
+            showToast(`保存 USRP RX 目录失败: ${error.message}`, 'error')
+          },
+        },
+      )
+    },
+    [activeLinkMode, boardAccessMut, remoteUsrPRxDir, showToast],
+  )
   const roiEffectiveCount = Math.max(1, Math.ceil(batchCount / 3))
-  const batchTargetLabel = activeTransport === 'usrp' && batchCount === 20
-    ? '20 张快演'
-    : `${batchCount} 张`
-  const batchPresetHint = activeTransport === 'usrp'
-    ? 'USRP 模式推荐先跑 20 张快演，视频录制更紧凑；需要完整留证时再切回 300 张。'
-    : '默认可跑 300 张全量；如需快速演示，也可以先切到 20 张。'
-  const authHint = authEnabled
-    ? AUTH_POLICY_HINTS[authSigPolicy]
-    : '当前只保留 ML-KEM + SM4，会跳过 ML-DSA / SM2 身份认证。'
-  const authStatusLabel = cryptoData?.auth_enabled
-    ? `已保存: ${normalizeAuthSigPolicy(cryptoData?.sig_policy)}`
-    : '已保存: 未启用'
+  const batchTargetLabel = `${batchCount} 张`
+  const boardHostLabel = typeof boardAccess?.host === 'string' && boardAccess.host.trim()
+    ? boardAccess.host
+    : '未配置'
+  const boardUserLabel = typeof boardAccess?.user === 'string' && boardAccess.user.trim()
+    ? boardAccess.user
+    : '未配置'
+  const cryptoServerId = authEnabled && typeof cryptoData?.server_id === 'string' && cryptoData.server_id.trim()
+    ? cryptoData.server_id.trim()
+    : ''
+  const boardPasswordSaved = Boolean(boardAccess?.has_password)
+  const authConfig = {
+    enabled: authEnabled,
+    disabled: boardAccessMut.isPending,
+    onToggle: handleToggleAuth,
+  }
 
   return (
     <PageTransition className={s.root}>
@@ -528,7 +786,7 @@ export function DashboardPageMinimal() {
 
       {/* Metrics Bar */}
       <div className={s.metricsBar}>
-        <HeroMetrics system={system} inferenceProgress={inferenceProgress} batchState={batchState} />
+        <HeroMetrics system={system} inferenceProgress={inferenceProgress} batchState={batchState} currentMode={currentMode} />
         {currentMode && currentMode !== 'FULL_FRAME' && (
           <div className={s.modeBadgeTop} style={{
             background: currentMode === 'ALERT_ONLY' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
@@ -569,45 +827,69 @@ export function DashboardPageMinimal() {
                   </div>
                 </div>
 
-                {hasStageProgress ? (
-                  <div className={s.stageProgressGrid}>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>上位机图片→latent</span>
-                        <span className={s.stageProgressCount}>{hostPreprocessStage.completed} / {hostPreprocessStage.total} {stageProgressSuffix}</span>
-                      </div>
-                      <div className={s.progressTrack}>
-                        <div
-                          className={`${s.progressFill} ${s.hostPreprocessFill}`}
-                          style={{ width: `${hostPreprocessStage.percent}%` }}
-                        />
-                      </div>
+                {useUsrpProgressLayout ? (
+                  <>
+                    <div className={s.progressCount}>
+                      <strong className={s.progressStageText}>{mainProgressStageText}</strong>
+                      {mainProgressStageDetail && <span>{mainProgressStageDetail}</span>}
                     </div>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>USRP 传输/解包</span>
-                        <span className={s.stageProgressCount}>{transportStage.completed} / {transportStage.total} {stageProgressSuffix}</span>
-                      </div>
-                      <div className={s.progressTrack}>
+
+                    <div className={s.mainStageTrack} aria-label="推理阶段进度">
+                      {mainProgressStages.map((stage) => (
                         <div
-                          className={`${s.progressFill} ${s.transportFill}`}
-                          style={{ width: `${transportStage.percent}%` }}
+                          key={stage.key}
+                          className={[
+                            s.mainStageSegment,
+                            mainProgressToneClass(stage.tone),
+                            mainProgressStateClass(stage.state),
+                          ].join(' ')}
+                          title={`${stage.label}: ${stage.state}`}
+                          aria-label={`${stage.label}: ${stage.state}`}
                         />
-                      </div>
+                      ))}
                     </div>
-                    <div className={s.stageProgressRow}>
-                      <div className={s.stageProgressTopline}>
-                        <span className={s.stageProgressTitle}>{batchEngineLabel} 板端推理</span>
-                        <span className={s.stageProgressCount}>{inferenceStage.completed} / {inferenceStage.total} {stageProgressSuffix}</span>
+
+                    {hasStageProgress && (
+                      <div className={s.stageProgressGrid}>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>上位机图片→latent</span>
+                            <span className={s.stageProgressCount}>{hostPreprocessStage.completed} / {hostPreprocessStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.hostPreprocessFill}`}
+                              style={{ width: `${hostPreprocessStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>USRP 传输/解包</span>
+                            <span className={s.stageProgressCount}>{transportStage.completed} / {transportStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.transportFill}`}
+                              style={{ width: `${transportStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className={s.stageProgressRow}>
+                          <div className={s.stageProgressTopline}>
+                            <span className={s.stageProgressTitle}>{batchEngineLabel} 板端推理</span>
+                            <span className={s.stageProgressCount}>{inferenceStage.completed} / {inferenceStage.total} {stageProgressSuffix}</span>
+                          </div>
+                          <div className={s.progressTrack}>
+                            <div
+                              className={`${s.progressFill} ${s.inferenceFill}`}
+                              style={{ width: `${inferenceStage.percent}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className={s.progressTrack}>
-                        <div
-                          className={`${s.progressFill} ${s.inferenceFill}`}
-                          style={{ width: `${inferenceStage.percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <div className={s.progressCount}>
@@ -623,12 +905,6 @@ export function DashboardPageMinimal() {
                     </div>
                   </>
                 )}
-
-                <div className={s.progressMeta}>
-                  当前阶段：{hasStageProgress
-                    ? `USRP ${transportStage.status} · ${batchEngineLabel} ${inferenceStage.status}`
-                    : currentStage}
-                </div>
 
                 {batchIssueMessage && (
                   <div className={s.progressIssue}>
@@ -657,16 +933,6 @@ export function DashboardPageMinimal() {
               <div className={s.sectionCard}>
                 <div className={s.sectionTitle}>执行操作</div>
 
-                <div className={s.batchPresetMeta}>
-                  <div>
-                    <div className={s.batchPresetTitle}>批量规模</div>
-                    <div className={s.batchPresetHint}>{batchPresetHint}</div>
-                  </div>
-                  <div className={`${s.batchPresetBadge} ${activeTransport === 'usrp' ? s.batchPresetBadgeUsr : s.batchPresetBadgeTcp}`}>
-                    当前: {batchTargetLabel}
-                  </div>
-                </div>
-
                 <div className={s.batchInputRow}>
                   <label className={s.batchInputField}>
                     <span className={s.batchInputLabel}>图像数量</span>
@@ -680,14 +946,11 @@ export function DashboardPageMinimal() {
                       value={batchCount}
                       disabled={isRunning || batchMut.isPending || mnnBatchMut.isPending || baselineMut.isPending}
                       onChange={(e) => {
-                        setBatchCount(normalizeBatchCountInput(e.target.value, activeTransport === 'usrp' ? 20 : 300))
+                        setBatchCount(normalizeBatchCountInput(e.target.value, 300))
                         setBatchCountTouched(true)
                       }}
                     />
                   </label>
-                  <div className={s.batchInputHint}>
-                    预录模式默认 300，USRP 模式默认 20，最大 300。
-                  </div>
                 </div>
 
                 <button
@@ -809,119 +1072,176 @@ export function DashboardPageMinimal() {
             </AnimatedListItem>
 
             <AnimatedListItem>
-              {/* Board Password */}
+              {/* Data Plane */}
               <div className={s.sectionCard}>
-                <div className={s.sectionTitle}>板卡连接设置</div>
-                <div className={s.passwordRow}>
-                  <input
-                    type="password"
-                    placeholder="输入板卡密码"
-                    aria-label="板卡密码"
-                    autoComplete="current-password"
-                    value={boardPassword}
-                    onChange={(e) => setBoardPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSavePassword() }}
-                    className={s.passwordInput}
-                  />
-                  <button
-                    className={s.btnFilledSm}
-                    onClick={handleSavePassword}
-                    disabled={boardAccessMut.isPending}
-                  >
-                    {boardAccessMut.isPending ? '保存中...' : '保存'}
-                  </button>
-                </div>
+                <div className={s.sectionTitle}>数据面输入模式</div>
                 <div className={s.settingGroup}>
                   <div className={s.settingRow}>
                     <div className={s.settingMeta}>
-                      <div className={s.settingLabel}>认证面配置</div>
-                      <div className={s.settingCaption}>控制当前 ML-KEM 信道是否叠加 ML-DSA / SM2 身份认证。</div>
+                      <div className={s.settingLabel}>输入来源</div>
                     </div>
-                    <label className={s.authCheck}>
-                      <input
-                        type="checkbox"
-                        checked={authEnabled}
-                        onChange={(e) => {
-                          setAuthEnabled(e.target.checked)
-                          setAuthDirty(true)
-                        }}
-                      />
-                      <span>启用认证</span>
-                    </label>
-                  </div>
-                  <div className={s.settingStack}>
-                    <label className={s.formLabel} htmlFor="auth-sig-policy">认证策略</label>
-                    <select
-                      id="auth-sig-policy"
-                      className={s.selectInput}
-                      value={authSigPolicy}
-                      disabled={!authEnabled || boardAccessMut.isPending}
-                      onChange={(e) => {
-                        setAuthSigPolicy(normalizeAuthSigPolicy(e.target.value))
-                        setAuthDirty(true)
-                      }}
-                    >
-                      {AUTH_POLICY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={s.settingCaption}>{authHint}</div>
-                  <div className={s.settingStatus}>{authStatusLabel}</div>
-                  <div className={s.settingActions}>
-                    <button
-                      className={s.btnFilledSm}
-                      onClick={handleSaveAuth}
-                      disabled={boardAccessMut.isPending}
-                    >
-                      {boardAccessMut.isPending ? '保存中...' : '保存认证设置'}
-                    </button>
-                  </div>
-                </div>
-                <div className={s.settingGroup}>
-                  <div className={s.settingRow}>
-                    <div className={s.settingMeta}>
-                      <div className={s.settingLabel}>数据面输入模式</div>
-                      <div className={s.settingCaption}>认证面配置下方统一切换主 demo 的重建数据来源。</div>
-                    </div>
-                    <div className={`${s.transportBadge} ${activeTransport === 'usrp' ? s.transportBadgeUsr : s.transportBadgeTcp}`}>
-                      当前: {activeTransport === 'usrp' ? 'USRP' : '预录'}
+                    <div className={`${s.transportBadge} ${inputModeBadgeClass}`}>
+                      当前: {inputModeLabel}
                     </div>
                   </div>
-                  <div className={s.transportSwitch}>
-                    {TRANSPORT_OPTIONS.map((option) => {
-                      const isActive = activeTransport === option.mode
-                      const isPending = boardAccessMut.isPending && pendingTransportMode === option.mode
-                      return (
-                        <button
-                          key={option.mode}
-                          type="button"
-                          className={`${s.transportOption} ${isActive ? s.transportOptionActive : ''}`}
-                          aria-pressed={isActive}
-                          disabled={boardAccessMut.isPending}
-                          onClick={() => {
-                            if (!isActive) handleSelectTransport(option.mode)
-                          }}
-                        >
-                          <span className={s.transportOptionLabel}>
-                            {isPending ? '切换中...' : option.label}
-                          </span>
-                          <span className={s.transportOptionCaption}>{option.caption}</span>
-                        </button>
-                      )
-                    })}
+                  <div className={s.modeSwitchStack}>
+                    <div className={s.modeSwitchBlock}>
+                      <div className={s.formLabel}>数据来源</div>
+                      <div className={s.transportSwitch}>
+                        {TRANSPORT_OPTIONS.map((option) => {
+                          const isActive = activeTransport === option.mode
+                          const isPending = boardAccessMut.isPending && pendingTransportMode === option.mode
+                          return (
+                            <button
+                              key={option.mode}
+                              type="button"
+                              className={`${s.transportOption} ${isActive ? s.transportOptionActive : ''}`}
+                              aria-pressed={isActive}
+                              disabled={boardAccessMut.isPending}
+                              onClick={() => {
+                                if (!isActive) handleSelectTransport(option.mode)
+                              }}
+                            >
+                              <span className={s.transportOptionLabel}>
+                                {isPending ? '切换中...' : option.label}
+                              </span>
+                              <span className={s.transportOptionCaption}>{option.caption}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {activeTransport === 'usrp' && (
+                      <div className={s.modeSwitchBlock}>
+                        <div className={s.formLabel}>USRP JSCC 链路</div>
+                        <div className={s.linkModeSwitch}>
+                          {LINK_MODE_OPTIONS.map((option) => {
+                            const isActive = configuredLinkMode === option.mode
+                            const isPending = boardAccessMut.isPending && pendingJsccLinkMode === option.mode
+                            return (
+                              <button
+                                key={option.mode}
+                                type="button"
+                                className={`${s.linkModeOption} ${isActive ? s.linkModeOptionActive : ''}`}
+                                aria-pressed={isActive}
+                                disabled={boardAccessMut.isPending}
+                                onClick={() => {
+                                  if (!isActive) handleSelectLinkMode(option.mode)
+                                }}
+                              >
+                                <span className={s.linkModeOptionLabel}>
+                                  {isPending ? '切换中...' : option.label}
+                                </span>
+                                <span className={s.linkModeOptionCaption}>{option.caption}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                  {showIqAuditPanel && (
+                    <div className={s.iqAuditPanel}>
+                      <div className={s.iqAuditHeader}>
+                        <div>
+                          <div className={s.iqAuditTitle}>IQ直传链路诊断</div>
+                          <div className={s.iqAuditCaption}>链路质量、尾部计数与耗时阈值分布</div>
+                        </div>
+                        <span className={s.iqAuditBadge}>IQ 生效</span>
+                      </div>
+
+                      {iqRadioMetricItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionTitle}>链路质量</div>
+                          <div className={s.iqQualityGrid} aria-label="IQ 射频质量指标">
+                            {iqRadioMetricItems.map((item) => (
+                              <div key={item.key} className={s.iqQualityItem}>
+                                <span className={s.iqQualityLabel}>{item.label}</span>
+                                <span className={s.iqQualityValue}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {iqTailDistributionItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionHeader}>
+                            <div className={s.iqAuditSectionTitle}>尾部时间分布</div>
+                            {iqTailReferenceMs != null && (
+                              <div className={s.iqTailReference}>参考 {iqTailReferenceMs.toFixed(1)}ms</div>
+                            )}
+                          </div>
+                          <div className={s.iqTailAxis} aria-label="IQ 尾部耗时阈值分布">
+                            {iqTailDistributionItems.map((item) => (
+                              <div
+                                key={item.key}
+                                className={`${s.iqTailAxisItem} ${item.tone === 'fail' ? s.iqTailAxisItemFail : s.iqTailAxisItemOk}`}
+                              >
+                                <span className={s.iqTailAxisTick}>{item.label}</span>
+                                <span className={item.tone === 'fail' ? s.iqTailAxisValueFail : s.iqTailAxisValue}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {iqTailAuditItems.length > 0 && (
+                        <div className={s.iqAuditSection}>
+                          <div className={s.iqAuditSectionTitle}>尾部统计</div>
+                          <div className={s.iqTailGrid} aria-label="IQ 尾部统计指标">
+                            {iqTailAuditItems.map((item) => (
+                              <div
+                                key={item.key}
+                                className={`${s.iqTailItem} ${item.tone === 'fail' ? s.iqTailItemFail : item.tone === 'ok' ? s.iqTailItemOk : ''}`}
+                              >
+                                <span className={s.iqTailLabel}>{item.label}</span>
+                                <span className={item.tone === 'fail' ? s.iqTailValueFail : s.iqTailValue}>{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className={s.pathGrid}>
                     <div className={s.pathItem}>
                       <span className={s.pathLabel}>上位机输入目录</span>
                       <span className={s.pathValue}>{hostInputDir || (activeTransport === 'usrp' ? '未配置' : '预录模式不使用上位机输入')}</span>
                     </div>
-                    <div className={s.pathItem}>
-                      <span className={s.pathLabel}>板端输入目录</span>
-                      <span className={s.pathValue}>{boardInputDir || '未配置'}</span>
-                    </div>
+                    {activeTransport === 'usrp' ? (
+                      <div className={`${s.pathItem} ${s.pathItemEditable}`}>
+                        <label className={s.pathLabel} htmlFor="remote-usrp-rx-dir">板端输入/RX 目录</label>
+                        <input
+                          id="remote-usrp-rx-dir"
+                          type="text"
+                          placeholder="/home/user/cockpit_usrp_rx"
+                          aria-label="板端输入/RX 目录"
+                          value={remoteUsrPRxDir}
+                          onChange={(event) => {
+                            setRemoteUsrPRxDir(event.target.value)
+                            setRemoteUsrPRxDirDirty(event.target.value.trim() !== configuredRemoteUsrPRxDir)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !remoteUsrPRxDirApplied) handleSaveRemoteUsrPRxDir()
+                          }}
+                          className={s.pathInput}
+                        />
+                        <button
+                          type="button"
+                          className={remoteUsrPRxDirApplied ? s.btnAppliedSm : s.btnFilledSm}
+                          onClick={handleSaveRemoteUsrPRxDir}
+                          disabled={boardAccessMut.isPending || remoteUsrPRxDirApplied || remoteUsrPRxDirInput.length === 0}
+                        >
+                          {remoteUsrPRxDirButtonLabel}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={s.pathItem}>
+                        <span className={s.pathLabel}>板端输入目录</span>
+                        <span className={s.pathValue}>{boardInputDir || '未配置'}</span>
+                      </div>
+                    )}
                     <div className={s.pathItem}>
                       <span className={s.pathLabel}>板端重建输出目录</span>
                       <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
@@ -949,7 +1269,44 @@ export function DashboardPageMinimal() {
             activeJobId={activeJobId}
           />
 
-          <CryptoStatusPanel />
+          <div className={s.sectionCard}>
+            <div className={s.sectionTitleRow}>
+              <div className={s.sectionTitle}>板卡密码</div>
+              <div
+                className={`${s.boardSessionBadge} ${boardSessionReady ? s.boardSessionBadgeReady : s.boardSessionBadgeBlocked}`}
+                title={boardSessionReady ? 'SSH 会话字段已补齐' : '补齐板卡主机、用户和密码后才能执行 live/USRP 推理'}
+              >
+                {boardSessionReady ? '板卡就绪' : '板卡未就绪'}
+              </div>
+            </div>
+            <div className={s.boardPasswordMeta}>
+              <span>主机: {boardHostLabel}</span>
+              <span>用户: {boardUserLabel}</span>
+              <span>{boardPasswordSaved ? '当前会话已保存密码' : '当前会话缺少密码'}</span>
+              {cryptoServerId && <span>服务端标识: {cryptoServerId}</span>}
+            </div>
+            <div className={s.passwordRow}>
+              <input
+                type="password"
+                placeholder="输入板卡密码"
+                aria-label="板卡密码"
+                autoComplete="current-password"
+                value={boardPassword}
+                onChange={(e) => setBoardPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSavePassword() }}
+                className={s.passwordInput}
+              />
+              <button
+                className={s.btnFilledSm}
+                onClick={handleSavePassword}
+                disabled={boardAccessMut.isPending}
+              >
+                {boardAccessMut.isPending ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+
+          <CryptoStatusPanel authConfig={authConfig} />
         </div>
       </div>
     </PageTransition>

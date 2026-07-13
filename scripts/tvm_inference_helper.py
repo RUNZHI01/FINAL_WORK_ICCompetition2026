@@ -17,6 +17,7 @@ import argparse
 import base64
 import io
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -93,6 +94,28 @@ def awgn_channel(latent, snr):
     return noisy, metrics
 
 
+def apply_channel(latent, snr, channel_mode):
+    mode = str(channel_mode or "sim-awgn").strip().lower()
+    if mode == "sim-awgn":
+        noisy, metrics = awgn_channel(latent, snr)
+        metrics.update({
+            "channel_mode": mode,
+            "awgn_injected": True,
+        })
+        return noisy.astype(np.float32), metrics
+    if mode in ("real-usrp", "none"):
+        metrics = {
+            "channel_mode": mode,
+            "awgn_injected": False,
+            "jscc_configured_awgn_snr_db": float(snr),
+            "jscc_realized_awgn_snr_db": None,
+            "jscc_awgn_snr_valid": False,
+            "jscc_awgn_note": "software_awgn_disabled",
+        }
+        return np.asarray(latent, dtype=np.float32), metrics
+    raise ValueError(f"unsupported channel_mode: {channel_mode}")
+
+
 def runtime_tensor(array, dev):
     rt = getattr(tvm, "runtime", None)
     fn = getattr(rt, "tensor", None) if rt is not None else None
@@ -124,15 +147,15 @@ def run_inference(
     dev,
     input_payload,
     snr: float,
+    channel_mode: str = "sim-awgn",
     include_output: bool = False,
 ) -> tuple[dict[str, object], np.ndarray]:
     """执行一次推理并返回摘要，可选内联输出 .npy 字节。"""
     latent = load_npz(input_payload)
-    noisy, channel_metrics = awgn_channel(latent, snr)
-    noisy = noisy.astype(np.float32)
+    model_input, channel_metrics = apply_channel(latent, snr, channel_mode)
 
     t0 = time.perf_counter()
-    output = fn(runtime_tensor(noisy, dev))
+    output = fn(runtime_tensor(model_input, dev))
     output_np = output.numpy() if hasattr(output, "numpy") else np.asarray(output)
     inference_ms = (time.perf_counter() - t0) * 1000
 
@@ -153,9 +176,20 @@ def run_inference(
     return result, output_np
 
 
-def daemon_loop(*, artifact_path: str, snr: float) -> int:
+def daemon_loop(*, artifact_path: str, snr: float, channel_mode: str, cpu_affinity: int | None = None) -> int:
     """守护模式：加载一次模型，通过 stdin JSON 连续推理。"""
     requests_served = 0
+
+    if cpu_affinity is not None:
+        try:
+            os.sched_setaffinity(0, {cpu_affinity})
+        except (OSError, AttributeError) as exc:
+            print(
+                f"[tvm_helper] WARNING: sched_setaffinity({cpu_affinity}) failed ({exc}), "
+                "continuing without CPU affinity",
+                flush=True,
+            )
+
     dev, fn, load_ms = load_runtime(artifact_path)
 
     def _write(payload: dict[str, object]) -> None:
@@ -213,6 +247,7 @@ def daemon_loop(*, artifact_path: str, snr: float) -> int:
                 dev=dev,
                 input_payload=payload,
                 snr=float(command.get("snr") or snr),
+                channel_mode=str(command.get("channel_mode") or channel_mode),
                 include_output=include_output,
             )
             requests_served += 1
@@ -231,15 +266,27 @@ def main():
     parser.add_argument("--input", required=False, help="输入 .npz latent 文件")
     parser.add_argument("--output", required=False, help="输出 .npy 结果路径")
     parser.add_argument("--snr", type=float, default=10.0, help="JSCC/AWGN 仿真 SNR (dB)")
+    parser.add_argument(
+        "--channel-mode",
+        choices=["sim-awgn", "real-usrp", "none"],
+        default=os.environ.get("JSCC_CHANNEL_MODE", "sim-awgn"),
+        help="sim-awgn 注入软件 AWGN；real-usrp/none 直接使用输入 latent",
+    )
     parser.add_argument("--seed", type=int, default=None, help="随机种子")
     parser.add_argument("--daemon", action="store_true", help="常驻模式：stdin JSON 请求，stdout JSON 响应")
+    parser.add_argument("--cpu-affinity", type=int, default=None, help="绑定 CPU 核心（仅 daemon 模式）")
     args = parser.parse_args()
 
     if args.seed is not None:
         np.random.seed(args.seed)
 
     if args.daemon:
-        return daemon_loop(artifact_path=args.artifact_path, snr=args.snr)
+        return daemon_loop(
+            artifact_path=args.artifact_path,
+            snr=args.snr,
+            channel_mode=args.channel_mode,
+            cpu_affinity=args.cpu_affinity,
+        )
 
     if not args.input or not args.output:
         parser.error("非 daemon 模式需要 --input 和 --output")
@@ -253,6 +300,7 @@ def main():
             dev=dev,
             input_payload=args.input,
             snr=args.snr,
+            channel_mode=args.channel_mode,
             include_output=False,
         )
 

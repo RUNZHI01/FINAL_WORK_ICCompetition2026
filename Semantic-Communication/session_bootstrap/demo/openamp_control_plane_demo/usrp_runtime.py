@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import shlex
@@ -11,16 +12,18 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from board_access import (
     BoardAccessConfig,
     current_input_source_mode,
+    current_jscc_link_mode,
     input_source_mode_label,
 )
 
@@ -52,16 +55,32 @@ REPO_ROOT = _discover_repo_root()
 ROOT_SCRIPTS = REPO_ROOT / "scripts"
 if str(ROOT_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(ROOT_SCRIPTS))
+SESSION_SCRIPTS = REPO_ROOT / "Semantic-Communication" / "session_bootstrap" / "scripts"
+if str(SESSION_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SESSION_SCRIPTS))
 
 from latent_transport import (  # noqa: E402
     build_transport_blob,
     unpack_transport_frame,
 )
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
 
 DEFAULT_RUNNER = REPO_ROOT / "USRP292x" / "RunQpskFileBatchSpoolArq.py"
+DEFAULT_ANALOG_RUNNER = REPO_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
 DEFAULT_INPUT_DIR = REPO_ROOT / "USRP292x" / "payloads" / "finalwork_webp5"
 DEFAULT_INPUT_FILE = REPO_ROOT / "USRP292x" / "payloads" / "source_latent_wire_blob.bin"
 DEFAULT_RUN_ROOT = REPO_ROOT / "USRP292x" / "qpsk_batch_spool_arq_runs"
+DEFAULT_ANALOG_RUN_ROOT = REPO_ROOT / "USRP292x" / "analog_latent_runs"
+LINK_MODE_QPSK = "qpsk"
+LINK_MODE_IQ_DIRECT = "iq-direct"
+DEFAULT_IQ_DIRECT_SPS = 2
+DEFAULT_IQ_DIRECT_AMPLITUDE = 6000
+DEFAULT_IQ_DIRECT_MAX_ARQ_ROUNDS = 5
+DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.05
+DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
+DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
+DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD = 0.08
+LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
     / "Semantic-Communication"
@@ -77,12 +96,68 @@ RUN_ROOT_KEYS = ("MLKEM_USRP_RUN_ROOT", "USRP_RUN_ROOT")
 MAX_ARQ_ROUNDS_KEYS = ("MLKEM_USRP_MAX_ARQ_ROUNDS", "USRP_MAX_ARQ_ROUNDS")
 DECODE_BACKEND_KEYS = ("QPSK_DECODE_BACKEND",)
 CPP_SYNC_MODE_KEYS = ("QPSK_CPP_SYNC_MODE",)
+TX_DOCKER_MOUNT_TARGET_KEYS = ("OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET", "USRP_TX_DOCKER_MOUNT_TARGET")
+TX_FILE_PATH_PREFIX_FROM_KEYS = ("OPENAMP_USRP_TX_FILE_PATH_PREFIX_FROM", "USRP_TX_FILE_PATH_PREFIX_FROM")
+TX_FILE_PATH_PREFIX_TO_KEYS = ("OPENAMP_USRP_TX_FILE_PATH_PREFIX_TO", "USRP_TX_FILE_PATH_PREFIX_TO")
 ARTIFACT_MODE_KEYS = ("USRP_ARTIFACT_MODE",)
 BATCH_SIZE_KEYS = ("BATCH_SIZE",)
 DECODE_WORKERS_KEYS = ("BATCH_DECODE_WORKERS",)
 CHUNK_BYTES_KEYS = ("CHUNK_BYTES",)
 FAST_ARQ_PROFILE_KEYS = ("USRP_FAST_ARQ_PROFILE",)
 STOP_ON_FAIL_KEYS = ("USRP_STOP_ON_FAIL",)
+# ── IQ 直传 (AnalogLatentLink) 参数 KEYS ──
+ANALOG_SPS_KEYS = ("ANALOG_SPS",)
+ANALOG_RRC_BETA_KEYS = ("ANALOG_RRC_BETA",)
+ANALOG_RRC_SPAN_KEYS = ("ANALOG_RRC_SPAN",)
+ANALOG_AMP_KEYS = ("AMPLITUDE", "ANALOG_AMPLITUDE")
+ANALOG_ZERO_GUARD_KEYS = ("ANALOG_ZERO_GUARD_SAMPLES",)
+ANALOG_TAIL_GUARD_KEYS = ("ANALOG_TAIL_GUARD_SAMPLES",)
+ANALOG_CFO_PILOT_KEYS = ("ANALOG_CFO_PILOT_SYMBOLS",)
+ANALOG_SYNC_PILOT_KEYS = ("ANALOG_SYNC_PILOT_SYMBOLS",)
+ANALOG_DATA_BLOCK_KEYS = ("ANALOG_DATA_BLOCK_SYMBOLS",)
+ANALOG_MID_PILOT_KEYS = ("ANALOG_MID_PILOT_SYMBOLS",)
+ANALOG_CAPTURE_MARGIN_KEYS = ("ANALOG_CAPTURE_MARGIN_SAMPLES",)
+ANALOG_RX_POST_QUANTIZE_KEYS = ("ANALOG_RX_POST_QUANTIZE",)
+ANALOG_ROBUST_SYNC_KEYS = ("ANALOG_ROBUST_SYNC",)
+ANALOG_MIN_SYNC_METRIC_KEYS = ("ANALOG_MIN_SYNC_METRIC",)
+ANALOG_ROBUST_CFO_MAX_HZ_KEYS = ("ANALOG_ROBUST_CFO_MAX_HZ",)
+ANALOG_ROBUST_CFO_STEP_HZ_KEYS = ("ANALOG_ROBUST_CFO_STEP_HZ",)
+ANALOG_SYNC_PROFILE_KEYS = ("ANALOG_SYNC_PROFILE",)
+ANALOG_SYNC_CANDIDATES_KEYS = ("ANALOG_SYNC_CANDIDATES",)
+ANALOG_FAST_SYNC_CANDIDATES_KEYS = ("ANALOG_FAST_SYNC_CANDIDATES",)
+ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS = ("ANALOG_FALLBACK_SYNC_CANDIDATES",)
+ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_RETRY_ON_BURST_MISS_KEYS = ("ANALOG_RETRY_ON_BURST_MISS",)
+ANALOG_RETRY_ON_LOW_SYNC_KEYS = ("ANALOG_RETRY_ON_LOW_SYNC",)
+ANALOG_LOW_SYNC_RETRY_THRESHOLD_KEYS = ("ANALOG_LOW_SYNC_RETRY_THRESHOLD",)
+ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
+ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
+ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
+ANALOG_RX_SESSION_CONTROL_KEYS = ("ANALOG_RX_SESSION_CONTROL",)
+ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
+ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
+ANALOG_RX_HEALTH_RESET_ON_STALL_KEYS = ("ANALOG_RX_HEALTH_RESET_ON_STALL",)
+ANALOG_RX_HEALTH_STALL_THRESHOLD_KEYS = ("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC",)
+ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS = ("ANALOG_RX_ARM_STATUS_TIMEOUT_SEC",)
+ANALOG_RX_ARM_STATUS_POLL_KEYS = ("ANALOG_RX_ARM_STATUS_POLL_SEC",)
+ANALOG_RX_WAIT_TIMEOUT_KEYS = ("ANALOG_RX_WAIT_TIMEOUT_SEC",)
+ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS = ("ANALOG_REMOTE_DECODE_RESULT_MODE",)
+ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS = ("ANALOG_REMOTE_DECODED_OUTPUT_DIR",)
+ANALOG_REMOTE_DECODED_FORMAT_KEYS = ("ANALOG_REMOTE_DECODED_FORMAT",)
+ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_SEC",)
+ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_KEYS = ("ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_SEC",)
+ANALOG_SCRAMBLE_KEY_KEYS = ("ANALOG_SCRAMBLE_KEY",)
+ANALOG_SCRAMBLE_KEY_HEX_KEYS = ("ANALOG_SCRAMBLE_KEY_HEX",)
+ANALOG_SCRAMBLE_CONTEXT_KEYS = ("ANALOG_SCRAMBLE_CONTEXT",)
+ANALOG_SIM_CFO_HZ_KEYS = ("ANALOG_SIM_CFO_HZ",)
+ANALOG_SIM_SNR_DB_KEYS = ("ANALOG_SIM_SNR_DB",)
+ANALOG_SIM_GAIN_KEYS = ("ANALOG_SIM_GAIN",)
+ANALOG_SIM_PHASE_DEG_KEYS = ("ANALOG_SIM_PHASE_DEG",)
+ANALOG_SIM_PHASE_DRIFT_DEG_KEYS = ("ANALOG_SIM_PHASE_DRIFT_DEG",)
+ANALOG_SIM_DC_REAL_KEYS = ("ANALOG_SIM_DC_REAL",)
+ANALOG_SIM_DC_IMAG_KEYS = ("ANALOG_SIM_DC_IMAG",)
+ANALOG_SIM_SEED_KEYS = ("ANALOG_SIM_SEED",)
 TIMEOUT_SEC_KEYS = ("USRP_JOB_TIMEOUT_SEC", "MLKEM_USRP_JOB_TIMEOUT_SEC")
 LOCAL_LATENT_DIR_KEYS = ("OPENAMP_DEMO_LOCAL_LATENT_DIR", "MLKEM_USRP_SOURCE_LATENT_DIR", "USRP_SOURCE_LATENT_DIR")
 LOCAL_LATENT_PATTERN_KEYS = ("OPENAMP_DEMO_LOCAL_LATENT_PATTERN", "USRP_SOURCE_LATENT_PATTERN")
@@ -114,16 +189,18 @@ SHUTDOWN_AFTER_TRANSPORT_KEYS = (
 REMOTE_DECODE_PYTHON_KEYS = (
     "OPENAMP_DEMO_REMOTE_DECODE_PYTHON",
     "REMOTE_USRP_DECODE_PYTHON",
-    "REMOTE_TVM_PYTHON",
-    "MLKEM_REMOTE_PYTHON",
 )
+DEFAULT_REMOTE_DECODE_PYTHON = "/home/user/venv/bin/python"
 REMOTE_DECODE_BIN_KEYS = ("REMOTE_DECODE_BIN", "USRP_REMOTE_DECODE_BIN")
 INFERENCE_ENGINE_KEYS = ("OPENAMP_DEMO_USRP_INFERENCE_ENGINE", "USRP_INFERENCE_ENGINE")
 INFERENCE_ENGINE_NONE = "none"
 INFERENCE_ENGINE_TVM = "tvm"
 INFERENCE_ENGINE_MNN = "mnn"
+IQ_STREAMING_TVM_KEYS = ("OPENAMP_IQ_STREAMING_TVM", "USRP_IQ_STREAMING_TVM")
+IQ_STREAMING_MIN_READY_KEYS = ("OPENAMP_IQ_STREAMING_MIN_READY", "USRP_IQ_STREAMING_MIN_READY")
 DEFAULT_RX_CONTROL_PORT = "29220"
 DEFAULT_TX_CONTROL_PORT = "29221"
+DEFAULT_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
 DEFAULT_REMOTE_USRP_PROJECT_ROOT = "/home/user"
 DEFAULT_REMOTE_RX_RUN_ROOT = "/tmp/usrp292x_remote_runs"
 DEFAULT_RATE = "5000000"
@@ -141,6 +218,15 @@ HOST_IMAGE_LATENT_MANIFEST_VERSION = 1
 CONTROL_PING_TIMEOUT_SEC = 2.0
 CONTROL_START_TIMEOUT_SEC = 15.0
 CONTROL_SHUTDOWN_TIMEOUT_SEC = 5.0
+CHILD_PROCESS_ENV = {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+}
+
+_IQ_DECODE_ASSET_SYNC_CACHE: dict[tuple[str, str, str, str, tuple[tuple[str, str], ...]], dict[str, Any]] = {}
 
 BOARD_DECODE_SCRIPT = r'''#!/usr/bin/env python3
 from __future__ import annotations
@@ -214,6 +300,17 @@ def _first_value(env_values: dict[str, str], keys: tuple[str, ...], default: str
     return default
 
 
+def _rx_stop_wait_ms(env_values: dict[str, str]) -> str:
+    configured = _first_value(env_values, ("RX_STOP_WAIT_MS",))
+    if configured:
+        return configured
+    drain_timeout_sec = _parse_float(
+        _first_value(env_values, ("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC",), "8.0"),
+        8.0,
+    )
+    return str(max(0, int(round(drain_timeout_sec * 1000.0))))
+
+
 def _resolve_existing_path(raw_value: str) -> Path | None:
     text = str(raw_value or "").strip()
     if not text:
@@ -260,6 +357,15 @@ def _parse_bool(raw_value: str, default: bool = False) -> bool:
     if text in {"0", "false", "no", "off"}:
         return False
     return default
+
+
+def _default_shutdown_after_transport(env_values: dict[str, str]) -> bool:
+    return current_jscc_link_mode(env_values) != LINK_MODE_IQ_DIRECT
+
+
+def resolve_shutdown_after_transport(env_values: dict[str, str]) -> bool:
+    default = _default_shutdown_after_transport(env_values)
+    return _parse_bool(_first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS), default)
 
 
 def _read_log_tail(path: Path, *, max_lines: int = 40) -> str:
@@ -331,10 +437,65 @@ def _control_is_ready(host: str, port: str) -> tuple[bool, str]:
     return response.startswith("OK"), response
 
 
+def _tx_server_uses_docker(env_values: dict[str, str]) -> bool:
+    runner = _first_value(env_values, ("OPENAMP_USRP_TX_RUNNER", "USRP_TX_RUNNER")).lower()
+    local_binary = REPO_ROOT / "USRP292x" / "OtaTxPersistentServer"
+    force_local = runner in {"local", "host", "bash"}
+    docker_available = shutil.which("docker") is not None
+    prefer_docker_by_default = os.name == "nt" or not local_binary.exists()
+    return runner == "docker" or (not force_local and docker_available and prefer_docker_by_default)
+
+
 def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port: str) -> dict[str, Any]:
     script = REPO_ROOT / "USRP292x" / "OtaTxPersistentServer.sh"
     if not script.is_file():
         return {"status": "error", "message": f"TX persistent server 脚本不存在: {script}"}
+    use_docker = _tx_server_uses_docker(env_values)
+    if use_docker:
+        image = _first_value(env_values, ("OPENAMP_USRP_TX_DOCKER_IMAGE", "USRP_TX_DOCKER_IMAGE"), "iccomp-usrp-tx:latest")
+        mount_target = _first_value(env_values, TX_DOCKER_MOUNT_TARGET_KEYS, DEFAULT_TX_DOCKER_MOUNT_TARGET)
+        script_in_container = f"{mount_target.rstrip('/')}/USRP292x/OtaTxPersistentServer.sh"
+        command = [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--mount",
+            f"type=bind,source={REPO_ROOT},target={mount_target}",
+            "-p",
+            f"127.0.0.1:{tx_port}:{tx_port}",
+            "-e",
+            f"DEVICE_ARGS={_first_value(env_values, ('TX_ARGS',), DEFAULT_TX_ARGS)}",
+            "-e",
+            f"RATE={_first_value(env_values, ('RATE',), DEFAULT_RATE)}",
+            "-e",
+            f"FREQ={_first_value(env_values, ('FREQ',), DEFAULT_FREQ)}",
+            "-e",
+            f"GAIN={_first_value(env_values, ('TX_GAIN',), DEFAULT_TX_GAIN)}",
+            "-e",
+            f"ANT={_first_value(env_values, ('TX_ANT',), 'TX/RX')}",
+            "-e",
+            "BIND_ADDR=0.0.0.0",
+            "-e",
+            f"PORT={tx_port}",
+            image,
+            "bash",
+            script_in_container,
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
+        if result.returncode != 0:
+            return {
+                "status": "error",
+                "runner": "docker",
+                "message": (result.stderr or result.stdout or f"docker rc={result.returncode}").strip(),
+            }
+        return {
+            "status": "started",
+            "runner": "docker",
+            "container_id": (result.stdout or "").strip(),
+            "image": image,
+            "port": str(tx_port),
+        }
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"tx_persistent_cockpit_{int(time.time())}.log"
     env = os.environ.copy()
@@ -348,39 +509,104 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
         "PORT": str(tx_port),
     })
     with log_path.open("w", encoding="utf-8") as log:
-        proc = subprocess.Popen(
-            [str(script)],
-            cwd=REPO_ROOT,
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
+        try:
+            proc = subprocess.Popen(
+                [resolve_bash_executable(), str(script)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            return {
+                "status": "error",
+                "message": f"TX persistent server 启动失败: {type(exc).__name__}: {exc}",
+                "log_path": str(log_path),
+            }
     return {"status": "started", "pid": proc.pid, "log_path": str(log_path)}
 
 
-def _run_remote_command(access: BoardAccessConfig, command: str, *, timeout: float = 20.0) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(
-        [
-            "bash",
-            str(SSH_HELPER),
-            "--host",
-            access.host,
-            "--user",
-            access.user,
-            "--pass",
-            access.password,
-            "--port",
-            access.port,
-            "--",
-            command,
-        ],
-        capture_output=True,
-        cwd=REPO_ROOT,
-        timeout=timeout,
-        check=False,
-    )
+def _run_remote_command(
+    access: BoardAccessConfig,
+    command: str,
+    *,
+    timeout: float = 20.0,
+    input_data: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    cmd = [
+        resolve_bash_executable(),
+        str(SSH_HELPER),
+        "--host",
+        access.host,
+        "--user",
+        access.user,
+        "--pass",
+        access.password,
+        "--port",
+        access.port,
+        "--",
+        command,
+    ]
+    env = os.environ.copy()
+    env.setdefault("OPENAMP_SSH_TIMEOUT_SEC", str(max(1.0, timeout)))
+    stdout_path: Path | None = None
+    stderr_path: Path | None = None
+    proc: subprocess.Popen[bytes] | None = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as stdout_file, tempfile.NamedTemporaryFile(delete=False) as stderr_file:
+            stdout_path = Path(stdout_file.name)
+            stderr_path = Path(stderr_file.name)
+            proc = subprocess.Popen(
+                cmd,
+                cwd=REPO_ROOT,
+                stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                env=env,
+            )
+            if input_data is not None and proc.stdin is not None:
+                try:
+                    proc.stdin.write(input_data)
+                    proc.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+            returncode = proc.wait(timeout=timeout)
+        stdout = stdout_path.read_bytes() if stdout_path is not None and stdout_path.exists() else b""
+        stderr = stderr_path.read_bytes() if stderr_path is not None and stderr_path.exists() else b""
+        return subprocess.CompletedProcess(cmd, int(returncode or 0), stdout=stdout, stderr=stderr)
+    except subprocess.TimeoutExpired as exc:
+        try:
+            if os.name == "nt" and proc is not None:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(getattr(proc, "pid", ""))],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            elif proc is not None:
+                proc.kill()
+        except Exception:
+            pass
+        try:
+            if proc is not None:
+                proc.wait(timeout=5)
+        except Exception:
+            pass
+        stdout = stdout_path.read_bytes() if stdout_path is not None and stdout_path.exists() else b""
+        stderr = stderr_path.read_bytes() if stderr_path is not None and stderr_path.exists() else b""
+        detail = f"TimeoutExpired: remote command timed out after {timeout:.1f}s".encode("utf-8")
+        stderr = (stderr + b"\n" + detail).strip()
+        return subprocess.CompletedProcess(cmd, 124, stdout=stdout, stderr=stderr)
+    finally:
+        for path in (stdout_path, stderr_path):
+            if path is None:
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
 
 def _start_remote_rx_server(
@@ -406,12 +632,14 @@ def _start_remote_rx_server(
         f"GAIN={shlex.quote(_first_value(env_values, ('RX_GAIN',), DEFAULT_RX_GAIN))} "
         f"ANT={shlex.quote(_first_value(env_values, ('RX_ANT',), DEFAULT_RX_ANT))} "
         f"BIND_ADDR={shlex.quote(_first_value(env_values, ('RX_BIND_ADDR', 'BIND_ADDR'), DEFAULT_BIND_ADDR))} "
+        f"ARM_WAIT_MS={shlex.quote(_first_value(env_values, ('RX_ARM_WAIT_MS',), '2000'))} "
+        f"STOP_WAIT_MS={shlex.quote(_rx_stop_wait_ms(env_values))} "
         f"PORT={shlex.quote(str(rx_port))} "
         "./USRP292x/OtaRxPersistentServer.sh "
         f"> {shlex.quote(remote_log)} 2>&1 < /dev/null & "
         "sleep 1"
     )
-    proc = _run_remote_command(access, remote_cmd, timeout=20.0)
+    proc = _run_remote_command(access, remote_cmd, timeout=60.0)
     stdout = proc.stdout.decode("utf-8", errors="replace").strip()
     stderr = proc.stderr.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
@@ -508,7 +736,7 @@ def _usrp_control_server_params(access: BoardAccessConfig, env_values: dict[str,
     remote_run_root = _first_value(env_values, REMOTE_RX_RUN_ROOT_KEYS, DEFAULT_REMOTE_RX_RUN_ROOT)
     remote_project_root = _remote_usrp_project_root(env_values)
     auto_start = _parse_bool(_first_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"), True)
-    shutdown_after_transport = _parse_bool(_first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"), True)
+    shutdown_after_transport = resolve_shutdown_after_transport(env_values)
     return {
         "rx_host": rx_host,
         "rx_port": rx_port,
@@ -1146,14 +1374,38 @@ def _sync_and_decode_wire_blobs_on_remote(
     remote_dir = f"{remote_root_text}/{remote_subdir}".rstrip("/")
     remote_python_cmd = str(remote_python or "").strip() or "python3"
     payload = _tar_directory_bytes(local_stage_dir)
+    local_tar_path: Path | None = None
+    remote_tar_path = f"/tmp/cockpit_usrp_wire_{os.getpid()}_{int(time.time() * 1000)}.tar.gz"
+    scp_env = os.environ.copy()
+    scp_env.update(CHILD_PROCESS_ENV)
+    scp_env["SSHPASS"] = access.password
+    scp_command = [
+        "sshpass",
+        "-e",
+        "scp",
+        "-q",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "BatchMode=no",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-P",
+        access.port,
+    ]
     remote_command = (
         f"set -euo pipefail && mkdir -p {shlex.quote(remote_dir)} "
-        f"&& tar xzf - -C {shlex.quote(remote_dir)} "
+        f"&& tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_dir)} "
+        f"&& rm -f {shlex.quote(remote_tar_path)} "
         f"&& cd {shlex.quote(remote_dir)} "
         f"&& {remote_python_cmd} decode_usrp_wire.py --wire-dir _wire --output-dir ."
     )
     command = [
-        "bash",
+        resolve_bash_executable(),
         str(SSH_HELPER),
         "--host",
         access.host,
@@ -1166,13 +1418,39 @@ def _sync_and_decode_wire_blobs_on_remote(
         "--",
         remote_command,
     ]
-    result = subprocess.run(
-        command,
-        input=payload,
-        capture_output=True,
-        cwd=REPO_ROOT,
-        check=False,
-    )
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp:
+            tmp.write(payload)
+            local_tar_path = Path(tmp.name)
+        scp_result = subprocess.run(
+            [
+                *scp_command,
+                str(local_tar_path),
+                f"{access.user}@{access.host}:{remote_tar_path}",
+            ],
+            capture_output=True,
+            cwd=REPO_ROOT,
+            env=scp_env,
+            check=False,
+        )
+        if scp_result.returncode != 0:
+            stderr = scp_result.stderr.decode("utf-8", errors="ignore").strip()
+            stdout = scp_result.stdout.decode("utf-8", errors="ignore").strip()
+            detail = stderr or stdout or f"scp rc={scp_result.returncode}"
+            raise RuntimeError(f"板端 USRP RX 目录上传失败: {detail}")
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            env=scp_env,
+            check=False,
+        )
+    finally:
+        if local_tar_path is not None:
+            try:
+                local_tar_path.unlink()
+            except OSError:
+                pass
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="ignore").strip()
         stdout = result.stdout.decode("utf-8", errors="ignore").strip()
@@ -1200,6 +1478,221 @@ def _sync_and_decode_wire_blobs_on_remote(
         "uploaded_bytes": len(payload),
         "decode_manifest": decode_manifest,
     }
+
+
+def _iq_remote_decode_stage_manifest_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    if str(summary.get("remote_decode_result_mode") or "").strip().lower() != "remote-dir":
+        return None
+    remote_dir = str(summary.get("remote_decoded_output_dir") or "").strip().rstrip("/")
+    if not remote_dir:
+        return None
+    remote_files = [
+        str(path or "").strip()
+        for path in summary.get("remote_received_latent_npz_files", [])
+        if str(path or "").strip()
+    ]
+    if not remote_files:
+        images = summary.get("images") if isinstance(summary.get("images"), list) else []
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            records = image.get("round_records") if isinstance(image.get("round_records"), list) else []
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                remote_npz = str(record.get("remote_received_latent_npz") or "").strip()
+                if remote_npz:
+                    remote_files.append(remote_npz)
+    remote_root = remote_dir.rsplit("/", 1)[0] if "/" in remote_dir else remote_dir
+    return {
+        "remote_root": remote_root,
+        "remote_dir": remote_dir,
+        "remote_wire_dir": "",
+        "decode_location": "board",
+        "remote_python": "",
+        "uploaded_bytes": 0,
+        "decode_manifest": {
+            "status": "ok",
+            "source": "iq_remote_decode",
+            "decoded_count": len(remote_files),
+            "files": remote_files,
+        },
+    }
+
+
+def _image_index_from_run_dir(image_dir: Path) -> int | None:
+    match = re.fullmatch(r"image_(\d+)", image_dir.name)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _iq_remote_decoded_extension_from_env(env_values: dict[str, str]) -> str:
+    remote_decoded_format = _first_value(env_values, ANALOG_REMOTE_DECODED_FORMAT_KEYS).strip().lower()
+    return "npy" if remote_decoded_format == "npy" else "npz"
+
+
+def _iq_remote_decode_stage_manifest_from_image_dirs(
+    run_dir: Path,
+    remote_dir: str,
+    *,
+    decoded_extension: str = "npz",
+) -> dict[str, Any] | None:
+    remote_dir = str(remote_dir or "").strip().rstrip("/")
+    if not remote_dir:
+        return None
+    try:
+        image_dirs = sorted(path for path in run_dir.glob("image_*") if path.is_dir())
+    except OSError:
+        return None
+
+    decoded_images: list[dict[str, Any]] = []
+    for image_dir in image_dirs:
+        image_index = _image_index_from_run_dir(image_dir)
+        if image_index is None:
+            continue
+        summary_path = image_dir / "decode_summary.json"
+        if not summary_path.is_file():
+            continue
+        summary = _safe_read_json(summary_path)
+        status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+        frame_complete = bool(summary.get("frame_complete", True))
+        if not (status_ok and frame_complete):
+            continue
+        remote_npz = str(
+            summary.get("remote_received_latent_npz")
+            or summary.get("target_npz")
+            or summary.get("out_npz")
+            or ""
+        ).strip()
+        if not remote_npz:
+            extension = "npy" if str(decoded_extension).strip().lower() == "npy" else "npz"
+            remote_npz = f"{remote_dir}/{image_index:08d}.{extension}"
+        decoded_images.append(
+            {
+                "index": image_index,
+                "status": "decoded",
+                "remote_npz": remote_npz,
+                "decode_summary": str(summary_path),
+            }
+        )
+
+    if not decoded_images:
+        return None
+
+    decoded_images.sort(key=lambda item: int(item["index"]))
+    remote_files = [str(item["remote_npz"]) for item in decoded_images]
+    remote_root = remote_dir.rsplit("/", 1)[0] if "/" in remote_dir else remote_dir
+    return {
+        "remote_root": remote_root,
+        "remote_dir": remote_dir,
+        "remote_wire_dir": "",
+        "decode_location": "board",
+        "remote_python": "",
+        "uploaded_bytes": 0,
+        "decode_manifest": {
+            "status": "ok",
+            "source": "iq_remote_decode_partial",
+            "decoded_count": len(remote_files),
+            "files": remote_files,
+            "images": decoded_images,
+        },
+    }
+
+
+def _sync_iq_decode_assets_on_remote(
+    access: BoardAccessConfig,
+    *,
+    remote_project_root: str,
+    probe_timeout_sec: float = 15.0,
+    upload_timeout_sec: float = 90.0,
+) -> dict[str, Any]:
+    if not access.connection_ready:
+        raise RuntimeError("板端连接信息不完整，无法同步 IQ remote-decode 资产")
+    remote_root = str(remote_project_root or "").strip().rstrip("/") or DEFAULT_REMOTE_USRP_PROJECT_ROOT
+    assets = (
+        (REPO_ROOT / "USRP292x" / "AnalogLatentLink.py", "USRP292x/AnalogLatentLink.py"),
+        (ROOT_SCRIPTS / "latent_transport.py", "scripts/latent_transport.py"),
+    )
+    missing = [str(path) for path, _ in assets if not path.is_file()]
+    if missing:
+        raise RuntimeError(f"IQ remote-decode 本地资产缺失: {', '.join(missing)}")
+
+    local_hashes = {
+        f"{remote_root}/{arcname}": hashlib.sha256(local_path.read_bytes()).hexdigest()
+        for local_path, arcname in assets
+    }
+    cache_key = (
+        access.host,
+        access.user,
+        str(access.port or "22"),
+        remote_root,
+        tuple(sorted(local_hashes.items())),
+    )
+    cached = _IQ_DECODE_ASSET_SYNC_CACHE.get(cache_key)
+    if cached is not None:
+        result = dict(cached)
+        result["status"] = "cached"
+        result["cached_from_status"] = cached.get("status")
+        result["uploaded_bytes"] = 0
+        return result
+
+    probe_timeout = max(1.0, float(probe_timeout_sec or 15.0))
+    upload_timeout = max(1.0, float(upload_timeout_sec or 90.0))
+    probe_command = (
+        "if command -v sha256sum >/dev/null 2>&1; then "
+        + "sha256sum "
+        + " ".join(shlex.quote(path) for path in local_hashes)
+        + " 2>/dev/null || true; fi"
+    )
+    probe_result = _run_remote_command(access, probe_command, timeout=probe_timeout)
+    if probe_result.returncode == 0:
+        remote_hashes: dict[str, str] = {}
+        for line in probe_result.stdout.decode("utf-8", errors="ignore").splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2:
+                remote_hashes[parts[1].strip()] = parts[0].strip().lower()
+        if local_hashes and all(remote_hashes.get(path) == digest for path, digest in local_hashes.items()):
+            result = {
+                "status": "current",
+                "remote_project_root": remote_root,
+                "uploaded_bytes": 0,
+                "files": [arcname for _, arcname in assets],
+            }
+            _IQ_DECODE_ASSET_SYNC_CACHE[cache_key] = dict(result)
+            return result
+
+    payload_buffer = io.BytesIO()
+    with tarfile.open(fileobj=payload_buffer, mode="w:gz") as archive:
+        for local_path, arcname in assets:
+            archive.add(local_path, arcname=arcname)
+    payload = payload_buffer.getvalue()
+    remote_tar_path = f"/tmp/cockpit_iq_decode_assets_{os.getpid()}_{int(time.time() * 1000)}.tar.gz"
+    upload_command = (
+        f"set -e; mkdir -p {shlex.quote(remote_root)}; "
+        f"cat > {shlex.quote(remote_tar_path)}; "
+        f"tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_root)}; "
+        f"rm -f {shlex.quote(remote_tar_path)}"
+    )
+    ssh_result = _run_remote_command(access, upload_command, timeout=upload_timeout, input_data=payload)
+    if ssh_result.returncode != 0:
+        detail = (
+            ssh_result.stderr.decode("utf-8", errors="ignore").strip()
+            or ssh_result.stdout.decode("utf-8", errors="ignore").strip()
+            or f"ssh rc={ssh_result.returncode}"
+        )
+        raise RuntimeError(f"IQ remote-decode 资产上传/解包失败: {detail}")
+    result = {
+        "status": "uploaded",
+        "remote_project_root": remote_root,
+        "uploaded_bytes": len(payload),
+        "files": [arcname for _, arcname in assets],
+    }
+    _IQ_DECODE_ASSET_SYNC_CACHE[cache_key] = dict(result)
+    return result
 
 
 def _normalize_inference_engine(raw_value: str) -> str:
@@ -1314,25 +1807,253 @@ def _single_metric_from_value(value: float | int | None, *, n: int) -> dict[str,
     }
 
 
+def _metric_from_ms_values(values: list[float]) -> dict[str, Any] | None:
+    numeric_values = sorted(float(value) for value in values if float(value) >= 0.0)
+    if not numeric_values:
+        return None
+    count = len(numeric_values)
+    mid = count // 2
+    if count % 2:
+        median = numeric_values[mid]
+    else:
+        median = (numeric_values[mid - 1] + numeric_values[mid]) / 2.0
+    p95_index = max(0, min(count - 1, math.ceil(0.95 * count) - 1))
+    return {
+        "n": count,
+        "min_ms": round(numeric_values[0], 2),
+        "max_ms": round(numeric_values[-1], 2),
+        "mean_ms": round(sum(numeric_values) / count, 2),
+        "median_ms": round(median, 2),
+        "p95_ms": round(numeric_values[p95_index], 2),
+    }
+
+
+def _float_from_mapping(mapping: Mapping[str, Any], key: str) -> float:
+    try:
+        return float(mapping.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _transport_benchmark_from_iq_round_records(summary: dict[str, Any]) -> dict[str, Any] | None:
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return None
+
+    total_ms_values: list[float] = []
+    airtime_ms_values: list[float] = []
+    decode_ms_values: list[float] = []
+    merge_ms_values: list[float] = []
+    rx_pull_ms_values: list[float] = []
+    cleanup_ms_values: list[float] = []
+    other_ms_values: list[float] = []
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list) or not records:
+            continue
+        total_sec = 0.0
+        airtime_ms = 0.0
+        decode_sec = 0.0
+        merge_sec = 0.0
+        rx_pull_sec = 0.0
+        cleanup_sec = 0.0
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            total_sec += _float_from_mapping(record, "total_wall_sec")
+            airtime_ms += _float_from_mapping(record, "detected_airtime_ms")
+            decode_sec += _float_from_mapping(record, "decode_wall_sec")
+            merge_sec += _float_from_mapping(record, "merge_wall_sec")
+            rx_pull_sec += _float_from_mapping(record, "rx_pull_wall_sec")
+            cleanup_sec += _float_from_mapping(record, "remote_cleanup_wall_sec")
+        if total_sec <= 0.0:
+            continue
+        total_ms_values.append(total_sec * 1000.0)
+        if airtime_ms >= 0.0:
+            airtime_ms_values.append(airtime_ms)
+        decode_ms_values.append(decode_sec * 1000.0)
+        merge_ms_values.append(merge_sec * 1000.0)
+        rx_pull_ms_values.append(rx_pull_sec * 1000.0)
+        cleanup_ms_values.append(cleanup_sec * 1000.0)
+        other_sec = max(
+            0.0,
+            total_sec - (airtime_ms / 1000.0) - decode_sec - merge_sec - rx_pull_sec - cleanup_sec,
+        )
+        other_ms_values.append(other_sec * 1000.0)
+
+    if not total_ms_values:
+        return None
+    return {
+        "radio_airtime_ms": _metric_from_ms_values(airtime_ms_values),
+        "decode_ms": _metric_from_ms_values(decode_ms_values),
+        "merge_ms": _metric_from_ms_values(merge_ms_values),
+        "rx_pull_ms": _metric_from_ms_values(rx_pull_ms_values),
+        "remote_cleanup_ms": _metric_from_ms_values(cleanup_ms_values),
+        "other_wall_ms": _metric_from_ms_values(other_ms_values),
+        "total_ms": _metric_from_ms_values(total_ms_values),
+    }
+
+
+def _iq_stage_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    existing = summary.get("iq_stage_benchmark") if isinstance(summary, dict) else None
+    if isinstance(existing, dict) and existing:
+        return existing
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return None
+
+    field_map = (
+        ("tx_control_ms", "tx_wall_sec"),
+        ("rx_arm_ms", "rx_arm_wall_sec"),
+        ("rx_capture_ms", "rx_capture_wall_sec"),
+        ("rx_wait_ms", "rx_wait_wall_sec"),
+        ("remote_decode_ms", "decode_wall_sec"),
+        ("remote_decode_reported_ms", "remote_decode_reported_wall_sec"),
+        ("remote_decode_restart_ms", "remote_decode_restart_wall_sec"),
+        ("remote_dir_publish_ms", "remote_dir_publish_wall_sec"),
+        ("retry_wait_ms", "retry_wait_wall_sec"),
+        ("total_transport_ms", "total_wall_sec"),
+    )
+    stage_values: dict[str, list[float]] = {metric_name: [] for metric_name, _ in field_map}
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            for metric_name, record_field in field_map:
+                if record_field not in record:
+                    continue
+                try:
+                    value = float(record.get(record_field) or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                if value >= 0.0:
+                    stage_values[metric_name].append(value * 1000.0)
+
+    benchmark: dict[str, Any] = {}
+    for metric_name, values in stage_values.items():
+        metric = _metric_from_ms_values(values)
+        if metric is not None:
+            benchmark[metric_name] = metric
+    return benchmark or None
+
+
+def _iq_tail_audit_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    existing = summary.get("iq_tail_audit") if isinstance(summary, dict) else None
+    if isinstance(existing, dict) and existing:
+        return existing
+    return None
+
+
 def _transport_benchmark_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    record_benchmark = _transport_benchmark_from_iq_round_records(summary)
+    if record_benchmark is not None:
+        return record_benchmark
     count = max(1, int(summary.get("pass_count") or summary.get("completed_count") or summary.get("target_count") or 1))
     per_image_sec = float(summary.get("per_image_sec") or 0.0)
     payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)
     decode_total_wall_sec_mean = float(summary.get("decode_total_wall_sec_mean") or 0.0)
     merge_wall_sec_mean = float(summary.get("merge_wall_sec_mean") or 0.0)
+    rx_pull_wall_sec_mean = float(summary.get("rx_pull_wall_sec_mean") or 0.0)
+    remote_cleanup_wall_sec_mean = float(summary.get("remote_cleanup_wall_sec_mean") or 0.0)
     other_sec_mean = float(summary.get("estimated_non_airtime_non_decode_non_merge_wall_sec_mean") or 0.0)
     air_ms = payload_airtime_ms_mean if payload_airtime_ms_mean > 0 else None
     decode_ms = decode_total_wall_sec_mean * 1000.0 if decode_total_wall_sec_mean > 0 else None
     merge_ms = merge_wall_sec_mean * 1000.0 if merge_wall_sec_mean > 0 else None
+    rx_pull_ms = rx_pull_wall_sec_mean * 1000.0 if rx_pull_wall_sec_mean > 0 else None
+    remote_cleanup_ms = remote_cleanup_wall_sec_mean * 1000.0 if remote_cleanup_wall_sec_mean > 0 else None
     other_ms = other_sec_mean * 1000.0 if other_sec_mean > 0 else None
     total_ms = per_image_sec * 1000.0 if per_image_sec > 0 else None
     return {
         "radio_airtime_ms": _single_metric_from_value(air_ms, n=count),
         "decode_ms": _single_metric_from_value(decode_ms, n=count),
         "merge_ms": _single_metric_from_value(merge_ms, n=count),
+        "rx_pull_ms": _single_metric_from_value(rx_pull_ms, n=count),
+        "remote_cleanup_ms": _single_metric_from_value(remote_cleanup_ms, n=count),
         "other_wall_ms": _single_metric_from_value(other_ms, n=count),
         "total_ms": _single_metric_from_value(total_ms, n=count),
     }
+
+
+def _aggregate_iq_radio_metrics(summary: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate IQ-direct PHY metrics (sync_metric / evm_rms / estimated_cfo_hz /
+    estimated_snr_db / rx_clipping_ratio / latent_mse_vs_tx) across all images
+    in an AnalogLatentLink batch_spool_summary.json.
+
+    Returns {} if no IQ round records are found. Mean and max are reported so
+    the cockpit can show both typical and worst-case link health.
+    """
+    images = summary.get("images") if isinstance(summary, dict) else None
+    if not isinstance(images, list):
+        return {}
+
+    field_names = (
+        "sync_metric",
+        "evm_rms",
+        "estimated_cfo_hz",
+        "estimated_snr_db",
+        "rx_clipping_ratio",
+        "latent_mse_vs_tx",
+    )
+    collected: dict[str, list[float]] = {name: [] for name in field_names}
+    sync_success_count = 0
+    total_records = 0
+
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        records = image.get("round_records")
+        if not isinstance(records, list):
+            # IQ runner may put fields directly on the image record
+            records = [image]
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            total_records += 1
+            if record.get("sync_success"):
+                sync_success_count += 1
+            for name in field_names:
+                value = record.get(name)
+                if value is None:
+                    continue
+                try:
+                    collected[name].append(float(value))
+                except (TypeError, ValueError):
+                    pass
+
+    if total_records == 0:
+        return {}
+
+    def _mean(values: list[float]) -> float | None:
+        return (sum(values) / len(values)) if values else None
+
+    def _max(values: list[float]) -> float | None:
+        return max(values) if values else None
+
+    metrics: dict[str, Any] = {
+        "sample_count": total_records,
+        "sync_success_count": sync_success_count,
+        "sync_success_ratio": round(sync_success_count / total_records, 4),
+    }
+    for name in field_names:
+        values = collected[name]
+        if not values:
+            metrics[name] = {"mean": None, "max": None}
+            continue
+        # Truncate to avoid floating-point noise on the wire
+        mean_v = _mean(values)
+        max_v = _max(values)
+        metrics[name] = {
+            "mean": round(mean_v, 6) if mean_v is not None else None,
+            "max": round(max_v, 6) if max_v is not None else None,
+        }
+    return metrics
 
 
 def _count_processed_from_results(results: list[dict[str, Any]]) -> int:
@@ -1343,6 +2064,31 @@ def _count_processed_from_results(results: list[dict[str, Any]]) -> int:
         if rounds > 0 or merge_summary:
             processed += 1
     return processed
+
+
+def _count_progress_from_image_dirs(run_dir: Path) -> dict[str, int]:
+    processed = 0
+    passed = 0
+    try:
+        image_dirs = sorted(path for path in run_dir.glob("image_*") if path.is_dir())
+    except OSError:
+        return {"processed": 0, "pass_count": 0}
+
+    for image_dir in image_dirs:
+        summary_path = image_dir / "decode_summary.json"
+        if not summary_path.is_file():
+            continue
+        processed += 1
+        summary = _safe_read_json(summary_path)
+        status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
+        has_payload = (
+            (image_dir / "received_latent.npz").is_file()
+            or (image_dir / "merged_round0.bin").is_file()
+            or bool(summary.get("frame_complete"))
+        )
+        if status_ok and has_payload:
+            passed += 1
+    return {"processed": processed, "pass_count": passed}
 
 
 def _parse_progress_from_log(log_path: Path, *, fallback_target: int) -> dict[str, int]:
@@ -1409,6 +2155,23 @@ def _resolve_usrp_job_timeout_sec(env_values: dict[str, str], *, expected_output
     return max(300.0, float(max(1, int(expected_outputs))) * 5.0)
 
 
+def _resolve_link_mode(env_values: dict[str, str]) -> str:
+    """Return normalized link mode: 'qpsk' (default) or 'iq-direct'.
+
+    Reads JSCC_LINK_MODE / OPENAMP_DEMO_LINK_MODE. Accepts case-insensitive
+    variants like 'iq', 'analog', 'iq-direct', 'qpsk', 'baseline'. Any unknown
+    value falls back to qpsk baseline (safe default — preserves prior behavior).
+    """
+    raw = str(_first_value(env_values, LINK_MODE_KEYS) or "").strip().lower()
+    if raw in ("iq-direct", "iq_direct", "iq", "analog", "analog-iq"):
+        return LINK_MODE_IQ_DIRECT
+    return LINK_MODE_QPSK
+
+
+def _is_iq_direct_mode(env_values: dict[str, str]) -> bool:
+    return _resolve_link_mode(env_values) == LINK_MODE_IQ_DIRECT
+
+
 class UsrpBatchSpoolJob:
     def __init__(
         self,
@@ -1438,7 +2201,12 @@ class UsrpBatchSpoolJob:
         self._input_source_mode = current_input_source_mode(env_values)
         self._input_source_label = input_source_mode_label(self._input_source_mode)
         self._remote_usrp_rx_root = _first_value(env_values, REMOTE_USRP_RX_ROOT_KEYS)
-        self._remote_decode_python = _first_value(env_values, REMOTE_DECODE_PYTHON_KEYS, "python3")
+        self._remote_decode_python = _first_value(
+            env_values,
+            REMOTE_DECODE_PYTHON_KEYS,
+            DEFAULT_REMOTE_DECODE_PYTHON,
+        )
+        self._iq_remote_decoded_output_dir = ""
         self._prepared_input_manifest: dict[str, Any] | None = None
         self._wire_stage_manifest: dict[str, Any] | None = None
         self._remote_stage_manifest: dict[str, Any] | None = None
@@ -1447,10 +2215,7 @@ class UsrpBatchSpoolJob:
         self._rx_control_port = DEFAULT_RX_CONTROL_PORT
         self._tx_control_host = ""
         self._tx_control_port = DEFAULT_TX_CONTROL_PORT
-        self._shutdown_after_transport = _parse_bool(
-            _first_value(env_values, SHUTDOWN_AFTER_TRANSPORT_KEYS, "1"),
-            True,
-        )
+        self._shutdown_after_transport = resolve_shutdown_after_transport(env_values)
         self._phase = "starting"
         self._host_preprocess_completed = 0
         self._host_preprocess_total = self._expected_outputs
@@ -1462,6 +2227,17 @@ class UsrpBatchSpoolJob:
         self._inference_completed = 0
         self._inference_total = self._expected_outputs
         self._inference_summary: dict[str, Any] | None = None
+        self._inference_thread: threading.Thread | None = None
+        self._inference_error = ""
+        self._inference_started = False
+        self._iq_streaming_tvm_enabled = _parse_bool(
+            _first_value(env_values, IQ_STREAMING_TVM_KEYS, "0"),
+            False,
+        )
+        self._iq_streaming_min_ready = min(
+            self._expected_outputs,
+            max(1, _parse_int(_first_value(env_values, IQ_STREAMING_MIN_READY_KEYS, "1"), 1)),
+        )
         runner_path = _resolve_existing_path(_first_value(env_values, RUNNER_SCRIPT_KEYS)) or DEFAULT_RUNNER
         input_dir = _resolve_existing_path(_first_value(env_values, INPUT_DIR_KEYS)) or DEFAULT_INPUT_DIR
         input_file = _resolve_existing_path(_first_value(env_values, INPUT_FILE_KEYS)) or DEFAULT_INPUT_FILE
@@ -1471,6 +2247,9 @@ class UsrpBatchSpoolJob:
         self._summary_path = self._run_dir / "batch_spool_summary.json"
         self._log_path = self._run_dir / "cockpit_usrp.log"
         self._runner_path = Path(runner_path)
+        self._link_mode = _resolve_link_mode(env_values)
+        if self._link_mode == LINK_MODE_IQ_DIRECT and not _first_value(env_values, RUNNER_SCRIPT_KEYS):
+            self._runner_path = DEFAULT_ANALOG_RUNNER
         self._timeout_sec = _resolve_usrp_job_timeout_sec(env_values, expected_outputs=self._expected_outputs)
 
         self._run_dir.mkdir(parents=True, exist_ok=True)
@@ -1567,7 +2346,11 @@ class UsrpBatchSpoolJob:
             self._rx_control_port = rx_port
             self._tx_control_host = tx_host
             self._tx_control_port = tx_port
-            rx_capture_mode = _first_value(env_values, RX_CAPTURE_MODE_KEYS, "remote-decode" if rx_host == access.host else "local")
+            if rx_host == access.host:
+                default_rx_capture_mode = "remote-decode"
+            else:
+                default_rx_capture_mode = "local"
+            rx_capture_mode = _first_value(env_values, RX_CAPTURE_MODE_KEYS, default_rx_capture_mode)
             remote_rx_target = _remote_ssh_target(access, env_values)
             remote_run_root = _first_value(env_values, REMOTE_RX_RUN_ROOT_KEYS, DEFAULT_REMOTE_RX_RUN_ROOT)
             remote_project_root = _remote_usrp_project_root(env_values)
@@ -1576,6 +2359,30 @@ class UsrpBatchSpoolJob:
                 REMOTE_DECODE_BIN_KEYS,
                 f"{remote_project_root.rstrip('/')}/USRP292x/QpskFileDecode",
             )
+            iq_decode_asset_sync: dict[str, Any] | None = None
+            if self._link_mode == LINK_MODE_IQ_DIRECT and rx_capture_mode == "remote-decode":
+                asset_probe_timeout = _parse_float(
+                    _first_value(env_values, ANALOG_REMOTE_DECODE_ASSET_PROBE_TIMEOUT_KEYS),
+                    15.0,
+                )
+                asset_sync_timeout = _parse_float(
+                    _first_value(env_values, ANALOG_REMOTE_DECODE_ASSET_SYNC_TIMEOUT_KEYS),
+                    90.0,
+                )
+                try:
+                    iq_decode_asset_sync = _sync_iq_decode_assets_on_remote(
+                        access,
+                        remote_project_root=remote_project_root,
+                        probe_timeout_sec=max(1.0, asset_probe_timeout),
+                        upload_timeout_sec=max(1.0, asset_sync_timeout),
+                    )
+                except Exception as exc:
+                    self._final_snapshot = self._build_terminal_snapshot(
+                        status="config_error",
+                        status_category="config_error",
+                        message=f"IQ remote-decode 资产同步失败: {exc}",
+                    )
+                    return
             auto_start_control = _parse_bool(_first_value(env_values, USRP_AUTO_START_CONTROL_KEYS, "1"), True)
             control_ready, control_diagnostics = _ensure_usrp_control_servers(
                 access,
@@ -1590,6 +2397,8 @@ class UsrpBatchSpoolJob:
                 log_dir=REPO_ROOT / "USRP292x" / "server_logs",
             )
             self._control_server_diagnostics = control_diagnostics
+            if iq_decode_asset_sync is not None:
+                self._control_server_diagnostics["iq_decode_asset_sync"] = iq_decode_asset_sync
             if not control_ready:
                 rx_response = str(control_diagnostics.get("rx_control", {}).get("final_response") or "")
                 tx_response = str(control_diagnostics.get("tx_control", {}).get("final_response") or "")
@@ -1651,12 +2460,6 @@ class UsrpBatchSpoolJob:
             self._run_id,
             "--run-root",
             str(self._run_root),
-            "--max-arq-rounds",
-            str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
-            "--decode-backend",
-            _first_value(env_values, DECODE_BACKEND_KEYS, "cpp"),
-            "--cpp-sync-mode",
-            _first_value(env_values, CPP_SYNC_MODE_KEYS, "header"),
             "--artifact-mode",
             _first_value(env_values, ARTIFACT_MODE_KEYS, "minimal"),
             "--rx-control-host",
@@ -1686,13 +2489,89 @@ class UsrpBatchSpoolJob:
         chunk_bytes = _parse_int(_first_value(env_values, CHUNK_BYTES_KEYS), 0)
         if chunk_bytes > 0:
             command.extend(["--chunk-bytes", str(chunk_bytes)])
-        if _parse_bool(_first_value(env_values, FAST_ARQ_PROFILE_KEYS), False):
-            command.append("--fast-arq-profile")
         if _parse_bool(_first_value(env_values, STOP_ON_FAIL_KEYS), False):
             command.append("--stop-on-fail")
 
+        if self._link_mode == LINK_MODE_IQ_DIRECT:
+            command.extend([
+                "--max-arq-rounds",
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), DEFAULT_IQ_DIRECT_MAX_ARQ_ROUNDS))),
+            ])
+            command.extend(self._build_analog_link_args(env_values))
+            remote_decode_result_mode = str(
+                _first_value(env_values, ANALOG_REMOTE_DECODE_RESULT_MODE_KEYS) or ""
+            ).strip().lower()
+            if (
+                not remote_decode_result_mode
+                and str(rx_capture_mode or "").strip().lower() == "remote-decode"
+                and self._inference_engine != INFERENCE_ENGINE_NONE
+            ):
+                remote_decode_result_mode = "remote-dir"
+            if remote_decode_result_mode:
+                command.extend(["--remote-decode-result-mode", remote_decode_result_mode])
+            if remote_decode_result_mode == "remote-dir":
+                remote_decoded_output_dir = str(
+                    _first_value(env_values, ANALOG_REMOTE_DECODED_OUTPUT_DIR_KEYS) or ""
+                ).strip().rstrip("/")
+                if not remote_decoded_output_dir:
+                    remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root or '').rstrip('/')}/{self._run_id}_rx"
+                with self._lock:
+                    self._iq_remote_decoded_output_dir = remote_decoded_output_dir
+                command.extend(["--remote-decoded-output-dir", remote_decoded_output_dir])
+            tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
+            tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
+            if _tx_server_uses_docker(env_values):
+                tx_path_prefix_from = tx_path_prefix_from or str(REPO_ROOT)
+                tx_path_prefix_to = tx_path_prefix_to or _first_value(
+                    env_values,
+                    TX_DOCKER_MOUNT_TARGET_KEYS,
+                    DEFAULT_TX_DOCKER_MOUNT_TARGET,
+                )
+            if tx_path_prefix_from and tx_path_prefix_to:
+                command.extend([
+                    "--tx-file-path-prefix-from",
+                    tx_path_prefix_from,
+                    "--tx-file-path-prefix-to",
+                    tx_path_prefix_to,
+                ])
+        else:
+            command.extend([
+                "--max-arq-rounds",
+                str(max(0, _parse_int(_first_value(env_values, MAX_ARQ_ROUNDS_KEYS), 2))),
+                "--decode-backend",
+                _first_value(env_values, DECODE_BACKEND_KEYS, "python"),
+                "--cpp-sync-mode",
+                _first_value(env_values, CPP_SYNC_MODE_KEYS, "header"),
+            ])
+            tx_path_prefix_from = _first_value(env_values, TX_FILE_PATH_PREFIX_FROM_KEYS)
+            tx_path_prefix_to = _first_value(env_values, TX_FILE_PATH_PREFIX_TO_KEYS)
+            if _tx_server_uses_docker(env_values):
+                tx_path_prefix_from = tx_path_prefix_from or str(REPO_ROOT)
+                tx_path_prefix_to = tx_path_prefix_to or _first_value(
+                    env_values,
+                    TX_DOCKER_MOUNT_TARGET_KEYS,
+                    DEFAULT_TX_DOCKER_MOUNT_TARGET,
+                )
+            if tx_path_prefix_from and tx_path_prefix_to:
+                command.extend([
+                    "--tx-file-path-prefix-from",
+                    tx_path_prefix_from,
+                    "--tx-file-path-prefix-to",
+                    tx_path_prefix_to,
+                ])
+            if _parse_bool(_first_value(env_values, FAST_ARQ_PROFILE_KEYS), False):
+                command.append("--fast-arq-profile")
+
         env = access.build_subprocess_env()
         env["PYTHONUNBUFFERED"] = "1"
+        env.setdefault("REMOTE_USRP_PROJECT_ROOT", remote_project_root)
+        env.setdefault("USRP_REMOTE_PROJECT_ROOT", remote_project_root)
+        remote_decode_python = _first_value(
+            env_values,
+            REMOTE_DECODE_PYTHON_KEYS,
+            DEFAULT_REMOTE_DECODE_PYTHON,
+        )
+        env["REMOTE_DECODE_PYTHON"] = remote_decode_python
         if access.password:
             env.setdefault("SSHPASS", access.password)
 
@@ -1720,6 +2599,226 @@ class UsrpBatchSpoolJob:
             return
 
         self._wait_for_completion()
+
+    def _build_analog_link_args(self, env_values: dict[str, str]) -> list[str]:
+        """Build CLI args for RunAnalogLatentBatch.py (IQ-direct mode).
+
+        Reads ANALOG_* / AMPLITUDE / SIM_* env vars. IQ-direct emits the
+        verified OTA defaults when no explicit override is provided.
+        """
+        args: list[str] = []
+        sps = _first_value(env_values, ANALOG_SPS_KEYS)
+        if sps:
+            args.extend(["--sps", str(_parse_int(sps, 4))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--sps", str(DEFAULT_IQ_DIRECT_SPS)])
+        rrc_beta = _first_value(env_values, ANALOG_RRC_BETA_KEYS)
+        if rrc_beta:
+            args.extend(["--rrc-beta", str(_parse_float(rrc_beta, 0.35))])
+        rrc_span = _first_value(env_values, ANALOG_RRC_SPAN_KEYS)
+        if rrc_span:
+            args.extend(["--rrc-span", str(_parse_int(rrc_span, 8))])
+        amp = _first_value(env_values, ANALOG_AMP_KEYS)
+        if amp:
+            args.extend(["--amp", str(_parse_int(amp, 3000))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--amp", str(DEFAULT_IQ_DIRECT_AMPLITUDE)])
+        zero_guard = _first_value(env_values, ANALOG_ZERO_GUARD_KEYS)
+        if zero_guard:
+            args.extend(["--zero-guard-samples", str(_parse_int(zero_guard, 4096))])
+        tail_guard = _first_value(env_values, ANALOG_TAIL_GUARD_KEYS)
+        if tail_guard:
+            args.extend(["--tail-guard-samples", str(_parse_int(tail_guard, 4096))])
+        cfo_pilot = _first_value(env_values, ANALOG_CFO_PILOT_KEYS)
+        if cfo_pilot:
+            args.extend(["--cfo-pilot-symbols", str(_parse_int(cfo_pilot, 1024))])
+        sync_pilot = _first_value(env_values, ANALOG_SYNC_PILOT_KEYS)
+        if sync_pilot:
+            args.extend(["--sync-pilot-symbols", str(_parse_int(sync_pilot, 1024))])
+        data_block = _first_value(env_values, ANALOG_DATA_BLOCK_KEYS)
+        if data_block:
+            args.extend(["--data-block-symbols", str(_parse_int(data_block, 4096))])
+        mid_pilot = _first_value(env_values, ANALOG_MID_PILOT_KEYS)
+        if mid_pilot:
+            args.extend(["--mid-pilot-symbols", str(_parse_int(mid_pilot, 128))])
+        margin = _first_value(env_values, ANALOG_CAPTURE_MARGIN_KEYS)
+        if margin:
+            args.extend(["--capture-margin-samples", str(_parse_int(margin, 20000))])
+
+        rx_post_quantize_raw = _first_value(env_values, ANALOG_RX_POST_QUANTIZE_KEYS)
+        if rx_post_quantize_raw:
+            if _parse_bool(rx_post_quantize_raw, True):
+                args.append("--rx-post-quantize")
+            else:
+                args.append("--no-rx-post-quantize")
+
+        remote_decoded_format = _first_value(env_values, ANALOG_REMOTE_DECODED_FORMAT_KEYS).strip().lower()
+        if remote_decoded_format in {"npz", "npy"}:
+            args.extend(["--remote-decoded-format", remote_decoded_format])
+
+        sync_profile = _first_value(env_values, ANALOG_SYNC_PROFILE_KEYS).strip()
+        if sync_profile:
+            args.extend(["--sync-profile", sync_profile])
+        fast_sync_candidates = _first_value(env_values, ANALOG_FAST_SYNC_CANDIDATES_KEYS)
+        if fast_sync_candidates:
+            args.extend(["--fast-sync-candidates", str(_parse_int(fast_sync_candidates, 4))])
+        fast_sync_window = _first_value(env_values, ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if fast_sync_window:
+            args.extend(["--fast-sync-search-window-symbols", str(_parse_int(fast_sync_window, 1024))])
+        fallback_sync_candidates = _first_value(env_values, ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS)
+        if fallback_sync_candidates:
+            args.extend(["--fallback-sync-candidates", str(_parse_int(fallback_sync_candidates, 12))])
+        fallback_sync_window = _first_value(env_values, ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if fallback_sync_window:
+            args.extend(["--fallback-sync-search-window-symbols", str(_parse_int(fallback_sync_window, 4096))])
+        retry_on_burst_miss_raw = _first_value(env_values, ANALOG_RETRY_ON_BURST_MISS_KEYS)
+        if retry_on_burst_miss_raw:
+            args.append(
+                "--retry-on-burst-miss"
+                if _parse_bool(retry_on_burst_miss_raw, False)
+                else "--no-retry-on-burst-miss"
+            )
+        retry_on_low_sync_raw = _first_value(env_values, ANALOG_RETRY_ON_LOW_SYNC_KEYS)
+        if retry_on_low_sync_raw:
+            args.append(
+                "--retry-on-low-sync"
+                if _parse_bool(retry_on_low_sync_raw, False)
+                else "--no-retry-on-low-sync"
+            )
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.append("--retry-on-low-sync")
+        low_sync_retry_threshold = _first_value(env_values, ANALOG_LOW_SYNC_RETRY_THRESHOLD_KEYS)
+        if low_sync_retry_threshold:
+            args.extend([
+                "--low-sync-retry-threshold",
+                str(_parse_float(low_sync_retry_threshold, DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--low-sync-retry-threshold", str(DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD)])
+        sync_candidates = _first_value(env_values, ANALOG_SYNC_CANDIDATES_KEYS)
+        if sync_candidates:
+            args.extend(["--sync-candidates", str(_parse_int(sync_candidates, 12))])
+        min_sync_metric = _first_value(env_values, ANALOG_MIN_SYNC_METRIC_KEYS)
+        if min_sync_metric:
+            args.extend(["--min-sync-metric", str(_parse_float(min_sync_metric, 0.25))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--min-sync-metric", str(DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC)])
+        robust_sync_raw = _first_value(env_values, ANALOG_ROBUST_SYNC_KEYS)
+        if robust_sync_raw:
+            if _parse_bool(robust_sync_raw, True):
+                args.append("--robust-sync")
+            else:
+                args.append("--no-robust-sync")
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.append("--robust-sync" if DEFAULT_IQ_DIRECT_ROBUST_SYNC else "--no-robust-sync")
+        robust_cfo_max = _first_value(env_values, ANALOG_ROBUST_CFO_MAX_HZ_KEYS)
+        if robust_cfo_max:
+            args.extend(["--robust-cfo-max-hz", str(_parse_float(robust_cfo_max, 8000.0))])
+        robust_cfo_step = _first_value(env_values, ANALOG_ROBUST_CFO_STEP_HZ_KEYS)
+        if robust_cfo_step:
+            args.extend(["--robust-cfo-step-hz", str(_parse_float(robust_cfo_step, 500.0))])
+        sync_search_window = _first_value(env_values, ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
+        if sync_search_window:
+            args.extend([
+                "--sync-search-window-symbols",
+                str(_parse_int(sync_search_window, DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--sync-search-window-symbols", str(DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS)])
+        pipeline_depth = _first_value(env_values, ANALOG_PIPELINE_DEPTH_KEYS)
+        if pipeline_depth:
+            args.extend(["--pipeline-depth", str(max(1, _parse_int(pipeline_depth, 1)))])
+        pipeline_rf_decode_overlap = _first_value(env_values, ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS)
+        if pipeline_rf_decode_overlap:
+            args.append(
+                "--pipeline-rf-decode-overlap"
+                if _parse_bool(pipeline_rf_decode_overlap, False)
+                else "--no-pipeline-rf-decode-overlap"
+            )
+        rx_session_control = _first_value(env_values, ANALOG_RX_SESSION_CONTROL_KEYS)
+        if rx_session_control:
+            args.append("--rx-session-control" if _parse_bool(rx_session_control, False) else "--no-rx-session-control")
+        rx_batch_session_control = _first_value(env_values, ANALOG_RX_BATCH_SESSION_CONTROL_KEYS)
+        if rx_batch_session_control:
+            args.append(
+                "--rx-batch-session-control"
+                if _parse_bool(rx_batch_session_control, False)
+                else "--no-rx-batch-session-control"
+            )
+        rx_batch_session_max_images = _first_value(env_values, ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS)
+        if rx_batch_session_max_images:
+            args.extend([
+                "--rx-batch-session-max-images",
+                str(max(0, _parse_int(rx_batch_session_max_images, 0))),
+            ])
+        rx_health_reset = _first_value(env_values, ANALOG_RX_HEALTH_RESET_ON_STALL_KEYS)
+        if rx_health_reset:
+            args.append(
+                "--rx-health-reset-on-stall"
+                if _parse_bool(rx_health_reset, False)
+                else "--no-rx-health-reset-on-stall"
+            )
+        rx_health_threshold = _first_value(env_values, ANALOG_RX_HEALTH_STALL_THRESHOLD_KEYS)
+        if rx_health_threshold:
+            args.extend([
+                "--rx-health-stall-threshold-sec",
+                str(max(0.0, _parse_float(rx_health_threshold, 1.0))),
+            ])
+        rx_arm_status_timeout = _first_value(env_values, ANALOG_RX_ARM_STATUS_TIMEOUT_KEYS)
+        if rx_arm_status_timeout:
+            args.extend([
+                "--rx-arm-status-timeout-sec",
+                str(_parse_float(rx_arm_status_timeout, 8.0)),
+            ])
+        rx_arm_status_poll = _first_value(env_values, ANALOG_RX_ARM_STATUS_POLL_KEYS)
+        if rx_arm_status_poll:
+            args.extend([
+                "--rx-arm-status-poll-sec",
+                str(_parse_float(rx_arm_status_poll, 0.05)),
+            ])
+        rx_wait_timeout = _first_value(env_values, ANALOG_RX_WAIT_TIMEOUT_KEYS)
+        if rx_wait_timeout:
+            args.extend([
+                "--rx-wait-timeout-sec",
+                str(max(0.0, _parse_float(rx_wait_timeout, 0.0))),
+            ])
+
+        scramble_key = _first_value(env_values, ANALOG_SCRAMBLE_KEY_KEYS)
+        if scramble_key:
+            args.extend(["--scramble-key", str(scramble_key)])
+        scramble_key_hex = _first_value(env_values, ANALOG_SCRAMBLE_KEY_HEX_KEYS)
+        if scramble_key_hex:
+            args.extend(["--scramble-key-hex", str(scramble_key_hex)])
+        scramble_ctx = _first_value(env_values, ANALOG_SCRAMBLE_CONTEXT_KEYS)
+        if scramble_ctx:
+            args.extend(["--scramble-context", str(scramble_ctx)])
+
+        sim_cfo = _first_value(env_values, ANALOG_SIM_CFO_HZ_KEYS)
+        if sim_cfo:
+            args.extend(["--sim-cfo-hz", str(_parse_float(sim_cfo, 0.0))])
+        sim_snr = _first_value(env_values, ANALOG_SIM_SNR_DB_KEYS)
+        if sim_snr:
+            args.extend(["--sim-snr-db", str(_parse_float(sim_snr, 0.0))])
+        sim_gain = _first_value(env_values, ANALOG_SIM_GAIN_KEYS)
+        if sim_gain:
+            args.extend(["--sim-gain", str(_parse_float(sim_gain, 1.0))])
+        sim_phase = _first_value(env_values, ANALOG_SIM_PHASE_DEG_KEYS)
+        if sim_phase:
+            args.extend(["--sim-phase-deg", str(_parse_float(sim_phase, 0.0))])
+        sim_drift = _first_value(env_values, ANALOG_SIM_PHASE_DRIFT_DEG_KEYS)
+        if sim_drift:
+            args.extend(["--sim-phase-drift-deg", str(_parse_float(sim_drift, 0.0))])
+        sim_dc_real = _first_value(env_values, ANALOG_SIM_DC_REAL_KEYS)
+        if sim_dc_real:
+            args.extend(["--sim-dc-real", str(_parse_float(sim_dc_real, 0.0))])
+        sim_dc_imag = _first_value(env_values, ANALOG_SIM_DC_IMAG_KEYS)
+        if sim_dc_imag:
+            args.extend(["--sim-dc-imag", str(_parse_float(sim_dc_imag, 0.0))])
+        sim_seed = _first_value(env_values, ANALOG_SIM_SEED_KEYS)
+        if sim_seed:
+            args.extend(["--sim-seed", str(_parse_int(sim_seed, 1))])
+
+        return args
 
     def _set_transport_progress(self, summary: dict[str, Any]) -> None:
         self._transport_total = max(1, int(summary.get("target_count") or self._expected_outputs))
@@ -1878,6 +2977,73 @@ class UsrpBatchSpoolJob:
             self._inference_total = max(1, int(total))
             self._inference_completed = max(0, min(int(completed), self._inference_total))
 
+    def _run_inference_callback(self, remote_stage_manifest: dict[str, Any]) -> None:
+        try:
+            if self._inference_callback is None:
+                raise RuntimeError(f"未配置 {self._inference_engine.upper()} 推理回调")
+            inference_summary = self._inference_callback(
+                remote_stage_manifest,
+                self._set_inference_progress,
+            )
+            with self._lock:
+                self._inference_summary = dict(inference_summary or {})
+        except Exception as exc:
+            with self._lock:
+                self._inference_error = f"{type(exc).__name__}: {exc}"
+
+    def _maybe_start_iq_streaming_inference(self) -> bool:
+        if self._link_mode != LINK_MODE_IQ_DIRECT:
+            return False
+        if self._input_source_mode != "usrp":
+            return False
+        if self._inference_engine != INFERENCE_ENGINE_TVM:
+            return False
+        if self._inference_callback is None:
+            return False
+        if not self._iq_streaming_tvm_enabled:
+            return False
+        with self._lock:
+            if self._inference_started or self._inference_thread is not None:
+                return False
+            remote_decoded_output_dir = str(self._iq_remote_decoded_output_dir or "").strip().rstrip("/")
+            if not remote_decoded_output_dir and self._remote_usrp_rx_root:
+                remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root).rstrip('/')}/{self._run_id}_rx"
+        manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
+            self._run_dir,
+            remote_decoded_output_dir,
+            decoded_extension=_iq_remote_decoded_extension_from_env(self._env_values),
+        )
+        if manifest is None:
+            return False
+        decode_manifest = manifest.get("decode_manifest") if isinstance(manifest.get("decode_manifest"), dict) else {}
+        decoded_count = _parse_int(str(decode_manifest.get("decoded_count") or "0"), 0)
+        if decoded_count < self._iq_streaming_min_ready:
+            return False
+        thread = threading.Thread(
+            target=lambda: self._run_inference_callback(manifest),
+            daemon=True,
+        )
+        with self._lock:
+            if self._inference_started or self._inference_thread is not None:
+                return False
+            self._remote_stage_manifest = manifest
+            self._inference_started = True
+            self._inference_thread = thread
+        thread.start()
+        return True
+
+    def _inference_summary_or_raise(self, remote_stage_manifest: dict[str, Any]) -> dict[str, Any]:
+        if self._inference_thread is None:
+            self._run_inference_callback(remote_stage_manifest)
+        else:
+            self._inference_thread.join(timeout=max(30.0, self._timeout_sec))
+            if self._inference_thread.is_alive():
+                raise RuntimeError("IQ-direct TVM 早启动推理等待超时")
+        with self._lock:
+            if self._inference_error:
+                raise RuntimeError(self._inference_error)
+            return dict(self._inference_summary or {})
+
     def _shutdown_control_servers_after_transport(self) -> None:
         if not self._rx_control_host or not self._tx_control_host:
             return
@@ -1960,8 +3126,11 @@ class UsrpBatchSpoolJob:
         payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)
         decode_total_wall_sec_mean = float(summary.get("decode_total_wall_sec_mean") or 0.0)
         merge_wall_sec_mean = float(summary.get("merge_wall_sec_mean") or 0.0)
+        rx_pull_wall_sec_mean = float(summary.get("rx_pull_wall_sec_mean") or 0.0)
+        remote_cleanup_wall_sec_mean = float(summary.get("remote_cleanup_wall_sec_mean") or 0.0)
         diagnostics = {
             "transport_mode": "usrp_batch_spool",
+            "link_mode": self._link_mode,
             "input_source_mode": self._input_source_mode,
             "input_source_label": self._input_source_label,
             "summary_path": str(self._summary_path),
@@ -1985,6 +3154,8 @@ class UsrpBatchSpoolJob:
             diagnostics["usrp_summary"] = summary
 
         transport_benchmark = _transport_benchmark_from_summary(summary)
+        iq_stage_benchmark = _iq_stage_benchmark_from_summary(summary)
+        iq_tail_audit = _iq_tail_audit_from_summary(summary)
         inference_benchmark = summary.get("benchmark") if isinstance(summary.get("benchmark"), dict) else None
         inference_pipeline = summary.get("pipeline") if isinstance(summary.get("pipeline"), dict) else {}
         runner_summary = {
@@ -2018,6 +3189,8 @@ class UsrpBatchSpoolJob:
                 "payload_airtime_ms_mean": round(payload_airtime_ms_mean, 3),
                 "decode_total_wall_sec_mean": round(decode_total_wall_sec_mean * 1000.0, 3),
                 "merge_wall_sec_mean": round(merge_wall_sec_mean * 1000.0, 3),
+                "rx_pull_wall_sec_mean": round(rx_pull_wall_sec_mean * 1000.0, 3),
+                "remote_cleanup_wall_sec_mean": round(remote_cleanup_wall_sec_mean * 1000.0, 3),
                 "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": round(
                     float(summary.get("estimated_non_airtime_non_decode_non_merge_wall_sec_mean") or 0.0) * 1000.0,
                     3,
@@ -2027,7 +3200,16 @@ class UsrpBatchSpoolJob:
             "radio_sample_count": int(summary.get("pass_count") or 0),
             "transport_benchmark": transport_benchmark,
             "inference_benchmark": inference_benchmark,
+            "link_mode": self._link_mode,
         }
+        if self._link_mode == LINK_MODE_IQ_DIRECT:
+            wrapper_summary["iq_radio_metrics"] = _aggregate_iq_radio_metrics(summary)
+            if self._remote_stage_manifest:
+                wrapper_summary["iq_remote_decode_manifest"] = self._remote_stage_manifest
+            if iq_stage_benchmark is not None:
+                wrapper_summary["iq_stage_benchmark"] = iq_stage_benchmark
+            if iq_tail_audit is not None:
+                wrapper_summary["iq_tail_audit"] = iq_tail_audit
         if self._inference_summary:
             wrapper_summary["inference_engine"] = self._inference_engine
             wrapper_summary["inference_summary"] = self._inference_summary
@@ -2094,12 +3276,22 @@ class UsrpBatchSpoolJob:
 
     def _wait_for_completion(self) -> None:
         assert self._process is not None
+        rc = 0
+        deadline = time.monotonic() + self._timeout_sec
         try:
-            rc = self._process.wait(timeout=self._timeout_sec)
-        except subprocess.TimeoutExpired:
-            self._timed_out = True
-            self._process.kill()
-            rc = self._process.wait()
+            while True:
+                self._maybe_start_iq_streaming_inference()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._timed_out = True
+                    self._process.kill()
+                    rc = self._process.wait()
+                    break
+                try:
+                    rc = self._process.wait(timeout=min(0.1, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
         finally:
             self._log_handle.close()
 
@@ -2122,26 +3314,34 @@ class UsrpBatchSpoolJob:
                 self._phase = "transport_shutdown"
                 self._shutdown_control_servers_after_transport()
                 if self._input_source_mode == "usrp":
-                    self._phase = "board_decode"
-                    wire_stage_dir = self._run_dir / "board_wire_decode_stage"
-                    self._wire_stage_manifest = _stage_merged_wire_blobs_for_remote_decode(
-                        self._run_dir,
-                        wire_stage_dir,
-                    )
-                    self._remote_stage_manifest = _sync_and_decode_wire_blobs_on_remote(
-                        local_stage_dir=wire_stage_dir,
-                        remote_root=self._remote_usrp_rx_root,
-                        remote_subdir=f"{self._run_dir.name}_rx",
-                        remote_python=self._remote_decode_python,
-                        access=self._access,
-                    )
+                    if self._link_mode == LINK_MODE_IQ_DIRECT:
+                        self._remote_stage_manifest = _iq_remote_decode_stage_manifest_from_summary(summary)
+                        if (
+                            self._remote_stage_manifest is None
+                            and self._inference_engine != INFERENCE_ENGINE_NONE
+                        ):
+                            raise RuntimeError(
+                                "IQ-direct remote-decode 缺少 remote-dir 板端输出目录；"
+                                "为避免 USRP 数据面绕行 Tailscale，拒绝通过控制面重传 wire blob。"
+                            )
+                    else:
+                        self._phase = "board_decode"
+                        wire_stage_dir = self._run_dir / "board_wire_decode_stage"
+                        self._wire_stage_manifest = _stage_merged_wire_blobs_for_remote_decode(
+                            self._run_dir,
+                            wire_stage_dir,
+                        )
+                        self._remote_stage_manifest = _sync_and_decode_wire_blobs_on_remote(
+                            local_stage_dir=wire_stage_dir,
+                            remote_root=self._remote_usrp_rx_root,
+                            remote_subdir=f"{self._run_dir.name}_rx",
+                            remote_python=self._remote_decode_python,
+                            access=self._access,
+                        )
                 if self._inference_engine != INFERENCE_ENGINE_NONE:
-                    if self._inference_callback is None:
-                        raise RuntimeError(f"未配置 {self._inference_engine.upper()} 推理回调")
                     self._phase = "inference"
-                    inference_summary = self._inference_callback(
+                    inference_summary = self._inference_summary_or_raise(
                         self._remote_stage_manifest or {},
-                        self._set_inference_progress,
                     )
                     self._inference_summary = dict(inference_summary or {})
                     status_text = str(self._inference_summary.get("status") or "").lower()
@@ -2233,6 +3433,9 @@ class UsrpBatchSpoolJob:
         log_progress = _parse_progress_from_log(self._log_path, fallback_target=target_count)
         processed_count = max(processed_count, int(log_progress.get("processed") or 0))
         pass_count = max(pass_count, int(log_progress.get("pass_count") or 0))
+        image_dir_progress = _count_progress_from_image_dirs(self._run_dir)
+        processed_count = max(processed_count, int(image_dir_progress.get("processed") or 0))
+        pass_count = max(pass_count, int(image_dir_progress.get("pass_count") or 0))
         percent = int(round((processed_count / target_count) * 100)) if target_count > 0 else 0
         with self._lock:
             phase = self._phase
@@ -2241,7 +3444,10 @@ class UsrpBatchSpoolJob:
             host_preprocess_completed = self._host_preprocess_completed
             host_preprocess_total = self._host_preprocess_total
             host_preprocess_state = self._host_preprocess_state
-        transport_done = phase in {"transport_shutdown", "board_decode", "inference"}
+            iq_remote_decoded_output_dir = self._iq_remote_decoded_output_dir
+        transport_done = phase in {"transport_shutdown", "board_decode"} or (
+            phase == "inference" and processed_count >= target_count
+        )
         host_preprocess_done = phase not in {"starting", "host_preprocess"} and host_preprocess_state == "completed"
         decoding = phase in {"transport_shutdown", "board_decode"}
         progress_label = (
@@ -2256,6 +3462,7 @@ class UsrpBatchSpoolJob:
 
         diagnostics = {
             "transport_mode": "usrp_batch_spool",
+            "link_mode": self._link_mode,
             "input_source_mode": self._input_source_mode,
             "input_source_label": self._input_source_label,
             "summary_path": str(self._summary_path),
@@ -2269,6 +3476,20 @@ class UsrpBatchSpoolJob:
             diagnostics["usrp_control_servers"] = self._control_server_diagnostics
         if self._control_preflight:
             diagnostics["control_preflight"] = self._control_preflight
+
+        wrapper_summary: dict[str, Any] = {}
+        if self._link_mode == LINK_MODE_IQ_DIRECT and self._inference_engine != INFERENCE_ENGINE_NONE:
+            remote_decoded_output_dir = str(iq_remote_decoded_output_dir or "").strip().rstrip("/")
+            if not remote_decoded_output_dir and self._remote_usrp_rx_root:
+                remote_decoded_output_dir = f"{str(self._remote_usrp_rx_root).rstrip('/')}/{self._run_id}_rx"
+            iq_manifest = _iq_remote_decode_stage_manifest_from_image_dirs(
+                self._run_dir,
+                remote_decoded_output_dir,
+                decoded_extension=_iq_remote_decoded_extension_from_env(self._env_values),
+            )
+            if iq_manifest is not None:
+                wrapper_summary["iq_remote_decode_manifest"] = iq_manifest
+                diagnostics["board_decode_partial"] = iq_manifest
 
         return {
             "status": "running",
@@ -2284,7 +3505,7 @@ class UsrpBatchSpoolJob:
             "data_transport": "usrp",
             "control_handshake_complete": self._control_transport != "none",
             "runner_summary": {},
-            "wrapper_summary": {},
+            "wrapper_summary": wrapper_summary,
             "diagnostics": diagnostics,
             "progress": self._build_progress_payload(
                 state="running",

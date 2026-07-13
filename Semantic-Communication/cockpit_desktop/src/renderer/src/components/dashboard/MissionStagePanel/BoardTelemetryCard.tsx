@@ -4,7 +4,7 @@ import { ToneTag } from '../../shared/ToneTag'
 import { Icons } from '../../icons'
 import { SkeletonCard } from '../../loading'
 import { UseQueryResult } from '@tanstack/react-query'
-import type { SystemStatusResponse } from '../../../api/types'
+import type { BoardTelemetryPayload, SystemStatusResponse } from '../../../api/types'
 import s from './BoardTelemetryCard.module.css'
 
 const { Text } = Typography
@@ -19,6 +19,37 @@ function boardPositionApiStatusLabel(rawStatus: unknown): string {
   return status ? status.toUpperCase() : 'UNAVAILABLE'
 }
 
+function formatTelemetrySampleTime(rawTime: unknown): string {
+  const value = String(rawTime ?? '').trim()
+  if (!value) return '—'
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+  const match = value.match(/(\d{1,2}:\d{2}:\d{2})/)
+  return match?.[1] ?? value
+}
+
+function telemetryStatusLabel(telemetry: BoardTelemetryPayload | undefined): string {
+  const status = String(telemetry?.status ?? 'unavailable').toUpperCase()
+  const note = String(telemetry?.note ?? '')
+  if (note.includes('暂缓')) return 'PAUSED'
+  if (telemetry?.refreshing) return `${status} · REFRESH`
+  if (telemetry?.stale) return `${status} · STALE`
+  return status
+}
+
+function telemetryTone(telemetry: BoardTelemetryPayload | undefined): string {
+  const note = String(telemetry?.note ?? '')
+  if (note.includes('暂缓') || telemetry?.stale) return 'warning'
+  return telemetry?.status === 'ok' ? 'success' : 'neutral'
+}
+
 interface BoardTelemetryCardProps {
   system: UseQueryResult<SystemStatusResponse>
 }
@@ -31,6 +62,8 @@ export function BoardTelemetryCard({ system }: BoardTelemetryCardProps) {
   const memorySummary = telemetry?.memory_used_mb != null && telemetry?.memory_total_mb != null
     ? `${Math.round(telemetry.memory_used_mb)} / ${Math.round(telemetry.memory_total_mb)} MB`
     : '—'
+  const telemetryDisplayStatus = telemetryStatusLabel(telemetry)
+  const telemetrySampleTime = formatTelemetrySampleTime(telemetry?.collected_at)
   const boardPositionApiStatus = boardPositionApiStatusLabel(boardPositionApi?.status)
 
   return (
@@ -80,9 +113,14 @@ export function BoardTelemetryCard({ system }: BoardTelemetryCardProps) {
             </span>
           </Descriptions.Item>
           <Descriptions.Item label="telemetry">
-            <ToneTag tone={telemetry?.status === 'ok' ? 'success' : 'neutral'}>
-              {String(telemetry?.status ?? 'unavailable').toUpperCase()}
+            <ToneTag tone={telemetryTone(telemetry)}>
+              {telemetryDisplayStatus}
             </ToneTag>
+          </Descriptions.Item>
+          <Descriptions.Item label="sample">
+            <span className="text-number font-mono metricValue">
+              {telemetrySampleTime}
+            </span>
           </Descriptions.Item>
           <Descriptions.Item label="板端定位 API">
             <ToneTag tone={boardPositionApiStatus === 'LIVE' ? 'success' : 'neutral'}>

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -95,8 +97,33 @@ SSH_OPTIONS=(
   -p "$PORT"
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
+  -o BatchMode=no
+  -o PreferredAuthentications=password,keyboard-interactive
 )
-if [[ "${SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER:-0}" != "1" ]]; then
+
+SSH_RUNNER="$(printf '%s' "${OPENAMP_SSH_RUNNER:-}" | tr '[:upper:]' '[:lower:]')"
+run_paramiko_runner() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: OPENAMP_SSH_RUNNER=paramiko but python3 was not found in PATH." >&2
+    exit 1
+  fi
+  SSH_WITH_PASSWORD_PARAMIKO_PASS="$SSH_PASS" exec python3 \
+    "$SCRIPT_DIR/ssh_with_password_paramiko.py" \
+    --host "$HOST" \
+    --user "$SSH_USER" \
+    --pass-env SSH_WITH_PASSWORD_PARAMIKO_PASS \
+    --port "$PORT" \
+    --timeout-sec "${OPENAMP_SSH_TIMEOUT_SEC:-900}" \
+    -- \
+    "$REMOTE_COMMAND"
+}
+
+if [[ "$SSH_RUNNER" == "paramiko" || "$SSH_RUNNER" == "python" ]]; then
+  run_paramiko_runner
+fi
+
+if [[ "$SSH_RUNNER" != "docker" && "${SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER:-0}" != "1" ]]; then
   SSH_CONTROL_DIR="${TMPDIR:-/tmp}/ssh_mux"
   mkdir -p "$SSH_CONTROL_DIR"
   chmod 700 "$SSH_CONTROL_DIR" >/dev/null 2>&1 || true
@@ -105,6 +132,21 @@ if [[ "${SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER:-0}" != "1" ]]; then
     -o ControlPersist=60
     -o ControlPath="$SSH_CONTROL_DIR/%C"
   )
+fi
+
+if [[ "$SSH_RUNNER" == "docker" ]]; then
+  DOCKER_IMAGE="${OPENAMP_SSH_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "ERROR: OPENAMP_SSH_RUNNER=docker but docker was not found in PATH." >&2
+    exit 1
+  fi
+  SSHPASS="$SSH_PASS" exec docker run --rm -i \
+    -e SSHPASS \
+    "$DOCKER_IMAGE" \
+    sshpass -e ssh \
+    "${SSH_OPTIONS[@]}" \
+    "${SSH_USER}@${HOST}" \
+    "$REMOTE_COMMAND"
 fi
 
 create_temp_file() {

@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SESSION_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_DIR="$(cd "$SESSION_DIR/.." && pwd)"
 PYTHON_RUNNER_SOURCE="$SCRIPT_DIR/big_little_pipeline.py"
+LOCAL_BASH="${BASH:-bash}"
 
 usage() {
   cat <<'EOF'
@@ -49,6 +50,9 @@ Env:
     BIG_LITTLE_EXECUTION_MODE=pipeline|serial
     BIG_LITTLE_MOCK_INFER_MS=15
     BIG_LITTLE_MAX_INPUTS=300
+    BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC=0
+    BIG_LITTLE_INPUT_POLL_SEC=0.05
+    BIG_LITTLE_INPUT_CHUNK_SIZE=1
     BIG_LITTLE_SEED=123
     BIG_LITTLE_OUTPUT_PREFIX=big_little_pipeline
     BIG_LITTLE_REPORT_PREFIX=big_little_pipeline
@@ -87,7 +91,7 @@ for raw in reversed(path.read_text(encoding="utf-8", errors="replace").splitline
         payload = json.loads(line)
     except Exception:
         continue
-    print(json.dumps(payload, ensure_ascii=False))
+    print(json.dumps(payload, ensure_ascii=True))
     raise SystemExit(0)
 raise SystemExit(1)
 PY
@@ -117,27 +121,25 @@ python_command_supports_modules() {
   local candidate="$1"
   shift
   [[ -z "$candidate" ]] && return 1
-  local probe_script
+  local probe_code
   local cmd
   local module
   local rc=0
-  probe_script="$(mktemp)"
-  cat >"$probe_script" <<'PY'
+  read -r -d '' probe_code <<'PY' || true
 import importlib
 import sys
 
 for name in sys.argv[1:]:
     importlib.import_module(name)
 PY
-  cmd="$candidate $(printf '%q' "$probe_script")"
+  cmd="$candidate -c $(printf '%q' "$probe_code")"
   for module in "$@"; do
     cmd+=" $(printf '%q' "$module")"
   done
   set +e
-  bash -lc "$cmd" >/dev/null 2>&1
+  "$LOCAL_BASH" -lc "$cmd" >/dev/null 2>&1
   rc=$?
   set -e
-  rm -f "$probe_script"
   return "$rc"
 }
 
@@ -236,7 +238,7 @@ if pipeline.get("errors"):
 
 report_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(json.dumps(payload, ensure_ascii=False))
+print(json.dumps(payload, ensure_ascii=True))
 PY
 }
 
@@ -393,6 +395,9 @@ DRY_RUN="${DRY_RUN_OVERRIDE:-${BIG_LITTLE_DRY_RUN:-0}}"
 EXECUTION_MODE_EFFECTIVE="${EXECUTION_MODE:-${BIG_LITTLE_EXECUTION_MODE:-pipeline}}"
 MOCK_INFER_MS="${BIG_LITTLE_MOCK_INFER_MS:-15}"
 MAX_INPUTS_EFFECTIVE="${MAX_INPUTS:-${BIG_LITTLE_MAX_INPUTS:-}}"
+INPUT_WAIT_TIMEOUT_SEC="${BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC:-0}"
+INPUT_POLL_SEC="${BIG_LITTLE_INPUT_POLL_SEC:-0.05}"
+INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-1}"
 SEED_EFFECTIVE="${SEED:-${BIG_LITTLE_SEED:-}}"
 OUTPUT_PREFIX="${BIG_LITTLE_OUTPUT_PREFIX:-big_little_pipeline}"
 REPORT_PREFIX="${BIG_LITTLE_REPORT_PREFIX:-big_little_pipeline}"
@@ -462,6 +467,9 @@ REAL_EXTRA_PYTHONPATH="${REMOTE_REAL_EXTRA_PYTHONPATH:-${REMOTE_TORCH_PYTHONPATH
   echo "backend=$BACKEND"
   echo "dry_run=$DRY_RUN"
   echo "max_inputs=${MAX_INPUTS_EFFECTIVE:-NA}"
+  echo "input_wait_timeout_sec=$INPUT_WAIT_TIMEOUT_SEC"
+  echo "input_poll_sec=$INPUT_POLL_SEC"
+  echo "input_chunk_size=$INPUT_CHUNK_SIZE"
   echo "seed=${SEED_EFFECTIVE:-NA}"
 } >"$LOG_FILE"
 
@@ -478,7 +486,7 @@ SH
       REMOTE_TVM_PYTHON REMOTE_INPUT_DIR REAL_OUTPUT_DIR REAL_SNR REAL_BATCH VARIANT \
       REAL_ARTIFACT_PATH REAL_EXPECTED_SHA256 REAL_EXTRA_PYTHONPATH BIG_CORES LITTLE_CORES \
       BACKEND ALLOW_MISSING_AFFINITY INPUT_QUEUE_SIZE OUTPUT_QUEUE_SIZE DRY_RUN MOCK_INFER_MS \
-      MAX_INPUTS_EFFECTIVE SEED_EFFECTIVE EXECUTION_MODE_EFFECTIVE \
+      MAX_INPUTS_EFFECTIVE INPUT_WAIT_TIMEOUT_SEC INPUT_POLL_SEC INPUT_CHUNK_SIZE SEED_EFFECTIVE EXECUTION_MODE_EFFECTIVE \
       TVM_RUNTIME_PRELOAD_PY TVM_TRANSPOSE_ADD6_PROXY_SO TVM_TRANSPOSE_ADD6_PROXY_FUNC \
       TVM_TRANSPOSE_ADD6_PROXY_REG; do
       emit_shell_assignment "$var_name"
@@ -503,6 +511,9 @@ output_queue_size="$OUTPUT_QUEUE_SIZE"
 dry_run="$DRY_RUN"
 mock_infer_ms="$MOCK_INFER_MS"
 max_inputs="$MAX_INPUTS_EFFECTIVE"
+input_wait_timeout_sec="$INPUT_WAIT_TIMEOUT_SEC"
+input_poll_sec="$INPUT_POLL_SEC"
+input_chunk_size="$INPUT_CHUNK_SIZE"
 seed="$SEED_EFFECTIVE"
 execution_mode="$EXECUTION_MODE_EFFECTIVE"
 preload_py="${TVM_RUNTIME_PRELOAD_PY:-}"
@@ -542,7 +553,7 @@ run_remote_python() {
     cmd+=" $(printf '%q' "$arg")"
   done
   set +e
-  bash -c "$cmd" <"$stdin_payload"
+  "${BASH:-bash}" -c "$cmd" <"$stdin_payload"
   rc=$?
   set -e
   rm -f "$stdin_payload"
@@ -573,6 +584,15 @@ fi
 if [[ -n "$mock_infer_ms" ]]; then
   extra_args+=(--mock-infer-ms "$mock_infer_ms")
 fi
+if [[ -n "$input_wait_timeout_sec" ]]; then
+  extra_args+=(--input-wait-timeout-sec "$input_wait_timeout_sec")
+fi
+if [[ -n "$input_poll_sec" ]]; then
+  extra_args+=(--input-poll-sec "$input_poll_sec")
+fi
+if [[ -n "$input_chunk_size" ]]; then
+  extra_args+=(--input-chunk-size "$input_chunk_size")
+fi
 
 run_remote_python - \
   --artifact-path "$artifact_path" \
@@ -596,15 +616,29 @@ SH
   chmod 700 "$runner_script"
 
   if [[ "$REMOTE_MODE" == "ssh" ]]; then
+    local REMOTE_RUNNER_SCRIPT
+    REMOTE_RUNNER_SCRIPT="/tmp/openamp_big_little_runner_${RUN_ID}_$$.sh"
     set +e
-    bash "$SCRIPT_DIR/ssh_with_password.sh" \
+    "$LOCAL_BASH" "$SCRIPT_DIR/ssh_with_password.sh" \
       --host "$REMOTE_HOST" \
       --user "$REMOTE_USER" \
       --pass "$REMOTE_PASS" \
       --port "${REMOTE_SSH_PORT:-22}" \
       -- \
-      bash -s \
-      <"$runner_script"
+      "umask 077; cat > '$REMOTE_RUNNER_SCRIPT'" <"$runner_script"
+    rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+      set -e
+      rm -f "$runner_script"
+      return "$rc"
+    fi
+    "$LOCAL_BASH" "$SCRIPT_DIR/ssh_with_password.sh" \
+      --host "$REMOTE_HOST" \
+      --user "$REMOTE_USER" \
+      --pass "$REMOTE_PASS" \
+      --port "${REMOTE_SSH_PORT:-22}" \
+      -- \
+      "set -e; chmod 700 '$REMOTE_RUNNER_SCRIPT'; set +e; bash '$REMOTE_RUNNER_SCRIPT'; rc=\$?; rm -f '$REMOTE_RUNNER_SCRIPT'; exit \$rc" < /dev/null
     rc=$?
     set -e
     rm -f "$runner_script"
@@ -612,7 +646,7 @@ SH
   fi
 
   set +e
-  bash "$runner_script"
+  "$LOCAL_BASH" "$runner_script"
   rc=$?
   set -e
   rm -f "$runner_script"

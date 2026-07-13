@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_RUNNER_SOURCE="$SCRIPT_DIR/mnn_real_reconstruction.py"
+LOCAL_BASH="${OPENAMP_LOCAL_BASH:-${BASH:-bash}}"
 
 usage() {
   cat <<'EOF'
@@ -229,7 +230,7 @@ run_remote_reconstruction() {
 #!/usr/bin/env bash
 set -euo pipefail
 SH
-    declare -p REMOTE_MNN_PYTHON REAL_INPUT_DIR REAL_OUTPUT_DIR REAL_SNR VARIANT MODEL_PATH MNN_EXPECTED_SHA256 MNN_EXTRA_PYTHONPATH MAX_INPUTS SEED INTERPRETER_COUNT SESSION_THREADS PRECISION SHAPE_MODE BUCKET_SHAPES WARMUP_INPUTS AUTO_BACKEND TUNE_NUM DRY_RUN MOCK_INFER_MS INPUT_SOURCE_MODE INPUT_SOURCE_LABEL
+    declare -p REMOTE_MNN_PYTHON REAL_INPUT_DIR REAL_OUTPUT_DIR REAL_SNR VARIANT MODEL_PATH MNN_EXPECTED_SHA256 MNN_EXTRA_PYTHONPATH MAX_INPUTS SEED INTERPRETER_COUNT SESSION_THREADS PRECISION SHAPE_MODE BUCKET_SHAPES WARMUP_INPUTS AUTO_BACKEND TUNE_NUM DRY_RUN MOCK_INFER_MS INPUT_SOURCE_MODE INPUT_SOURCE_LABEL LOCAL_BASH
     cat <<'SH'
 
 remote_python="$REMOTE_MNN_PYTHON"
@@ -269,12 +270,12 @@ run_remote_python() {
   local stdin_payload cmd arg rc=0
   stdin_payload="$(mktemp)"
   cat >"$stdin_payload"
-  cmd="$remote_python"
+  cmd="$(printf '%q' "$remote_python")"
   for arg in "$@"; do
     cmd+=" $(printf '%q' "$arg")"
   done
   set +e
-  bash -c "$cmd" <"$stdin_payload"
+  "$LOCAL_BASH" -c "$cmd" <"$stdin_payload"
   rc=$?
   set -e
   rm -f "$stdin_payload"
@@ -328,7 +329,7 @@ SH
   if [[ "$REMOTE_MODE" == "ssh" ]]; then
     set +e
     SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER=1 \
-    bash "$SCRIPT_DIR/ssh_with_password.sh" \
+    "$LOCAL_BASH" "$SCRIPT_DIR/ssh_with_password.sh" \
       --host "$REMOTE_HOST" \
       --user "$REMOTE_USER" \
       --pass "$REMOTE_PASS" \
@@ -343,7 +344,7 @@ SH
   fi
 
   set +e
-  bash "$runner_script"
+  "$LOCAL_BASH" "$runner_script"
   rc=$?
   set -e
   rm -f "$runner_script"

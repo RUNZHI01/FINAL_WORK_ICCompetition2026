@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import time
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -182,6 +184,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--rx-control-port', type=int, default=int(os.environ.get('RX_CONTROL_PORT', '29220')))
     parser.add_argument('--tx-control-host', default=os.environ.get('TX_CONTROL_HOST', '127.0.0.1'))
     parser.add_argument('--tx-control-port', type=int, default=int(os.environ.get('TX_CONTROL_PORT', '29221')))
+    parser.add_argument(
+        '--tx-file-path-prefix-from',
+        default=os.environ.get('TX_FILE_PATH_PREFIX_FROM', ''),
+        help='local path prefix to rewrite before sending TX file paths to a containerized TX server.',
+    )
+    parser.add_argument(
+        '--tx-file-path-prefix-to',
+        default=os.environ.get('TX_FILE_PATH_PREFIX_TO', ''),
+        help='TX server-visible replacement prefix for --tx-file-path-prefix-from.',
+    )
     parser.add_argument(
         '--rx-capture-mode',
         choices=('local', 'remote-pull', 'remote-decode'),
@@ -461,6 +473,21 @@ def run_control_inline(
     return response
 
 
+def translate_tx_control_file_path(path: Path, prefix_from: str, prefix_to: str) -> str:
+    source_text = str(prefix_from or '').strip()
+    target_text = str(prefix_to or '').strip()
+    if not source_text or not target_text:
+        return str(path)
+    try:
+        source_root = Path(source_text).resolve()
+        path_resolved = Path(path).resolve()
+        relative = path_resolved.relative_to(source_root)
+    except (OSError, ValueError):
+        return str(path)
+    target_root = target_text.rstrip("/\\")
+    return f"{target_root}/{relative.as_posix()}"
+
+
 def run_control(cmd: list[str], log_path: Path, check: bool = True) -> str:
     """Legacy subprocess-based control — kept as fallback."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -483,6 +510,30 @@ def run_control(cmd: list[str], log_path: Path, check: bool = True) -> str:
 
 def _ssh_base_args(timeout: int = 10, control_socket: str | None = None) -> list[str]:
     """Build SSH/SCP base args, using sshpass if SSHPASS env var is set."""
+    if os.environ.get('OPENAMP_SSH_RUNNER', '').strip().lower() == 'docker':
+        image = os.environ.get('OPENAMP_SSH_DOCKER_IMAGE', 'iccomp-usrp-tx:latest')
+        return [
+            'docker',
+            'run',
+            '--rm',
+            '-i',
+            '-e',
+            'SSHPASS',
+            image,
+            'sshpass',
+            '-e',
+            'ssh',
+            '-o',
+            'StrictHostKeyChecking=no',
+            '-o',
+            'UserKnownHostsFile=/dev/null',
+            '-o',
+            'BatchMode=no',
+            '-o',
+            'ConnectTimeout={}'.format(timeout),
+            '-o',
+            'PreferredAuthentications=password,keyboard-interactive',
+        ]
     sshpass = os.environ.get('SSHPASS')
     if sshpass is not None:
         args = ['sshpass', '-e', 'ssh', '-o', 'ConnectTimeout={}'.format(timeout)]
@@ -515,6 +566,101 @@ def _ssh_shell_prefix(target: str, timeout: int = 10, control_socket: str | None
     return f'ssh -o BatchMode=yes -o ConnectTimeout={timeout}{ctrl} {shlex.quote(target)}'
 
 
+def tar_directory_bytes(source_dir: Path) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode='w') as archive:
+        for path in sorted(source_dir.rglob('*')):
+            if not path.is_file():
+                continue
+            archive.add(path, arcname=path.relative_to(source_dir).as_posix())
+    return buffer.getvalue()
+
+
+def strip_leading_non_tar_bytes(payload: bytes) -> bytes:
+    """Remove SSH/banner noise that may appear before a streamed tar header."""
+    if len(payload) >= 262 and payload[257:262] == b'ustar':
+        return payload
+    scan_limit = min(len(payload), 16 * 1024)
+    for offset in range(1, scan_limit):
+        magic_start = offset + 257
+        magic_end = magic_start + 5
+        if magic_end <= len(payload) and payload[magic_start:magic_end] == b'ustar':
+            return payload[offset:]
+    return payload
+
+
+def extract_tar_bytes(payload: bytes, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_root = output_dir.resolve()
+    with tarfile.open(fileobj=io.BytesIO(strip_leading_non_tar_bytes(payload)), mode='r:*') as archive:
+        members = archive.getmembers()
+        for member in members:
+            target = (output_dir / member.name).resolve()
+            if output_root != target and output_root not in target.parents:
+                raise RuntimeError(f'refusing to extract tar member outside destination: {member.name}')
+        archive.extractall(output_dir, members=members)
+
+
+def push_directory_to_remote(
+    source_dir: Path,
+    *,
+    target: str,
+    remote_dir: str,
+    log_path: Path,
+    control_socket: str | None,
+    timeout: int = 30,
+) -> None:
+    payload = tar_directory_bytes(source_dir)
+    remote_cmd = f'mkdir -p {shlex.quote(remote_dir)} && cd {shlex.quote(remote_dir)} && tar xf -'
+    cmd = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [target, remote_cmd]
+    env = os.environ.copy()
+    env.update(CHILD_THREAD_ENV)
+    proc = subprocess.run(
+        cmd,
+        cwd=PROJECT_ROOT,
+        env=env,
+        input=payload,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        shell=False,
+        check=False,
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text((proc.stdout or b'').decode('utf-8', errors='replace'), encoding='utf-8')
+    if proc.returncode != 0:
+        raise RuntimeError(f'remote tar push failed ({proc.returncode}): {" ".join(cmd)}')
+
+
+def pull_remote_directory_to_local(
+    *,
+    target: str,
+    remote_dir: str,
+    output_dir: Path,
+    log_path: Path,
+    control_socket: str | None,
+    timeout: int = 30,
+) -> None:
+    remote_cmd = f'cd {shlex.quote(remote_dir)} && tar cf - .'
+    cmd = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [target, remote_cmd]
+    env = os.environ.copy()
+    env.update(CHILD_THREAD_ENV)
+    proc = subprocess.run(
+        cmd,
+        cwd=PROJECT_ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        check=False,
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_text = (proc.stderr or b'').decode('utf-8', errors='replace')
+    log_path.write_text(log_text, encoding='utf-8')
+    if proc.returncode != 0:
+        raise RuntimeError(f'remote tar pull failed ({proc.returncode}): {" ".join(cmd)}\n{log_text}')
+    extract_tar_bytes(proc.stdout or b'', output_dir)
+
+
 def _ssh_control_socket_path() -> str:
     """Return a deterministic path for the SSH ControlMaster socket."""
     return '/tmp/usrp_ssh_ctrl_{}'.format(os.getpid())
@@ -528,7 +674,7 @@ def _ssh_start_control_master(target: str) -> subprocess.Popen | None:
     SSHPASS is set); subsequent connections via the control socket skip the
     full SSH handshake.
     """
-    if not target:
+    if not target or os.environ.get('OPENAMP_SSH_RUNNER', '').strip().lower() == 'docker':
         return None
     sock = _ssh_control_socket_path()
     # Clean up any stale socket from a previous run with the same PID.
@@ -1011,13 +1157,14 @@ def decode_batch_remote(
         sub.mkdir(exist_ok=True)
         shutil.copy2(str(bp['burst'].manifest), str(sub / 'manifest.json'))
         shutil.copy2(str(bp['burst'].image.input_path), str(sub / 'reference.bin'))
-    tar_push = (
-        f'cd {_shlex.quote(str(local_staging))} && '
-        f'tar cf - . | '
-        f'{_ssh_shell_prefix(target, control_socket=ctrl)} '
-        f'"cd {_shlex.quote(remote_base)} && tar xf -"'
+    push_directory_to_remote(
+        local_staging,
+        target=target,
+        remote_dir=remote_base,
+        log_path=bursts[0].round_dir / 'remote_push.log',
+        control_socket=ctrl,
+        timeout=30,
     )
-    subprocess.run(tar_push, shell=True, capture_output=True, timeout=30)
     scp_to_wall_sec = time.monotonic() - scp_to_started
 
     # 3. Run ALL decodes in ONE SSH session (respect decode_workers limit for remote CPU)
@@ -1070,12 +1217,14 @@ def decode_batch_remote(
 
     # 4. tar-pipe pull all results back in ONE pipe
     scp_from_started = time.monotonic()
-    tar_pull = (
-        f'{_ssh_shell_prefix(target, control_socket=ctrl)} '
-        f'"cd {_shlex.quote(remote_base)} && tar cf - ." '
-        f'| tar xf - -C {_shlex.quote(str(local_staging))}'
+    pull_remote_directory_to_local(
+        target=target,
+        remote_dir=remote_base,
+        output_dir=local_staging,
+        log_path=bursts[0].round_dir / 'remote_pull.log',
+        control_socket=ctrl,
+        timeout=30,
     )
-    subprocess.run(tar_pull, shell=True, capture_output=True, timeout=30)
     for i, bp in enumerate(bp_list):
         bp['burst'].round_dir.mkdir(parents=True, exist_ok=True)
         src = local_staging / f'{i:03d}'
@@ -1415,10 +1564,15 @@ def run_round(args: argparse.Namespace, run_dir: Path, round_idx: int, images: l
         rx_start_wall_sec = time.monotonic() - rx_start_started
         time.sleep(round_params.tx_delay_sec)
         tx_send_started = time.monotonic()
+        tx_control_file = translate_tx_control_file_path(
+            batch_tx,
+            args.tx_file_path_prefix_from,
+            args.tx_file_path_prefix_to,
+        )
         tx_send = run_control_inline(
             args.tx_control_host,
             int(args.tx_control_port),
-            f'SEND file={batch_tx}',
+            f'SEND file={tx_control_file}',
             batch_dir / 'tx_send.log',
             timeout=args.tx_timeout_sec,
         )

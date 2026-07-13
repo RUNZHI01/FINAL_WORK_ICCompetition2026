@@ -56,7 +56,7 @@ function allowsComparison(payload: RunInferenceResponse, engine: ComparisonEngin
   if (payload.status !== 'success') {
     return false
   }
-  return executionMode === 'live'
+  return executionMode === 'live' || executionMode === 'prerecorded'
 }
 
 function totalWallMsPerImage(summary: Record<string, unknown> | undefined): number | undefined {

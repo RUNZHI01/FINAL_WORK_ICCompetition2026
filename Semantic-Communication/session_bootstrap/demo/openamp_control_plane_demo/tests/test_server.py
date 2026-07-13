@@ -29,6 +29,302 @@ import usrp_runtime  # noqa: E402
 REPO_ROOT = DEMO_ROOT.parents[2]
 
 
+def test_transport_benchmark_exposes_iq_remote_pull_and_cleanup_metrics() -> None:
+    benchmark = usrp_runtime._transport_benchmark_from_summary(
+        {
+            "pass_count": 1,
+            "per_image_sec": 10.0,
+            "payload_airtime_ms_mean": 100.0,
+            "decode_total_wall_sec_mean": 2.0,
+            "merge_wall_sec_mean": 0.3,
+            "rx_pull_wall_sec_mean": 3.0,
+            "remote_cleanup_wall_sec_mean": 0.7,
+            "estimated_non_airtime_non_decode_non_merge_wall_sec_mean": 3.9,
+        }
+    )
+
+    assert benchmark["rx_pull_ms"]["mean_ms"] == 3000.0
+    assert benchmark["remote_cleanup_ms"]["mean_ms"] == 700.0
+    assert benchmark["other_wall_ms"]["mean_ms"] == 3900.0
+
+
+def test_transport_benchmark_prefers_iq_round_medians_over_outlier_means() -> None:
+    benchmark = usrp_runtime._transport_benchmark_from_summary(
+        {
+            "pass_count": 3,
+            "per_image_sec": 10.0,
+            "payload_airtime_ms_mean": 9.58,
+            "decode_total_wall_sec_mean": 5.0,
+            "images": [
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 0.20,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.07,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 0.21,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.08,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "total_wall_sec": 7.0,
+                            "detected_airtime_ms": 9.58,
+                            "decode_wall_sec": 0.07,
+                            "merge_wall_sec": 0.0,
+                            "rx_pull_wall_sec": 0.0,
+                            "remote_cleanup_wall_sec": 0.0,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert benchmark["total_ms"]["median_ms"] == 210.0
+    assert benchmark["decode_ms"]["median_ms"] == 70.0
+    assert benchmark["other_wall_ms"]["median_ms"] == 120.42
+    assert benchmark["total_ms"]["mean_ms"] > benchmark["total_ms"]["median_ms"]
+
+
+def test_crypto_status_exposes_iq_stage_benchmark_from_batch_state() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._crypto_enabled = True
+    state._crypto_status_cache = {
+        "channel_state": "ready",
+        "kem_backend": "mock-kem",
+        "cipher_suite": "mock-cipher",
+        "board_configured": True,
+    }
+    state._crypto_status_cache_ts = time.monotonic()
+    state._batch_state = {
+        "status": "done",
+        "completed": 5,
+        "total": 5,
+        "iq_stage_benchmark": {
+            "rx_arm_control_overhead_ms": {"n": 5, "median_ms": 21.0, "p95_ms": 45.0},
+            "rx_wait_response_overhead_ms": {"n": 5, "median_ms": 1.4, "p95_ms": 126.0},
+        },
+    }
+
+    status = state._get_crypto_status_core()
+
+    assert status["batch_status"] == "done"
+    assert status["batch_iq_stage_benchmark"]["rx_arm_control_overhead_ms"]["median_ms"] == 21.0
+    assert status["batch_iq_stage_benchmark"]["rx_wait_response_overhead_ms"]["p95_ms"] == 126.0
+
+
+def test_crypto_status_exposes_iq_tail_audit_from_batch_state() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._crypto_enabled = True
+    state._crypto_status_cache = {
+        "channel_state": "ready",
+        "kem_backend": "mock-kem",
+        "cipher_suite": "mock-cipher",
+        "board_configured": True,
+    }
+    state._crypto_status_cache_ts = time.monotonic()
+    state._batch_state = {
+        "status": "done",
+        "completed": 5,
+        "total": 5,
+        "iq_tail_audit": {
+            "record_count": 5,
+            "over_reference_count": 2,
+            "reference_ms": 244.45,
+            "total_gt_250ms_count": 2,
+            "rx_control_overhead_gt_50ms_count": 1,
+        },
+    }
+
+    status = state._get_crypto_status_core()
+
+    assert status["batch_iq_tail_audit"]["over_reference_count"] == 2
+    assert status["batch_iq_tail_audit"]["rx_control_overhead_gt_50ms_count"] == 1
+
+
+def test_iq_tail_audit_from_summary_preserves_runner_counts() -> None:
+    audit = usrp_runtime._iq_tail_audit_from_summary(
+        {
+            "iq_tail_audit": {
+                "record_count": 300,
+                "reference_ms": 244.45,
+                "over_reference_count": 33,
+                "total_gt_250ms_count": 30,
+                "decode_gt_160ms_count": 17,
+            }
+        }
+    )
+
+    assert audit is not None
+    assert audit["over_reference_count"] == 33
+    assert audit["decode_gt_160ms_count"] == 17
+
+
+def test_iq_stage_benchmark_exposes_control_decode_and_retry_metrics() -> None:
+    benchmark = usrp_runtime._iq_stage_benchmark_from_summary(
+        {
+            "images": [
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.010,
+                            "rx_arm_wall_sec": 0.003,
+                            "rx_capture_wall_sec": 0.030,
+                            "rx_wait_wall_sec": 0.017,
+                            "decode_wall_sec": 0.060,
+                            "remote_decode_reported_wall_sec": 0.041,
+                            "remote_decode_restart_wall_sec": 0.0,
+                            "remote_dir_publish_wall_sec": 0.004,
+                            "retry_wait_wall_sec": 0.0,
+                            "total_wall_sec": 0.120,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.020,
+                            "rx_arm_wall_sec": 0.004,
+                            "rx_capture_wall_sec": 0.040,
+                            "rx_wait_wall_sec": 0.026,
+                            "decode_wall_sec": 0.070,
+                            "remote_decode_reported_wall_sec": 0.042,
+                            "remote_decode_restart_wall_sec": 0.030,
+                            "remote_dir_publish_wall_sec": 0.005,
+                            "retry_wait_wall_sec": 0.0,
+                            "total_wall_sec": 0.140,
+                        }
+                    ],
+                },
+                {
+                    "passed": True,
+                    "round_records": [
+                        {
+                            "tx_wall_sec": 0.070,
+                            "rx_arm_wall_sec": 0.009,
+                            "rx_capture_wall_sec": 0.050,
+                            "rx_wait_wall_sec": 0.031,
+                            "decode_wall_sec": 0.080,
+                            "remote_decode_reported_wall_sec": 0.043,
+                            "remote_decode_restart_wall_sec": 0.0,
+                            "remote_dir_publish_wall_sec": 0.006,
+                            "retry_wait_wall_sec": 0.020,
+                            "total_wall_sec": 0.240,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert benchmark is not None
+    assert benchmark["tx_control_ms"]["median_ms"] == 20.0
+    assert benchmark["tx_control_ms"]["p95_ms"] == 70.0
+    assert benchmark["rx_arm_ms"]["median_ms"] == 4.0
+    assert benchmark["rx_capture_ms"]["median_ms"] == 40.0
+    assert benchmark["rx_wait_ms"]["median_ms"] == 26.0
+    assert benchmark["remote_decode_ms"]["median_ms"] == 70.0
+    assert benchmark["remote_decode_reported_ms"]["median_ms"] == 42.0
+    assert benchmark["remote_decode_restart_ms"]["max_ms"] == 30.0
+    assert benchmark["remote_dir_publish_ms"]["mean_ms"] == 5.0
+    assert benchmark["retry_wait_ms"]["max_ms"] == 20.0
+    assert benchmark["total_transport_ms"]["median_ms"] == 140.0
+
+
+def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
+    access = usrp_runtime.BoardAccessConfig(
+        host="demo-board",
+        user="user",
+        password="user",
+        port="22",
+        env_file=None,
+        env_values={},
+        source_summary="test",
+    )
+
+    class HangingPopen:
+        pid = 12345
+        returncode = None
+
+        def __init__(self, command, **_kwargs):  # type: ignore[no-untyped-def]
+            self.args = command
+
+        def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+            raise subprocess.TimeoutExpired(self.args, timeout)
+
+        def poll(self):  # type: ignore[no-untyped-def]
+            return self.returncode
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    with (
+        patch("usrp_runtime.os.name", "nt"),
+        patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+        patch("usrp_runtime.subprocess.Popen", side_effect=HangingPopen),
+        patch("usrp_runtime.subprocess.run") as run_mock,
+    ):
+        result = usrp_runtime._run_remote_command(access, "sleep 999", timeout=1.0)
+
+    assert result.returncode == 124
+    assert b"TimeoutExpired: remote command timed out after 1.0s" in result.stderr
+    run_mock.assert_called_once()
+    assert run_mock.call_args.args[0][:4] == ["taskkill", "/F", "/T", "/PID"]
+    assert run_mock.call_args.args[0][4] == "12345"
+
+
+def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
+    access = usrp_runtime.BoardAccessConfig(
+        host="demo-board",
+        user="user",
+        password="user",
+        port="22",
+        env_file=None,
+        env_values={},
+        source_summary="test",
+    )
+    commands: list[str] = []
+
+    def fake_run_remote_command(_access, remote_command, *, timeout):  # type: ignore[no-untyped-def]
+        commands.append(remote_command)
+        return subprocess.CompletedProcess(args=remote_command, returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(usrp_runtime, "_run_remote_command", fake_run_remote_command)
+
+    result = usrp_runtime._start_remote_rx_server(
+        access,
+        {"RX_ARM_WAIT_MS": "50", "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0"},
+        rx_port="29220",
+        remote_run_root="/tmp/usrp292x_remote_runs",
+        remote_project_root="/home/user",
+    )
+
+    assert result["status"] == "started"
+    assert "ARM_WAIT_MS=50" in commands[0]
+    assert "STOP_WAIT_MS=8000" in commands[0]
+
+
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
     return {
         "requested_at": requested_at,
@@ -121,6 +417,26 @@ class FakePopen:
         self.returncode = returncode
 
     def wait(self, timeout: float | None = None) -> int:
+        return self.returncode
+
+
+class KillableFakePopen(FakePopen):
+    def __init__(self, stdout_lines: list[str] | None = None, *, stderr_text: str = "", returncode: int | None = None) -> None:
+        super().__init__(stdout_lines=stdout_lines, stderr_text=stderr_text, returncode=returncode or 0)
+        self.returncode = returncode
+        self.killed = False
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = 124
+
+    def wait(self, timeout: float | None = None) -> int:
+        if self.returncode is None:
+            time.sleep(0.01)
+            return 124
         return self.returncode
 
 
@@ -482,6 +798,401 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(system_payload["recent_results"]["current"]["timings"]["payload_ms"], 239.2)
         self.assertEqual(system_payload["recent_results"]["current"]["timings"]["total_ms"], 251.7)
 
+    def test_compute_tvm_benchmark_accepts_big_little_wrapper_payload(self) -> None:
+        benchmark = server._compute_tvm_benchmark(
+            {
+                "status": "ok",
+                "runner": "run_big_little_pipeline.sh",
+                "pipeline": {
+                    "status": "ok",
+                    "processed_count": 3,
+                    "run_samples_ms": [243.717, 244.086, 246.424],
+                    "run_median_ms": 244.086,
+                    "run_mean_ms": 244.742,
+                    "big_cores": [2],
+                    "little_cores": [0, 1],
+                },
+            }
+        )
+
+        self.assertEqual(benchmark["inference_ms"]["n"], 3)
+        self.assertEqual(benchmark["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(benchmark["total_ms"]["mean_ms"], 244.74)
+
+    def test_start_batch_inference_uses_runner_summary_for_tvm_benchmark(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-biglittle-live-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "真实在线推进 + handwritten big.LITTLE",
+                "message": "TVM big.LITTLE completed.",
+                "artifact_sha": "sha-biglittle",
+                "sample": {"label": "sample-biglittle"},
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "timings": {"payload_ms": 999.0, "total_ms": 1001.0},
+                "runner_summary": {
+                    "status": "ok",
+                    "run_id": "biglittle-run-001",
+                    "runner": "run_big_little_pipeline.sh",
+                    "pipeline": {
+                        "status": "ok",
+                        "processed_count": 3,
+                        "execution_mode": "pipeline",
+                        "run_samples_ms": [243.717, 244.086, 246.424],
+                        "run_median_ms": 244.086,
+                        "run_mean_ms": 244.742,
+                        "big_cores": [2],
+                        "little_cores": [0, 1],
+                    },
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+        final_state = state.get_batch_state()
+        self.assertEqual(final_state["completed"], 3)
+        self.assertEqual(final_state["benchmark"]["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(final_state["benchmark"]["total_ms"]["mean_ms"], 244.74)
+        self.assertEqual(final_state["runner_summary"]["pipeline"]["big_cores"], [2])
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+        self.assertEqual(status, 200)
+        current = system_payload["recent_results"]["current"]
+        self.assertEqual(current["run_id"], "biglittle-run-001")
+        self.assertEqual(current["processed_count"], 3)
+        self.assertEqual(current["inference_benchmark"]["inference_ms"]["median_ms"], 244.09)
+        self.assertEqual(current["benchmark"]["total_ms"]["mean_ms"], 244.74)
+        self.assertEqual(current["runner_summary"]["pipeline"]["little_cores"], [0, 1])
+
+    def test_start_batch_inference_publishes_prerecorded_tvm_summary_without_sample_payload(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "current-prerecorded-biglittle-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "runner_summary": {
+                    "status": "ok",
+                    "mode": "big_little_pipeline",
+                    "execution_mode": "pipeline",
+                    "processed_count": 3,
+                    "input_count": 3,
+                    "run_samples_ms": [240.1, 240.2, 240.3],
+                    "run_median_ms": 240.2,
+                    "run_mean_ms": 240.2,
+                    "big_cores": [2],
+                    "little_cores": [0, 1],
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"batch state did not finish: {state.get_batch_state()}")
+
+            status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(state.get_batch_state()["benchmark"]["inference_ms"]["median_ms"], 240.2)
+        current = system_payload["recent_results"]["current"]
+        self.assertEqual(current["status"], "success")
+        self.assertEqual(current["execution_mode"], "live")
+        self.assertEqual(current["source_label"], "预录输入 + TVM 板端推理 + 归档样例图")
+        self.assertEqual(current["inference_benchmark"]["inference_ms"]["median_ms"], 240.2)
+        self.assertEqual(system_payload["last_inference"]["status"], "success")
+
+    def test_run_tvm_batch_accepts_complete_summary_from_stale_wrapper_process(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/input",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+            },
+            source_summary="test",
+        )
+        complete_summary = {
+            "status": "ok",
+            "processed_count": 1,
+            "selected_input_count": 1,
+            "run_samples_ms": [252.3],
+            "run_median_ms": 252.3,
+            "run_mean_ms": 252.3,
+        }
+        progress_seen: list[tuple[int, int]] = []
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=KillableFakePopen(
+                stdout_lines=[
+                    json.dumps({"openamp_demo_progress": {"delta": 1, "completed_count": 1}}) + "\n",
+                    json.dumps(complete_summary) + "\n",
+                ],
+                stderr_text="wrapper exited after remote result was written",
+                returncode=124,
+            ),
+        ):
+            payload = state._run_tvm_batch_with_access(
+                access,
+                count=1,
+                progress_callback=lambda completed, total: progress_seen.append((completed, total)),
+            )
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["run_median_ms"], 252.3)
+        self.assertEqual(progress_seen, [(1, 1)])
+
+    def test_run_tvm_batch_marks_statusless_complete_summary_ok(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/input",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+            },
+            source_summary="test",
+        )
+        statusless_summary = {
+            "processed_count": 1,
+            "input_count": 1,
+            "run_samples_ms": [608.835],
+            "run_median_ms": 608.835,
+            "run_mean_ms": 608.835,
+        }
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=FakePopen(
+                stdout_lines=[json.dumps(statusless_summary) + "\n"],
+                returncode=0,
+            ),
+        ):
+            payload = state._run_tvm_batch_with_access(access, count=1)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["run_median_ms"], 608.835)
+
+    def test_run_tvm_batch_decodes_subprocess_output_with_replacement(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/input",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+            },
+            source_summary="test",
+        )
+        statusless_summary = {
+            "processed_count": 1,
+            "input_count": 1,
+            "run_samples_ms": [252.3],
+            "run_median_ms": 252.3,
+            "run_mean_ms": 252.3,
+        }
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=FakePopen(stdout_lines=[json.dumps(statusless_summary) + "\n"], returncode=0),
+        ) as popen:
+            state._run_tvm_batch_with_access(access, count=1)
+
+        kwargs = popen.call_args.kwargs
+        self.assertEqual(kwargs["encoding"], "utf-8")
+        self.assertEqual(kwargs["errors"], "replace")
+
+    def test_run_tvm_batch_flattens_big_little_wrapper_summary(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/usrp-rx",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+                "INFERENCE_CURRENT_CMD": "bash ./session_bootstrap/scripts/run_big_little_pipeline.sh --variant current --max-inputs 300",
+            },
+            source_summary="test",
+        )
+        wrapper_summary = {
+            "status": "ok",
+            "runner": "run_big_little_pipeline.sh",
+            "pipeline": {
+                "status": "ok",
+                "processed_count": 2,
+                "input_count": 2,
+                "run_samples_ms": [243.7, 244.1],
+                "run_median_ms": 243.9,
+                "run_mean_ms": 243.9,
+                "big_cores": [2],
+                "little_cores": [0, 1],
+            },
+        }
+
+        with patch(
+            "server.subprocess.Popen",
+            return_value=FakePopen(stdout_lines=[json.dumps(wrapper_summary) + "\n"], returncode=0),
+        ):
+            payload = state._run_tvm_batch_with_access(access, count=2)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["runner"], "run_big_little_pipeline.sh")
+        self.assertEqual(payload["processed_count"], 2)
+        self.assertEqual(payload["run_median_ms"], 243.9)
+        self.assertEqual(payload["big_cores"], [2])
+
+    def test_run_tvm_batch_uses_big_little_script_when_current_command_selects_it(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={
+                "REMOTE_TVM_PYTHON": "/opt/tvm/bin/python",
+                "REMOTE_INPUT_DIR": "/remote/usrp-rx",
+                "REMOTE_OUTPUT_BASE": "/remote/output",
+                "REMOTE_SNR_CURRENT": "10",
+                "REMOTE_BATCH_CURRENT": "1",
+                "REMOTE_CURRENT_ARTIFACT": "/remote/model.so",
+                "INFERENCE_CURRENT_CMD": "bash ./session_bootstrap/scripts/run_big_little_pipeline.sh --variant current --max-inputs 300",
+            },
+            source_summary="test",
+        )
+        captured: dict[str, object] = {}
+
+        def fake_popen(command, *args, **kwargs):
+            captured["command"] = list(command)
+            captured["env"] = dict(kwargs.get("env") or {})
+            return FakePopen(
+                stdout_lines=[
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "runner": "run_big_little_pipeline.sh",
+                            "pipeline": {
+                                "status": "ok",
+                                "processed_count": 2,
+                                "input_count": 2,
+                                "run_samples_ms": [244.0, 245.0],
+                                "run_median_ms": 244.5,
+                                "run_mean_ms": 244.5,
+                            },
+                        }
+                    )
+                    + "\n"
+                ],
+                returncode=0,
+            )
+
+        with patch("server.subprocess.Popen", side_effect=fake_popen):
+            payload = state._run_tvm_batch_with_access(access, count=2)
+
+        command = captured["command"]
+        self.assertIn("run_big_little_pipeline.sh", str(command[1]))
+        self.assertIn("--max-inputs", command)
+        self.assertEqual(command[command.index("--max-inputs") + 1], "2")
+        self.assertEqual(payload["processed_count"], 2)
+
     def test_runner_only_fallback_allows_host_env_error_preflight(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -609,6 +1320,10 @@ class DashboardStateTest(unittest.TestCase):
                 "timings": {"payload_ms": 121.0, "total_ms": 130.0},
                 "wrapper_summary": {
                     "inference_engine": "tvm",
+                    "iq_stage_benchmark": {
+                        "tx_control_ms": {"n": 5, "median_ms": 18.0, "p95_ms": 29.0},
+                        "remote_decode_ms": {"n": 5, "median_ms": 64.0, "p95_ms": 91.0},
+                    },
                     "inference_summary": {
                         "status": "ok",
                         "processed_count": 5,
@@ -621,6 +1336,10 @@ class DashboardStateTest(unittest.TestCase):
                 "live_attempt": {
                     "wrapper_summary": {
                         "inference_engine": "tvm",
+                        "iq_stage_benchmark": {
+                            "tx_control_ms": {"n": 5, "median_ms": 18.0, "p95_ms": 29.0},
+                            "remote_decode_ms": {"n": 5, "median_ms": 64.0, "p95_ms": 91.0},
+                        },
                         "inference_summary": {
                             "status": "ok",
                             "processed_count": 5,
@@ -657,11 +1376,207 @@ class DashboardStateTest(unittest.TestCase):
 
         final_state = state.get_batch_state()
         self.assertEqual(final_state["engine"], "tvm")
+        self.assertEqual(final_state["iq_stage_benchmark"]["tx_control_ms"]["median_ms"], 18.0)
+        self.assertEqual(final_state["iq_stage_benchmark"]["remote_decode_ms"]["p95_ms"], 91.0)
         self.assertEqual(final_state["quality"]["psnr_db"], server.build_prerecorded_inference_result(0, "current")["quality"]["psnr_db"])
         self.assertEqual(status, 200)
         self.assertEqual(system_payload["recent_results"]["current"]["execution_mode"], "live")
         self.assertEqual(system_payload["recent_results"]["current"]["quality"]["psnr_db"], 37.0)
         self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "tvm")
+
+    def test_start_batch_inference_marks_iq_remote_dir_images_decoded_while_transport_runs(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+        allow_finish = threading.Event()
+
+        def fake_run_demo_inference(
+            *,
+            variant: str,
+            image_index: int,
+            allow_preflight_degraded: bool = False,
+            max_inputs: int = server.DEFAULT_MAX_INPUTS,
+        ) -> dict[str, object]:
+            del allow_preflight_degraded
+            self.assertEqual(variant, "current")
+            self.assertEqual(image_index, 0)
+            self.assertEqual(max_inputs, 3)
+            return {
+                "status": "running",
+                "execution_mode": "live",
+                "request_state": "running",
+                "job_id": "usrp-stream-live-001",
+                "live_progress": {"completed_count": 0, "expected_count": 3},
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "iq_remote_decode_manifest": {
+                            "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                            "decode_manifest": {
+                                "decoded_count": 1,
+                                "files": ["/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz"],
+                            },
+                        }
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "transport": {"completed_count": 1, "expected_count": 3, "state": "running"},
+                        "inference": {"completed_count": 0, "expected_count": 3, "state": "pending"},
+                    },
+                },
+            }
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            self.assertEqual(job_id, "usrp-stream-live-001")
+            allow_finish.wait(timeout=2.0)
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "source_label": "USRP stream + handwritten TVM",
+                "message": "USRP TVM completed.",
+                "artifact_sha": "sha-usrp-stream",
+                "sample": {"label": "airfield"},
+                "quality": {"psnr_db": 37.0, "ssim": 0.97},
+                "live_progress": {"completed_count": 3, "expected_count": 3},
+                "timings": {"payload_ms": 121.0, "total_ms": 130.0},
+                "wrapper_summary": {
+                    "inference_engine": "tvm",
+                    "iq_remote_decode_manifest": {
+                        "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                        "decode_manifest": {
+                            "decoded_count": 3,
+                            "files": [
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000001.npz",
+                                "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000002.npz",
+                            ],
+                        },
+                    },
+                    "inference_summary": {
+                        "status": "ok",
+                        "processed_count": 3,
+                        "selected_input_count": 3,
+                        "run_samples_ms": [120.0, 121.0, 122.0],
+                        "run_median_ms": 121.0,
+                        "run_mean_ms": 121.0,
+                    },
+                },
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "tvm",
+                        "iq_remote_decode_manifest": {
+                            "remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx",
+                            "decode_manifest": {
+                                "decoded_count": 3,
+                                "files": [
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000001.npz",
+                                    "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000002.npz",
+                                ],
+                            },
+                        },
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 3,
+                            "selected_input_count": 3,
+                            "run_samples_ms": [120.0, 121.0, 122.0],
+                            "run_median_ms": 121.0,
+                            "run_mean_ms": 121.0,
+                        },
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "transport": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                        "inference": {"completed_count": 3, "expected_count": 3, "state": "completed"},
+                    },
+                },
+            }
+
+        with (
+            patch.object(state, "run_demo_inference", side_effect=fake_run_demo_inference),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_batch_inference(count=3)
+            self.assertEqual(payload["status"], "started")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                images = current.get("iq_streaming_images") or []
+                if images:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail(f"iq streaming state did not appear: {state.get_batch_state()}")
+
+            self.assertEqual(images[0]["status"], "decoded")
+            self.assertEqual(images[0]["remote_npz"], "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz")
+            self.assertEqual(images[1]["status"], "pending")
+            self.assertEqual(images[2]["status"], "pending")
+            allow_finish.set()
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                current = state.get_batch_state()
+                if current.get("status") == "done":
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail(f"usrp stream batch did not finish: {state.get_batch_state()}")
+
+        final_images = state.get_batch_state()["iq_streaming_images"]
+        self.assertEqual([image["status"] for image in final_images], ["done", "done", "done"])
+
+    def test_iq_streaming_images_prefers_npy_summary_files_over_npz_manifest_defaults(self) -> None:
+        manifest = {
+            "decode_manifest": {
+                "images": [
+                    {
+                        "index": 0,
+                        "remote_npz": "/home/user/cockpit_usrp_rx/run_rx/00000000.npz",
+                    },
+                    {
+                        "index": 1,
+                        "remote_npz": "/home/user/cockpit_usrp_rx/run_rx/00000001.npz",
+                    },
+                ],
+                "files": [
+                    "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                    "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+                ],
+            },
+        }
+
+        images = server._iq_streaming_images_from_manifest(
+            manifest,
+            total=2,
+            inference_state="completed",
+            final_success=True,
+        )
+
+        self.assertEqual([image["remote_npz"] for image in images], [
+            "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+            "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+        ])
+        self.assertEqual([image["status"] for image in images], ["done", "done"])
+
+    def test_iq_partial_manifest_uses_configured_npy_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            run_dir = Path(temp_dir_name)
+            image_dir = run_dir / "image_0000"
+            image_dir.mkdir()
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps({"status": "ok", "frame_complete": True}),
+                encoding="utf-8",
+            )
+
+            manifest = usrp_runtime._iq_remote_decode_stage_manifest_from_image_dirs(
+                run_dir,
+                "/home/user/cockpit_usrp_rx/run_rx",
+                decoded_extension="npy",
+            )
+
+        self.assertIsNotNone(manifest)
+        files = manifest["decode_manifest"]["files"]
+        self.assertEqual(files, ["/home/user/cockpit_usrp_rx/run_rx/00000000.npy"])
 
     def test_start_batch_inference_marks_done_when_worker_raises(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -739,51 +1654,38 @@ class DashboardStateTest(unittest.TestCase):
         self.assertIn("远端推理配置不完整或不可用", batch_state["message"])
         run_demo_inference.assert_called_once()
 
-    def test_start_batch_inference_returns_blocked_when_crypto_client_diagnostics_include_paths(self) -> None:
-        env_file = "session_bootstrap/config/inference_demo_openamp_mean4_v7.2026-04-20.phytium_pi.env"
-        state = DashboardState(env_file, 30.0, probe_cache_path=None)
+    def test_start_batch_inference_uses_standard_runner_when_crypto_enabled(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True
-        state._board_access = server.build_board_access_config(
-            {
-                "host": "demo-board",
-                "user": "demo-user",
-                "password": "demo-pass",
-                "port": "22",
-                "env_file": env_file,
-            },
-            fallback=state._board_access,
-        )
-
-        preflight = {
-            "status": "success",
-            "guard_state": "READY",
-            "last_fault_code": "NONE",
-            "heartbeat_ok": 1,
-            "total_fault_count": 0,
-            "logs": [],
-        }
 
         with (
-            patch.object(state, "_ensure_board_tcp_server", return_value=None),
-            patch.object(state, "_get_mlkem_session_manager", return_value=None),
-            patch("server.query_live_status", return_value=preflight),
-            patch(
-                "server.resolve_local_crypto_client",
-                return_value=(Path("/tmp/legacy_tcp_client.py"), [Path("/tmp/legacy_tcp_client.py")]),
-            ),
-            patch.object(state, "_emit_inference_rejection_events", return_value=None),
+            patch.object(
+                state,
+                "run_demo_inference",
+                return_value={
+                    "status": "fallback",
+                    "execution_mode": "prerecorded",
+                    "request_state": "completed",
+                    "status_category": "config_error",
+                    "source_label": "配置不完整，回退展示（归档样例）",
+                    "message": "远端推理配置不完整或不可用，请检查连接信息和推理环境参数。 当前已回退到预录结果。",
+                    "live_progress": {"completed_count": 0, "expected_count": 3},
+                },
+            ) as run_demo_inference,
+            patch.object(state, "run_mlkem_inference", side_effect=AssertionError("legacy ML-KEM data path should not be used")),
         ):
             payload = state.start_batch_inference(count=3)
 
         self.assertEqual(payload["status"], "blocked")
-        self.assertEqual(payload["status_category"], "client_missing")
+        self.assertEqual(payload["status_category"], "config_error")
         self.assertEqual(payload["engine"], "tvm")
         self.assertEqual(payload["service_mode"], "FULL_FRAME")
         batch_state = state.get_batch_state()
         self.assertEqual(batch_state["status"], "done")
         self.assertEqual(batch_state["completed"], 0)
         self.assertEqual(batch_state["fallback"], 3)
-        self.assertEqual(batch_state["status_category"], "client_missing")
+        self.assertEqual(batch_state["status_category"], "config_error")
+        run_demo_inference.assert_called_once()
 
     def test_start_batch_inference_alert_mode_keeps_batch_state_accessible_and_completes(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -1059,6 +1961,60 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(system_payload["recent_results"]["current"]["wrapper_summary"]["inference_engine"], "mnn")
         self.assertEqual(system_payload["recent_results"]["current"]["quality"]["ssim"], server.build_prerecorded_inference_result(0, "current")["quality"]["ssim"])
 
+    def test_start_mnn_usrp_batch_arms_security_outside_state_lock(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+
+        def fake_arm_security_context(**_kwargs):
+            acquired = state._lock.acquire(timeout=0.05)
+            self.assertTrue(acquired, "security arm called while DashboardState lock is held")
+            state._lock.release()
+            return None, None
+
+        def fake_register_live_job(*, live_job, variant: str, image_index: int, security_context=None):
+            del security_context
+            record = {"job": live_job, "job_id": live_job.job_id, "variant": variant, "image_index": image_index}
+            return record, {"job_id": live_job.job_id}
+
+        def fake_peek_inference_progress(job_id: str) -> dict[str, object]:
+            return {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "job_id": job_id,
+                "live_progress": {"completed_count": 1, "expected_count": 1},
+                "live_attempt": {
+                    "wrapper_summary": {
+                        "inference_engine": "mnn",
+                        "inference_summary": {
+                            "status": "ok",
+                            "processed_count": 1,
+                            "selected_input_count": 1,
+                            "sample_stats": {
+                                "run_ms": {"count": 1, "mean_ms": 10.0, "median_ms": 10.0},
+                                "total_ms": {"count": 1, "mean_ms": 12.0, "median_ms": 12.0},
+                            },
+                        },
+                    },
+                    "stage_progress": {
+                        "host_preprocess": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                        "transport": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                        "inference": {"completed_count": 1, "expected_count": 1, "state": "completed"},
+                    },
+                },
+            }
+
+        fake_live_job = Mock(job_id="usrp-mnn-lock-001")
+        with (
+            patch.object(state, "_arm_mlkem_security_context", side_effect=fake_arm_security_context),
+            patch("server.launch_local_usrp_reconstruction_job", return_value=fake_live_job),
+            patch.object(state, "_register_live_job", side_effect=fake_register_live_job),
+            patch.object(state, "_peek_inference_progress", side_effect=fake_peek_inference_progress),
+        ):
+            payload = state.start_mnn_batch_inference(count=1)
+
+        self.assertEqual(payload["status"], "started")
+
     def test_start_mnn_batch_inference_updates_progress_while_running(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         progress_seen = threading.Event()
@@ -1149,6 +2105,7 @@ class DashboardStateTest(unittest.TestCase):
 
             with (
                 patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.resolve_bash_executable", return_value="bash"),
                 patch("server.subprocess.Popen", side_effect=fake_popen),
             ):
                 payload = state._run_mnn_batch(count=3)
@@ -1210,6 +2167,7 @@ class DashboardStateTest(unittest.TestCase):
 
             with (
                 patch.object(server, "DEFAULT_MNN_BATCH_ENV_FILE", env_path),
+                patch("server.resolve_bash_executable", return_value="bash"),
                 patch("server.subprocess.Popen", side_effect=fake_popen),
             ):
                 payload = state._run_mnn_batch(count=3)
@@ -1217,6 +2175,41 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(captured_env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(captured_env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+
+    def test_prerecorded_mnn_batch_success_updates_recent_results(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        mnn_summary = {
+            "status": "ok",
+            "variant": "current",
+            "selected_input_count": 2,
+            "processed_count": 2,
+            "sample_stats": {
+                "run_ms": {"count": 2, "median_ms": 128.0, "mean_ms": 129.0},
+                "total_ms": {"count": 2, "median_ms": 550.0, "mean_ms": 552.0},
+            },
+            "errors": [],
+        }
+
+        with patch.object(state, "_run_mnn_batch", return_value=mnn_summary):
+            payload = state.start_mnn_batch_inference(count=2)
+
+        self.assertEqual(payload["status"], "started")
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            batch_state = state.get_batch_state()
+            if batch_state.get("status") == "done":
+                break
+            time.sleep(0.02)
+        else:
+            self.fail(f"mnn batch did not finish: {state.get_batch_state()}")
+
+        status, _, system_payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(system_payload["recent_results"]["mnn"]["job_id"], payload["batch_job_id"])
+        self.assertEqual(system_payload["recent_results"]["current"]["job_id"], payload["batch_job_id"])
+        self.assertEqual(system_payload["recent_results"]["mnn"]["wrapper_summary"]["inference_engine"], "mnn")
+        self.assertEqual(system_payload["last_inference"]["variant"], "current")
 
     def test_usrp_stage_access_uses_run_specific_tvm_output_prefix(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -1237,8 +2230,41 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(env["REMOTE_INPUT_SOURCE_MODE"], "usrp")
         self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx")
+        self.assertEqual(env["REMOTE_INPUT_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx")
         self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/tvm")
         self.assertEqual(env["INFERENCE_REAL_OUTPUT_PREFIX"], "openamp3_usrp_123")
+        self.assertEqual(env["BIG_LITTLE_OUTPUT_PREFIX"], "openamp3_usrp_123")
+        self.assertEqual(env["BIG_LITTLE_REPORT_PREFIX"], "openamp3_usrp_123")
+
+    def test_usrp_tvm_stage_sets_big_little_input_wait_window(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides(
+            {
+                "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "JSCC_LINK_MODE": "iq-direct",
+                "OPENAMP_IQ_STREAMING_TVM": "1",
+                "OPENAMP_IQ_STREAMING_MIN_READY": "10",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
+            }
+        )
+        captured: dict[str, str] = {}
+
+        def fake_run_tvm(access, *, count, progress_callback):
+            captured.update(access.build_env())
+            progress_callback(count, count)
+            return {"status": "ok", "processed_count": count, "selected_input_count": count}
+
+        with patch.object(state, "_run_tvm_batch_with_access", side_effect=fake_run_tvm):
+            callback = state._run_tvm_after_usrp_stage(base_access, count=300)
+            result = callback(
+                {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-789_rx"},
+                lambda *_args: None,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC"], "300.0")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_POLL_SEC"], "0.05")
+        self.assertEqual(captured["BIG_LITTLE_INPUT_CHUNK_SIZE"], "10")
 
     def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -1391,6 +2417,64 @@ class DashboardStateTest(unittest.TestCase):
         security = payload.get("live_attempt", {}).get("security", {})
         self.assertEqual(security.get("protocol"), "mlkem_control")
         self.assertEqual(security.get("handshake_ms"), 8.5)
+
+    def test_run_demo_inference_with_usrp_transport_blocks_when_mlkem_control_unavailable(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+        blocked_payload = state._build_blocked_inference_payload(
+            variant="current",
+            image_index=0,
+            status_category="crypto_unavailable",
+            source_label="ML-KEM 安全协议未就绪，回退展示（归档样例）",
+            message="ML-KEM 安全协议未建立，本次按安全策略不发起 Current live 重建。",
+            detail="auth verification failed",
+            diagnostics={"crypto_enabled": True},
+            expected_count=300,
+        )
+
+        with (
+            patch.object(state, "_arm_mlkem_security_context", return_value=(None, blocked_payload)) as arm_security,
+            patch("server.launch_local_usrp_reconstruction_job", side_effect=AssertionError("USRP data plane must not start without ML-KEM gate")) as launch_usrp_job,
+            patch("server.launch_remote_reconstruction_job", side_effect=AssertionError("OpenAMP fallback should not launch for USRP crypto block")),
+            patch("server.expected_sha_for_variant", side_effect=AssertionError("USRP mode should not inspect OpenAMP artifact sha gate")),
+            patch("server.describe_demo_variant_support", side_effect=AssertionError("USRP mode should not inspect OpenAMP variant support")),
+        ):
+            payload = state.run_demo_inference(variant="current", image_index=0)
+
+        arm_security.assert_called_once()
+        launch_usrp_job.assert_not_called()
+        self.assertEqual(payload["status"], "fallback")
+        self.assertEqual(payload["request_state"], "completed")
+        self.assertEqual(payload["status_category"], "crypto_unavailable")
+        self.assertEqual(payload["live_attempt"]["status"], "blocked")
+        self.assertIn("不发起 Current live 重建", str(payload["message"]))
+
+    def test_run_baseline_in_usrp_mode_keeps_pytorch_prerecorded_reference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass", "transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_arm_mlkem_security_context", side_effect=AssertionError("PyTorch reference should not arm USRP security")),
+            patch("server.launch_local_usrp_reconstruction_job", side_effect=AssertionError("PyTorch reference should not launch USRP transport")) as launch_usrp_job,
+        ):
+            payload = state.run_demo_inference(variant="baseline", image_index=0)
+
+        launch_usrp_job.assert_not_called()
+        self.assertEqual(payload["variant"], "baseline")
+        self.assertEqual(payload["execution_mode"], "prerecorded")
+        self.assertEqual(payload["data_transport"], "prerecorded")
+        self.assertIn("不走 USRP", str(payload["source_label"]))
 
     def test_run_demo_inference_blocks_nontrusted_current_when_admission_stays_legacy_sha(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -2404,6 +3488,60 @@ class DashboardStateTest(unittest.TestCase):
         self.assertIn("pkill -f 'tcp_server.py' || true", captured)
         self.assertIn("echo restart-remote-server", captured)
 
+    def test_ensure_board_tcp_server_restarts_when_auth_status_mismatches(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "MLKEM_AUTH_ENABLED": "1",
+                    "MLKEM_AUTH_SIG_POLICY": "DUAL_REQUIRED",
+                    "MLKEM_AUTH_SERVER_ID": "phytium-board",
+                }
+            ),
+        )
+        captured: list[str] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            captured.append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch(
+                "server.fetch_json_direct",
+                side_effect=[
+                    {
+                        "cipher_suite": "sm4-gcm",
+                        "auth_enabled": False,
+                        "sig_policy": "",
+                        "server_id": "",
+                    },
+                    {
+                        "cipher_suite": "sm4-gcm",
+                        "auth_enabled": True,
+                        "sig_policy": "DUAL_REQUIRED",
+                        "server_id": "phytium-board",
+                    },
+                ],
+            ),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertIn("pkill -f 'tcp_server.py' || true", captured)
+        self.assertIn("echo restart-remote-server", captured)
+
     def test_ensure_board_tcp_server_keeps_running_process_when_normalized_tvm_python_matches(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
@@ -2464,10 +3602,14 @@ class DashboardStateTest(unittest.TestCase):
                 "port": "22",
             },
             fallback=state._board_access.with_env_overrides(
-                {"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"}
+                {
+                    "MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py",
+                    "MLKEM_STATUS_STARTUP_WAIT_SEC": "2",
+                }
             ),
         )
         captured: list[str] = []
+        monotonic_value = {"value": 0.0}
 
         def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
             del kwargs
@@ -2484,23 +3626,24 @@ class DashboardStateTest(unittest.TestCase):
                 )
             return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
 
+        def fake_fetch_json_direct(*args: object, **kwargs: object):
+            del args, kwargs
+            if any("echo restart-remote-server" in command for command in captured):
+                return {"cipher_suite": "sm4-gcm"}
+            raise RuntimeError("status down")
+
+        def fake_monotonic() -> float:
+            monotonic_value["value"] += 10.0
+            return monotonic_value["value"]
+
         with (
-            patch(
-                "server.fetch_json_direct",
-                side_effect=[
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    RuntimeError("status down"),
-                    {"cipher_suite": "sm4-gcm"},
-                ],
-            ),
+            patch("server.fetch_json_direct", side_effect=fake_fetch_json_direct),
             patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/tcp_server.py"), [])),
             patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
             patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
             patch("server.build_remote_crypto_server_command", return_value="echo restart-remote-server"),
             patch("server.time.sleep", return_value=None),
+            patch("server.time.monotonic", side_effect=fake_monotonic),
         ):
             state._ensure_board_tcp_server(board_access)
 
@@ -2572,6 +3715,50 @@ class DashboardStateTest(unittest.TestCase):
                 "/home/demo-user/mlkem_link/kem.py",
             ],
         )
+
+    def test_write_remote_text_file_uses_scp_instead_of_embedding_large_content(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        large_content = "PAYLOAD-CONTENT-" * 6000
+        ssh_commands: list[str] = []
+        scp_calls: list[dict[str, object]] = []
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            ssh_commands.append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        def fake_run_scp_file(**kwargs: object):
+            local_path = Path(str(kwargs["local_path"]))
+            scp_calls.append({**kwargs, "uploaded_content": local_path.read_text(encoding="utf-8")})
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.run_scp_file", side_effect=fake_run_scp_file),
+        ):
+            state._write_remote_text_file(
+                board_access,
+                remote_path="/home/demo-user/tcp_server.py",
+                content=large_content,
+                mode=0o755,
+                timeout=25.0,
+            )
+
+        self.assertEqual(len(scp_calls), 1)
+        self.assertEqual(scp_calls[0]["uploaded_content"], large_content)
+        self.assertTrue(str(scp_calls[0]["remote_path"]).startswith("/home/demo-user/.tcp_server.py."))
+        self.assertEqual(len(ssh_commands), 2)
+        self.assertLess(max(len(command) for command in ssh_commands), 2000)
+        self.assertNotIn(large_content[:200], "\n".join(ssh_commands))
 
     def test_get_crypto_status_fetches_board_status_without_proxy(self) -> None:
         class FakeResponse:
@@ -2747,6 +3934,114 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["status_source"], "probe_error")
         self.assertEqual(payload["status_note"], "rpmsg unavailable")
 
+    def test_get_crypto_status_uses_board_access_auth_over_status_endpoint_stale_value(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_AUTH_ENABLED": "1",
+                    "MLKEM_AUTH_SIG_POLICY": "DUAL_REQUIRED",
+                    "MLKEM_AUTH_SERVER_ID": "phytium-board",
+                }
+            ),
+        )
+
+        stale_status = {
+            "channel_state": "idle",
+            "kem_backend": "mock-backend",
+            "cipher_suite": "sm4-gcm",
+            "auth_enabled": False,
+            "sig_policy": "",
+            "server_id": "",
+        }
+        with patch("server.fetch_json_direct", return_value=stale_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["auth_enabled"], True)
+        self.assertEqual(payload["sig_policy"], "DUAL_REQUIRED")
+        self.assertEqual(payload["server_id"], "phytium-board")
+
+    def test_get_crypto_status_marks_usrp_security_as_control_gate(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_TRANSPORT_MODE": "usrp",
+                    "MLKEM_AUTH_ENABLED": "1",
+                }
+            ),
+        )
+
+        live_status = {
+            "channel_state": "ready",
+            "kem_backend": "tongsuo-ML-KEM-768",
+            "cipher_suite": "sm4-gcm",
+            "bytes_sent": 1024,
+            "bytes_received": 2048,
+        }
+
+        with patch("server.fetch_json_direct", return_value=live_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["security_scope"], "control_gate")
+        self.assertEqual(payload["security_scope_label"], "控制/认证面准入")
+        self.assertTrue(payload["control_plane_protected"])
+        self.assertFalse(payload["data_plane_encrypted"])
+        self.assertFalse(payload["tcp_payload_encrypted"])
+        self.assertFalse(payload["usrp_payload_encrypted"])
+        self.assertIn("USRP IQ", payload["security_scope_note"])
+
+    def test_get_crypto_status_marks_tcp_security_as_payload_encryption(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "100.121.87.73",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides(
+                {
+                    "MLKEM_TRANSPORT_MODE": "tcp",
+                    "MLKEM_AUTH_ENABLED": "1",
+                }
+            ),
+        )
+
+        live_status = {
+            "channel_state": "ready",
+            "kem_backend": "tongsuo-ML-KEM-768",
+            "cipher_suite": "sm4-gcm",
+            "bytes_sent": 1024,
+            "bytes_received": 2048,
+        }
+
+        with patch("server.fetch_json_direct", return_value=live_status):
+            payload = state.get_crypto_status()
+
+        self.assertEqual(payload["security_scope"], "tcp_payload")
+        self.assertEqual(payload["security_scope_label"], "TCP 数据面加密")
+        self.assertTrue(payload["control_plane_protected"])
+        self.assertTrue(payload["data_plane_encrypted"])
+        self.assertTrue(payload["tcp_payload_encrypted"])
+        self.assertFalse(payload["usrp_payload_encrypted"])
+        self.assertIn("latent", payload["security_scope_note"])
+
     def test_run_crypto_test_updates_status_cache_from_subprocess_metrics(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True
@@ -2828,6 +4123,89 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["control_heartbeat_ok"], 1)
         self.assertEqual(payload["control_total_fault_count"], 0)
         self.assertIsNone(payload["error"])
+
+    def test_run_crypto_test_starts_control_tcp_server_in_usrp_transport_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"}),
+        )
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None) as ensure_server,
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch(
+                "server.subprocess.run",
+                return_value=server.subprocess.CompletedProcess(
+                    ["fake-python", "tcp_client.py"],
+                    0,
+                    stdout="✓ 传输成功\n  对端 SHA256 匹配: 是\n",
+                    stderr="",
+                ),
+            ),
+            patch("server.query_live_status", return_value={}),
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        ensure_server.assert_called_once_with(state._board_access)
+
+    def test_run_crypto_test_uses_utf8_replacement_for_local_client_output(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        state._board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> server.subprocess.CompletedProcess[str]:
+            captured.update(kwargs)
+            return server.subprocess.CompletedProcess(
+                args[0],
+                0,
+                stdout="✓ 传输成功\n  对端 SHA256 匹配: 是\n",
+                stderr="",
+            )
+
+        with (
+            patch("server.resolve_local_crypto_client", return_value=(Path("/tmp/tcp_client.py"), [Path("/tmp/tcp_client.py")])),
+            patch(
+                "server.build_local_crypto_client_command",
+                side_effect=lambda env_values, *, host, input_path, client_script: (
+                    ["fake-python", str(client_script), "--host", host, "--input", str(input_path)],
+                    {},
+                ),
+            ),
+            patch.object(state, "_ensure_board_tcp_server", return_value=None),
+            patch.object(state, "_get_mlkem_session_manager", return_value=None),
+            patch("server.subprocess.run", side_effect=fake_run),
+            patch("server.query_live_status", return_value={}),
+        ):
+            result = state.run_crypto_test()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["encoding"], "utf-8")
+        self.assertEqual(captured["errors"], "replace")
 
     def test_get_crypto_status_reuses_last_successful_crypto_test_when_status_probe_is_unreachable(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -2919,6 +4297,64 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(env.get("MLKEM_AUTH_ENABLED"), "1")
         self.assertEqual(env.get("MLKEM_AUTH_SIG_POLICY"), "MLDSA_ONLY")
         self.assertEqual(env.get("MLKEM_AUTH_SERVER_ID"), "phytium-board")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_SM2_KEY"), "/home/user/keys/server_sm2_identity.key")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_SM2_PUB"), "/home/user/keys/server_sm2_identity.pub")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_MLDSA_KEY"), "/home/user/keys/server_mldsa_identity.key")
+        self.assertEqual(env.get("MLKEM_AUTH_SERVER_MLDSA_PUB"), "/home/user/keys/server_mldsa_identity.pub")
+        self.assertEqual(env.get("MLKEM_AUTH_PEER_SM2_PUB"), str(server.PACKAGE_ROOT / "keys" / "server_sm2_identity.pub"))
+        self.assertEqual(
+            env.get("MLKEM_AUTH_PEER_MLDSA_PUB"),
+            str(server.PACKAGE_ROOT / "keys" / "server_mldsa_identity.pub"),
+        )
+        self.assertEqual(env.get("MLKEM_REMOTE_TONGSUO_SIG_BRIDGE"), "/home/user/libtongsuo_sig_bridge.so")
+        self.assertEqual(env.get("MLKEM_REMOTE_OQS_INSTALL_PATH"), "/home/user/liboqs-dist")
+
+    def test_set_board_access_preserves_usrp_iq_runtime_env_from_process(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "ANALOG_REMOTE_DECODED_FORMAT": "npy",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_PRECONNECT_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "10",
+                "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
+                "ANALOG_PIPELINE_DEPTH": "2",
+                "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "1",
+                "OPENAMP_IQ_STREAMING_TVM": "1",
+                "OPENAMP_IQ_STREAMING_MIN_READY": "10",
+                "BIG_LITTLE_INPUT_CHUNK_SIZE": "10",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 0,1",
+            },
+            clear=False,
+        ):
+            state.set_board_access(
+                {
+                    "host": "100.121.87.73",
+                    "user": "user",
+                    "password": "user",
+                    "transport_mode": "usrp",
+                    "remote_usrp_rx_dir": "/home/user/cockpit_usrp_rx",
+                }
+            )
+
+        env = state._board_access.build_env()
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODED_FORMAT"), "npy")
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODE_RESPONSE_MODE"), "minimal")
+        self.assertEqual(env.get("ANALOG_PRECONNECT_CONTROL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_CONTROL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_BATCH_SESSION_MAX_IMAGES"), "10")
+        self.assertEqual(env.get("ANALOG_RX_HEALTH_RESET_ON_STALL"), "1")
+        self.assertEqual(env.get("ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC"), "0.75")
+        self.assertEqual(env.get("ANALOG_PIPELINE_DEPTH"), "2")
+        self.assertEqual(env.get("ANALOG_PIPELINE_RF_DECODE_OVERLAP"), "1")
+        self.assertEqual(env.get("OPENAMP_IQ_STREAMING_TVM"), "1")
+        self.assertEqual(env.get("OPENAMP_IQ_STREAMING_MIN_READY"), "10")
+        self.assertEqual(env.get("BIG_LITTLE_INPUT_CHUNK_SIZE"), "10")
+        self.assertEqual(env.get("ANALOG_REMOTE_DECODE_WORKER_PREFIX"), "taskset -c 0,1")
 
     def test_session_board_access_rejects_unsupported_auth_sig_policy(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -3011,6 +4447,38 @@ class ServerMainTest(unittest.TestCase):
         )
         self.assertEqual(overrides["AIRCRAFT_POSITION_LATITUDE_PATH"], "content.point.y")
 
+    def test_demo_startup_env_overrides_forwards_board_connection_env(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "REMOTE_HOST": "192.168.50.23",
+                "PHYTIUM_PI_HOST": "192.168.50.23",
+                "REMOTE_USER": "user",
+                "PHYTIUM_PI_USER": "user",
+                "REMOTE_SSH_PORT": "2202",
+                "PHYTIUM_PI_PORT": "2202",
+            },
+            clear=False,
+        ):
+            overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["REMOTE_HOST"], "192.168.50.23")
+        self.assertEqual(overrides["PHYTIUM_PI_HOST"], "192.168.50.23")
+        self.assertEqual(overrides["REMOTE_USER"], "user")
+        self.assertEqual(overrides["PHYTIUM_PI_USER"], "user")
+        self.assertEqual(overrides["REMOTE_SSH_PORT"], "2202")
+        self.assertEqual(overrides["PHYTIUM_PI_PORT"], "2202")
+
     def test_demo_startup_env_overrides_keeps_usrp_runtime_env(self) -> None:
         args = Namespace(
             aircraft_position_env="",
@@ -3026,22 +4494,124 @@ class ServerMainTest(unittest.TestCase):
             os.environ,
             {
                 "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                "MLKEM_TRANSPORT_MODE": "usrp",
+                "MLKEM_USRP_MODE": "ota",
                 "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                "OPENAMP_DEMO_LINK_MODE": "iq-direct",
                 "OPENAMP_DEMO_LOCAL_LATENT_DIR": "/tmp/latents",
                 "CHUNK_BYTES": "4096",
                 "USRP_WIRE_PREPARE_WORKERS": "2",
                 "USRP_WIRE_CACHE_ENABLED": "1",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "minimal",
+                "ANALOG_REMOTE_DECODED_FORMAT": "npy",
+                "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "1",
+                "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "0.14",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "taskset -c 2",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "1",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK": "64",
+                "ANALOG_RX_SC16_MMAP": "1",
+                "ANALOG_RX_CLIPPING_DECIMATION": "8",
+                "ANALOG_PRECONNECT_RX_CAPTURE_CONTROL": "1",
+                "ANALOG_RX_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
+                "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.75",
+                "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
+                "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
+                "ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC": "1.0",
+                "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "0.0",
+                "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC": "2.5",
+                "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "8.0",
+                "ANALOG_RX_STOP_DRAIN_POLL_SEC": "0.05",
+                "ANALOG_PIPELINE_DEPTH": "1",
+                "RX_ARM_WAIT_MS": "50",
+                "RX_STOP_WAIT_MS": "8000",
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET": "/host_workspace",
+                "OPENAMP_SSH_RUNNER": "paramiko",
+                "SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER": "1",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
             },
             clear=False,
         ):
             overrides = server.demo_startup_env_overrides(args)
 
         self.assertEqual(overrides["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(overrides["MLKEM_TRANSPORT_MODE"], "usrp")
+        self.assertEqual(overrides["MLKEM_USRP_MODE"], "ota")
         self.assertEqual(overrides["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
+        self.assertEqual(overrides["OPENAMP_DEMO_LINK_MODE"], "iq-direct")
         self.assertEqual(overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"], "/tmp/latents")
         self.assertEqual(overrides["CHUNK_BYTES"], "4096")
         self.assertEqual(overrides["USRP_WIRE_PREPARE_WORKERS"], "2")
         self.assertEqual(overrides["USRP_WIRE_CACHE_ENABLED"], "1")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.14")
+        self.assertEqual(overrides["ANALOG_REMOTE_DECODE_WORKER_PREFIX"], "taskset -c 2")
+        self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
+        self.assertEqual(overrides["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK"], "64")
+        self.assertEqual(overrides["ANALOG_RX_SC16_MMAP"], "1")
+        self.assertEqual(overrides["ANALOG_RX_CLIPPING_DECIMATION"], "8")
+        self.assertEqual(overrides["ANALOG_PRECONNECT_RX_CAPTURE_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_SESSION_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(overrides["ANALOG_RX_HEALTH_RESET_ON_STALL"], "1")
+        self.assertEqual(overrides["ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC"], "0.75")
+        self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.75")
+        self.assertEqual(overrides["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertEqual(overrides["ANALOG_RX_WAIT_TIMEOUT_SEC"], "1.0")
+        self.assertEqual(overrides["ANALOG_RX_WAIT_CONTROL_TIMEOUT_MARGIN_SEC"], "1.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC"], "0.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC"], "2.5")
+        self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
+        self.assertEqual(overrides["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
+        self.assertEqual(overrides["ANALOG_PIPELINE_DEPTH"], "1")
+        self.assertEqual(overrides["RX_ARM_WAIT_MS"], "50")
+        self.assertEqual(overrides["RX_STOP_WAIT_MS"], "8000")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_RUNNER"], "docker")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(overrides["OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET"], "/host_workspace")
+        self.assertEqual(overrides["OPENAMP_SSH_RUNNER"], "paramiko")
+        self.assertEqual(overrides["SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER"], "1")
+        self.assertEqual(overrides["OPENAMP_TVM_BATCH_RUNNER"], "biglittle")
+
+    def test_demo_startup_env_overrides_discovers_usrp_latent_dir(self) -> None:
+        args = Namespace(
+            aircraft_position_env="",
+            demo_admission_mode="",
+            signed_manifest_file="",
+            signed_manifest_public_key="",
+            baseline_admission_mode="",
+            baseline_signed_manifest_file="",
+            baseline_signed_manifest_public_key="",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            latent_dir = Path(tmpdir) / "encoder_outputs"
+            latent_dir.mkdir()
+            (latent_dir / "sample.pt").write_bytes(b"latent")
+            with (
+                patch.object(server, "DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES", (latent_dir,)),
+                patch.dict(
+                    os.environ,
+                    {
+                        "MLKEM_TRANSPORT_MODE": "usrp",
+                        "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                        "OPENAMP_DEMO_LOCAL_LATENT_DIR": "",
+                    },
+                    clear=False,
+                ),
+            ):
+                overrides = server.demo_startup_env_overrides(args)
+
+        self.assertEqual(overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"], str(latent_dir))
+        self.assertEqual(overrides["OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED"], "0")
 
     def test_usrp_job_default_timeout_scales_with_batch_count(self) -> None:
         self.assertEqual(
@@ -3379,6 +4949,1125 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(summary["fail_count"], 1)
         self.assertEqual(summary["pending_count"], 260)
         self.assertFalse(summary["all_pass"])
+
+    def test_usrp_snapshot_counts_completed_image_dirs_before_summary_exists(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=3)
+
+            for index in (0, 1):
+                image_dir = job._run_dir / f"image_{index:04d}"
+                image_dir.mkdir(parents=True)
+                (image_dir / "decode_summary.json").write_text('{"status":"ok"}', encoding="utf-8")
+                (image_dir / "received_latent.npz").write_bytes(b"npz")
+
+            with job._lock:
+                job._phase = "transport"
+                job._host_preprocess_completed = 3
+                job._host_preprocess_state = "completed"
+
+            snapshot = job.snapshot()
+
+        self.assertEqual(snapshot["progress"]["count_label"], "2 / 3")
+        self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 2)
+
+    def test_usrp_iq_snapshot_exposes_remote_dir_decoded_manifest_before_summary_exists(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+
+            image_0 = job._run_dir / "image_0000"
+            image_0.mkdir(parents=True)
+            (image_0 / "decode_summary.json").write_text(
+                json.dumps({"status": "ok", "frame_complete": True, "sync_success": True}),
+                encoding="utf-8",
+            )
+            with job._lock:
+                job._phase = "transport"
+                job._host_preprocess_completed = 3
+                job._host_preprocess_state = "completed"
+
+            snapshot = job.snapshot()
+
+        manifest = snapshot["wrapper_summary"]["iq_remote_decode_manifest"]
+        self.assertEqual(manifest["remote_dir"], f"/home/user/cockpit_usrp_rx/{job._run_id}_rx")
+        self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+        self.assertEqual(
+            manifest["decode_manifest"]["files"],
+            [f"/home/user/cockpit_usrp_rx/{job._run_id}_rx/00000000.npz"],
+        )
+        self.assertEqual(snapshot["stage_progress"]["transport"]["completed_count"], 1)
+
+    def test_usrp_iq_terminal_snapshot_keeps_final_remote_decode_manifest(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=2,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+            job._remote_stage_manifest = {
+                "remote_dir": "/home/user/cockpit_usrp_rx/run_rx",
+                "decode_manifest": {
+                    "decoded_count": 2,
+                    "files": [
+                        "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                        "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+                    ],
+                },
+            }
+            job._inference_summary = {"status": "ok", "processed_count": 2}
+
+            snapshot = job._build_terminal_snapshot(
+                status="success",
+                status_category="success",
+                message="done",
+                summary={"target_count": 2, "pass_count": 2, "all_pass": True},
+            )
+
+        manifest = snapshot["wrapper_summary"]["iq_remote_decode_manifest"]
+        self.assertEqual(
+            manifest["decode_manifest"]["files"],
+            [
+                "/home/user/cockpit_usrp_rx/run_rx/00000000.npy",
+                "/home/user/cockpit_usrp_rx/run_rx/00000001.npy",
+            ],
+        )
+
+    def test_usrp_local_tx_server_starts_shell_script_through_configured_bash(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            fake_proc = Mock(pid=4242)
+            with (
+                patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+                patch("usrp_runtime.subprocess.Popen", return_value=fake_proc) as popen,
+            ):
+                result = usrp_runtime._start_local_tx_server(
+                    {"OPENAMP_USRP_TX_RUNNER": "local"},
+                    log_dir=Path(temp_dir_name),
+                    tx_port="29221",
+                )
+
+        self.assertEqual(result["status"], "started")
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], "bash")
+        self.assertTrue(str(command[1]).endswith("OtaTxPersistentServer.sh"))
+
+    def test_usrp_local_tx_server_can_start_from_docker_image(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            result = Mock(returncode=0, stdout="container-123\n", stderr="")
+            env_values = {
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+            }
+            with (
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=9999)),
+                patch("usrp_runtime.subprocess.run", return_value=result) as run,
+            ):
+                payload = usrp_runtime._start_local_tx_server(env_values, log_dir=Path(temp_dir_name), tx_port="29221")
+
+        self.assertEqual(payload["status"], "started")
+        self.assertEqual(payload["runner"], "docker")
+        command = run.call_args.args[0]
+        self.assertEqual(command[:4], ["docker", "run", "-d", "--rm"])
+        self.assertIn("--mount", command)
+        mount_value = command[command.index("--mount") + 1]
+        self.assertIn(f"source={usrp_runtime.REPO_ROOT}", mount_value)
+        self.assertIn("target=/host_workspace", mount_value)
+        self.assertIn("-p", command)
+        self.assertIn("127.0.0.1:29221:29221", command)
+        self.assertIn("iccomp-usrp-tx:latest", command)
+        self.assertEqual(command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
+
+    def test_usrp_tx_server_defaults_to_docker_on_windows_when_available(self) -> None:
+        with (
+            patch.object(usrp_runtime.os, "name", "nt"),
+            patch("usrp_runtime.shutil.which", return_value="docker"),
+        ):
+            self.assertTrue(usrp_runtime._tx_server_uses_docker({}))
+
+    def test_usrp_remote_command_timeout_returns_error_completed_process(self) -> None:
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+
+        class TimeoutPopen:
+            pid = 2222
+            returncode = None
+
+            def __init__(self, command, **_kwargs):  # type: ignore[no-untyped-def]
+                self.args = command
+                self.killed = False
+
+            def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+                raise subprocess.TimeoutExpired(self.args, timeout)
+
+            def kill(self) -> None:
+                self.killed = True
+                self.returncode = -9
+
+        with (
+            patch("usrp_runtime.os.name", "posix"),
+            patch("usrp_runtime.resolve_bash_executable", return_value="bash"),
+            patch("usrp_runtime.subprocess.Popen", side_effect=TimeoutPopen),
+        ):
+            result = usrp_runtime._run_remote_command(access, "echo ok", timeout=20.0)
+
+        self.assertEqual(result.returncode, 124)
+        self.assertIn(b"TimeoutExpired", result.stderr)
+
+    def test_usrp_qpsk_runner_command_defaults_to_python_decode_backend(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "qpsk",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("RunQpskFileBatchSpoolArq.py", str(command[1]))
+        self.assertIn("--decode-backend", command)
+        self.assertEqual(command[command.index("--decode-backend") + 1], "python")
+        self.assertIn("--tx-file-path-prefix-from", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-from") + 1], str(usrp_runtime.REPO_ROOT))
+        self.assertIn("--tx-file-path-prefix-to", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
+        self.assertNotIn("--sps", command)
+        self.assertNotIn("--amp", command)
+        sync_decode_assets.assert_not_called()
+
+    def test_usrp_wire_sync_uses_scp_instead_of_ssh_stdin(self) -> None:
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="demo-pass",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            stage_dir = Path(temp_dir_name) / "stage"
+            wire_dir = stage_dir / "_wire"
+            wire_dir.mkdir(parents=True)
+            (wire_dir / "00000001.bin").write_bytes(b"wire")
+            calls: list[tuple[list[str], dict[str, object]]] = []
+
+            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+                calls.append((command, kwargs))
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=b'{"decoded_count": 1}\n',
+                    stderr=b"",
+                )
+
+            with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+                payload = usrp_runtime._sync_and_decode_wire_blobs_on_remote(
+                    local_stage_dir=stage_dir,
+                    remote_root="/home/user/cockpit_usrp_rx",
+                    remote_subdir="run-001",
+                    remote_python="python3",
+                    access=access,
+                )
+
+        self.assertEqual(len(calls), 2)
+        self.assertIn("scp", calls[0][0])
+        self.assertNotIn("input", calls[0][1])
+        self.assertNotIn("input", calls[1][1])
+        self.assertEqual(calls[0][1]["env"]["SSHPASS"], "demo-pass")
+        self.assertEqual(payload["decode_manifest"]["decoded_count"], 1)
+
+    def test_usrp_iq_direct_runner_command_defaults_to_remote_decode(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_DEMO_REMOTE_DECODE_PYTHON": "/home/user/venv/bin/python",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "ANALOG_SYNC_PROFILE": "fast-first",
+                    "ANALOG_FAST_SYNC_CANDIDATES": "4",
+                    "ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS": "1024",
+                    "ANALOG_FALLBACK_SYNC_CANDIDATES": "12",
+                    "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS": "4096",
+                    "ANALOG_RETRY_ON_BURST_MISS": "1",
+                    "ANALOG_REMOTE_DECODED_FORMAT": "npy",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("RunAnalogLatentBatch.py", str(command[1]))
+        self.assertIn("--tx-file-path-prefix-from", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-from") + 1], str(usrp_runtime.REPO_ROOT))
+        self.assertIn("--tx-file-path-prefix-to", command)
+        self.assertEqual(command[command.index("--tx-file-path-prefix-to") + 1], "/host_workspace")
+        self.assertIn("--rx-capture-mode", command)
+        self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-decode")
+        self.assertIn("--sps", command)
+        self.assertEqual(command[command.index("--sps") + 1], "2")
+        self.assertIn("--amp", command)
+        self.assertEqual(command[command.index("--amp") + 1], "6000")
+        self.assertIn("--max-arq-rounds", command)
+        self.assertEqual(command[command.index("--max-arq-rounds") + 1], "5")
+        self.assertIn("--sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--sync-search-window-symbols") + 1], "4096")
+        self.assertIn("--min-sync-metric", command)
+        self.assertEqual(command[command.index("--min-sync-metric") + 1], "0.05")
+        self.assertIn("--sync-profile", command)
+        self.assertEqual(command[command.index("--sync-profile") + 1], "fast-first")
+        self.assertIn("--fast-sync-candidates", command)
+        self.assertEqual(command[command.index("--fast-sync-candidates") + 1], "4")
+        self.assertIn("--fast-sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--fast-sync-search-window-symbols") + 1], "1024")
+        self.assertIn("--fallback-sync-candidates", command)
+        self.assertEqual(command[command.index("--fallback-sync-candidates") + 1], "12")
+        self.assertIn("--fallback-sync-search-window-symbols", command)
+        self.assertEqual(command[command.index("--fallback-sync-search-window-symbols") + 1], "4096")
+        self.assertIn("--retry-on-burst-miss", command)
+        self.assertIn("--retry-on-low-sync", command)
+        self.assertIn("--low-sync-retry-threshold", command)
+        self.assertEqual(command[command.index("--low-sync-retry-threshold") + 1], "0.08")
+        self.assertIn("--remote-decoded-format", command)
+        self.assertEqual(command[command.index("--remote-decoded-format") + 1], "npy")
+        self.assertIn("--no-robust-sync", command)
+        self.assertFalse(job._shutdown_after_transport)
+        self.assertEqual(job._runner_env["REMOTE_USRP_PROJECT_ROOT"], "/home/user")
+        self.assertEqual(job._runner_env["REMOTE_DECODE_PYTHON"], "/home/user/venv/bin/python")
+        sync_decode_assets.assert_called_once()
+        _, sync_kwargs = sync_decode_assets.call_args
+        self.assertEqual(sync_kwargs["remote_project_root"], "/home/user")
+
+    def test_usrp_iq_direct_tvm_runner_defaults_to_remote_dir_decode(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                    "REMOTE_TVM_PYTHON": "env OMP_NUM_THREADS=3 /home/user/anaconda3/envs/tvm310_safe/bin/python",
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=1,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                )
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("RunAnalogLatentBatch.py", str(command[1]))
+        self.assertIn("--remote-decode-result-mode", command)
+        self.assertEqual(command[command.index("--remote-decode-result-mode") + 1], "remote-dir")
+        self.assertIn("--remote-decoded-output-dir", command)
+        self.assertEqual(
+            command[command.index("--remote-decoded-output-dir") + 1],
+            f"/home/user/cockpit_usrp_rx/{job._run_id}_rx",
+        )
+        self.assertEqual(job._runner_env["REMOTE_DECODE_PYTHON"], "/home/user/venv/bin/python")
+
+    def test_usrp_iq_direct_runner_respects_explicit_sync_overrides(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                    "ANALOG_MIN_SYNC_METRIC": "0.25",
+                    "ANALOG_ROBUST_SYNC": "1",
+                    "ANALOG_PIPELINE_DEPTH": "2",
+                    "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "1",
+                    "ANALOG_RX_SESSION_CONTROL": "1",
+                    "ANALOG_RX_BATCH_SESSION_CONTROL": "1",
+                    "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "16",
+                    "ANALOG_RX_HEALTH_RESET_ON_STALL": "1",
+                    "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC": "0.75",
+                    "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "0.5",
+                    "ANALOG_RX_ARM_STATUS_POLL_SEC": "0.025",
+                    "ANALOG_RX_WAIT_TIMEOUT_SEC": "1.0",
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("--min-sync-metric", command)
+        self.assertEqual(command[command.index("--min-sync-metric") + 1], "0.25")
+        self.assertIn("--robust-sync", command)
+        self.assertNotIn("--no-robust-sync", command)
+        self.assertIn("--pipeline-depth", command)
+        self.assertEqual(command[command.index("--pipeline-depth") + 1], "2")
+        self.assertIn("--pipeline-rf-decode-overlap", command)
+        self.assertIn("--rx-session-control", command)
+        self.assertIn("--rx-batch-session-control", command)
+        self.assertIn("--rx-batch-session-max-images", command)
+        self.assertEqual(command[command.index("--rx-batch-session-max-images") + 1], "16")
+        self.assertIn("--rx-health-reset-on-stall", command)
+        self.assertIn("--rx-health-stall-threshold-sec", command)
+        self.assertEqual(command[command.index("--rx-health-stall-threshold-sec") + 1], "0.75")
+        self.assertIn("--rx-arm-status-timeout-sec", command)
+        self.assertEqual(command[command.index("--rx-arm-status-timeout-sec") + 1], "0.5")
+        self.assertIn("--rx-arm-status-poll-sec", command)
+        self.assertEqual(command[command.index("--rx-arm-status-poll-sec") + 1], "0.025")
+        self.assertIn("--rx-wait-timeout-sec", command)
+        self.assertEqual(command[command.index("--rx-wait-timeout-sec") + 1], "1.0")
+
+    def test_usrp_iq_direct_runner_can_override_rx_capture_mode_to_remote_pull(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            latent_dir = temp_dir / "latents"
+            latent_dir.mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "OPENAMP_DEMO_LOCAL_LATENT_DIR": str(latent_dir),
+                    "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "RX_CAPTURE_MODE": "remote-pull",
+                    "OPENAMP_USRP_TX_RUNNER": "docker",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_prepare_wire_input_dir(*, output_dir: Path, **_: object) -> dict[str, object]:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                return {"prepared_count": 1}
+
+            with (
+                patch("usrp_runtime.threading.Thread", FakeThread),
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
+                patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
+                patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
+                patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
+                patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
+            ):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job._start_and_watch()
+                job._log_handle.close()
+
+        command = job._runner_command
+        self.assertIn("--rx-capture-mode", command)
+        self.assertEqual(command[command.index("--rx-capture-mode") + 1], "remote-pull")
+        sync_decode_assets.assert_not_called()
+
+    def test_usrp_iq_remote_decode_reuses_board_output_dir_for_inference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            captured: dict[str, object] = {}
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_inference(remote_stage_manifest: dict[str, object], progress) -> dict[str, object]:
+                captured["remote_stage_manifest"] = dict(remote_stage_manifest)
+                progress(1, 1)
+                return {
+                    "status": "ok",
+                    "processed_count": 1,
+                    "selected_input_count": 1,
+                    "run_samples_ms": [252.0],
+                    "run_mean_ms": 252.0,
+                    "run_median_ms": 252.0,
+                }
+
+            job = usrp_runtime.UsrpBatchSpoolJob(
+                access,
+                variant="current",
+                max_inputs=1,
+                inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                inference_callback=fake_inference,
+            )
+            job._run_dir.mkdir(parents=True, exist_ok=True)
+            job._summary_path.write_text(
+                json.dumps(
+                    {
+                        "target_count": 1,
+                        "completed_count": 1,
+                        "pass_count": 1,
+                        "failed_count": 0,
+                        "all_pass": True,
+                        "remote_decode_result_mode": "remote-dir",
+                        "remote_decoded_output_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_123_rx",
+                        "images": [
+                            {
+                                "index": 0,
+                                "passed": True,
+                                "round_records": [
+                                    {
+                                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_123_rx/00000000.npz",
+                                        "sync_success": True,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            job._log_path.write_text("", encoding="utf-8")
+            job._process = Mock()
+            job._process.wait.return_value = 0
+            job._log_handle = Mock()
+
+            with (
+                patch("usrp_runtime._stage_merged_wire_blobs_for_remote_decode") as stage_wire,
+                patch("usrp_runtime._sync_and_decode_wire_blobs_on_remote") as sync_wire,
+            ):
+                stage_wire.side_effect = AssertionError("IQ remote-dir should not restage local wire blobs")
+                sync_wire.side_effect = AssertionError("IQ remote-dir should not upload decoded outputs back to board")
+                job._wait_for_completion()
+
+        manifest = captured["remote_stage_manifest"]
+        self.assertEqual(manifest["remote_dir"], "/home/user/cockpit_usrp_rx/cockpit_usrp_123_rx")
+        self.assertEqual(manifest["decode_location"], "board")
+        self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+
+    def test_usrp_iq_remote_decode_can_start_tvm_before_transport_completes(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        class ImmediateThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+                self._alive = False
+
+            def start(self) -> None:
+                self.target()
+
+            def join(self, timeout=None) -> None:
+                return None
+
+            def is_alive(self) -> bool:
+                return self._alive
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            captured: dict[str, object] = {}
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_IQ_STREAMING_TVM": "1",
+                    "OPENAMP_IQ_STREAMING_MIN_READY": "1",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            def fake_inference(remote_stage_manifest: dict[str, object], progress) -> dict[str, object]:
+                captured["remote_stage_manifest"] = dict(remote_stage_manifest)
+                progress(1, 3)
+                return {"status": "ok", "processed_count": 1, "selected_input_count": 3}
+
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=fake_inference,
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+            image_dir = job._run_dir / "image_0000"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("usrp_runtime.threading.Thread", ImmediateThread):
+                started = job._maybe_start_iq_streaming_inference()
+
+        self.assertTrue(started)
+        manifest = captured["remote_stage_manifest"]
+        self.assertEqual(manifest["remote_dir"], "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx")
+        self.assertEqual(manifest["decode_manifest"]["decoded_count"], 1)
+        self.assertEqual(job._inference_completed, 1)
+        self.assertEqual(job._inference_total, 3)
+
+    def test_usrp_iq_remote_decode_streaming_tvm_waits_for_min_ready_count(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "OPENAMP_IQ_STREAMING_TVM": "1",
+                    "OPENAMP_IQ_STREAMING_MIN_READY": "10",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=30,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=lambda *_args: {"status": "ok"},
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+
+            for index in range(9):
+                image_dir = job._run_dir / f"image_{index:04d}"
+                image_dir.mkdir(parents=True)
+                (image_dir / "decode_summary.json").write_text(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "frame_complete": True,
+                            "remote_received_latent_npz": (
+                                f"/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/{index:08d}.npz"
+                            ),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            self.assertFalse(job._maybe_start_iq_streaming_inference())
+            self.assertFalse(job._inference_started)
+
+            image_dir = job._run_dir / "image_0009"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000009.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertTrue(job._maybe_start_iq_streaming_inference())
+            self.assertTrue(job._inference_started)
+            self.assertEqual(job._remote_stage_manifest["decode_manifest"]["decoded_count"], 10)
+
+    def test_usrp_iq_remote_decode_streaming_tvm_is_opt_in(self) -> None:
+        class NoStartThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", NoStartThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(
+                    access,
+                    variant="current",
+                    max_inputs=3,
+                    inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                    inference_callback=lambda *_args: {"status": "ok"},
+                )
+            job._iq_remote_decoded_output_dir = "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx"
+            image_dir = job._run_dir / "image_0000"
+            image_dir.mkdir(parents=True)
+            (image_dir / "decode_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "remote_received_latent_npz": "/home/user/cockpit_usrp_rx/cockpit_usrp_stream_rx/00000000.npz",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(job._maybe_start_iq_streaming_inference())
+
+    def test_usrp_iq_remote_decode_refuses_control_plane_wire_restaging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+
+            job = usrp_runtime.UsrpBatchSpoolJob(
+                access,
+                variant="current",
+                max_inputs=1,
+                inference_engine=usrp_runtime.INFERENCE_ENGINE_TVM,
+                inference_callback=lambda *_args, **_kwargs: {"status": "ok"},
+            )
+            job._run_dir.mkdir(parents=True, exist_ok=True)
+            job._summary_path.write_text(
+                json.dumps(
+                    {
+                        "target_count": 1,
+                        "completed_count": 1,
+                        "pass_count": 1,
+                        "failed_count": 0,
+                        "all_pass": True,
+                        "remote_decode_result_mode": "pull",
+                        "images": [{"index": 0, "passed": True}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            job._log_path.write_text("", encoding="utf-8")
+            job._process = Mock()
+            job._process.wait.return_value = 0
+            job._log_handle = Mock()
+
+            with (
+                patch("usrp_runtime._stage_merged_wire_blobs_for_remote_decode") as stage_wire,
+                patch("usrp_runtime._sync_and_decode_wire_blobs_on_remote") as sync_wire,
+            ):
+                job._wait_for_completion()
+
+        stage_wire.assert_not_called()
+        sync_wire.assert_not_called()
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["status"], "fallback")
+        self.assertIn("IQ-direct", snapshot["message"])
+        self.assertIn("remote-dir", snapshot["message"])
+
+    def test_sync_iq_decode_assets_skips_upload_when_remote_hashes_match(self) -> None:
+        import hashlib
+
+        usrp_runtime._IQ_DECODE_ASSET_SYNC_CACHE.clear()
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        asset_pairs = (
+            (usrp_runtime.REPO_ROOT / "USRP292x" / "AnalogLatentLink.py", "/home/user/USRP292x/AnalogLatentLink.py"),
+            (usrp_runtime.ROOT_SCRIPTS / "latent_transport.py", "/home/user/scripts/latent_transport.py"),
+        )
+        stdout = "".join(
+            f"{hashlib.sha256(local_path.read_bytes()).hexdigest()}  {remote_path}\n"
+            for local_path, remote_path in asset_pairs
+        ).encode("utf-8")
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **_kwargs):
+            calls.append(list(cmd))
+            if "scp" in cmd:
+                raise AssertionError("matching remote IQ assets should not be uploaded")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=stdout, stderr=b"")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            result = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+
+        self.assertEqual(result["status"], "current")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], usrp_runtime.resolve_bash_executable())
+        self.assertEqual(calls[0][1], str(usrp_runtime.SSH_HELPER))
+        self.assertIn("sha256sum", calls[0][-1])
+
+    def test_sync_iq_decode_assets_uploads_tar_through_ssh_helper(self) -> None:
+        usrp_runtime._IQ_DECODE_ASSET_SYNC_CACHE.clear()
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append((list(cmd), dict(kwargs)))
+            self.assertNotIn("scp", cmd)
+            if len(calls) == 1:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+            self.assertGreater(len(kwargs.get("input") or b""), 0)
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            result = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+
+        self.assertEqual(result["status"], "uploaded")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][0][0], usrp_runtime.resolve_bash_executable())
+        self.assertEqual(calls[1][0][1], str(usrp_runtime.SSH_HELPER))
+        self.assertIn("tar xzf", calls[1][0][-1])
+        self.assertGreaterEqual(float(calls[1][1]["timeout"]), 90.0)
+
+    def test_sync_iq_decode_assets_reuses_successful_sync_in_process(self) -> None:
+        usrp_runtime._IQ_DECODE_ASSET_SYNC_CACHE.clear()
+        access = usrp_runtime.BoardAccessConfig(
+            host="100.121.87.73",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append((list(cmd), dict(kwargs)))
+            if len(calls) == 1:
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+            self.assertGreater(len(kwargs.get("input") or b""), 0)
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+
+        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            first = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+            second = usrp_runtime._sync_iq_decode_assets_on_remote(
+                access,
+                remote_project_root="/home/user",
+            )
+
+        self.assertEqual(first["status"], "uploaded")
+        self.assertEqual(second["status"], "cached")
+        self.assertEqual(second["uploaded_bytes"], 0)
+        self.assertEqual(len(calls), 2)
 
     def test_main_builds_server_and_serves_without_startup_probe(self) -> None:
         args = Namespace(
@@ -4443,6 +7132,13 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["http_status"], 200)
         self.assertEqual(payload["payload"]["status"], "starting")
 
+    def test_remote_http_json_probe_command_avoids_nested_single_quote_splicing(self) -> None:
+        command = server._remote_http_json_probe_command("http://127.0.0.1:9000/health", timeout_sec=4.0)
+
+        self.assertIn('base64.b64decode("', command)
+        self.assertIn('.decode("utf-8")', command)
+        self.assertNotIn("'\"'\"'", command)
+
     def test_board_position_api_status_promotes_live_sample_from_position_endpoint(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
@@ -4517,8 +7213,9 @@ class DemoHTTPServerTest(unittest.TestCase):
                     "results": [],
                 },
             ),
-            patch(
-                "server._board_position_api_status",
+            patch.object(
+                state,
+                "_board_position_api_snapshot",
                 return_value={
                     "status": "source_unavailable",
                     "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
@@ -4579,6 +7276,19 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertAlmostEqual(telemetry["memory_total_mb"], 2000.0, places=1)
         self.assertEqual(telemetry["cpu_cores"], 4)
 
+    def test_board_telemetry_remote_command_uses_stable_cpu_sample_window(self) -> None:
+        with patch.dict(os.environ, {"BOARD_TELEMETRY_CPU_SAMPLE_SEC": ""}, clear=False):
+            command = server._board_telemetry_remote_command()
+
+        self.assertIn("sleep 1.000", command)
+        self.assertNotIn("sleep 0.1", command)
+
+    def test_board_telemetry_remote_command_allows_cpu_sample_window_override(self) -> None:
+        with patch.dict(os.environ, {"BOARD_TELEMETRY_CPU_SAMPLE_SEC": "0.5"}, clear=False):
+            command = server._board_telemetry_remote_command()
+
+        self.assertIn("sleep 0.500", command)
+
     def test_system_status_endpoint_exposes_board_telemetry(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         request_json(
@@ -4588,24 +7298,23 @@ class DemoHTTPServerTest(unittest.TestCase):
             body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
         )
         state._last_live_probe = live_probe_payload("2026-04-11T03:33:00+0800", "board reachable")
+        state._board_telemetry_cache = {
+            "status": "ok",
+            "stale": False,
+            "source": "ssh_procfs",
+            "collected_at": "2026-04-11T03:33:05+0800",
+            "compute_label": "CPU",
+            "compute_pct": 48.5,
+            "memory_pct": 61.2,
+            "memory_used_mb": 1254.0,
+            "memory_available_mb": 796.0,
+            "memory_total_mb": 2050.0,
+            "loadavg_1m": 1.42,
+            "cpu_cores": 4,
+        }
+        state._board_telemetry_cache_ts = time.monotonic()
 
-        with patch(
-            "server.query_board_telemetry",
-            return_value={
-                "status": "ok",
-                "stale": False,
-                "source": "ssh_procfs",
-                "collected_at": "2026-04-11T03:33:05+0800",
-                "compute_label": "CPU",
-                "compute_pct": 48.5,
-                "memory_pct": 61.2,
-                "memory_used_mb": 1254.0,
-                "memory_available_mb": 796.0,
-                "memory_total_mb": 2050.0,
-                "loadavg_1m": 1.42,
-                "cpu_cores": 4,
-            },
-        ), patch.object(
+        with patch.object(
             state,
             "_aircraft_position_upstream_probe_snapshot",
             return_value={
@@ -4615,6 +7324,10 @@ class DemoHTTPServerTest(unittest.TestCase):
                 "candidate_urls": list(server.DEFAULT_AIRCRAFT_POSITION_UPSTREAM_CANDIDATES),
                 "results": [],
             },
+        ), patch.object(
+            state,
+            "_start_board_telemetry_refresh",
+            side_effect=AssertionError("fresh telemetry cache should not refresh"),
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
@@ -4650,9 +7363,6 @@ class DemoHTTPServerTest(unittest.TestCase):
         }
         state._board_telemetry_cache_ts = time.monotonic() - (server.BOARD_TELEMETRY_TTL_SEC + 1.0)
 
-        fake_thread = Mock()
-        fake_thread.start = Mock()
-
         with (
             patch.object(
                 state,
@@ -4673,16 +7383,45 @@ class DemoHTTPServerTest(unittest.TestCase):
                     "note": "板端定位 API 服务已启动，但当前没有拿到有效位置样本。",
                 },
             ),
-            patch("server.threading.Thread", return_value=fake_thread) as thread_cls,
+            patch.object(state, "_usrp_control_status_snapshot", return_value={"status": "waiting_session"}),
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
+        self.assertEqual(payload["live"]["telemetry"]["status"], "ok")
+        self.assertFalse(payload["live"]["telemetry"]["stale"])
+        self.assertTrue(payload["live"]["telemetry"]["refreshing"])
         self.assertAlmostEqual(payload["live"]["telemetry"]["memory_pct"], 61.2)
         self.assertIn("后台刷新中", payload["live"]["telemetry"]["note"])
-        thread_cls.assert_called_once()
-        fake_thread.start.assert_called_once()
+        self.assertGreater(payload["live"]["telemetry"]["age_sec"], server.BOARD_TELEMETRY_TTL_SEC)
+        start_telemetry_refresh.assert_called_once()
+
+    def test_board_telemetry_snapshot_returns_refreshing_without_sync_on_cold_online_board(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"password": "demo-pass"}).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_start_board_telemetry_refresh") as start_refresh,
+            patch(
+                "server.query_board_telemetry",
+                side_effect=AssertionError("system-status must not synchronously probe board telemetry"),
+            ),
+        ):
+            payload = state._board_telemetry_snapshot(
+                board_access=state._board_access,
+                board_online=True,
+            )
+
+        self.assertEqual(payload["status"], "refreshing")
+        self.assertTrue(payload["stale"])
+        self.assertIn("后台刷新", payload["note"])
+        start_refresh.assert_called_once()
 
     def test_board_position_api_snapshot_reuses_cached_payload_while_refreshing(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -4714,6 +7453,88 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertIn("后台刷新中", payload["note"])
         thread_cls.assert_called_once()
         fake_thread.start.assert_called_once()
+
+    def test_aircraft_position_upstream_snapshot_returns_refreshing_without_sync_on_cold_session(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh", create=True) as start_refresh,
+            patch(
+                "server.query_board_aircraft_position_upstream",
+                side_effect=AssertionError("system-status must not synchronously probe aircraft upstream"),
+            ),
+        ):
+            payload = state._aircraft_position_upstream_probe_snapshot(board_access=state._board_access)
+
+        self.assertEqual(payload["status"], "refreshing")
+        self.assertTrue(payload["stale"])
+        self.assertIn("后台探测", payload["note"])
+        start_refresh.assert_called_once()
+
+    def test_system_status_refreshes_board_telemetry_for_idle_usrp_session(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "100.121.87.73",
+                    "user": "demo-user",
+                    "password": "demo-pass",
+                    "port": "22",
+                    "transport_mode": "usrp",
+                }
+            ).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-21T15:43:00+0800", "board reachable")
+
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh") as start_upstream_refresh,
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
+            patch.object(state, "_start_board_position_api_refresh") as start_position_refresh,
+            patch.object(state, "_start_usrp_control_status_refresh", create=True) as start_usrp_refresh,
+            patch(
+                "server.query_board_aircraft_position_upstream",
+                side_effect=AssertionError("USRP system-status must not probe aircraft upstream"),
+            ),
+            patch(
+                "server.query_board_telemetry",
+                side_effect=AssertionError("USRP system-status must not probe board telemetry"),
+            ),
+            patch(
+                "server._board_position_api_status",
+                side_effect=AssertionError("USRP system-status must not probe board position API"),
+            ),
+            patch(
+                "server.inspect_usrp_control_servers",
+                side_effect=AssertionError("USRP system-status must not probe USRP control sockets"),
+            ),
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["live"]["telemetry"]["status"], "refreshing")
+        self.assertIn("后台刷新", payload["live"]["telemetry"]["note"])
+        self.assertEqual(payload["live"]["aircraft_bridge"]["upstream_probe"]["status"], "deferred")
+        self.assertEqual(payload["live"]["board_position_api"]["status"], "deferred")
+        self.assertTrue(payload["live"]["board_position_api"]["stale"])
+        self.assertIn("暂缓", payload["live"]["board_position_api"]["note"])
+        self.assertEqual(payload["live"]["usrp_control"]["status"], "deferred")
+        self.assertTrue(payload["live"]["usrp_control"]["stale"])
+        self.assertIn("暂缓", payload["live"]["usrp_control"]["message"])
+        start_upstream_refresh.assert_not_called()
+        start_telemetry_refresh.assert_called_once()
+        start_position_refresh.assert_not_called()
+        start_usrp_refresh.assert_not_called()
 
     def test_system_status_skips_remote_refreshes_while_tvm_batch_is_running(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -4776,7 +7597,7 @@ class DemoHTTPServerTest(unittest.TestCase):
             patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
             patch("server._board_position_api_status") as board_position_status,
             patch.object(state, "_start_board_position_api_refresh") as start_position_refresh,
-            patch("server.query_board_aircraft_position_upstream") as query_upstream,
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh") as start_upstream_refresh,
         ):
             status, _, payload = request_json(state, "GET", "/api/system-status")
 
@@ -4791,7 +7612,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         start_telemetry_refresh.assert_not_called()
         board_position_status.assert_not_called()
         start_position_refresh.assert_not_called()
-        query_upstream.assert_not_called()
+        start_upstream_refresh.assert_not_called()
 
     def test_system_status_reports_upstream_not_found_when_probe_finds_no_candidate(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)
@@ -5088,6 +7909,115 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertTrue(payload["recent_results"]["current"]["reconstructed_image_b64"].startswith("data:image/png;base64,"))
         self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-archive-001")
         self.assertEqual(payload["recent_results"]["baseline"]["execution_mode"], "reference")
+
+    def test_system_status_endpoint_keeps_engine_specific_recent_results(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload["job_id"] = "baseline-usrp-001"
+        tvm_payload = server.build_prerecorded_inference_result(0, "current")
+        tvm_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "variant": "current",
+                "job_id": "usrp-tvm-001",
+                "wrapper_summary": {"inference_engine": "tvm"},
+            }
+        )
+        mnn_payload = server.build_prerecorded_inference_result(0, "current")
+        mnn_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "variant": "current",
+                "job_id": "usrp-mnn-001",
+                "wrapper_summary": {"inference_engine": "mnn"},
+            }
+        )
+
+        state._update_last_inference_summary(tvm_payload, "current")
+        state._update_last_inference_summary(mnn_payload, "current")
+        state._update_last_inference_summary(baseline_payload, "baseline")
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["recent_results"]["current"]["job_id"], "usrp-mnn-001")
+        self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-usrp-001")
+        self.assertEqual(payload["recent_results"]["tvm"]["job_id"], "usrp-tvm-001")
+        self.assertEqual(payload["recent_results"]["mnn"]["job_id"], "usrp-mnn-001")
+        self.assertEqual(payload["recent_results"]["pytorch"]["job_id"], "baseline-usrp-001")
+
+    def test_system_status_endpoint_harvests_completed_baseline_job_for_refresh_hydration(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "baseline",
+                "job_id": "baseline-live-001",
+                "message": "PyTorch baseline completed.",
+            }
+        )
+        running_job = FakeInferenceJob([baseline_payload], job_id="baseline-live-001")
+        state._inference_jobs[running_job.job_id] = {
+            "job": running_job,
+            "job_id": running_job.job_id,
+            "variant": "baseline",
+            "image_index": 0,
+        }
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["active_inference"]["running"])
+        self.assertEqual(payload["recent_results"]["baseline"]["job_id"], "baseline-live-001")
+        self.assertEqual(payload["recent_results"]["pytorch"]["job_id"], "baseline-live-001")
+        self.assertEqual(payload["last_inference"]["variant"], "baseline")
+
+    def test_completed_job_harvest_does_not_overwrite_newer_last_inference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        baseline_payload = server.build_prerecorded_inference_result(0, "baseline")
+        baseline_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "baseline",
+                "job_id": "baseline-live-001",
+            }
+        )
+        baseline_job = FakeInferenceJob([baseline_payload], job_id="baseline-live-001")
+        state._inference_jobs[baseline_job.job_id] = {
+            "job": baseline_job,
+            "job_id": baseline_job.job_id,
+            "variant": "baseline",
+            "image_index": 0,
+        }
+        request_json(state, "GET", "/api/system-status")
+        current_payload = server.build_prerecorded_inference_result(0, "current")
+        current_payload.update(
+            {
+                "status": "success",
+                "execution_mode": "live",
+                "request_state": "completed",
+                "status_category": "success",
+                "variant": "current",
+                "job_id": "mnn-current-001",
+                "wrapper_summary": {"inference_engine": "mnn"},
+            }
+        )
+        state._update_last_inference_summary(current_payload, "current")
+
+        status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["last_inference"]["variant"], "current")
+        self.assertEqual(payload["recent_results"]["mnn"]["job_id"], "mnn-current-001")
 
     def test_operator_readiness_smoke_state_covers_required_page_modules(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -5434,7 +8364,12 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(state._board_access.build_env()["MLKEM_USRP_MODE"], "ota")
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "usrp")
 
-        system_status, _, system_payload = request_json(state, "GET", "/api/system-status")
+        with (
+            patch.object(state, "_start_aircraft_position_upstream_probe_refresh"),
+            patch.object(state, "_start_board_position_api_refresh"),
+            patch.object(state, "_start_usrp_control_status_refresh"),
+        ):
+            system_status, _, system_payload = request_json(state, "GET", "/api/system-status")
 
         self.assertEqual(system_status, 200)
         self.assertEqual(system_payload["board_access"]["transport_mode"], "usrp")
@@ -5453,6 +8388,27 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["board_access"]["input_source_mode"], "prerecorded")
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_INPUT_SOURCE_MODE"], "prerecorded")
 
+    def test_board_access_endpoint_accepts_remote_usrp_rx_dir_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "password": "demo-pass",
+                    "transport_mode": "usrp",
+                    "remote_usrp_rx_dir": "/home/user/cockpit_usrp_rx",
+                }
+            ).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(payload["board_access"]["remote_usrp_rx_dir"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(state._board_access.build_env()["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+
     def test_board_access_endpoint_rejects_unsupported_transport_mode(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
@@ -5467,7 +8423,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["message"], "unsupported transport_mode; expected tcp or usrp")
 
-    def test_board_access_usrp_defaults_prefer_local_airfield300_image_dir(self) -> None:
+    def test_board_access_usrp_defaults_discover_workspace_original_images(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
         status, _, payload = request_json(
@@ -5478,8 +8434,207 @@ class DemoHTTPServerTest(unittest.TestCase):
         )
 
         self.assertEqual(status, 200)
-        self.assertTrue(payload["board_access"]["local_usrp_image_dir"].endswith("host_pic_to_latent/airfield300"))
-        self.assertTrue(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"].endswith("host_pic_to_latent/airfield300"))
+        image_dir = Path(payload["board_access"]["local_usrp_image_dir"])
+        self.assertEqual(image_dir.name, "原始图像")
+        self.assertTrue((image_dir / "00000001.jpg").is_file())
+        self.assertTrue((image_dir / "00000050.jpg").is_file())
+        self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"], str(image_dir))
+
+    def test_board_access_usrp_defaults_use_existing_latent_cache_without_reencoding(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        latent_dir = Path(payload["board_access"]["local_usrp_input_dir"])
+        self.assertTrue(any(latent_dir.glob("*.pt")))
+        env = state._board_access.build_env()
+        self.assertEqual(env["OPENAMP_DEMO_LOCAL_LATENT_DIR"], str(latent_dir))
+        self.assertEqual(env["OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED"], "0")
+
+    def test_board_access_usrp_forwards_docker_runner_environment(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "OPENAMP_SSH_RUNNER": "docker",
+                "OPENAMP_SSH_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_TVM_BATCH_RUNNER": "biglittle",
+                "OPENAMP_TVM_BATCH_EXIT_GRACE_SEC": "0.5",
+            },
+            clear=False,
+        ):
+            status, _, _ = request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "qpsk"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        env = state._board_access.build_env()
+        self.assertEqual(env["OPENAMP_SSH_RUNNER"], "docker")
+        self.assertEqual(env["OPENAMP_SSH_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(env["OPENAMP_USRP_TX_RUNNER"], "docker")
+        self.assertEqual(env["OPENAMP_USRP_TX_DOCKER_IMAGE"], "iccomp-usrp-tx:latest")
+        self.assertEqual(env["OPENAMP_TVM_BATCH_RUNNER"], "biglittle")
+        self.assertEqual(env["OPENAMP_TVM_BATCH_EXIT_GRACE_SEC"], "0.5")
+
+    def test_board_access_usrp_iq_defaults_fast_rx_arm_status_timeout(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch.dict(
+            os.environ,
+            {
+                "ANALOG_PRECONNECT_CONTROL": "",
+                "ANALOG_REMOTE_CLEANUP_MODE": "",
+                "ANALOG_REMOTE_DECODE_RESPONSE_MODE": "",
+                "ANALOG_REMOTE_DECODED_FORMAT": "",
+                "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY": "",
+                "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC": "",
+                "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS": "",
+                "ANALOG_RX_SC16_MMAP": "",
+                "ANALOG_RX_CLIPPING_DECIMATION": "",
+                "ANALOG_RX_POST_QUANTIZE": "",
+                "ANALOG_RX_SESSION_CONTROL": "",
+                "ANALOG_RX_BATCH_SESSION_CONTROL": "",
+                "ANALOG_RX_BATCH_SESSION_MAX_IMAGES": "",
+                "ANALOG_PIPELINE_DEPTH": "",
+                "ANALOG_PIPELINE_RF_DECODE_OVERLAP": "",
+                "ANALOG_REMOTE_DECODE_WORKER_PREFIX": "",
+                "ANALOG_RETRY_ON_BURST_MISS": "",
+                "ANALOG_RETRY_ON_LOW_SYNC": "",
+                "ANALOG_LOW_SYNC_RETRY_THRESHOLD": "",
+                "ANALOG_FALLBACK_SYNC_CANDIDATES": "",
+                "ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS": "",
+                "MLKEM_USRP_MAX_ARQ_ROUNDS": "",
+                "ANALOG_RX_ARM_STATUS_TIMEOUT_SEC": "",
+                "ANALOG_RX_ARM_STATUS_POLL_SEC": "",
+                "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC": "",
+                "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC": "",
+                "ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC": "",
+                "ANALOG_RX_STOP_DRAIN_POLL_SEC": "",
+                "RX_ARM_WAIT_MS": "",
+                "RX_STOP_WAIT_MS": "",
+                "REMOTE_USRP_RX_DIR": "",
+                "REMOTE_RX_RUN_ROOT": "",
+            },
+            clear=False,
+        ):
+            status, _, _ = request_json(
+                state,
+                "POST",
+                "/api/session/board-access",
+                body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "iq-direct"}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        env = state._board_access.build_env()
+        self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx")
+        self.assertEqual(env["REMOTE_RX_RUN_ROOT"], "/dev/shm/usrp292x_remote_runs")
+        self.assertEqual(env["ANALOG_PRECONNECT_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_REMOTE_CLEANUP_MODE"], "skip")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_MODE"], "minimal")
+        self.assertEqual(env["ANALOG_REMOTE_DECODED_FORMAT"], "npy")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY"], "1")
+        self.assertEqual(env["ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC"], "0.05")
+        self.assertEqual(env["ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS"], "1")
+        self.assertEqual(env["ANALOG_RX_SC16_MMAP"], "1")
+        self.assertEqual(env["ANALOG_RX_CLIPPING_DECIMATION"], "8")
+        self.assertEqual(env["ANALOG_RX_POST_QUANTIZE"], "0")
+        self.assertEqual(env["ANALOG_RX_SESSION_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_RX_BATCH_SESSION_CONTROL"], "1")
+        self.assertEqual(env["ANALOG_RX_BATCH_SESSION_MAX_IMAGES"], "16")
+        self.assertEqual(env["ANALOG_PIPELINE_DEPTH"], "1")
+        self.assertEqual(env["ANALOG_PIPELINE_RF_DECODE_OVERLAP"], "0")
+        self.assertNotIn("ANALOG_REMOTE_DECODE_WORKER_PREFIX", env)
+        self.assertEqual(env["ANALOG_RETRY_ON_BURST_MISS"], "1")
+        self.assertEqual(env["ANALOG_RETRY_ON_LOW_SYNC"], "1")
+        self.assertEqual(env["ANALOG_LOW_SYNC_RETRY_THRESHOLD"], "0.08")
+        self.assertEqual(env["ANALOG_FALLBACK_SYNC_CANDIDATES"], "4")
+        self.assertEqual(env["ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS"], "1024")
+        self.assertEqual(env["MLKEM_USRP_MAX_ARQ_ROUNDS"], "5")
+        self.assertEqual(env["ANALOG_RX_ARM_STATUS_TIMEOUT_SEC"], "0.5")
+        self.assertEqual(env["ANALOG_RX_ARM_STATUS_POLL_SEC"], "0.025")
+        self.assertNotIn("ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC", env)
+        self.assertEqual(env["ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC"], "1.5")
+        self.assertEqual(env["ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC"], "8.0")
+        self.assertEqual(env["ANALOG_RX_STOP_DRAIN_POLL_SEC"], "0.05")
+        self.assertEqual(env["RX_ARM_WAIT_MS"], "500")
+        self.assertEqual(env["RX_STOP_WAIT_MS"], "8000")
+
+    def test_board_access_endpoint_accepts_jscc_link_mode_override(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp", "jscc_link_mode": "iq-direct"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
+        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
+
+    def test_board_access_usrp_defaults_to_iq_direct_link_mode(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "usrp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
+        self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
+        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
+
+        status, _, payload = request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps({"transport_mode": "tcp"}).encode("utf-8"),
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["board_access"]["transport_mode"], "tcp")
+        self.assertEqual(payload["board_access"]["input_source_mode"], "prerecorded")
+
+    def test_usrp_live_payload_uses_original_gallery_range(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+
+        payload = state._build_live_payload_from_batch_summary(
+            engine="tvm",
+            job_id="usrp-gallery-50",
+            count=50,
+            summary={
+                "processed_count": 50,
+                "selected_input_count": 50,
+                "run_samples_ms": [250.0],
+                "run_median_ms": 250.0,
+                "run_mean_ms": 250.0,
+            },
+        )
+
+        self.assertEqual(payload["original_gallery"]["mode"], "usrp")
+        self.assertEqual(payload["original_gallery"]["range"]["start"], 1)
+        self.assertEqual(payload["original_gallery"]["range"]["end"], 50)
+        self.assertEqual(payload["original_gallery"]["images"][0]["filename"], "00000001.jpg")
+        self.assertEqual(payload["original_gallery"]["images"][-1]["filename"], "00000050.jpg")
+        self.assertTrue(payload["image_sources"]["original_path"].endswith("00000001.jpg"))
+        self.assertTrue(payload["original_image_b64"].startswith("data:image/jpeg;base64,"))
 
     def test_board_access_env_switch_refreshes_current_trusted_sha_runtime(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -6533,6 +9688,8 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertIn("systemStatus.safety_panel", body)
         self.assertIn('"/api/recover"', body)
         self.assertIn("selectedCompareViewerSample", body)
+        self.assertIn("originalGallerySummary", body)
+        self.assertIn("original_gallery", body)
         self.assertIn('document.getElementById("compareViewerBoard")', body)
         self.assertIn("baselineLiveDisplayLabel", body)
         self.assertIn("PyTorch reference archive", body)

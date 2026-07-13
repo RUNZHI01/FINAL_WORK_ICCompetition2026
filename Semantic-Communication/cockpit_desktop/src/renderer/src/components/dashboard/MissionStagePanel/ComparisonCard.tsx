@@ -5,6 +5,7 @@ import { SkeletonCard } from '../../loading'
 import { UseQueryResult } from '@tanstack/react-query'
 import type { SystemStatusResponse } from '../../../api/types'
 import { useAppStore } from '../../../stores/appStore'
+import { buildComparisonRows } from './comparisonRows'
 import s from './ComparisonCard.module.css'
 
 const { Text } = Typography
@@ -22,8 +23,8 @@ export function ComparisonCard({ system }: ComparisonCardProps) {
     lastCompletedInference?.variant === 'current'
     && lastCompletedInference?.execution_mode === 'live'
     && lastCompletedInference?.status === 'success'
-  ) ? lastCompletedInference : currentFromStatus
-  const baseline = results?.['baseline']
+  ) ? lastCompletedInference : (results?.['tvm'] ?? currentFromStatus)
+  const baseline = results?.['pytorch'] ?? results?.['baseline']
 
   if (system.isPending) {
     return (
@@ -43,20 +44,15 @@ export function ComparisonCard({ system }: ComparisonCardProps) {
     )
   }
 
-  if (!current || !baseline) {
+  if (!current && !baseline) {
     return (
       <PanelCard title="Current vs Baseline" icon={Icons.TrendingUp}>
-        <Text className={s.emptyText}>需要同时存在 current 和 baseline 结果</Text>
+        <Text className={s.emptyText}>等待 current 或 baseline 结果</Text>
       </PanelCard>
     )
   }
 
-  const dataSource = [
-    { key: 'payload_ms', metric: 'Payload (ms)', current: current.timings?.payload_ms, baseline: baseline.timings?.payload_ms },
-    { key: 'total_ms', metric: 'Total (ms)', current: current.timings?.total_ms, baseline: baseline.timings?.total_ms },
-    { key: 'psnr', metric: 'PSNR (dB)', current: current.quality?.psnr_db, baseline: baseline.quality?.psnr_db },
-    { key: 'ssim', metric: 'SSIM', current: current.quality?.ssim, baseline: baseline.quality?.ssim },
-  ]
+  const dataSource = buildComparisonRows(current, baseline)
 
   return (
     <PanelCard title="性能对比" icon={Icons.TrendingUp}>

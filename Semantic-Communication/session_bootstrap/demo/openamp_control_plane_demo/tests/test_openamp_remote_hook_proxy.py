@@ -17,7 +17,14 @@ DEMO_ROOT = Path(__file__).resolve().parents[1]
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
-from openamp_remote_hook_proxy import SSH_HELPER, build_bridge_bundle_base64, build_remote_command, main, normalize_args  # noqa: E402
+from openamp_remote_hook_proxy import (  # noqa: E402
+    SSH_HELPER,
+    build_bridge_bundle_base64,
+    build_remote_command,
+    main,
+    normalize_args,
+    resolve_bash_executable,
+)
 
 
 class OpenampRemoteHookProxyTest(unittest.TestCase):
@@ -114,7 +121,7 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertIn('BRIDGE_SCRIPT="${REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}"', command)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1", command)
 
-    def test_main_passes_password_only_on_stdin_and_embeds_hook_event_for_remote_sudo(self) -> None:
+    def test_main_passes_password_and_remote_script_on_stdin_to_avoid_long_windows_argv(self) -> None:
         args = SimpleNamespace(
             host="demo-board",
             user="demo-user",
@@ -147,12 +154,21 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         command = run.call_args.args[0]
-        self.assertEqual(command[:2], ["bash", str(SSH_HELPER)])
-        remote_command = command[-1]
+        self.assertEqual(command[:2], [resolve_bash_executable(), str(SSH_HELPER)])
+        self.assertEqual(command[-3:-1], ["bash", "-lc"])
+        self.assertIn('cat >"$WRAPPER_SCRIPT"', command[-1])
+        self.assertNotIn("HOOK_EVENT_B64=", command[-1])
+        self.assertLess(max(len(part) for part in command), 1024)
+        remote_input = run.call_args.kwargs["input"]
+        self.assertIsInstance(remote_input, bytes)
+        self.assertTrue(remote_input.startswith(b"demo-pass\n"))
+        self.assertNotIn(b"\r\n", remote_input)
+        remote_command = remote_input.decode("utf-8").split("\n", 1)[1]
         hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
         self.assertIn(f"HOOK_EVENT_B64={hook_event_b64}", remote_command)
-        self.assertEqual(run.call_args.kwargs["input"], "demo-pass\n")
-        self.assertEqual(run.call_args.kwargs["text"], True)
+        self.assertNotIn("text", run.call_args.kwargs)
+        self.assertNotIn("encoding", run.call_args.kwargs)
+        self.assertNotIn("errors", run.call_args.kwargs)
         self.assertEqual(stdout.getvalue(), '{"decision":"ALLOW"}\n')
         self.assertEqual(stderr.getvalue(), "")
 

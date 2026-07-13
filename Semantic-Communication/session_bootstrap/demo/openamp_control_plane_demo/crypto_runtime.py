@@ -73,6 +73,19 @@ REMOTE_AUTH_SERVER_KEYS = (
 _LOCAL_CRYPTO_CLIENT_CAP_CACHE: dict[Path, dict[str, bool]] = {}
 _LOCAL_CRYPTO_SERVER_CAP_CACHE: dict[Path, dict[str, bool]] = {}
 
+SSH_RUNNER_ENV = "OPENAMP_SSH_RUNNER"
+SSH_DOCKER_IMAGE_ENV = "OPENAMP_SSH_DOCKER_IMAGE"
+DEFAULT_SSH_DOCKER_IMAGE = "iccomp-usrp-tx:latest"
+LOCAL_CLIENT_RUNNER_KEYS = ("MLKEM_LOCAL_CLIENT_RUNNER", "OPENAMP_LOCAL_CLIENT_RUNNER")
+LOCAL_CLIENT_DOCKER_IMAGE_KEYS = ("MLKEM_LOCAL_CLIENT_DOCKER_IMAGE", "OPENAMP_SSH_DOCKER_IMAGE")
+LOCAL_CLIENT_DOCKER_PYTHON_KEYS = ("MLKEM_LOCAL_CLIENT_DOCKER_PYTHON",)
+LOCAL_CLIENT_DOCKER_SCRIPT_KEYS = ("MLKEM_LOCAL_CLIENT_DOCKER_SCRIPT",)
+DEFAULT_LOCAL_CLIENT_DOCKER_PYTHON = "/opt/iccomp-venv/bin/python"
+DEFAULT_LOCAL_CLIENT_DOCKER_SCRIPT = "/workspace/Semantic-Communication/scripts/tcp_client.py"
+DEFAULT_LOCAL_CLIENT_DOCKER_OQS_INSTALL = "/workspace/liboqs-dist"
+DEFAULT_LOCAL_CLIENT_DOCKER_SIG_BRIDGE = "/workspace/artifacts/crypto/libtongsuo_sig_bridge.so"
+DEFAULT_LOCAL_CLIENT_DOCKER_PATH = "/opt/iccomp-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 
 def _sources(env_values: Mapping[str, str] | None) -> tuple[Mapping[str, str], Mapping[str, str]]:
     return env_values or {}, os.environ
@@ -113,6 +126,125 @@ def parse_bool_config(raw_value: str, default: bool) -> bool:
     return default
 
 
+def _local_crypto_client_runner(env_values: Mapping[str, str] | None) -> str:
+    return first_config_value(env_values, keys=LOCAL_CLIENT_RUNNER_KEYS, default="native").strip().lower()
+
+
+def _local_crypto_client_docker_requested(env_values: Mapping[str, str] | None) -> bool:
+    return _local_crypto_client_runner(env_values) == "docker"
+
+
+def _local_crypto_client_docker_enabled(env_values: Mapping[str, str] | None) -> bool:
+    return _local_crypto_client_docker_requested(env_values) and bool(shutil.which("docker"))
+
+
+def _windows_drive_letter(raw_path: str | Path) -> str:
+    text = str(raw_path or "").strip()
+    if len(text) >= 2 and text[1] == ":" and text[0].isalpha():
+        return text[0].lower()
+    return ""
+
+
+def _docker_mount_args_for_local_paths(paths: Sequence[str | Path]) -> list[str]:
+    drives: set[str] = set()
+    for path in paths:
+        drive = _windows_drive_letter(path)
+        if drive:
+            drives.add(drive)
+
+    args: list[str] = []
+    for drive in sorted(drives):
+        args.extend(["-v", f"{drive.upper()}:\\:/host/{drive}"])
+    return args
+
+
+def map_local_path_for_crypto_runner(env_values: Mapping[str, str] | None, path: str | Path) -> str:
+    text = str(path or "").strip()
+    if not text:
+        return text
+    if not _local_crypto_client_docker_requested(env_values):
+        return text
+    drive = _windows_drive_letter(text)
+    if not drive:
+        return text
+    normalized = text.replace("\\", "/")
+    remainder = normalized[2:].lstrip("/")
+    return f"/host/{drive}/{remainder}" if remainder else f"/host/{drive}"
+
+
+def _local_client_docker_image(env_values: Mapping[str, str] | None) -> str:
+    return first_config_value(
+        env_values,
+        keys=LOCAL_CLIENT_DOCKER_IMAGE_KEYS,
+        default=DEFAULT_SSH_DOCKER_IMAGE,
+    )
+
+
+def _docker_env_args(env_values: Mapping[str, str] | None) -> list[str]:
+    oqs_install = DEFAULT_LOCAL_CLIENT_DOCKER_OQS_INSTALL
+    sig_bridge = DEFAULT_LOCAL_CLIENT_DOCKER_SIG_BRIDGE
+    docker_env: dict[str, str] = {
+        "OQS_INSTALL_PATH": oqs_install,
+        "TONGSUO_SIG_BRIDGE": sig_bridge,
+        "LD_LIBRARY_PATH": f"{oqs_install}/lib:{Path(sig_bridge).parent.as_posix()}",
+        "PATH": DEFAULT_LOCAL_CLIENT_DOCKER_PATH,
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+    }
+    for key, value in _config_env_pairs(env_values, (*AUTH_COMMON_KEYS, *LOCAL_AUTH_CLIENT_KEYS)):
+        if key in LOCAL_AUTH_CLIENT_KEYS:
+            docker_env[key] = map_local_path_for_crypto_runner(env_values, value)
+        else:
+            docker_env[key] = value
+
+    args: list[str] = []
+    for key, value in docker_env.items():
+        args.extend(["-e", f"{key}={value}"])
+    return args
+
+
+def _docker_local_crypto_command(
+    env_values: Mapping[str, str] | None,
+    *,
+    client_script: Path,
+    args: Sequence[str],
+    input_path: Path | None = None,
+    daemon: bool = False,
+) -> tuple[list[str], dict[str, str]]:
+    mount_sources: list[str | Path] = [client_script]
+    if input_path is not None:
+        mount_sources.append(input_path)
+    for _key, value in _config_env_pairs(env_values, LOCAL_AUTH_CLIENT_KEYS):
+        mount_sources.append(value)
+    temp_dir = os.environ.get("TEMP") or os.environ.get("TMP") or ""
+    if temp_dir:
+        mount_sources.append(temp_dir)
+
+    command = ["docker", "run", "--rm"]
+    if daemon:
+        command.append("-i")
+    command.extend(_docker_mount_args_for_local_paths(mount_sources))
+    command.extend(_docker_env_args(env_values))
+    command.append(_local_client_docker_image(env_values))
+    command.append(
+        first_config_value(
+            env_values,
+            keys=LOCAL_CLIENT_DOCKER_PYTHON_KEYS,
+            default=DEFAULT_LOCAL_CLIENT_DOCKER_PYTHON,
+        )
+    )
+    command.append(
+        first_config_value(
+            env_values,
+            keys=LOCAL_CLIENT_DOCKER_SCRIPT_KEYS,
+            default=DEFAULT_LOCAL_CLIENT_DOCKER_SCRIPT,
+        )
+    )
+    command.extend(args)
+    return command, dict(os.environ)
+
+
 def local_crypto_transport_mode(env_values: Mapping[str, str] | None) -> str:
     raw_value = first_config_value(env_values, keys=TRANSPORT_MODE_KEYS, default="tcp")
     normalized = str(raw_value or "").strip().lower()
@@ -141,6 +273,13 @@ def _resolve_existing_path(raw_path: str, *, base_dir: Path | None = None) -> Pa
     if exists:
         return candidate
     return None
+
+
+def _path_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
 
 
 def _append_unique(paths: list[Path], seen: set[Path], candidate: Path | None) -> None:
@@ -638,6 +777,23 @@ def build_local_crypto_client_command(
         DEFAULT_CRYPTO_PORT,
     )
 
+    if _local_crypto_client_docker_enabled(env_values):
+        return _docker_local_crypto_command(
+            env_values,
+            client_script=client_script,
+            input_path=input_path,
+            args=[
+                "--host",
+                host,
+                "--port",
+                str(crypto_port),
+                "--input",
+                map_local_path_for_crypto_runner(env_values, input_path),
+                "--suite",
+                suite,
+            ],
+        )
+
     env = _build_local_crypto_env(
         env_values,
         client_script=client_script,
@@ -680,6 +836,22 @@ def build_local_crypto_daemon_command(
         first_config_value(env_values, keys=REMOTE_PORT_KEYS),
         DEFAULT_CRYPTO_PORT,
     )
+
+    if _local_crypto_client_docker_enabled(env_values):
+        return _docker_local_crypto_command(
+            env_values,
+            client_script=client_script,
+            args=[
+                "--host",
+                host,
+                "--port",
+                str(crypto_port),
+                "--suite",
+                suite,
+                "--daemon",
+            ],
+            daemon=True,
+        )
 
     env = _build_local_crypto_env(
         env_values,
@@ -727,6 +899,18 @@ def build_local_crypto_daemon_fingerprint(
         f"{key}={value}"
         for key, value in _config_env_pairs(env_values, (*AUTH_COMMON_KEYS, *LOCAL_AUTH_CLIENT_KEYS))
     )
+    runner_parts = tuple(
+        f"{key}={value}"
+        for key, value in _config_env_pairs(
+            env_values,
+            (
+                *LOCAL_CLIENT_RUNNER_KEYS,
+                *LOCAL_CLIENT_DOCKER_IMAGE_KEYS,
+                *LOCAL_CLIENT_DOCKER_PYTHON_KEYS,
+                *LOCAL_CLIENT_DOCKER_SCRIPT_KEYS,
+            ),
+        )
+    )
     return (
         transport_mode,
         str(host).strip(),
@@ -734,6 +918,7 @@ def build_local_crypto_daemon_fingerprint(
         str(suite).strip().upper(),
         resolved_client,
         resolved_runtime_root,
+        *runner_parts,
         *auth_parts,
     )
 
@@ -772,6 +957,8 @@ class MlkemSessionManager:
         self._io_timeout = io_timeout
         self._lock = threading.Lock()
         self._proc: subprocess.Popen[str] | None = None
+        self._stdout_queue: queue.Queue[str | None] = queue.Queue()
+        self._stdout_reader_thread: threading.Thread | None = None
         self._handshake_ms: float = 0.0
         self._images_sent: int = 0
         self._alive: bool = False
@@ -820,13 +1007,22 @@ class MlkemSessionManager:
         print(f"[MlkemSessionManager] 启动 daemon: {' '.join(cmd[:6])}...")
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, env=env, bufsize=1)
+            stderr=subprocess.PIPE, text=True, encoding="utf-8",
+            errors="replace", env=env, bufsize=1)
         assert self._proc.stdin is not None
         assert self._proc.stdout is not None
+        self._start_stdout_reader()
 
         try:
-            ready_line = self._read_line(timeout=self._startup_timeout)
-            ready = json.loads(ready_line)
+            ready = None
+            for _skip in range(20):
+                ready_line = self._read_line(timeout=self._startup_timeout)
+                stripped = ready_line.strip()
+                if stripped and stripped.startswith("{"):
+                    ready = json.loads(stripped)
+                    break
+            if ready is None:
+                raise RuntimeError(f"daemon 未输出有效 JSON: {ready_line[:200] if ready_line else '(empty)'}")
             if ready.get("status") != "ready":
                 raise RuntimeError(f"daemon 未就绪: {ready}")
             self._handshake_ms = ready.get("handshake_ms", 0.0)
@@ -841,6 +1037,7 @@ class MlkemSessionManager:
                     stderr_tail = (self._proc.stderr.read() or "").strip()[-400:]
                 except Exception:
                     stderr_tail = ""
+            print(f"[MlkemSessionManager] daemon 启动失败: {e}; stderr={stderr_tail}", flush=True)
             self._kill_proc()
             detail = f"{e}"
             if stderr_tail:
@@ -868,9 +1065,10 @@ class MlkemSessionManager:
                 if not self.is_alive:
                     self._start_daemon()
                 try:
+                    mapped_input = map_local_path_for_crypto_runner(self._env_values, input_path)
                     self._stdin_write(json.dumps({
                         "action": "send",
-                        "input": str(input_path),
+                        "input": mapped_input,
                         "job_id": job_id,
                         "run_tvm": run_tvm,
                         "expect_result": expect_result,
@@ -962,31 +1160,36 @@ class MlkemSessionManager:
         self._proc.stdin.write(data + "\n")
         self._proc.stdin.flush()
 
-    def _read_line(self, timeout: float) -> str:
-        """从 daemon stdout 读取一行，带超时（O-2: select 替代线程 spawn）
-
-        注意：必须用 os.read() 直接读 fd，绕过 TextIOWrapper 的内部缓冲区。
-        BufferedReader 首次 read() 会预读整个 fd，导致后续 select 看不到数据。
-        """
+    def _start_stdout_reader(self) -> None:
         assert self._proc is not None and self._proc.stdout is not None
-        fd = self._proc.stdout.fileno()
-        deadline = time.monotonic() + timeout
-        buf: list[bytes] = []
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                self._alive = False
-                raise TimeoutError(f"daemon 读取超时 ({timeout}s)")
-            ready, _, _ = select.select([fd], [], [], min(remaining, 0.5))
-            if not ready:
-                continue
-            raw = os.read(fd, 1)
-            if not raw:
-                self._alive = False
-                raise RuntimeError("daemon stdout 已关闭")
-            if raw == b'\n':
-                return b''.join(buf).decode('utf-8')
-            buf.append(raw)
+        stdout = self._proc.stdout
+        self._stdout_queue = queue.Queue()
+
+        def reader() -> None:
+            try:
+                while True:
+                    line = stdout.readline()
+                    if line == "":
+                        break
+                    self._stdout_queue.put(line)
+            finally:
+                self._stdout_queue.put(None)
+
+        self._stdout_reader_thread = threading.Thread(target=reader, daemon=True)
+        self._stdout_reader_thread.start()
+
+    def _read_line(self, timeout: float) -> str:
+        """从 daemon stdout 读取一行，带超时。"""
+        assert self._proc is not None and self._proc.stdout is not None
+        try:
+            line = self._stdout_queue.get(timeout=timeout)
+        except queue.Empty as exc:
+            self._alive = False
+            raise TimeoutError(f"daemon 读取超时 ({timeout}s)") from exc
+        if line is None:
+            self._alive = False
+            raise RuntimeError("daemon stdout 已关闭")
+        return line
 
     def _kill_proc(self) -> None:
         if self._proc is not None:
@@ -996,6 +1199,7 @@ class MlkemSessionManager:
             except Exception:
                 pass
             self._proc = None
+        self._stdout_reader_thread = None
         self._alive = False
 
     def __del__(self) -> None:
@@ -1035,7 +1239,7 @@ def _derive_remote_server_script(
             relative_script = Path("scripts/tcp_server.py")
         return f"{remote_project_root.rstrip('/')}/{relative_script.as_posix()}"
 
-    return "~/tcp_server.py"
+    return "/home/user/tcp_server.py"
 
 
 def build_remote_crypto_server_command(
@@ -1151,6 +1355,53 @@ def build_remote_crypto_server_command(
     return f"bash -c {shlex_quote('; '.join(command_steps))}"
 
 
+def _wrap_ssh_password_command(
+    command: list[str],
+    *,
+    password: str,
+) -> tuple[list[str], dict[str, str], Path | None]:
+    env = dict(os.environ)
+    env["MSYS2_ARG_CONV_EXCL"] = "*"
+    askpass_path: Path | None = None
+
+    if password and shutil.which("sshpass"):
+        env["SSHPASS"] = password
+        return ["sshpass", "-e", *command], env, askpass_path
+
+    if password:
+        fd, raw_path = tempfile.mkstemp(prefix="mlkem-askpass-", suffix=".sh", text=True)
+        askpass_path = Path(raw_path)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\n")
+            handle.write(f"printf '%s\\n' {shlex_quote(password)}\n")
+        askpass_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        env["SSH_ASKPASS"] = str(askpass_path)
+        env["SSH_ASKPASS_REQUIRE"] = "force"
+        env.setdefault("DISPLAY", "mlkem-askpass:0")
+        if shutil.which("setsid"):
+            return ["setsid", "-w", *command], env, askpass_path
+
+    return command, env, askpass_path
+
+
+def _docker_ssh_runner_enabled(password: str) -> bool:
+    if not password:
+        return False
+    runner = str(os.environ.get(SSH_RUNNER_ENV, "") or "").strip().lower()
+    return runner == "docker" and bool(shutil.which("docker"))
+
+
+def _docker_ssh_env(password: str) -> dict[str, str]:
+    env = dict(os.environ)
+    env["SSHPASS"] = password
+    env["MSYS2_ARG_CONV_EXCL"] = "*"
+    return env
+
+
+def _docker_ssh_image() -> str:
+    return str(os.environ.get(SSH_DOCKER_IMAGE_ENV, "") or "").strip() or DEFAULT_SSH_DOCKER_IMAGE
+
+
 def run_ssh_command(
     *,
     host: str,
@@ -1173,34 +1424,88 @@ def run_ssh_command(
         f"{user}@{host}",
         remote_command,
     ]
-    env = dict(os.environ)
-    askpass_path: Path | None = None
-
-    if password and shutil.which("sshpass"):
-        env["SSHPASS"] = password
-        command = ["sshpass", "-e", *ssh_command]
-    elif password:
-        fd, raw_path = tempfile.mkstemp(prefix="mlkem-askpass-", suffix=".sh", text=True)
-        askpass_path = Path(raw_path)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("#!/bin/sh\n")
-            handle.write(f"printf '%s\\n' {shlex_quote(password)}\n")
-        askpass_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-        env["SSH_ASKPASS"] = str(askpass_path)
-        env["SSH_ASKPASS_REQUIRE"] = "force"
-        env.setdefault("DISPLAY", "mlkem-askpass:0")
-        if shutil.which("setsid"):
-            command = ["setsid", "-w", *ssh_command]
-        else:
-            command = ssh_command
+    if _docker_ssh_runner_enabled(password):
+        command = ["docker", "run", "--rm", "-e", "SSHPASS", _docker_ssh_image(), "sshpass", "-e", *ssh_command]
+        env = _docker_ssh_env(password)
+        askpass_path = None
     else:
-        command = ssh_command
+        command, env, askpass_path = _wrap_ssh_password_command(ssh_command, password=password)
 
     try:
         return subprocess.run(
             command,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            env=env,
+            stdin=subprocess.DEVNULL,
+        )
+    finally:
+        if askpass_path is not None:
+            try:
+                askpass_path.unlink()
+            except OSError:
+                pass
+
+
+def run_scp_file(
+    *,
+    host: str,
+    user: str,
+    password: str,
+    port: str | int,
+    local_path: str | Path,
+    remote_path: str,
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    local_path = Path(local_path)
+    local_arg = str(local_path)
+    docker_args: list[str] = []
+    if _docker_ssh_runner_enabled(password):
+        resolved_local = local_path.resolve()
+        docker_args = ["-v", f"{resolved_local.parent}:/upload:ro"]
+        local_arg = f"/upload/{resolved_local.name}"
+
+    scp_command = [
+        "scp",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "BatchMode=no",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-P",
+        str(port),
+        local_arg,
+        f"{user}@{host}:{remote_path}",
+    ]
+    if _docker_ssh_runner_enabled(password):
+        command = [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "SSHPASS",
+            *docker_args,
+            _docker_ssh_image(),
+            "sshpass",
+            "-e",
+            *scp_command,
+        ]
+        env = _docker_ssh_env(password)
+        askpass_path = None
+    else:
+        command, env, askpass_path = _wrap_ssh_password_command(scp_command, password=password)
+
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=env,
             stdin=subprocess.DEVNULL,

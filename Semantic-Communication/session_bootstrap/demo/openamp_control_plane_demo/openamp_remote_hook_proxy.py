@@ -16,6 +16,12 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from openamp_control_wrapper import resolve_bash_executable  # noqa: E402
+
 SSH_HELPER = PROJECT_ROOT / "session_bootstrap" / "scripts" / "ssh_with_password.sh"
 BRIDGE_SCRIPT = PROJECT_ROOT / "session_bootstrap" / "scripts" / "openamp_rpmsg_bridge.py"
 PROTOCOL_SCRIPT = PROJECT_ROOT / "openamp_mock" / "protocol.py"
@@ -199,7 +205,9 @@ PY
 fi
 BRIDGE_SCRIPT="${{REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}}"
 BRIDGE_PYTHONPATH="${{REMOTE_BRIDGE_PYTHONPATH:-$STAGE_ROOT}}"
-IFS= read -r SUDO_PASSWORD || SUDO_PASSWORD=""
+if [[ "${{SUDO_PASSWORD+x}}" != "x" ]]; then
+  IFS= read -r SUDO_PASSWORD || SUDO_PASSWORD=""
+fi
 HOOK_INPUT_FILE="$HOOK_INPUT_FILE" HOOK_EVENT_B64="$HOOK_EVENT_B64" python3 - <<'PY'
 import base64
 import os
@@ -281,6 +289,29 @@ fi
 """.strip()
 
 
+def build_remote_stdin_wrapper_command() -> str:
+    return """
+set -euo pipefail
+WRAPPER_STAGE_ROOT="$(mktemp -d /tmp/openamp_demo_proxy.XXXXXX)"
+WRAPPER_SCRIPT="$WRAPPER_STAGE_ROOT/remote_hook.sh"
+cleanup() {
+  rm -rf "$WRAPPER_STAGE_ROOT" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+IFS= read -r OPENAMP_REMOTE_SUDO_PASSWORD || OPENAMP_REMOTE_SUDO_PASSWORD=""
+cat >"$WRAPPER_SCRIPT"
+SUDO_PASSWORD="$OPENAMP_REMOTE_SUDO_PASSWORD" bash "$WRAPPER_SCRIPT"
+""".strip()
+
+
+def decode_completed_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
 def main() -> int:
     args = normalize_args(parse_args())
     raw_event = sys.stdin.read()
@@ -289,9 +320,9 @@ def main() -> int:
     job_id = detect_job_id(event)
     hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
     remote_command = build_remote_command(args, phase=phase, job_id=job_id, hook_event_b64=hook_event_b64)
-    remote_input = f"{args.password}\n"
+    remote_input = f"{args.password}\n{remote_command}\n".encode("utf-8")
     command = [
-        "bash",
+        resolve_bash_executable(),
         str(SSH_HELPER),
         "--host",
         args.host,
@@ -304,21 +335,22 @@ def main() -> int:
         "--",
         "bash",
         "-lc",
-        remote_command,
+        build_remote_stdin_wrapper_command(),
     ]
     result = subprocess.run(
         command,
         cwd=PROJECT_ROOT,
         input=remote_input,
-        text=True,
         capture_output=True,
         check=False,
     )
-    stdout, suppressed_tail = suppress_synthetic_sudo_failure_tail(result.stdout)
+    result_stdout = decode_completed_output(result.stdout)
+    result_stderr = decode_completed_output(result.stderr)
+    stdout, suppressed_tail = suppress_synthetic_sudo_failure_tail(result_stdout)
     if stdout:
         sys.stdout.write(stdout)
-    if result.stderr:
-        sys.stderr.write(result.stderr)
+    if result_stderr:
+        sys.stderr.write(result_stderr)
     if result.returncode == 0 or suppressed_tail:
         return 0
     if stdout.strip():

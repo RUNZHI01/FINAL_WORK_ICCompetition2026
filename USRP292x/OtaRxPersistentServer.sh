@@ -23,6 +23,8 @@ BW="${BW:-0}"
 SETUP="${SETUP:-0.5}"
 WIREFMT="${WIREFMT:-sc16}"
 CHANNEL="${CHANNEL:-0}"
+ARM_WAIT_MS="${ARM_WAIT_MS:-2000}"
+STOP_WAIT_MS="${STOP_WAIT_MS:-8000}"
 
 cmd=(
     "${BIN}"
@@ -36,6 +38,8 @@ cmd=(
     --channel "${CHANNEL}"
     --wirefmt "${WIREFMT}"
     --setup "${SETUP}"
+    --arm-wait-ms "${ARM_WAIT_MS}"
+    --stop-wait-ms "${STOP_WAIT_MS}"
 )
 
 if [[ "${BW}" != "0" ]]; then

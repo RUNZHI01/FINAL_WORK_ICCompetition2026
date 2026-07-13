@@ -9,7 +9,12 @@ DEMO_ROOT = Path(__file__).resolve().parents[1]
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
-from demo_data import build_aircraft_position_snapshot, build_prerecorded_inference_result, build_snapshot  # noqa: E402
+from demo_data import (  # noqa: E402
+    build_aircraft_position_snapshot,
+    build_original_gallery_snapshot,
+    build_prerecorded_inference_result,
+    build_snapshot,
+)
 
 
 class DemoDataTest(unittest.TestCase):
@@ -73,6 +78,18 @@ class DemoDataTest(unittest.TestCase):
         self.assertIn("页面刷新后若系统状态保留最近一次已完成结果", guided_demo["compare_viewer"]["fallback_note"])
         self.assertEqual(guided_demo["compare_viewer"]["samples"][0]["current"]["source_label"], "Current 归档重建图")
         self.assertEqual(guided_demo["compare_viewer"]["samples"][0]["baseline"]["source_label"], "PyTorch 参考 archive")
+
+    def test_usrp_original_gallery_uses_workspace_image_range(self) -> None:
+        gallery = build_original_gallery_snapshot("usrp", count=50)
+
+        self.assertEqual(gallery["mode"], "usrp")
+        self.assertEqual(gallery["requested_count"], 50)
+        self.assertEqual(gallery["count"], 50)
+        self.assertEqual(gallery["range"]["start"], 1)
+        self.assertEqual(gallery["range"]["end"], 50)
+        self.assertEqual(gallery["images"][0]["filename"], "00000001.jpg")
+        self.assertEqual(gallery["images"][-1]["filename"], "00000050.jpg")
+        self.assertTrue(gallery["preview_image_b64"].startswith("data:image/jpeg;base64,"))
 
     def test_snapshot_surfaces_latest_live_dualpath_status_report(self) -> None:
         snapshot = build_snapshot()

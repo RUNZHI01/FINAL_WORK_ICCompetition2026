@@ -23,6 +23,10 @@ from board_access import (  # noqa: E402
     USER_KEYS,
     build_board_access_config,
     build_demo_default_board_access,
+    current_input_source_mode,
+    current_jscc_link_mode,
+    current_remote_usrp_rx_dir,
+    current_transport_mode,
     first_non_empty,
     load_env_path,
     repo_relative,
@@ -42,6 +46,12 @@ EXIT_BLOCKED = 2
 EXIT_ERROR = 1
 VARIANTS = ("current", "baseline")
 READINESS_PASSWORD_ENV_VAR = "OPENAMP_DEMO_READINESS_PASSWORD"
+DELIVERY_ROOT = PROJECT_ROOT.parent
+IQ_SYNC_SCRIPT = DELIVERY_ROOT / "scripts" / "prepare_iq_board_sync.sh"
+IQ_SYNC_POWERSHELL = DELIVERY_ROOT / "docker" / "prepare-iq-board-sync.ps1"
+IQ_SYNC_TAR = DELIVERY_ROOT / "artifacts" / "iq_board_sync.tar.gz"
+IQ_SYNC_MANIFEST = DELIVERY_ROOT / "artifacts" / "iq_board_sync_manifest.txt"
+IQ_BOARD_VALIDATION_ENV = "tvm310_safe"
 
 
 def parse_args() -> argparse.Namespace:
@@ -76,6 +86,13 @@ def validate_explicit_path(raw_path: str, label: str) -> None:
     if resolve_existing_env(value) is not None:
         return
     raise ValueError(f"{label} 不存在: {repo_relative(resolve_local_path(value))}")
+
+
+def delivery_relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(DELIVERY_ROOT).as_posix()
+    except ValueError:
+        return path.resolve().as_posix()
 
 
 def key_presence(values: dict[str, str], keys: tuple[str, ...] | list[str]) -> dict[str, list[str]]:
@@ -174,6 +191,74 @@ def build_blockers(session_public: dict[str, Any], variants: dict[str, dict[str,
                     "message": f"{payload['label']} control-plane 缺少字段: {', '.join(missing_control)}。",
                 }
             )
+    return blockers
+
+
+def iq_sync_manifest_activates_board_env() -> bool:
+    if not IQ_SYNC_SCRIPT.is_file():
+        return False
+    try:
+        script = IQ_SYNC_SCRIPT.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return f"conda activate {IQ_BOARD_VALIDATION_ENV}" in script
+
+
+def build_usrp_report(access: Any) -> dict[str, Any]:
+    env_values = access.build_env()
+    session_public = access.to_public_dict()
+    transport_mode = current_transport_mode(env_values)
+    input_source_mode = current_input_source_mode(env_values)
+    link_mode = current_jscc_link_mode(env_values)
+    enabled = transport_mode == "usrp" or input_source_mode == "usrp"
+
+    missing_fields: list[str] = []
+    if enabled:
+        missing_fields.extend(access.missing_connection_fields())
+        if not current_remote_usrp_rx_dir(env_values):
+            missing_fields.append("REMOTE_USRP_RX_DIR")
+        if link_mode == "iq-direct" and not IQ_SYNC_SCRIPT.is_file():
+            missing_fields.append("scripts/prepare_iq_board_sync.sh")
+
+    return {
+        "enabled": enabled,
+        "ready": bool(enabled and not missing_fields),
+        "transport_mode": transport_mode,
+        "input_source_mode": input_source_mode,
+        "link_mode": link_mode,
+        "remote_usrp_rx_dir": session_public.get("remote_usrp_rx_dir", ""),
+        "local_usrp_input_dir": session_public.get("local_usrp_input_dir", ""),
+        "local_usrp_image_dir": session_public.get("local_usrp_image_dir", ""),
+        "missing_fields": sorted(set(missing_fields), key=missing_fields.index),
+        "iq_board_sync": {
+            "script": delivery_relative(IQ_SYNC_SCRIPT),
+            "powershell_wrapper": delivery_relative(IQ_SYNC_POWERSHELL),
+            "tar": delivery_relative(IQ_SYNC_TAR),
+            "manifest": delivery_relative(IQ_SYNC_MANIFEST),
+            "board_validation_env": IQ_BOARD_VALIDATION_ENV,
+            "manifest_activates_board_env": iq_sync_manifest_activates_board_env(),
+            "script_exists": IQ_SYNC_SCRIPT.is_file(),
+            "powershell_wrapper_exists": IQ_SYNC_POWERSHELL.is_file(),
+            "bundle_exists": IQ_SYNC_TAR.is_file(),
+            "manifest_exists": IQ_SYNC_MANIFEST.is_file(),
+        },
+    }
+
+
+def append_usrp_blockers(blockers: list[dict[str, Any]], usrp: dict[str, Any]) -> list[dict[str, Any]]:
+    if not usrp.get("enabled") or usrp.get("ready"):
+        return blockers
+    missing = list(usrp.get("missing_fields") or [])
+    if not missing:
+        return blockers
+    blockers.append(
+        {
+            "scope": "usrp",
+            "kind": "missing_usrp_fields",
+            "fields": missing,
+            "message": f"USRP live 缺少字段: {', '.join(missing)}。",
+        }
+    )
     return blockers
 
 
@@ -292,8 +377,9 @@ def build_readiness_report(
 
     session_public = access.to_public_dict()
     variants = {variant: build_variant_report(access, variant) for variant in VARIANTS}
+    usrp = build_usrp_report(access)
     mode = build_mode(access, variants)
-    blockers = build_blockers(session_public, variants)
+    blockers = append_usrp_blockers(build_blockers(session_public, variants), usrp)
     ready_for_live_operator_flow = bool(access.probe_ready and all(variants[name]["ready"] for name in VARIANTS))
     report = {
         "generated_at": now_iso(),
@@ -315,6 +401,7 @@ def build_readiness_report(
                     "current": bool(variants["current"]["ready"]),
                     "baseline": bool(variants["baseline"]["ready"]),
                 },
+                "live_usrp": bool(usrp["ready"]),
             },
             "mode": mode,
             "blocker_count": len(blockers),
@@ -326,6 +413,7 @@ def build_readiness_report(
             "loaded": bool(access.env_file),
             "shared_required_keys": key_presence(access.build_env(), INFERENCE_SHARED_REQUIRED_KEYS),
         },
+        "usrp": usrp,
         "variants": variants,
         "blockers": blockers,
     }
@@ -343,6 +431,7 @@ def render_text(report: dict[str, Any]) -> str:
     probe_env = report["probe_env"]
     inference_env = report["inference_env"]
     variants = report["variants"]
+    usrp = report["usrp"]
     lines = [
         "OpenAMP Demo Session Readiness",
         f"status: {overall['status']}",
@@ -367,6 +456,15 @@ def render_text(report: dict[str, Any]) -> str:
             "inference_env: "
             f"source={inference_env['source_file'] or '-'} "
             f"shared_missing={', '.join(inference_env['shared_required_keys']['missing_keys']) or 'none'}"
+        ),
+        (
+            "usrp: "
+            f"enabled={'yes' if usrp['enabled'] else 'no'} "
+            f"ready={'yes' if usrp['ready'] else 'no'} "
+            f"link={usrp['link_mode']} "
+            f"remote_rx={usrp['remote_usrp_rx_dir'] or '-'} "
+            f"iq_env={usrp['iq_board_sync']['board_validation_env']} "
+            f"missing={', '.join(usrp['missing_fields']) or 'none'}"
         ),
     ]
     for variant in VARIANTS:

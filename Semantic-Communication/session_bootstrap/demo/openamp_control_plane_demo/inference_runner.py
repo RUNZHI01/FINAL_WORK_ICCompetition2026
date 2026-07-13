@@ -27,7 +27,7 @@ SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from openamp_control_wrapper import jsonl_append, parse_response  # noqa: E402
+from openamp_control_wrapper import jsonl_append, parse_response, resolve_bash_executable  # noqa: E402
 from openamp_signed_manifest import load_signed_manifest_bundle, verify_signed_manifest_bundle  # noqa: E402
 
 REMOTE_RECONSTRUCTION_SCRIPT = (
@@ -48,6 +48,16 @@ RUNNER_SAMPLE_LATENCY_PATTERNS = (
     re.compile(r"batch\s+infer(?:ence)?\s+time.*?:\s*([0-9]+(?:\.[0-9]+)?)\s*s(?:ec(?:onds?)?)?", re.I),
 )
 RUNNER_LOG_TAIL_LINES = 40
+
+
+def bash_path(path: Path) -> str:
+    resolved = Path(path).resolve()
+    if os.name != "nt":
+        return str(resolved)
+    drive = resolved.drive.rstrip(":").lower()
+    if not drive:
+        return resolved.as_posix()
+    return f"/{drive}{resolved.as_posix()[2:]}"
 DEFAULT_HEARTBEAT_INTERVAL_SEC = 2.0
 DEFAULT_LIVE_CONTROL_HOOK_TIMEOUT_SEC = 30.0
 MIN_LIVE_CONTROL_HOOK_TIMEOUT_SEC = 5.0
@@ -87,6 +97,17 @@ def parse_json_stdout(raw: str) -> dict[str, Any]:
         if isinstance(payload, dict):
             return payload
     raise ValueError("runner produced no JSON payload")
+
+
+def runner_metrics_summary(summary: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(summary, dict):
+        return {}
+    payload = summary
+    for nested_key in ("inference_summary", "pipeline"):
+        nested = payload.get(nested_key) if isinstance(payload, dict) else None
+        if isinstance(nested, dict):
+            payload = nested
+    return payload if isinstance(payload, dict) else {}
 
 
 def now_iso() -> str:
@@ -578,8 +599,9 @@ def detect_current_live_slowdown(
     if variant != "current":
         return {}
 
+    metrics_summary = runner_metrics_summary(runner_summary)
     observed_run_median_ms = normalize_nonnegative_float(
-        runner_summary.get("run_median_ms") or runner_summary.get("run_mean_ms")
+        metrics_summary.get("run_median_ms") or metrics_summary.get("run_mean_ms")
     )
     if observed_run_median_ms is None:
         return {}
@@ -660,8 +682,9 @@ def build_completion_counts(
     expected_outputs: int | None = None,
 ) -> dict[str, Any]:
     summary = runner_summary or {}
+    metrics_summary = runner_metrics_summary(summary)
 
-    summary_processed = normalize_positive_int(summary.get("processed_count"))
+    summary_processed = normalize_positive_int(metrics_summary.get("processed_count"))
     if summary_processed is not None:
         completed_count = summary_processed
         count_source = "runner_summary.processed_count"
@@ -682,8 +705,8 @@ def build_completion_counts(
             count_source = "runner_log.missing"
 
     expected_count = (
-        normalize_positive_int(summary.get("input_count"))
-        or normalize_positive_int(summary.get("max_inputs"))
+        normalize_positive_int(metrics_summary.get("input_count"))
+        or normalize_positive_int(metrics_summary.get("max_inputs"))
         or normalize_positive_int(expected_outputs)
         or 0
     )
@@ -1263,8 +1286,8 @@ def configured_runner_command(access: BoardAccessConfig, variant: str) -> str:
 
 def default_runner_command(variant: str) -> str:
     if variant == "baseline":
-        return shlex.join(["bash", str(REMOTE_PYTORCH_REFERENCE_SCRIPT)])
-    return shlex.join(["bash", str(REMOTE_RECONSTRUCTION_SCRIPT), "--variant", variant])
+        return shlex.join(["bash", bash_path(REMOTE_PYTORCH_REFERENCE_SCRIPT)])
+    return shlex.join(["bash", bash_path(REMOTE_RECONSTRUCTION_SCRIPT), "--variant", variant])
 
 
 def _strip_runner_option(parts: list[str], flag: str) -> list[str]:
@@ -1305,7 +1328,7 @@ def _normalize_current_runner_command(command: str, *, max_inputs: int, seed: in
     if script_index is None or script_path is None:
         return ""
 
-    parts[script_index] = str(script_path)
+    parts[script_index] = bash_path(script_path)
     parts = _strip_runner_option(parts, "--max-inputs")
     parts = _strip_runner_option(parts, "--seed")
     parts.extend(["--max-inputs", str(max_inputs), "--seed", str(seed)])
@@ -1349,7 +1372,7 @@ def build_current_live_runner_command(*, max_inputs: int, seed: int) -> str:
     return shlex.join(
         [
             "bash",
-            str(REMOTE_RECONSTRUCTION_SCRIPT),
+            bash_path(REMOTE_RECONSTRUCTION_SCRIPT),
             "--variant",
             "current",
             "--max-inputs",
@@ -1369,7 +1392,7 @@ def build_baseline_live_runner_command(
     expected_sha256 = expected_sha_for_variant(access, "baseline")
     command = [
         "bash",
-        str(REMOTE_PYTORCH_REFERENCE_SCRIPT),
+        bash_path(REMOTE_PYTORCH_REFERENCE_SCRIPT),
         "--max-images",
         str(max_inputs),
         "--seed",
@@ -1437,7 +1460,7 @@ def missing_control_plane_fields(access: BoardAccessConfig, variant: str) -> lis
 def parse_runner_summary_from_log(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ValueError("runner log not found")
-    return parse_json_stdout(path.read_text(encoding="utf-8"))
+    return parse_json_stdout(path.read_text(encoding="utf-8", errors="replace"))
 
 
 def live_control_hook_timeout_sec(timeout_sec: float) -> float:
@@ -1720,7 +1743,7 @@ class LiveRemoteReconstructionJob:
         started_at = time.monotonic()
         try:
             result = subprocess.run(
-                ["bash", "-lc", hook_cmd],
+                [resolve_bash_executable(), "-lc", hook_cmd],
                 check=False,
                 input=json.dumps(event, ensure_ascii=False),
                 text=True,
@@ -2065,7 +2088,7 @@ def run_remote_reconstruction(
         }
 
     runner_cmd = build_runner_command(access, variant=variant, max_inputs=max_inputs, seed=seed)
-    command = ["bash", "-lc", runner_cmd]
+    command = [resolve_bash_executable(), "-lc", runner_cmd]
     env = access.build_subprocess_env()
     env["REMOTE_MODE"] = "ssh"
     env[DEMO_MODE_ENV] = "1"

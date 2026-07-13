@@ -13,6 +13,32 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNNER = PROJECT_ROOT / "session_bootstrap" / "scripts" / "run_remote_mnn_reconstruction.sh"
 
 
+def resolve_bash_executable() -> str:
+    env_bash = os.environ.get("GIT_BASH") or os.environ.get("BASH_EXE")
+    candidates: list[Path] = []
+    if env_bash:
+        candidates.append(Path(env_bash))
+    for raw_dir in os.environ.get("PATH", "").split(os.pathsep):
+        if raw_dir:
+            candidates.append(Path(raw_dir) / "bash.exe")
+    candidates.extend(
+        [
+            Path(r"E:\Software\Scoop\apps\git\current\bin\bash.exe"),
+            Path(r"E:\Software\Scoop\apps\git\current\usr\bin\bash.exe"),
+            Path(r"C:\Program Files\Git\bin\bash.exe"),
+            Path(r"C:\Program Files\Git\usr\bin\bash.exe"),
+        ]
+    )
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        normalized = str(candidate).lower()
+        if "\\windows\\system32\\" in normalized or "\\windowsapps\\" in normalized:
+            continue
+        return str(candidate)
+    return "bash"
+
+
 def parse_last_json(stdout: str) -> dict[str, object]:
     for raw in reversed(stdout.splitlines()):
         line = raw.strip()
@@ -104,7 +130,7 @@ class RunRemoteMnnReconstructionTest(unittest.TestCase):
 
             completed = subprocess.run(
                 [
-                    "bash",
+                    resolve_bash_executable(),
                     str(RUNNER),
                     "--variant",
                     "current",

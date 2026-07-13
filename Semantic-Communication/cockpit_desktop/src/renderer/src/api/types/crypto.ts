@@ -4,6 +4,8 @@
 
 export type CryptoChannelState = 'idle' | 'handshaking' | 'ready' | 'closed' | 'disabled'
 
+export type CryptoSecurityScope = 'disabled' | 'control_gate' | 'tcp_payload'
+
 export type BenchmarkMetric = {
   n: number
   min_ms: number
@@ -14,6 +16,7 @@ export type BenchmarkMetric = {
 }
 
 export type BatchBenchmark = {
+  [metric: string]: BenchmarkMetric | null | undefined
   handshake_ms?: BenchmarkMetric | null
   encrypt_ms?: BenchmarkMetric | null
   decrypt_ms?: BenchmarkMetric | null
@@ -23,6 +26,22 @@ export type BatchBenchmark = {
   decode_ms?: BenchmarkMetric | null
   merge_ms?: BenchmarkMetric | null
   other_wall_ms?: BenchmarkMetric | null
+}
+
+export type IqTailAudit = {
+  [metric: string]: number | string | null | undefined
+  record_count?: number
+  reference_ms?: number | null
+  over_reference_count?: number
+  total_gt_250ms_count?: number
+  total_gt_275ms_count?: number
+  total_gt_500ms_count?: number
+  rx_control_overhead_gt_50ms_count?: number
+  server_capture_gt_100ms_count?: number
+  decode_gt_160ms_count?: number
+  worker_over_reported_gt_80ms_count?: number
+  write_gt_100ms_count?: number
+  soft_completed_count?: number
 }
 
 export type BatchStageProgress = {
@@ -92,6 +111,20 @@ export type CryptoStatusResponse = {
   enabled: boolean
   /** Whether board credentials have been entered */
   board_configured: boolean
+  /** Effective protection scope of the current secure-channel configuration */
+  security_scope?: CryptoSecurityScope
+  /** Presentation label for the effective protection scope */
+  security_scope_label?: string
+  /** Operator note explaining what the secure channel does and does not cover */
+  security_scope_note?: string
+  /** Whether the control/authentication plane is protected by the secure-channel gate */
+  control_plane_protected?: boolean
+  /** Whether the selected data plane is protected by ML-KEM/SM4 */
+  data_plane_encrypted?: boolean
+  /** Whether TCP payloads are protected by ML-KEM/SM4 */
+  tcp_payload_encrypted?: boolean
+  /** Whether USRP IQ payloads are protected by ML-KEM/SM4 */
+  usrp_payload_encrypted?: boolean
   /** Control-plane guard state snapshot from latest OpenAMP status */
   control_guard_state?: string
   /** Control-plane last fault snapshot */
@@ -134,6 +167,10 @@ export type CryptoStatusResponse = {
   batch_transport_benchmark?: BatchBenchmark | null
   /** Pure board-side TVM/MNN reconstruction benchmark */
   batch_inference_benchmark?: BatchBenchmark | null
+  /** IQ direct detailed transport stage benchmark */
+  batch_iq_stage_benchmark?: BatchBenchmark | null
+  /** IQ direct transport tail classifier from batch_spool_summary.json */
+  batch_iq_tail_audit?: IqTailAudit | null
   /** Batch inference run status: 'running' | 'done' | null */
   batch_status?: string | null
   /** Number of completed images in current/last batch */
@@ -174,6 +211,8 @@ export type BatchStateResponse = {
   benchmark?: BatchBenchmark | null
   transport_benchmark?: BatchBenchmark | null
   inference_benchmark?: BatchBenchmark | null
+  iq_stage_benchmark?: BatchBenchmark | null
+  iq_tail_audit?: IqTailAudit | null
   host_preprocess_progress?: BatchStageProgress | null
   transport_progress?: BatchStageProgress | null
   inference_progress?: BatchStageProgress | null

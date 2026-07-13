@@ -45,13 +45,47 @@ RUN sed -i \
         libxkbcommon0 \
         libxrandr2 \
         libxss1 \
+        libboost-all-dev \
+        libncurses-dev \
+        libusb-1.0-0-dev \
         openssh-client \
+        pkg-config \
         python3 \
+        python3-mako \
+        python3-numpy \
         python3-venv \
         sshpass \
         xauth \
         xvfb \
     && rm -rf /var/lib/apt/lists/*
+
+# Build UHD 4.6.0.0 host (no FPGA images, no tests/examples/docs) — matches board's UHD 4.6.0
+ARG UHD_VERSION=4.6.0.0
+RUN curl -fsSL "https://files.ettus.com/binaries/uhd/uhd_004.006.000.000-release/${UHD_VERSION}/uhd_${UHD_VERSION}-release.tar.gz" \
+        -o /tmp/uhd.tar.gz \
+    && mkdir -p /tmp/uhd \
+    && tar -xzf /tmp/uhd.tar.gz -C /tmp/uhd --strip-components=1 \
+    && cmake -S /tmp/uhd/host -B /tmp/uhd/host/build \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_TESTS=OFF \
+        -DENABLE_EXAMPLES=OFF \
+        -DENABLE_UTILS=ON \
+        -DENABLE_MAN_PAGES=OFF \
+        -DENABLE_MANUAL=OFF \
+        -DENABLE_DPDK=OFF \
+        -DENABLE_LIBERIO=OFF \
+        -DENABLE_NVDEVICE=OFF \
+        -DENABLE_MPM=OFF \
+        -DENABLE_PYTHON_API=OFF \
+    && cmake --build /tmp/uhd/host/build --parallel "$(nproc)" \
+    && cmake --install /tmp/uhd/host/build \
+    && ldconfig \
+    && rm -rf /tmp/uhd /tmp/uhd.tar.gz \
+    && /usr/local/bin/uhd_config_info --version > /etc/uhd-version.txt
+
+# Surface uhd.pc to pkg-config (UHD installs to /usr/local, default search path doesn't include it)
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/share/pkgconfig
 
 RUN install -d -m 0755 /etc/apt/keyrings \
     && curl -fsSL "${NODESOURCE_BASE}/gpgkey/nodesource-repo.gpg.key" \
@@ -103,6 +137,12 @@ COPY docker /workspace/docker
 COPY mlkem_link /workspace/mlkem_link
 COPY scripts /workspace/scripts
 COPY Semantic-Communication /workspace/Semantic-Communication
+COPY USRP292x /workspace/USRP292x
+
+RUN cd /workspace/USRP292x \
+    && rm -rf __pycache__ analog_latent_runs \
+    && bash BuildOtaTools.sh \
+    && rm -rf /workspace/USRP292x/*.o
 
 RUN ln -sfn /opt/iccomp-venv /workspace/.venv \
     && ln -sfn /opt/liboqs /workspace/liboqs-dist \

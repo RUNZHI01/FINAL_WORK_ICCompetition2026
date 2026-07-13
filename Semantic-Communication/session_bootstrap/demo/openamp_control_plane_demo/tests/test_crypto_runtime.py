@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -249,7 +250,7 @@ class CryptoRuntimeTest(unittest.TestCase):
                     local_server_script=local_server_script,
                 )
 
-        self.assertIn("~/tcp_server.py", command)
+        self.assertIn("/home/user/tcp_server.py", command)
         self.assertNotIn("/home/user/tvm_metaschedule_execution_project/scripts/tcp_server.py", command)
 
     def test_run_ssh_command_falls_back_to_askpass_when_sshpass_missing(self) -> None:
@@ -288,6 +289,120 @@ class CryptoRuntimeTest(unittest.TestCase):
         self.assertIn("demo-pass", str(captured["askpass_body"]))
         self.assertEqual(captured["env"]["SSH_ASKPASS_REQUIRE"], "force")
         self.assertFalse(Path(str(captured["env"]["SSH_ASKPASS"])).exists())
+
+    def test_run_ssh_command_uses_utf8_replacement_decoding(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured.update(kwargs)
+            return subprocess.CompletedProcess(args[0], 0, stdout="ok\n", stderr="")
+
+        with patch("crypto_runtime.subprocess.run", side_effect=fake_run):
+            crypto_runtime.run_ssh_command(
+                host="demo-board",
+                user="demo-user",
+                password="",
+                port="22",
+                remote_command="echo ready",
+                timeout=5,
+            )
+
+        self.assertIs(captured["text"], True)
+        self.assertEqual(captured["encoding"], "utf-8")
+        self.assertEqual(captured["errors"], "replace")
+        self.assertEqual(captured["env"]["MSYS2_ARG_CONV_EXCL"], "*")
+
+    def test_run_ssh_command_uses_docker_runner_when_requested(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured["command"] = args[0]
+            captured["env"] = kwargs["env"]
+            return subprocess.CompletedProcess(args[0], 0, stdout="ok\n", stderr="")
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OPENAMP_SSH_RUNNER": "docker",
+                    "OPENAMP_SSH_DOCKER_IMAGE": "demo-ssh-image:latest",
+                },
+            ),
+            patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"),
+            patch("crypto_runtime.subprocess.run", side_effect=fake_run),
+        ):
+            crypto_runtime.run_ssh_command(
+                host="demo-board",
+                user="demo-user",
+                password="demo-pass",
+                port="22",
+                remote_command="echo ready",
+                timeout=5,
+            )
+
+        command = captured["command"]
+        self.assertEqual(command[:5], ["docker", "run", "--rm", "-e", "SSHPASS"])
+        self.assertIn("demo-ssh-image:latest", command)
+        self.assertIn("sshpass", command)
+        self.assertIn("ssh", command)
+        self.assertEqual(captured["env"]["SSHPASS"], "demo-pass")
+
+    def test_run_scp_file_uses_docker_runner_when_requested(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            captured["command"] = args[0]
+            captured["env"] = kwargs["env"]
+            return subprocess.CompletedProcess(args[0], 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_file = Path(temp_dir) / "payload.txt"
+            local_file.write_text("payload", encoding="utf-8")
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "OPENAMP_SSH_RUNNER": "docker",
+                        "OPENAMP_SSH_DOCKER_IMAGE": "demo-ssh-image:latest",
+                    },
+                ),
+                patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"),
+                patch("crypto_runtime.subprocess.run", side_effect=fake_run),
+            ):
+                crypto_runtime.run_scp_file(
+                    host="demo-board",
+                    user="demo-user",
+                    password="demo-pass",
+                    port="22",
+                    local_path=local_file,
+                    remote_path="/tmp/payload.txt",
+                    timeout=5,
+                )
+
+        command = captured["command"]
+        self.assertEqual(command[:5], ["docker", "run", "--rm", "-e", "SSHPASS"])
+        self.assertIn("demo-ssh-image:latest", command)
+        self.assertIn("scp", command)
+        self.assertIn("/upload/payload.txt", command)
+        self.assertIn("/tmp/payload.txt", command[-1])
+        self.assertEqual(captured["env"]["SSHPASS"], "demo-pass")
+
+    def test_resolve_local_oqs_install_discovers_nested_liboqs_dist(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            current_repo = temp_root / "Semantic-Communication"
+            nested_oqs = current_repo / "liboqs" / "liboqs-dist"
+            (current_repo / "session_bootstrap").mkdir(parents=True)
+            nested_oqs.mkdir(parents=True)
+
+            with (
+                patch.object(crypto_runtime, "PROJECT_ROOT", current_repo),
+                patch.object(crypto_runtime.Path, "cwd", return_value=current_repo),
+            ):
+                resolved, searched = crypto_runtime.resolve_local_oqs_install({})
+
+        self.assertEqual(resolved, nested_oqs.resolve())
+        self.assertIn(nested_oqs.resolve(), searched)
 
     def test_build_local_crypto_client_command_uses_detected_oqs_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -351,7 +466,120 @@ class CryptoRuntimeTest(unittest.TestCase):
         self.assertEqual(command[1], str(client_script))
         self.assertEqual(env["TONGSUO_KEM_BRIDGE"], str(bridge_path.resolve()))
         self.assertTrue(env["LD_LIBRARY_PATH"].startswith(str(bridge_path.parent.resolve())))
-        self.assertTrue(env["PYTHONPATH"].split(":")[0] == str(sibling_repo.resolve()))
+        self.assertEqual(env["PYTHONPATH"].split(os.pathsep)[0], str(sibling_repo.resolve()))
+
+    def test_build_local_crypto_client_command_uses_docker_runner_and_maps_paths(self) -> None:
+        env_values = {
+            "MLKEM_LOCAL_CLIENT_RUNNER": "docker",
+            "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE": "demo-crypto-image:latest",
+            "MLKEM_AUTH_ENABLED": "1",
+            "MLKEM_AUTH_SIG_POLICY": "DUAL_REQUIRED",
+            "MLKEM_AUTH_PEER_SM2_PUB": r"E:\repo\keys\server_sm2_identity.pub",
+            "MLKEM_AUTH_PEER_MLDSA_PUB": r"E:\repo\keys\server_mldsa_identity.pub",
+            "MLKEM_PORT": "9527",
+        }
+
+        with patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"):
+            command, env = crypto_runtime.build_local_crypto_client_command(
+                env_values,
+                host="100.121.87.73",
+                input_path=Path(r"C:\Users\demo\AppData\Local\Temp\sample.bin"),
+                client_script=Path(r"E:\repo\Semantic-Communication\scripts\tcp_client.py"),
+            )
+
+        self.assertEqual(command[:3], ["docker", "run", "--rm"])
+        self.assertIn(r"C:\:/host/c", command)
+        self.assertIn(r"E:\:/host/e", command)
+        self.assertIn("demo-crypto-image:latest", command)
+        self.assertIn("/opt/iccomp-venv/bin/python", command)
+        self.assertIn("/workspace/Semantic-Communication/scripts/tcp_client.py", command)
+        self.assertIn("/host/c/Users/demo/AppData/Local/Temp/sample.bin", command)
+        self.assertIn("MLKEM_AUTH_PEER_SM2_PUB=/host/e/repo/keys/server_sm2_identity.pub", command)
+        self.assertIn("MLKEM_AUTH_PEER_MLDSA_PUB=/host/e/repo/keys/server_mldsa_identity.pub", command)
+        self.assertIn("OQS_INSTALL_PATH=/workspace/liboqs-dist", command)
+        self.assertIn("TONGSUO_SIG_BRIDGE=/workspace/artifacts/crypto/libtongsuo_sig_bridge.so", command)
+        self.assertIn("LD_LIBRARY_PATH=/workspace/liboqs-dist/lib:/workspace/artifacts/crypto", command)
+        self.assertIn("PATH=/opt/iccomp-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", command)
+        self.assertIn("PYTHONUNBUFFERED=1", command)
+        self.assertIn("PYTHONIOENCODING=utf-8", command)
+        self.assertIn("PYTHONUTF8=1", command)
+        self.assertIn("--port", command)
+        self.assertIn("9527", command)
+        self.assertIsInstance(env, dict)
+
+    def test_build_local_crypto_daemon_command_uses_docker_runner_and_mounts_temp_drive(self) -> None:
+        env_values = {
+            "MLKEM_LOCAL_CLIENT_RUNNER": "docker",
+            "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE": "demo-crypto-image:latest",
+        }
+
+        with (
+            patch.dict(os.environ, {"TEMP": r"C:\Users\demo\AppData\Local\Temp"}, clear=False),
+            patch("crypto_runtime.shutil.which", return_value="/usr/bin/docker"),
+        ):
+            command, _env = crypto_runtime.build_local_crypto_daemon_command(
+                env_values,
+                host="100.121.87.73",
+                client_script=Path(r"E:\repo\Semantic-Communication\scripts\tcp_client.py"),
+            )
+
+        self.assertEqual(command[:4], ["docker", "run", "--rm", "-i"])
+        self.assertIn(r"C:\:/host/c", command)
+        self.assertIn(r"E:\:/host/e", command)
+        self.assertIn("demo-crypto-image:latest", command)
+        self.assertIn("--daemon", command)
+
+    def test_mlkem_session_manager_maps_input_path_for_docker_daemon(self) -> None:
+        manager = crypto_runtime.MlkemSessionManager(
+            {"MLKEM_LOCAL_CLIENT_RUNNER": "docker"},
+            "100.121.87.73",
+            Path(r"E:\repo\Semantic-Communication\scripts\tcp_client.py"),
+        )
+        manager._proc = SimpleNamespace(poll=lambda: None)
+        manager._alive = True
+        captured: list[dict[str, object]] = []
+
+        def fake_stdin_write(data: str) -> None:
+            captured.append(json.loads(data))
+
+        manager._stdin_write = fake_stdin_write  # type: ignore[method-assign]
+        manager._read_line = lambda timeout: '{"status":"ok","encrypt_ms":0.5}'  # type: ignore[method-assign]
+
+        result = manager.send_image(Path(r"C:\Users\demo\AppData\Local\Temp\sample.bin"), "job-001")
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured[0]["input"], "/host/c/Users/demo/AppData/Local/Temp/sample.bin")
+
+    def test_mlkem_session_manager_reads_daemon_ready_from_non_selectable_pipe(self) -> None:
+        manager = crypto_runtime.MlkemSessionManager({}, "127.0.0.1", Path("/tmp/tcp_client.py"))
+
+        class FakeStdout:
+            def __init__(self) -> None:
+                self._lines = iter(['{"status":"ready","handshake_ms":12.5}\n', ""])
+
+            def readline(self) -> str:
+                return next(self._lines)
+
+        class FakeProc:
+            def __init__(self) -> None:
+                self.stdin = io.StringIO()
+                self.stdout = FakeStdout()
+                self.stderr = io.StringIO()
+
+            def poll(self) -> None:
+                return None
+
+        with (
+            patch(
+                "crypto_runtime.build_local_crypto_daemon_command",
+                return_value=(["fake-python", "tcp_client.py", "--daemon"], {}),
+            ),
+            patch("crypto_runtime.subprocess.Popen", return_value=FakeProc()),
+        ):
+            manager.ensure_alive()
+
+        self.assertTrue(manager.is_alive)
+        self.assertEqual(manager._handshake_ms, 12.5)
 
     def test_repo_tcp_client_supports_batch_summary_mode(self) -> None:
         client_script = DEMO_ROOT.parents[2] / "scripts" / "tcp_client.py"
@@ -366,10 +594,14 @@ class CryptoRuntimeTest(unittest.TestCase):
 
     def test_repo_tcp_client_infers_modern_bin_shape_from_size(self) -> None:
         tcp_client = self._load_repo_tcp_client_module()
-        with tempfile.NamedTemporaryFile(suffix=".bin") as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
             tmp.write(b"\0" * (1 * 32 * 32 * 32 * 4))
             tmp.flush()
-            raw, info = tcp_client.load_latent(tmp.name)
+            tmp_path = tmp.name
+        try:
+            raw, info = tcp_client.load_latent(tmp_path)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
         self.assertEqual(len(raw), 1 * 32 * 32 * 32 * 4)
         self.assertEqual(info["shape"], [1, 32, 32, 32])
@@ -377,10 +609,14 @@ class CryptoRuntimeTest(unittest.TestCase):
 
     def test_repo_tcp_client_infers_legacy_bin_shape_from_size(self) -> None:
         tcp_client = self._load_repo_tcp_client_module()
-        with tempfile.NamedTemporaryFile(suffix=".bin") as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
             tmp.write(b"\0" * (1 * 3 * 64 * 64 * 4))
             tmp.flush()
-            raw, info = tcp_client.load_latent(tmp.name)
+            tmp_path = tmp.name
+        try:
+            raw, info = tcp_client.load_latent(tmp_path)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
         self.assertEqual(len(raw), 1 * 3 * 64 * 64 * 4)
         self.assertEqual(info["shape"], [1, 3, 64, 64])

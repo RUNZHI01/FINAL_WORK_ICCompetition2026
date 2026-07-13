@@ -40,6 +40,8 @@ struct Options {
     double setup = 0.5;
     std::size_t channel = 0;
     int port = 29220;
+    int arm_wait_ms = 2000;
+    int stop_wait_ms = 8000;
 };
 
 struct Snapshot {
@@ -50,11 +52,18 @@ struct Snapshot {
     std::uint64_t job_id = 0;
     std::string file;
     std::string error;
+    std::string phase = "idle";
     std::size_t target_samps = 0;
     std::size_t written_samps = 0;
     std::size_t timeouts = 0;
     std::size_t overflows = 0;
     double wall_sec = 0.0;
+    double arm_wait_sec = 0.0;
+    double drain_sec = 0.0;
+    double stream_cmd_sec = 0.0;
+    double receive_sec = 0.0;
+    double stop_cmd_sec = 0.0;
+    double stop_wait_sec = 0.0;
 };
 
 void print_usage(const char* argv0)
@@ -71,7 +80,9 @@ void print_usage(const char* argv0)
         << "  --channel <index>         default 0\n"
         << "  --wirefmt <fmt>           default sc16\n"
         << "  --bw <Hz>                 optional analog bandwidth\n"
-        << "  --setup <sec>             default 0.5\n";
+        << "  --setup <sec>             default 0.5\n"
+        << "  --arm-wait-ms <ms>        CAPTURE wait for RX started before reply; default 2000\n"
+        << "  --stop-wait-ms <ms>       STOP wait for capture worker before reply; default 8000\n";
 }
 
 std::string next_arg(int& i, int argc, char** argv)
@@ -113,12 +124,22 @@ Options parse_args(int argc, char** argv)
             opts.bw = std::stod(next_arg(i, argc, argv));
         } else if (key == "--setup") {
             opts.setup = std::stod(next_arg(i, argc, argv));
+        } else if (key == "--arm-wait-ms") {
+            opts.arm_wait_ms = std::stoi(next_arg(i, argc, argv));
+        } else if (key == "--stop-wait-ms") {
+            opts.stop_wait_ms = std::stoi(next_arg(i, argc, argv));
         } else {
             throw std::runtime_error("unknown option: " + key);
         }
     }
     if (opts.port <= 0 || opts.port > 65535) {
         throw std::runtime_error("invalid TCP port");
+    }
+    if (opts.arm_wait_ms < 0) {
+        throw std::runtime_error("invalid --arm-wait-ms");
+    }
+    if (opts.stop_wait_ms < 0) {
+        throw std::runtime_error("invalid --stop-wait-ms");
     }
     return opts;
 }
@@ -150,6 +171,15 @@ std::string command_name(const std::string& line)
     return name;
 }
 
+std::uint64_t optional_job_id(const std::map<std::string, std::string>& kv)
+{
+    const auto it = kv.find("job_id");
+    if (it == kv.end() || it->second.empty()) {
+        return 0;
+    }
+    return static_cast<std::uint64_t>(std::stoull(it->second));
+}
+
 std::string sanitize_value(std::string value)
 {
     for (auto& ch : value) {
@@ -169,12 +199,19 @@ std::string format_snapshot(const std::string& prefix, const Snapshot& s)
         << " done=" << (s.done ? 1 : 0)
         << " ok=" << (s.ok ? 1 : 0)
         << " job_id=" << s.job_id
+        << " phase=" << sanitize_value(s.phase)
         << " file=" << sanitize_value(s.file)
         << " target_samps=" << s.target_samps
         << " written_samps=" << s.written_samps
         << " timeouts=" << s.timeouts
         << " overflows=" << s.overflows
-        << " wall_sec=" << s.wall_sec;
+        << " wall_sec=" << s.wall_sec
+        << " arm_wait_sec=" << s.arm_wait_sec
+        << " drain_sec=" << s.drain_sec
+        << " stream_cmd_sec=" << s.stream_cmd_sec
+        << " receive_sec=" << s.receive_sec
+        << " stop_cmd_sec=" << s.stop_cmd_sec
+        << " stop_wait_sec=" << s.stop_wait_sec;
     if (!s.error.empty()) {
         oss << " error=" << sanitize_value(s.error);
     }
@@ -270,31 +307,48 @@ public:
             state_.busy = true;
             state_.ok = true;
             state_.job_id = ++job_counter_;
+            state_.phase = "queued";
             state_.file = file;
             state_.target_samps = total_samps;
         }
 
         worker_ = std::thread(&PersistentRx::capture_loop, this, file, total_samps, job_counter_);
+        const auto arm_wait_start = std::chrono::steady_clock::now();
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait_for(lock, std::chrono::seconds(2), [this]() {
+            cv_.wait_for(lock, std::chrono::milliseconds(opts_.arm_wait_ms), [this]() {
                 return state_.started || state_.done;
             });
+            state_.arm_wait_sec = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - arm_wait_start).count();
             return state_;
         }
     }
 
     Snapshot wait_done(double timeout_sec)
     {
+        return wait_done(timeout_sec, 0);
+    }
+
+    Snapshot wait_done(double timeout_sec, std::uint64_t expected_job_id)
+    {
         std::unique_lock<std::mutex> lock(mutex_);
+        if (!job_id_matches_locked(expected_job_id)) {
+            return job_id_mismatch_snapshot_locked(expected_job_id);
+        }
         if (timeout_sec <= 0.0) {
-            cv_.wait(lock, [this]() { return !state_.busy; });
+            cv_.wait(lock, [this, expected_job_id]() {
+                return !state_.busy || !job_id_matches_locked(expected_job_id);
+            });
         } else {
-            cv_.wait_for(lock, std::chrono::duration<double>(timeout_sec), [this]() {
-                return !state_.busy;
+            cv_.wait_for(lock, std::chrono::duration<double>(timeout_sec), [this, expected_job_id]() {
+                return !state_.busy || !job_id_matches_locked(expected_job_id);
             });
         }
         Snapshot snap = state_;
+        if (!job_id_matches_snapshot(snap, expected_job_id)) {
+            snap = job_id_mismatch_snapshot(snap, expected_job_id);
+        }
         lock.unlock();
         join_finished();
         return snap;
@@ -302,7 +356,15 @@ public:
 
     Snapshot status()
     {
+        return status(0);
+    }
+
+    Snapshot status(std::uint64_t expected_job_id)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!job_id_matches_locked(expected_job_id)) {
+            return job_id_mismatch_snapshot_locked(expected_job_id);
+        }
         return state_;
     }
 
@@ -312,9 +374,60 @@ public:
         return status();
     }
 
+    Snapshot stop_and_wait(double timeout_sec)
+    {
+        return stop_and_wait(timeout_sec, 0);
+    }
+
+    Snapshot stop_and_wait(double timeout_sec, std::uint64_t expected_job_id)
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (!job_id_matches_locked(expected_job_id)) {
+                return job_id_mismatch_snapshot_locked(expected_job_id);
+            }
+        }
+        stop_requested_.store(true);
+        const auto stop_wait_start = std::chrono::steady_clock::now();
+        Snapshot snap = wait_done(timeout_sec, expected_job_id);
+        snap.stop_wait_sec = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - stop_wait_start).count();
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (state_.job_id == snap.job_id) {
+                state_.stop_wait_sec = snap.stop_wait_sec;
+                snap = state_;
+            }
+        }
+        return snap;
+    }
+
     double actual_rate() const { return actual_rate_; }
 
 private:
+    static bool job_id_matches_snapshot(const Snapshot& snap, std::uint64_t expected_job_id)
+    {
+        return expected_job_id == 0 || snap.job_id == expected_job_id;
+    }
+
+    bool job_id_matches_locked(std::uint64_t expected_job_id) const
+    {
+        return job_id_matches_snapshot(state_, expected_job_id);
+    }
+
+    static Snapshot job_id_mismatch_snapshot(Snapshot snap, std::uint64_t expected_job_id)
+    {
+        (void)expected_job_id;
+        snap.ok = false;
+        snap.error = "job_id_mismatch";
+        return snap;
+    }
+
+    Snapshot job_id_mismatch_snapshot_locked(std::uint64_t expected_job_id) const
+    {
+        return job_id_mismatch_snapshot(state_, expected_job_id);
+    }
+
     void join_finished()
     {
         if (!worker_.joinable()) {
@@ -336,14 +449,30 @@ private:
         std::size_t overflows = 0;
         bool ok = true;
         std::string error;
+        double drain_sec = 0.0;
+        double stream_cmd_sec = 0.0;
+        double receive_sec = 0.0;
+        double stop_cmd_sec = 0.0;
         const auto t0 = std::chrono::steady_clock::now();
 
         try {
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (state_.job_id == job_id) {
+                    state_.phase = "prepare";
+                }
+            }
             const auto parent = std::filesystem::path(file).parent_path();
             if (!parent.empty()) {
                 std::filesystem::create_directories(parent);
             }
 
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (state_.job_id == job_id) {
+                    state_.phase = "open_file";
+                }
+            }
             std::ofstream out(file, std::ios::binary);
             if (!out) {
                 throw std::runtime_error("failed to open output file: " + file);
@@ -352,64 +481,99 @@ private:
             auto& rx_stream = rx_stream_;
             // Drain any residual samples from a previous capture.
             {
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (state_.job_id == job_id) {
+                        state_.phase = "drain";
+                    }
+                }
+                const auto drain_start = std::chrono::steady_clock::now();
                 std::vector<std::complex<std::int16_t>> drain_buf(rx_stream->get_max_num_samps());
                 uhd::rx_metadata_t drain_md;
-                while (true) {
-                    std::size_t got = rx_stream->recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.01);
+                const auto drain_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+                while (!stop_requested_.load() && std::chrono::steady_clock::now() < drain_deadline) {
+                    std::size_t got = rx_stream->recv(&drain_buf.front(), drain_buf.size(), drain_md, 0.001);
                     if (got == 0) break;
                 }
-            }
-            std::vector<std::complex<std::int16_t>> buff(rx_stream->get_max_num_samps());
-            uhd::rx_metadata_t md;
-            uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
-            cmd.num_samps = total_samps;
-            cmd.stream_now = true;
-            rx_stream->issue_stream_cmd(cmd);
-
-            {
+                drain_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - drain_start).count();
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (state_.job_id == job_id) {
-                    state_.started = true;
+                    state_.drain_sec = drain_sec;
                 }
             }
-            cv_.notify_all();
 
-            const auto deadline = t0 + std::chrono::seconds(30);
-            while (written < total_samps && !stop_requested_.load()) {
-                if (std::chrono::steady_clock::now() > deadline) {
-                    throw std::runtime_error("RX capture deadline exceeded");
-                }
-                const std::size_t want = std::min<std::size_t>(buff.size(), total_samps - written);
-                const std::size_t got = rx_stream->recv(&buff.front(), want, md, 0.2, false);
-
-                if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-                    ++timeouts;
+            if (!stop_requested_.load()) {
+                std::vector<std::complex<std::int16_t>> buff(rx_stream->get_max_num_samps());
+                uhd::rx_metadata_t md;
+                uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
+                cmd.num_samps = total_samps;
+                cmd.stream_now = true;
+                const auto stream_cmd_start = std::chrono::steady_clock::now();
+                {
                     std::lock_guard<std::mutex> lock(mutex_);
                     if (state_.job_id == job_id) {
+                        state_.phase = "stream_cmd";
+                    }
+                }
+                rx_stream->issue_stream_cmd(cmd);
+                stream_cmd_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - stream_cmd_start).count();
+                const auto receive_start = std::chrono::steady_clock::now();
+
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (state_.job_id == job_id) {
+                        state_.stream_cmd_sec = stream_cmd_sec;
+                        state_.receive_sec = 0.0;
+                        state_.started = true;
+                        state_.phase = "receiving";
+                    }
+                }
+                cv_.notify_all();
+
+                const auto deadline = t0 + std::chrono::seconds(30);
+                while (written < total_samps && !stop_requested_.load()) {
+                    if (std::chrono::steady_clock::now() > deadline) {
+                        throw std::runtime_error("RX capture deadline exceeded");
+                    }
+                    const std::size_t want = std::min<std::size_t>(buff.size(), total_samps - written);
+                    const std::size_t got = rx_stream->recv(&buff.front(), want, md, 0.2, false);
+                    receive_sec = std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() - receive_start).count();
+
+                    if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+                        ++timeouts;
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (state_.job_id == job_id) {
+                            state_.timeouts = timeouts;
+                            state_.receive_sec = receive_sec;
+                        }
+                        continue;
+                    }
+                    if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+                        ++overflows;
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (state_.job_id == job_id) {
+                            state_.overflows = overflows;
+                            state_.receive_sec = receive_sec;
+                        }
+                        continue;
+                    }
+                    if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+                        throw std::runtime_error("RX metadata error: " + md.strerror());
+                    }
+                    out.write(reinterpret_cast<const char*>(buff.data()),
+                        static_cast<std::streamsize>(got * sizeof(buff.front())));
+                    written += got;
+
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (state_.job_id == job_id) {
+                        state_.written_samps = written;
                         state_.timeouts = timeouts;
-                    }
-                    continue;
-                }
-                if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
-                    ++overflows;
-                    std::lock_guard<std::mutex> lock(mutex_);
-                    if (state_.job_id == job_id) {
                         state_.overflows = overflows;
+                        state_.receive_sec = receive_sec;
                     }
-                    continue;
-                }
-                if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
-                    throw std::runtime_error("RX metadata error: " + md.strerror());
-                }
-                out.write(reinterpret_cast<const char*>(buff.data()),
-                    static_cast<std::streamsize>(got * sizeof(buff.front())));
-                written += got;
-
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (state_.job_id == job_id) {
-                    state_.written_samps = written;
-                    state_.timeouts = timeouts;
-                    state_.overflows = overflows;
                 }
             }
             out.close();
@@ -425,9 +589,22 @@ private:
 
         if (stop_requested_.load()) {
             try {
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (state_.job_id == job_id) {
+                        state_.phase = "stopping";
+                    }
+                }
                 uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+                const auto stop_cmd_start = std::chrono::steady_clock::now();
                 rx_stream_->issue_stream_cmd(stop_cmd);
+                stop_cmd_sec = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - stop_cmd_start).count();
             } catch (...) {
+            }
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (state_.job_id == job_id) {
+                state_.stop_cmd_sec = stop_cmd_sec;
             }
         }
 
@@ -443,6 +620,11 @@ private:
                 state_.timeouts = timeouts;
                 state_.overflows = overflows;
                 state_.wall_sec = wall;
+                state_.drain_sec = drain_sec;
+                state_.stream_cmd_sec = stream_cmd_sec;
+                state_.receive_sec = receive_sec;
+                state_.stop_cmd_sec = stop_cmd_sec;
+                state_.phase = "done";
                 state_.error = error;
             }
         }
@@ -557,43 +739,57 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            try {
-                const std::string line = read_line(client);
-                const std::string cmd = command_name(line);
-                const auto kv = parse_kv(line);
-
-                if (cmd == "PING") {
-                    send_line(client, "OK pong=1");
-                } else if (cmd == "STATUS") {
-                    send_line(client, format_snapshot("OK", rx.status()));
-                } else if (cmd == "CAPTURE") {
-                    const auto file_it = kv.find("file");
-                    if (file_it == kv.end() || file_it->second.empty()) {
-                        throw std::runtime_error("CAPTURE requires file=<path>");
+            bool keep_client = true;
+            while (running && keep_client) {
+                try {
+                    const std::string line = read_line(client);
+                    if (line.empty()) {
+                        break;
                     }
-                    const double duration = kv.count("duration") ? std::stod(kv.at("duration")) : 0.0;
-                    const std::size_t nsamps = kv.count("nsamps")
-                        ? static_cast<std::size_t>(std::stoull(kv.at("nsamps")))
-                        : 0;
-                    const Snapshot snap = rx.start_capture(file_it->second, duration, nsamps);
-                    send_line(client, format_snapshot((snap.done && !snap.ok) ? "ERR" : "OK", snap));
-                } else if (cmd == "WAIT") {
-                    const double timeout = kv.count("timeout") ? std::stod(kv.at("timeout")) : 0.0;
-                    const Snapshot snap = rx.wait_done(timeout);
-                    send_line(client, format_snapshot((snap.busy || !snap.ok) ? "ERR" : "OK", snap));
-                } else if (cmd == "STOP") {
-                    const Snapshot snap = rx.stop();
-                    send_line(client, format_snapshot("OK", snap));
-                } else if (cmd == "QUIT") {
-                    rx.stop();
-                    rx.wait_done(5.0);
-                    send_line(client, "OK bye=1");
-                    running = false;
-                } else {
-                    throw std::runtime_error("unknown command: " + cmd);
+                    const std::string cmd = command_name(line);
+                    const auto kv = parse_kv(line);
+
+                    if (cmd == "PING") {
+                        send_line(client, "OK pong=1");
+                    } else if (cmd == "STATUS") {
+                        const std::uint64_t job_id = optional_job_id(kv);
+                        const Snapshot snap = rx.status(job_id);
+                        send_line(client, format_snapshot((!snap.ok && snap.error == "job_id_mismatch") ? "ERR" : "OK", snap));
+                    } else if (cmd == "CAPTURE") {
+                        const auto file_it = kv.find("file");
+                        if (file_it == kv.end() || file_it->second.empty()) {
+                            throw std::runtime_error("CAPTURE requires file=<path>");
+                        }
+                        const double duration = kv.count("duration") ? std::stod(kv.at("duration")) : 0.0;
+                        const std::size_t nsamps = kv.count("nsamps")
+                            ? static_cast<std::size_t>(std::stoull(kv.at("nsamps")))
+                            : 0;
+                        const Snapshot snap = rx.start_capture(file_it->second, duration, nsamps);
+                        send_line(client, format_snapshot((snap.done && !snap.ok) ? "ERR" : "OK", snap));
+                    } else if (cmd == "WAIT") {
+                        const double timeout = kv.count("timeout") ? std::stod(kv.at("timeout")) : 0.0;
+                        const std::uint64_t job_id = optional_job_id(kv);
+                        const Snapshot snap = rx.wait_done(timeout, job_id);
+                        send_line(client, format_snapshot((snap.busy || !snap.ok) ? "ERR" : "OK", snap));
+                    } else if (cmd == "STOP") {
+                        const double timeout = kv.count("timeout")
+                            ? std::stod(kv.at("timeout"))
+                            : static_cast<double>(opts.stop_wait_ms) / 1000.0;
+                        const std::uint64_t job_id = optional_job_id(kv);
+                        const Snapshot snap = rx.stop_and_wait(timeout, job_id);
+                        send_line(client, format_snapshot((!snap.ok && snap.error == "job_id_mismatch") ? "ERR" : "OK", snap));
+                    } else if (cmd == "QUIT") {
+                        rx.stop();
+                        rx.wait_done(5.0);
+                        send_line(client, "OK bye=1");
+                        running = false;
+                        keep_client = false;
+                    } else {
+                        throw std::runtime_error("unknown command: " + cmd);
+                    }
+                } catch (const std::exception& ex) {
+                    send_line(client, std::string("ERR error=") + sanitize_value(ex.what()));
                 }
-            } catch (const std::exception& ex) {
-                send_line(client, std::string("ERR error=") + sanitize_value(ex.what()));
             }
             ::close(client);
         }

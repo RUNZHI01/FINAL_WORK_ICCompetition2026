@@ -25,6 +25,8 @@ board_deps/usrp/uhd-images/uhd-images_4.6.0.0.zip
 # Local transient outputs
 out.dat
 downloads/
+runtime_logs/
+Semantic-Communication/session_bootstrap/reports/openamp3_usrp_*.raw.log
 artifacts/*
 !artifacts/evidence/
 !artifacts/evidence/**

@@ -5,6 +5,7 @@ import { Icons } from '../../icons'
 import { CountUp } from '../../shared/CountUp'
 import { useAppStore } from '../../../stores/appStore'
 import { comparisonResultFromInferencePayload } from '../../../hooks/comparisonResult'
+import { shouldDisplayDashboardBatch } from '../../../hooks/dashboardBatchDisplayState'
 import s from './HeroMetrics.module.css'
 
 function Sparkline({ data, color }: { data: number[], color: string }) {
@@ -40,27 +41,29 @@ interface HeroMetricsProps {
   system: UseQueryResult<SystemStatusResponse>
   inferenceProgress?: any
   batchState?: UseQueryResult<BatchStateResponse>
+  currentMode?: string | null
 }
 
-export function HeroMetrics({ system, inferenceProgress, batchState }: HeroMetricsProps) {
+export function HeroMetrics({ system, inferenceProgress, batchState, currentMode }: HeroMetricsProps) {
   const status = system.data
   const comparisonResults = useAppStore((s) => s.comparisonResults)
   const pendingBatchJobId = useAppStore((s) => s.pendingBatchJobId)
-  const recentCurrentComparison = comparisonResultFromInferencePayload(status?.recent_results?.current)
-  const recentBaselineComparison = comparisonResultFromInferencePayload(status?.recent_results?.baseline)
+  const recentTvmComparisonRaw = comparisonResultFromInferencePayload(status?.recent_results?.tvm ?? status?.recent_results?.current)
+  const recentTvmComparison = recentTvmComparisonRaw?.engine === 'tvm' ? recentTvmComparisonRaw : undefined
+  const recentMnnComparisonRaw = comparisonResultFromInferencePayload(status?.recent_results?.mnn ?? status?.recent_results?.current)
+  const recentMnnComparison = recentMnnComparisonRaw?.engine === 'mnn' ? recentMnnComparisonRaw : undefined
+  const recentBaselineComparison = comparisonResultFromInferencePayload(status?.recent_results?.pytorch ?? status?.recent_results?.baseline)
   const live = status?.live
   const boardOnline = live?.board_online ?? false
   const batch = batchState?.data
-  const isCurrentSessionBatch = Boolean(
-    batch?.batch_job_id
-    && pendingBatchJobId
-    && batch.batch_job_id === pendingBatchJobId,
-  )
-  const activeBatch = batch && (isCurrentSessionBatch || batch.status === 'running' || batch.status === 'done')
+  const activeBatch = batch && shouldDisplayDashboardBatch(batch, pendingBatchJobId, currentMode)
     ? batch
     : undefined
 
-  const acceleratorResults = [comparisonResults.tvm ?? recentCurrentComparison, comparisonResults.mnn]
+  const acceleratorResults = [
+    comparisonResults.tvm ?? recentTvmComparison,
+    comparisonResults.mnn ?? recentMnnComparison,
+  ]
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
   const latestAccelerator = acceleratorResults.reduce<(typeof acceleratorResults)[number] | undefined>(
     (latest, item) => {

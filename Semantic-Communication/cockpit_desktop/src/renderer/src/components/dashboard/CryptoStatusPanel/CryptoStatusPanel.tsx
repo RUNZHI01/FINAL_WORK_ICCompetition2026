@@ -1,5 +1,6 @@
 import { useCryptoStatus } from '../../../hooks/useCryptoStatus'
 import { postCryptoReset, postCryptoTest, postCryptoToggle } from '../../../api/client'
+import { resolveAuthDisplayState } from './authDisplayState'
 import s from './CryptoStatusPanel.module.css'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { BenchmarkMetric } from '../../../api/types/crypto'
@@ -18,10 +19,83 @@ type MetricItem = {
   label: string
   value: ReactNode
   tone?: MetricTone
+  half?: boolean
   wide?: boolean
 }
 
-export function CryptoStatusPanel() {
+type SecurityAuthConfig = {
+  enabled: boolean
+  disabled: boolean
+  onToggle: (enabled: boolean) => void
+}
+
+type CryptoStatusPanelProps = {
+  authConfig?: SecurityAuthConfig
+}
+
+function ToggleSwitch({
+  checked,
+  disabled,
+  title,
+  onToggle,
+}: {
+  checked: boolean
+  disabled?: boolean
+  title: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      className={`${s.toggle} ${checked ? s.toggleOn : ''}`}
+      disabled={disabled}
+      onClick={onToggle}
+      role="switch"
+      aria-checked={checked}
+      title={title}
+      type="button"
+    >
+      <span className={s.toggleThumb} />
+    </button>
+  )
+}
+
+function SecuritySwitchRow({
+  label,
+  caption,
+  status,
+  checked,
+  disabled,
+  title,
+  onToggle,
+}: {
+  label: string
+  caption: string
+  status: string
+  checked: boolean
+  disabled?: boolean
+  title: string
+  onToggle: () => void
+}) {
+  return (
+    <div className={s.securitySwitchRow}>
+      <div className={s.securitySwitchMain}>
+        <div className={s.securitySwitchLabel}>{label}</div>
+        <div className={s.securitySwitchCaption}>{caption}</div>
+        <div className={s.securitySwitchStatus}>{status}</div>
+      </div>
+      <div className={s.securitySwitchControl}>
+        <ToggleSwitch
+          checked={checked}
+          disabled={disabled}
+          title={title}
+          onToggle={onToggle}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   const { data, isLoading, isError, refetch } = useCryptoStatus()
   const [testing, setTesting] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -84,25 +158,44 @@ export function CryptoStatusPanel() {
     }
   }
 
+  function renderSecurityControls(encryptionStatus: string, encryptionDisabled = false) {
+    return (
+      <div className={s.securitySwitchGroup}>
+        <SecuritySwitchRow
+          label="加密: ML-KEM + SM4"
+          caption="ML-KEM 协商会话密钥，SM4 保护控制面数据，降低明文暴露风险。"
+          status={encryptionStatus}
+          checked={enabled}
+          disabled={encryptionDisabled}
+          title={encryptionDisabled ? '请先输入板卡密码' : enabled ? '关闭加密通道' : '启用加密通道'}
+          onToggle={handleToggle}
+        />
+        {authConfig && (
+          <SecuritySwitchRow
+            label="认证: ML-DSA + SM2"
+            caption="ML-DSA 与 SM2 双重签名确认对端身份，降低冒充与中间人风险。"
+            status={authConfig.enabled ? '已启用' : '未启用'}
+            checked={authConfig.enabled}
+            disabled={authConfig.disabled}
+            title={authConfig.enabled ? '关闭身份认证' : '启用身份认证'}
+            onToggle={() => authConfig.onToggle(!authConfig.enabled)}
+          />
+        )}
+      </div>
+    )
+  }
+
   // 1) Board not configured — show prompt
   if (!boardConfigured && !enabled) {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={s.toggle}
-            disabled
-            role="switch"
-            aria-checked={false}
-            title="请先输入板卡密码"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('等待板卡密码', true)}
         <div className={s.disabledRow}>
           <span className={`${s.dot} ${s.dotOff}`} />
-          <span className={s.muted}>请先在下方输入板卡密码</span>
+          <span className={s.muted}>请先在上方输入板卡密码</span>
         </div>
       </div>
     )
@@ -113,21 +206,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={s.toggle}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={false}
-            title="点击启用 ML-KEM 加密通道"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
-        <div className={s.disabledRow}>
-          <span className={`${s.dot} ${s.dotOff}`} />
-          <span className={s.muted}>ML-KEM 加密通道未启用</span>
-        </div>
+        {renderSecurityControls('未启用')}
       </div>
     )
   }
@@ -137,17 +218,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={`${s.toggle} ${s.toggleOn}`}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={true}
-            title="点击关闭 ML-KEM"
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('通道未连接')}
         <div className={s.errorRow}>
           <span className={`${s.dot} ${s.dotOff}`} />
           <span className={s.errorText}>后量子加密通道未连接</span>
@@ -161,16 +234,9 @@ export function CryptoStatusPanel() {
     return (
       <div className={s.card}>
         <div className={s.titleRow}>
-          <span className={s.title}>ML-KEM 安全信道</span>
-          <button
-            className={`${s.toggle} ${s.toggleOn}`}
-            onClick={handleToggle}
-            role="switch"
-            aria-checked={true}
-          >
-            <span className={s.toggleThumb} />
-          </button>
+          <span className={s.title}>安全信道</span>
         </div>
+        {renderSecurityControls('检测中')}
         <div className={s.loadingRow}>
           <span className={s.spinner} />
           <span className={s.muted}>正在检测...</span>
@@ -185,19 +251,20 @@ export function CryptoStatusPanel() {
     { label: 'KEM 后端', value: data.kem_backend, tone: 'mono' },
     { label: '密码套件', value: data.cipher_suite, tone: 'mono' },
   ]
+  const authDisplay = resolveAuthDisplayState(authConfig?.enabled, data.auth_enabled)
 
-  if (data.auth_enabled != null) {
+  if (data.security_scope_label) {
     settingsItems.push({
-      label: '认证面',
-      value: data.auth_enabled ? `已启用 / ${data.sig_policy || 'UNKNOWN'}` : '未启用',
+      label: '作用范围',
+      value: data.security_scope_label,
       tone: 'mono',
     })
   }
 
-  if (data.auth_enabled && data.server_id) {
+  if (authDisplay.known) {
     settingsItems.push({
-      label: '服务端标识',
-      value: data.server_id,
+      label: '认证面',
+      value: authDisplay.label,
       tone: 'mono',
     })
   }
@@ -209,6 +276,14 @@ export function CryptoStatusPanel() {
   if (data.handshake_ms != null) {
     runtimeItems.push({ label: '握手耗时', value: `${data.handshake_ms.toFixed(1)} ms`, tone: 'mono' })
   }
+  if (data.bytes_sent != null || data.bytes_received != null) {
+    runtimeItems.push({
+      label: '加密流量',
+      value: `↑${data.bytes_sent ?? 0}B / ↓${data.bytes_received ?? 0}B`,
+      tone: 'mono',
+      half: true,
+    })
+  }
   if (data.encrypt_ms != null) {
     runtimeItems.push({ label: '加密发送', value: `${data.encrypt_ms.toFixed(1)} ms`, tone: 'mono' })
   }
@@ -217,13 +292,6 @@ export function CryptoStatusPanel() {
   }
   if (data.inference_ms != null) {
     runtimeItems.push({ label: 'TVM 推理', value: `${data.inference_ms.toFixed(1)} ms`, tone: 'mono' })
-  }
-  if (data.bytes_sent != null || data.bytes_received != null) {
-    runtimeItems.push({
-      label: '加密流量',
-      value: `↑${data.bytes_sent ?? 0}B / ↓${data.bytes_received ?? 0}B`,
-      tone: 'mono',
-    })
   }
   if (data.last_sha256_match != null) {
     runtimeItems.push({
@@ -273,17 +341,10 @@ export function CryptoStatusPanel() {
   return (
     <div className={s.card}>
       <div className={s.titleRow}>
-        <span className={s.title}>ML-KEM 安全信道</span>
-        <button
-          className={`${s.toggle} ${s.toggleOn}`}
-          onClick={handleToggle}
-          role="switch"
-          aria-checked={true}
-          title="点击关闭 ML-KEM"
-        >
-          <span className={s.toggleThumb} />
-        </button>
+        <span className={s.title}>安全信道</span>
       </div>
+
+      {renderSecurityControls(`通道状态: ${st.label}`)}
 
       <div className={s.subSection}>
         <div className={s.subSectionTitle}>配置项</div>
@@ -302,11 +363,11 @@ export function CryptoStatusPanel() {
 
       <div className={s.subSection}>
         <div className={s.subSectionTitle}>运行状态</div>
-        <div className={s.metricGrid}>
+        <div className={`${s.metricGrid} ${s.runtimeGrid}`}>
           {runtimeItems.map((item) => (
             <div
               key={item.label}
-              className={`${s.metricCard}${item.wide ? ` ${s.metricWide}` : ''}`}
+              className={`${s.metricCard}${item.half ? ` ${s.metricHalf}` : ''}${item.wide ? ` ${s.metricWide}` : ''}`}
             >
               <div className={s.metricLabel}>{item.label}</div>
               <div className={metricValueClass(item.tone)}>{item.value}</div>
@@ -316,14 +377,23 @@ export function CryptoStatusPanel() {
       </div>
 
       {/* Batch benchmark results */}
-      {data.batch_status === 'done' && (data.batch_benchmark || data.batch_transport_benchmark || data.batch_inference_benchmark) && (() => {
+      {data.batch_status === 'done' && (data.batch_benchmark || data.batch_transport_benchmark || data.batch_inference_benchmark || data.batch_iq_stage_benchmark) && (() => {
         const inferenceBm = data.batch_inference_benchmark ?? data.batch_benchmark
         const transportBm = data.batch_transport_benchmark
+        const iqStageBm = data.batch_iq_stage_benchmark
         const rows: { label: string; metric: BenchmarkMetric }[] = []
         if (transportBm?.radio_airtime_ms) rows.push({ label: '无线空口', metric: transportBm.radio_airtime_ms })
         if (transportBm?.decode_ms) rows.push({ label: '板端解码', metric: transportBm.decode_ms })
         if (transportBm?.merge_ms) rows.push({ label: '文件合并', metric: transportBm.merge_ms })
         if (transportBm?.total_ms) rows.push({ label: '传输/解包总计', metric: transportBm.total_ms })
+        if (iqStageBm?.rx_arm_ms) rows.push({ label: '接收就绪', metric: iqStageBm.rx_arm_ms })
+        if (iqStageBm?.rx_session_open_ms) rows.push({ label: '接收会话', metric: iqStageBm.rx_session_open_ms })
+        if (iqStageBm?.rx_capture_command_ms) rows.push({ label: '采集命令', metric: iqStageBm.rx_capture_command_ms })
+        if (iqStageBm?.rx_capture_ms) rows.push({ label: '接收采集', metric: iqStageBm.rx_capture_ms })
+        if (iqStageBm?.rx_wait_ms) rows.push({ label: '接收等待', metric: iqStageBm.rx_wait_ms })
+        if (iqStageBm?.rx_arm_control_overhead_ms) rows.push({ label: '接收就绪控制', metric: iqStageBm.rx_arm_control_overhead_ms })
+        if (iqStageBm?.rx_wait_response_overhead_ms) rows.push({ label: '等待响应', metric: iqStageBm.rx_wait_response_overhead_ms })
+        if (iqStageBm?.remote_decode_response_overhead_ms) rows.push({ label: '解码响应', metric: iqStageBm.remote_decode_response_overhead_ms })
         if (inferenceBm?.inference_ms) rows.push({ label: '推理重建', metric: inferenceBm.inference_ms })
         if (inferenceBm?.total_ms && inferenceBm.total_ms !== inferenceBm.inference_ms) rows.push({ label: '推理侧总计', metric: inferenceBm.total_ms })
         const validRows = rows.filter((row) => row.metric != null)
@@ -345,8 +415,9 @@ export function CryptoStatusPanel() {
               <tbody>
                 {validRows.map(({ label, metric }) => {
                   const m = metric!
+                  const emphasized = label === '传输/解包总计' || label === '推理侧总计'
                   return (
-                    <tr key={label}>
+                    <tr key={label} className={emphasized ? s.benchRowEmphasis : undefined}>
                       <td>{label}</td>
                       <td>{m.mean_ms} ms</td>
                       <td>{m.median_ms} ms</td>
