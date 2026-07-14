@@ -31,7 +31,7 @@
 | IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 默认 ARQ5、burst-miss retry、low-sync retry；仍需注意现场 RF 环境和天线位置 |
 | 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
 | 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
-| 启动环境 | 偏真机 Fedora/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数 |
+| 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数 |
 | 板卡会话 | 地址、密码、目录参数容易散落在脚本里 | Cockpit 可写入 board access；板卡地址、RX 目录、链路模式向参数化收敛 |
 | 文档和测试 | 资料分散在运行日志和零散报告里 | 新增/更新 runbook、安全审计、HANDOFF、layout tests、crypto scope/gate/auth 负测 |
 
@@ -41,8 +41,11 @@
 
 ```powershell
 cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+$env:REMOTE_PASS = 'user'
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
+
+比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。脚本会先在后端静默跑完 5 张 `USRP IQ + TVM`，清掉隐藏 batch-state，然后才启动/显示 Cockpit Desktop 前端。这样第一张冷启动 decode worker、TVM 和文件路径初始化尾部不会进入评委可见界面。启动前请临时设置 `REMOTE_PASS`，或在脚本提示时输入；若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
 
 启动后：
 
@@ -51,6 +54,22 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 - 板卡默认地址：`100.121.87.73`
 - 板卡用户名/密码：`user / user`
 - 板端 IQ decode Python：`/home/user/venv/bin/python`
+
+USRP2922 网口恢复脚本按用途分开。上位机/TX 侧使用：
+
+```bash
+sudo ./USRP292x/SetupUsrp2922UpperHostNetwork.sh
+```
+
+板端/RX 侧使用：
+
+```bash
+sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
+# 双网口板端如自动探测选错，可显式指定：
+sudo env USRP2922_BOARD_IFACE=eth0 ./USRP292x/SetupUsrp2922BoardNetwork.sh
+```
+
+通用诊断入口是 `./USRP292x/Usrp2922Network.sh detect|probe|auto-init|status`。不要再使用旧命名入口。
 
 如果重启后 UI 未带入会话，可以在页面里重新保存板卡密码，或用 API 写入：
 
@@ -90,6 +109,9 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
 | `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
 | `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT` | `0` | 保持 TX/RX 常驻，减少反复初始化 |
+| `COCKPIT_STARTUP_USRP_WARMUP` | `1` | 显示 Cockpit 前先做 USRP IQ + TVM 启动预热 |
+| `COCKPIT_STARTUP_USRP_WARMUP_COUNT` | `5` | 启动预热张数 |
+| `COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC` | `360` | 预热完成等待上限 |
 | `ANALOG_SPS` | `2` | IQ 直传每符号采样数 |
 | `ANALOG_AMPLITUDE` | `6000` | 当前验证环境下的 TX 幅度 |
 | `ANALOG_RX_TAIL_SEC` | `0.040` | RX capture 尾部保护 |

@@ -22,6 +22,7 @@
 
 ```powershell
 cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+$env:REMOTE_PASS = 'user'   # 比赛现场改为实际板卡 SSH 密码，或等待脚本提示输入
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 
@@ -31,7 +32,21 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 .\docker\run-demo-tailscale.ps1
 ```
 
-当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`。板卡密码不写入仓库，在 Cockpit 里填写，当前验证环境是 `user / user`。
+当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。板卡密码不写入仓库；启动预热需要临时设置 `REMOTE_PASS` 或按脚本提示输入，当前验证环境是 `user / user`。
+
+`start-dev.sh` 会在显示 Cockpit Desktop 前静默完成 5 张 `USRP IQ + TVM` warm-up，并清掉隐藏 batch 状态，避免第一张冷启动 decode / TVM 尾部污染演示指标。如需调试界面而跳过预热，可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
+
+USRP2922 网口恢复入口按用途分开：
+
+```bash
+# 上位机/TX 侧：本机网口 192.168.10.1/32 -> USRP 192.168.10.2
+sudo ./USRP292x/SetupUsrp2922UpperHostNetwork.sh
+
+# 板端/RX 侧：板端网口 192.168.10.11/32 -> USRP 192.168.10.22
+sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
+```
+
+通用诊断入口是 `./USRP292x/Usrp2922Network.sh detect|probe|auto-init|status`。板端当前部署在 `/home/user/USRP292x/`，若自动探测选错双网口设备，可显式加 `USRP2922_BOARD_IFACE=eth0`。
 
 写材料时优先引用这些典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；板端 TVM 重建 median `241.20 ms`、p95 `242.59 ms`；预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 

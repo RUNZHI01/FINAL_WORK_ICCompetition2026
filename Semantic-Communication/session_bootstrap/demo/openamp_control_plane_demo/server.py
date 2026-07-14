@@ -6793,6 +6793,36 @@ class DashboardState:
             return {"status": "idle"}
         return dict(state)
 
+    def clear_batch_state(self, *, warmup_only: bool = True, batch_job_id: str = "") -> dict[str, Any]:
+        with self._lock:
+            state = self._batch_state
+            if state is None:
+                return {"status": "ok", "cleared": False, "reason": "idle"}
+            current_job_id = str(state.get("batch_job_id") or "")
+            if batch_job_id and current_job_id != str(batch_job_id):
+                return {
+                    "status": "ok",
+                    "cleared": False,
+                    "reason": "batch_job_id_mismatch",
+                    "batch_job_id": current_job_id,
+                }
+            if warmup_only and not bool(state.get("warmup")):
+                return {
+                    "status": "ok",
+                    "cleared": False,
+                    "reason": "not_warmup",
+                    "batch_job_id": current_job_id,
+                }
+            if str(state.get("status") or "") in {"launching", "running"}:
+                return {
+                    "status": "busy",
+                    "cleared": False,
+                    "reason": "batch_running",
+                    "batch_job_id": current_job_id,
+                }
+            self._batch_state = None
+            return {"status": "ok", "cleared": True, "batch_job_id": current_job_id}
+
     def _mnn_batch_access(self) -> BoardAccessConfig:
         with self._lock:
             board_access = self._board_access
@@ -7687,7 +7717,13 @@ class DashboardState:
             "summary": "ML-KEM 安全协议已建立；Current 继续走板端本地 latent / 既有 live 数据面。",
         }, None
 
-    def start_batch_inference(self, *, count: int = 300, allow_preflight_degraded: bool = True) -> dict[str, Any]:
+    def start_batch_inference(
+        self,
+        *,
+        count: int = 300,
+        allow_preflight_degraded: bool = True,
+        warmup: bool = False,
+    ) -> dict[str, Any]:
         """在后台线程启动 Current live 300 张推进，并镜像为 batch_state。
 
         服务模式联动：
@@ -7697,13 +7733,22 @@ class DashboardState:
         """
         import threading
 
+        warmup = bool(warmup)
         # ── 读取当前服务模式 ──
         service_snapshot = self._service_mode_snapshot()
         current_mode = service_snapshot.get("current_mode", "FULL_FRAME")
+        if warmup and current_mode != "FULL_FRAME":
+            return {
+                "status": "error",
+                "engine": "tvm",
+                "warmup": True,
+                "service_mode": current_mode,
+                "message": f"startup warm-up requires FULL_FRAME mode, current mode is {current_mode}",
+            }
 
         with self._lock:
             existing = self._batch_state
-            if existing and existing.get("status") == "running":
+            if existing and existing.get("status") in {"launching", "running"}:
                 return {"status": "already_running", "batch_job_id": existing.get("batch_job_id")}
             board_access_for_mode = self._board_access
             is_usrp_batch = local_crypto_transport_mode(board_access_for_mode.build_env()) == "usrp"
@@ -7790,11 +7835,15 @@ class DashboardState:
             if current_mode == "ROI_ONLY":
                 effective_count = max(1, count // 3)
 
-            batch_job_id = f"batch-{int(time.time())}-{effective_count}"
+            batch_prefix = "warmup" if warmup else "batch"
+            batch_job_id = f"{batch_prefix}-{int(time.time())}-{effective_count}"
             self._batch_state = {
                 "status": "launching",
                 "batch_job_id": batch_job_id,
                 "engine": "tvm",
+                "warmup": warmup,
+                "hidden": warmup,
+                "purpose": "startup_warmup" if warmup else "batch",
                 "total": effective_count,
                 "completed": 0,
                 "success": 0,
@@ -8101,6 +8150,8 @@ class DashboardState:
                         if is_live:
                             state["quality"] = self._build_prerecorded_payload_safe(image_index=0, variant="current").get("quality")
                     if (
+                        not warmup
+                        and
                         last_result.get("request_state") == "completed"
                         and isinstance(last_result.get("sample"), dict)
                         and isinstance(timings, dict)
@@ -8109,7 +8160,7 @@ class DashboardState:
                         and "artifact_sha" in last_result
                     ):
                         self._update_last_inference_summary(last_result, "current")
-                    elif is_live and is_usrp_batch and inference_summary:
+                    elif not warmup and is_live and is_usrp_batch and inference_summary:
                         current_payload = self._build_live_payload_from_batch_summary(
                             engine="tvm",
                             job_id=live_job_id,
@@ -8119,7 +8170,7 @@ class DashboardState:
                             source_label=str(last_result.get("source_label") or ""),
                         )
                         self._update_last_inference_summary(current_payload, "current")
-                    elif is_live and not is_usrp_batch and tvm_summary:
+                    elif not warmup and is_live and not is_usrp_batch and tvm_summary:
                         current_payload = self._build_live_payload_from_batch_summary(
                             engine="tvm",
                             job_id=live_job_id,
@@ -8153,6 +8204,7 @@ class DashboardState:
             "total": effective_count,
             "service_mode": current_mode,
             "engine": "tvm",
+            "warmup": warmup,
         }
 
     def run_mlkem_inference(
@@ -10142,9 +10194,18 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
                 count = self.coerce_int(body.get("count"), default=300)
                 count = max(1, min(count, 1000))
                 allow_degraded = bool(body.get("allow_preflight_degraded", True))
+                warmup = bool(body.get("warmup", False))
                 payload = self.server.app_state.start_batch_inference(
                     count=count,
                     allow_preflight_degraded=allow_degraded,
+                    warmup=warmup,
+                )
+                self.respond_json(HTTPStatus.OK, payload)
+                return
+            if parsed.path == "/api/batch-state/clear":
+                payload = self.server.app_state.clear_batch_state(
+                    warmup_only=bool(body.get("warmup_only", True)),
+                    batch_job_id=str(body.get("batch_job_id") or "").strip(),
                 )
                 self.respond_json(HTTPStatus.OK, payload)
                 return

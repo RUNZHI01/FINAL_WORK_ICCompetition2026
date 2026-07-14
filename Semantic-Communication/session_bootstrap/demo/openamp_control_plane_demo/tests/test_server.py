@@ -161,6 +161,36 @@ def test_crypto_status_exposes_iq_tail_audit_from_batch_state() -> None:
     assert status["batch_iq_tail_audit"]["rx_control_overhead_gt_50ms_count"] == 1
 
 
+def test_clear_batch_state_only_clears_warmup_state() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._batch_state = {
+        "status": "done",
+        "batch_job_id": "warmup-1",
+        "warmup": True,
+        "completed": 5,
+        "total": 5,
+    }
+
+    cleared = state.clear_batch_state(warmup_only=True, batch_job_id="warmup-1")
+
+    assert cleared["status"] == "ok"
+    assert cleared["cleared"] is True
+    assert state.get_batch_state() == {"status": "idle"}
+
+    state._batch_state = {
+        "status": "done",
+        "batch_job_id": "batch-1",
+        "completed": 300,
+        "total": 300,
+    }
+
+    skipped = state.clear_batch_state(warmup_only=True)
+
+    assert skipped["status"] == "ok"
+    assert skipped["cleared"] is False
+    assert state.get_batch_state()["batch_job_id"] == "batch-1"
+
+
 def test_iq_tail_audit_from_summary_preserves_runner_counts() -> None:
     audit = usrp_runtime._iq_tail_audit_from_summary(
         {

@@ -10,19 +10,19 @@ BOARD_DEVICE_CANDIDATE="${USRP2922_BOARD_DEVICE:-192.168.10.22}"
 usage() {
     cat <<EOF
 Usage:
-  ./USRP292x/FedoraUsrpNetwork.sh detect
-  ./USRP292x/FedoraUsrpNetwork.sh probe
-  sudo ./USRP292x/FedoraUsrpNetwork.sh auto-init
-  sudo ./USRP292x/FedoraUsrpNetwork.sh host-init
-  sudo ./USRP292x/FedoraUsrpNetwork.sh board-init
-  sudo ./USRP292x/FedoraUsrpNetwork.sh local-loopback
-  ./USRP292x/FedoraUsrpNetwork.sh status
-  sudo ./USRP292x/FedoraUsrpNetwork.sh deactivate-host
-  sudo ./USRP292x/FedoraUsrpNetwork.sh deactivate-board
-  sudo ./USRP292x/FedoraUsrpNetwork.sh deactivate-local
+  ./USRP292x/Usrp2922Network.sh detect
+  ./USRP292x/Usrp2922Network.sh probe
+  sudo ./USRP292x/Usrp2922Network.sh auto-init
+  sudo ./USRP292x/Usrp2922Network.sh host-init
+  sudo ./USRP292x/Usrp2922Network.sh board-init
+  sudo ./USRP292x/Usrp2922Network.sh local-loopback
+  ./USRP292x/Usrp2922Network.sh status
+  sudo ./USRP292x/Usrp2922Network.sh deactivate-host
+  sudo ./USRP292x/Usrp2922Network.sh deactivate-board
+  sudo ./USRP292x/Usrp2922Network.sh deactivate-local
 
 Purpose:
-  Fedora wrapper for NI USRP-2920/2922 wired profile setup.
+  USRP2922 wired profile setup wrapper.
   It auto-detects Ethernet interface names and forwards them to the canonical
   NetworkManager script at scripts/setup_usrp2922_network.sh.
 
@@ -31,9 +31,9 @@ Default address plan:
   board-init  -> board NIC ${USRP2922_BOARD_ADDR:-192.168.10.11/32} -> device ${USRP2922_BOARD_DEVICE:-192.168.10.22}
 
 Notes:
-  - probe shows whether this Fedora NIC can already reach .2 or .22.
+  - probe shows whether this Ethernet NIC can already reach .2 or .22.
   - auto-init selects host-init / board-init based on that probe result.
-  - On a single-Ethernet Fedora host, use host-init by default.
+  - On a single-Ethernet upper host, use host-init by default.
   - local-loopback requires two Ethernet NICs on the same machine.
   - Override auto-detection with:
       USRP2922_HOST_IFACE=<iface>
@@ -58,7 +58,7 @@ discover_ethernet_ifaces() {
 
 print_detect_report() {
     local -a ifaces=("$@")
-    echo "[detect] Fedora Ethernet interfaces"
+    echo "[detect] Ethernet interfaces"
     if [[ "${#ifaces[@]}" -eq 0 ]]; then
         echo "  none"
         return 1
@@ -83,15 +83,15 @@ print_detect_report() {
 
     echo "[recommend]"
     echo "  Local single-USRP host:"
-    echo "    sudo USRP2922_HOST_IFACE=${host_iface} ./USRP292x/FedoraUsrpNetwork.sh host-init"
+    echo "    sudo USRP2922_HOST_IFACE=${host_iface} ./USRP292x/Usrp2922Network.sh host-init"
     echo
     echo "  Peer / board-side host:"
-    echo "    sudo USRP2922_BOARD_IFACE=${board_iface} ./USRP292x/FedoraUsrpNetwork.sh board-init"
+    echo "    sudo USRP2922_BOARD_IFACE=${board_iface} ./USRP292x/Usrp2922Network.sh board-init"
     if [[ "${#ifaces[@]}" -ge 2 ]]; then
         echo
         echo "  Same-machine dual-NIC loopback:"
         echo "    sudo USRP2922_LOCAL_HOST_IFACE=${host_iface} USRP2922_LOCAL_BOARD_IFACE=${board_iface} \\"
-        echo "      ./USRP292x/FedoraUsrpNetwork.sh local-loopback"
+        echo "      ./USRP292x/Usrp2922Network.sh local-loopback"
     fi
 }
 
@@ -127,6 +127,13 @@ forward_to_canonical() {
 }
 
 main() {
+    case "${MODE}" in
+        help|-h|--help)
+            usage
+            return
+            ;;
+    esac
+
     require_cmd nmcli
     require_cmd ip
 
@@ -149,9 +156,6 @@ main() {
             for iface in "${ETH_IFACES[@]}"; do
                 echo "${iface}: $(recommend_mode_for_iface "${iface}")"
             done
-            ;;
-        help|-h|--help)
-            usage
             ;;
         host-init|host)
             if [[ -z "${HOST_AUTO_IFACE}" && -z "${USRP2922_HOST_IFACE:-}" ]]; then

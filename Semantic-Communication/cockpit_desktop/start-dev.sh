@@ -120,6 +120,9 @@ configure_runtime_defaults() {
     export BIG_LITTLE_INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-10}"
   fi
   export OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"
+  export COCKPIT_STARTUP_USRP_WARMUP="${COCKPIT_STARTUP_USRP_WARMUP:-1}"
+  export COCKPIT_STARTUP_USRP_WARMUP_COUNT="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-5}"
+  export COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
   export MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"
   export MLKEM_AUTH_SERVER_ID="${MLKEM_AUTH_SERVER_ID:-phytium-board}"
   export MLKEM_AUTH_SIG_POLICY="${MLKEM_AUTH_SIG_POLICY:-DUAL_REQUIRED}"
@@ -252,6 +255,165 @@ with urllib.request.urlopen(f"http://127.0.0.1:{port}/#/", timeout=1.5) as respo
 PY
 }
 
+truthy_env() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+resolve_board_password() {
+  local candidate
+  for candidate in "${REMOTE_PASS:-}" "${REMOTE_PASSWORD:-}" "${PHYTIUM_PI_PASS:-}" "${PHYTIUM_PI_PASSWORD:-}" "${BOARD_PASS:-}"; do
+    if [[ -n "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+run_startup_usrp_warmup() {
+  if ! truthy_env "${COCKPIT_STARTUP_USRP_WARMUP:-0}"; then
+    return 0
+  fi
+  if [[ "${MLKEM_TRANSPORT_MODE:-}" != "usrp" || "${OPENAMP_DEMO_INPUT_SOURCE_MODE:-}" != "usrp" || "${JSCC_LINK_MODE:-}" != "iq-direct" ]]; then
+    echo "启动预热跳过：当前不是 USRP IQ 直传路径"
+    return 0
+  fi
+
+  local host="${REMOTE_HOST:-${PHYTIUM_PI_HOST:-}}"
+  local user="${REMOTE_USER:-${PHYTIUM_PI_USER:-user}}"
+  local port="${REMOTE_SSH_PORT:-${PHYTIUM_PI_PORT:-22}}"
+  local password=""
+  local count="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-5}"
+  local timeout_sec="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
+
+  if [[ -z "$host" ]]; then
+    echo "ERROR: 启动预热需要 REMOTE_HOST；如需跳过，设置 COCKPIT_STARTUP_USRP_WARMUP=0。" >&2
+    return 1
+  fi
+
+  password="$(resolve_board_password || true)"
+  if [[ -z "$password" && -t 0 ]]; then
+    read -r -s -p "板卡 SSH 密码（启动预热需要，输入不会显示）: " password
+    echo
+  fi
+  if [[ -z "$password" ]]; then
+    echo "ERROR: 启动预热需要板卡密码。请临时设置 REMOTE_PASS，或设置 COCKPIT_STARTUP_USRP_WARMUP=0 跳过。" >&2
+    return 1
+  fi
+
+  echo "启动前静默预热 USRP IQ + TVM：${count} 张..."
+  COCKPIT_STARTUP_USRP_WARMUP_PASS="$password" \
+    "$PYTHON_CMD" - \
+      "http://$BACKEND_HOST:$BACKEND_PORT" \
+      "$host" \
+      "$user" \
+      "$port" \
+      "$count" \
+      "$timeout_sec" \
+      "${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}" \
+      "${JSCC_LINK_MODE:-iq-direct}" <<'PY'
+from __future__ import annotations
+
+import json
+import os
+import sys
+import time
+import urllib.request
+
+
+base_url = sys.argv[1].rstrip("/")
+host = sys.argv[2]
+user = sys.argv[3]
+port = int(sys.argv[4])
+count = max(1, int(sys.argv[5]))
+timeout_sec = max(30.0, float(sys.argv[6]))
+remote_usrp_rx_dir = sys.argv[7]
+jscc_link_mode = sys.argv[8]
+password = os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_PASS", "")
+
+
+def request_json(method: str, path: str, payload: dict | None = None, timeout: float = 20.0) -> dict:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        base_url + path,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        body = response.read().decode("utf-8", errors="replace")
+    return json.loads(body) if body.strip() else {}
+
+
+session = request_json(
+    "POST",
+    "/api/session/board-access",
+    {
+        "host": host,
+        "user": user,
+        "password": password,
+        "port": port,
+        "transport_mode": "usrp",
+        "remote_usrp_rx_dir": remote_usrp_rx_dir,
+        "jscc_link_mode": jscc_link_mode,
+        "auth_enabled": True,
+        "auth_sig_policy": "DUAL_REQUIRED",
+    },
+)
+if session.get("status") != "ok":
+    raise SystemExit(f"board session setup failed: {session}")
+
+usrp = request_json("POST", "/api/usrp-control/start", {}, timeout=90.0)
+if usrp.get("status") != "ready":
+    raise SystemExit(f"USRP control did not become ready: {usrp}")
+
+started = request_json(
+    "POST",
+    "/api/run-inference-batch",
+    {"count": count, "allow_preflight_degraded": True, "warmup": True},
+    timeout=30.0,
+)
+if started.get("status") not in {"started", "done"}:
+    raise SystemExit(f"warm-up batch did not start: {started}")
+job_id = str(started.get("batch_job_id") or "")
+
+deadline = time.monotonic() + timeout_sec
+last_state: dict = {}
+while time.monotonic() < deadline:
+    last_state = request_json("GET", "/api/batch-state", timeout=10.0)
+    status = str(last_state.get("status") or "")
+    completed = int(last_state.get("completed") or 0)
+    total = int(last_state.get("total") or count)
+    print(f"启动预热进度: {completed}/{total} ({status})", flush=True)
+    if status in {"done", "completed"}:
+        break
+    if status in {"failed", "error", "cancelled"}:
+        raise SystemExit(f"warm-up failed: {last_state}")
+    time.sleep(3.0)
+else:
+    raise SystemExit(f"warm-up timeout after {timeout_sec:.0f}s: {last_state}")
+
+completed = int(last_state.get("completed") or 0)
+success = int(last_state.get("success") or 0)
+if completed < count or success < count:
+    raise SystemExit(f"warm-up incomplete: completed={completed}, success={success}, expected={count}")
+
+cleared = request_json(
+    "POST",
+    "/api/batch-state/clear",
+    {"warmup_only": True, "batch_job_id": job_id},
+    timeout=10.0,
+)
+if cleared.get("status") != "ok" or not cleared.get("cleared"):
+    raise SystemExit(f"warm-up batch-state clear failed: {cleared}")
+
+print(f"启动预热完成：{success}/{count}，Cockpit Desktop 即将显示。", flush=True)
+PY
+}
+
 PYTHON_CMD="$(resolve_python)" || {
   echo "ERROR: python3/python not found. Set COCKPIT_PYTHON if needed." >&2
   exit 1
@@ -318,6 +480,8 @@ for i in $(seq 1 15); do
   fi
   sleep 1
 done
+
+run_startup_usrp_warmup
 
 echo "启动 Electron/Vite 开发环境..."
 (
