@@ -7312,6 +7312,11 @@ class DemoHTTPServerTest(unittest.TestCase):
 
         self.assertIn("sleep 1.000", command)
         self.assertNotIn("sleep 0.1", command)
+        self.assertIn("echo __BOARD_MEMINFO_END__", command)
+        self.assertIn("echo __BOARD_STAT1_END__", command)
+        self.assertIn("echo __BOARD_STAT2_END__", command)
+        self.assertIn("echo __BOARD_LOADAVG_END__", command)
+        self.assertNotIn('printf "__BOARD_', command)
 
     def test_board_telemetry_remote_command_allows_cpu_sample_window_override(self) -> None:
         with patch.dict(os.environ, {"BOARD_TELEMETRY_CPU_SAMPLE_SEC": "0.5"}, clear=False):
@@ -7633,16 +7638,70 @@ class DemoHTTPServerTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["live"]["telemetry"]["status"], "stale")
-        self.assertIn("暂缓", payload["live"]["telemetry"]["note"])
+        self.assertIn("常驻采样器", payload["live"]["telemetry"]["note"])
         self.assertTrue(payload["live"]["board_position_api"]["stale"])
         self.assertIn("暂缓", payload["live"]["board_position_api"]["note"])
         self.assertEqual(payload["live"]["aircraft_bridge"]["upstream_probe"]["status"], "not_found")
         self.assertIn("暂缓", payload["live"]["aircraft_bridge"]["upstream_probe"]["note"])
         query_telemetry.assert_not_called()
-        start_telemetry_refresh.assert_not_called()
+        start_telemetry_refresh.assert_called_once()
         board_position_status.assert_not_called()
         start_position_refresh.assert_not_called()
         start_upstream_refresh.assert_not_called()
+
+    def test_system_status_uses_resident_board_telemetry_cache_during_running_batch(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {"host": "100.121.87.73", "user": "demo-user", "password": "demo-pass", "port": "22"}
+            ).encode("utf-8"),
+        )
+        state._last_live_probe = live_probe_payload("2026-04-21T15:43:00+0800", "board reachable")
+        state._batch_state = {
+            "status": "running",
+            "batch_job_id": "batch-123",
+            "engine": "tvm",
+            "total": 300,
+            "completed": 128,
+            "service_mode": "FULL_FRAME",
+            "_samples": {},
+            "benchmark": None,
+        }
+        state._board_telemetry_cache = {
+            "status": "ok",
+            "stale": False,
+            "source": "ssh_procfs_resident",
+            "collected_at": "2026-04-21T15:43:03+0800",
+            "compute_label": "CPU",
+            "compute_pct": 57.4,
+            "memory_pct": 66.2,
+            "memory_used_mb": 1357.0,
+            "memory_available_mb": 693.0,
+            "memory_total_mb": 2050.0,
+            "loadavg_1m": 1.87,
+            "cpu_cores": 4,
+        }
+        state._board_telemetry_cache_ts = time.monotonic()
+
+        with (
+            patch.object(state, "_start_board_telemetry_refresh") as start_telemetry_refresh,
+            patch("server.query_board_telemetry") as query_telemetry,
+        ):
+            status, _, payload = request_json(state, "GET", "/api/system-status")
+
+        self.assertEqual(status, 200)
+        telemetry = payload["live"]["telemetry"]
+        self.assertEqual(telemetry["status"], "ok")
+        self.assertFalse(telemetry["stale"])
+        self.assertNotIn("暂缓", str(telemetry.get("note") or ""))
+        self.assertAlmostEqual(telemetry["compute_pct"], 57.4)
+        self.assertAlmostEqual(telemetry["memory_pct"], 66.2)
+        self.assertAlmostEqual(telemetry["loadavg_1m"], 1.87)
+        query_telemetry.assert_not_called()
+        start_telemetry_refresh.assert_not_called()
 
     def test_system_status_reports_upstream_not_found_when_probe_finds_no_candidate(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None, bind_host="0.0.0.0", bind_port=8079)

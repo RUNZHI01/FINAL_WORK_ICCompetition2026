@@ -168,6 +168,7 @@ DEFAULT_MLKEM_REMOTE_OQS_INSTALL_PATH = "/home/user/liboqs-dist"
 BOARD_TELEMETRY_TTL_SEC = 5.0
 BOARD_POSITION_API_TTL_SEC = 5.0
 USRP_CONTROL_STATUS_TTL_SEC = 2.0
+BOARD_TELEMETRY_RESIDENT_INTERVAL_SEC = 1.0
 AIRCRAFT_POSITION_UPSTREAM_DISCOVERY_TTL_SEC = 15.0
 DEFAULT_BOARD_POSITION_API_REMOTE_ROOT = "~/.openamp-demo/board_position_api_service"
 BOARD_POSITION_API_REMOTE_ROOT_KEYS = ("BOARD_POSITION_API_REMOTE_ROOT",)
@@ -1206,14 +1207,14 @@ def _board_telemetry_remote_command() -> str:
     return (
         "sh -lc '"
         "cat /proc/meminfo; "
-        "printf \"__BOARD_MEMINFO_END__\\n\"; "
+        "echo __BOARD_MEMINFO_END__; "
         "cat /proc/stat; "
-        "printf \"__BOARD_STAT1_END__\\n\"; "
+        "echo __BOARD_STAT1_END__; "
         f"sleep {shlex.quote(f'{sample_sec:.3f}')}; "
         "cat /proc/stat; "
-        "printf \"__BOARD_STAT2_END__\\n\"; "
+        "echo __BOARD_STAT2_END__; "
         "cat /proc/loadavg; "
-        "printf \"__BOARD_LOADAVG_END__\\n\"; "
+        "echo __BOARD_LOADAVG_END__; "
         "(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)"
         "'"
     )
@@ -1226,6 +1227,15 @@ def _board_telemetry_cpu_sample_sec() -> float:
     except ValueError:
         value = 1.0
     return min(max(value, 0.2), 2.0)
+
+
+def _board_telemetry_resident_interval_sec() -> float:
+    raw = str(os.environ.get("BOARD_TELEMETRY_RESIDENT_INTERVAL_SEC") or "").strip()
+    try:
+        value = float(raw) if raw else BOARD_TELEMETRY_RESIDENT_INTERVAL_SEC
+    except ValueError:
+        value = BOARD_TELEMETRY_RESIDENT_INTERVAL_SEC
+    return min(max(value, 0.5), 5.0)
 
 
 def _parse_marker_sections(stdout: str) -> dict[str, str]:
@@ -2443,6 +2453,9 @@ class DashboardState:
         self._board_telemetry_cache: dict[str, Any] | None = None
         self._board_telemetry_cache_ts: float = 0.0
         self._board_telemetry_refreshing = False
+        self._board_telemetry_resident_generation = 0
+        self._board_telemetry_resident_key: tuple[str, str, str, str] | None = None
+        self._board_telemetry_resident_last_error = ""
         self._board_position_api_cache: dict[str, Any] | None = None
         self._board_position_api_cache_ts: float = 0.0
         self._board_position_api_refreshing = False
@@ -2692,6 +2705,9 @@ class DashboardState:
             self._board_telemetry_cache = None
             self._board_telemetry_cache_ts = 0.0
             self._board_telemetry_refreshing = False
+            self._board_telemetry_resident_generation += 1
+            self._board_telemetry_resident_key = None
+            self._board_telemetry_resident_last_error = ""
             self._board_position_api_cache = None
             self._board_position_api_cache_ts = 0.0
             self._board_position_api_refreshing = False
@@ -5390,14 +5406,34 @@ class DashboardState:
 
         age_sec = time.monotonic() - cached_ts if cached_ts > 0 else None
         if defer_refresh and cached is not None:
+            if age_sec is not None and age_sec <= BOARD_TELEMETRY_TTL_SEC:
+                cached.setdefault("resident", True)
+                return cached
+            if board_access.connection_ready and board_online:
+                self._start_board_telemetry_refresh(
+                    board_access,
+                    timeout_sec=min(max(self._probe_timeout_sec, 3.0), 12.0),
+                )
             cached["status"] = "stale"
             cached["stale"] = True
-            cached["note"] = "TVM live 推理进行中，暂缓板端资源占用刷新，继续展示最近一次缓存值。"
+            cached["resident"] = True
+            if age_sec is not None:
+                cached["age_sec"] = round(age_sec, 3)
+            cached["note"] = (
+                "板端资源占用常驻采样器后台刷新中，继续展示最近一次缓存值。"
+                if board_online
+                else "板卡当前未在线，继续展示最近一次缓存的板端资源占用。"
+            )
             return cached
         if defer_refresh:
+            if board_access.connection_ready and board_online:
+                self._start_board_telemetry_refresh(
+                    board_access,
+                    timeout_sec=min(max(self._probe_timeout_sec, 2.0), 4.0),
+                )
             return _board_telemetry_pending_status(
                 status="deferred",
-                note="TVM live 推理进行中，暂缓板端资源占用首次采样。",
+                note="板端资源占用常驻采样器启动中，等待首次采样结果。",
             )
         if cached is not None and age_sec is not None and age_sec <= BOARD_TELEMETRY_TTL_SEC:
             return cached
@@ -5467,28 +5503,71 @@ class DashboardState:
             note="板端资源占用后台刷新中，等待首次采样结果。",
         )
 
+    @staticmethod
+    def _board_telemetry_resident_key_for(board_access: BoardAccessConfig) -> tuple[str, str, str, str]:
+        return (
+            str(board_access.host or ""),
+            str(board_access.user or ""),
+            str(board_access.port or ""),
+            str(board_access.password or ""),
+        )
+
     def _start_board_telemetry_refresh(self, board_access: BoardAccessConfig, *, timeout_sec: float) -> None:
+        if not board_access.connection_ready:
+            return
+        access_key = self._board_telemetry_resident_key_for(board_access)
         with self._lock:
-            if self._board_telemetry_refreshing:
+            if self._board_telemetry_refreshing and self._board_telemetry_resident_key == access_key:
                 return
+            self._board_telemetry_resident_generation += 1
+            generation = self._board_telemetry_resident_generation
+            self._board_telemetry_resident_key = access_key
             self._board_telemetry_refreshing = True
 
         def worker() -> None:
-            try:
-                telemetry = query_board_telemetry(board_access, timeout_sec=timeout_sec)
+            interval_sec = _board_telemetry_resident_interval_sec()
+            while True:
                 with self._lock:
-                    self._board_telemetry_cache = json.loads(json.dumps(telemetry, ensure_ascii=False))
-                    self._board_telemetry_cache_ts = time.monotonic()
-            except Exception:
-                return
-            finally:
-                with self._lock:
-                    self._board_telemetry_refreshing = False
+                    if (
+                        generation != self._board_telemetry_resident_generation
+                        or self._board_telemetry_resident_key != access_key
+                    ):
+                        return
+                try:
+                    telemetry = query_board_telemetry(board_access, timeout_sec=timeout_sec)
+                    telemetry["resident"] = True
+                    telemetry["source"] = str(telemetry.get("source") or "ssh_procfs")
+                    with self._lock:
+                        if (
+                            generation != self._board_telemetry_resident_generation
+                            or self._board_telemetry_resident_key != access_key
+                        ):
+                            return
+                        self._board_telemetry_cache = json.loads(json.dumps(telemetry, ensure_ascii=False))
+                        self._board_telemetry_cache_ts = time.monotonic()
+                        self._board_telemetry_resident_last_error = ""
+                except Exception as exc:
+                    with self._lock:
+                        if (
+                            generation != self._board_telemetry_resident_generation
+                            or self._board_telemetry_resident_key != access_key
+                        ):
+                            return
+                        self._board_telemetry_resident_last_error = str(exc)
+                deadline = time.monotonic() + interval_sec
+                while time.monotonic() < deadline:
+                    time.sleep(min(0.2, max(deadline - time.monotonic(), 0.0)))
+                    with self._lock:
+                        if (
+                            generation != self._board_telemetry_resident_generation
+                            or self._board_telemetry_resident_key != access_key
+                        ):
+                            return
 
         threading.Thread(
             target=worker,
             daemon=True,
-            name="board-telemetry-refresh",
+            name="board-telemetry-resident",
         ).start()
 
     def _board_position_api_snapshot(
