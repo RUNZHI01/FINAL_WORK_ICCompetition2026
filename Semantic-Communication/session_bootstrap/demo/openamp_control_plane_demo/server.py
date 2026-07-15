@@ -1027,6 +1027,16 @@ def _remote_terminate_matching_processes_command(pattern: str) -> str:
     )
 
 
+ANSI_CSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def _sanitize_remote_path_output(raw_value: str) -> str:
+    cleaned = ANSI_CSI_RE.sub("", str(raw_value or ""))
+    cleaned = "".join(ch for ch in cleaned if ch == "\n" or ch == "\t" or ord(ch) >= 32)
+    first_line = cleaned.splitlines()[0] if cleaned.splitlines() else cleaned
+    return first_line.strip()
+
+
 def _board_position_api_health_url(runtime_env: dict[str, str]) -> str:
     bind_host = str(runtime_env.get("BOARD_POSITION_API_BIND_HOST") or "127.0.0.1").strip() or "127.0.0.1"
     if bind_host in {"0.0.0.0", "::", "[::]"}:
@@ -4950,7 +4960,7 @@ class DashboardState:
                     remote_command='printf %s "$HOME"',
                     timeout=8,
                 )
-                remote_home = (home_proc.stdout or "").strip()
+                remote_home = _sanitize_remote_path_output(home_proc.stdout or "")
                 if home_proc.returncode == 0 and remote_home:
                     runtime_env_values["MLKEM_REMOTE_SERVER_SCRIPT"] = (
                         f"{remote_home.rstrip('/')}/tcp_server.py"

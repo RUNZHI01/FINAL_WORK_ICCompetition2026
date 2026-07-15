@@ -3572,6 +3572,49 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(captured["env_values"]["MLKEM_REMOTE_SERVER_SCRIPT"], "/home/demo-user/tcp_server.py")
         self.assertIn("echo start-remote-server", captured["commands"])
 
+    def test_ensure_board_tcp_server_strips_ansi_from_remote_home(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access.with_env_overrides({"MLKEM_STATUS_STARTUP_WAIT_SEC": "2"}),
+        )
+        captured: dict[str, object] = {}
+
+        def fake_run_ssh_command(*, remote_command: str, **kwargs: object):
+            del kwargs
+            if remote_command == 'printf %s "$HOME"':
+                return server.subprocess.CompletedProcess(
+                    [],
+                    0,
+                    stdout="/home/demo-user\x1b[?9001l\x1b[?1004l\n",
+                    stderr="",
+                )
+            captured.setdefault("commands", []).append(remote_command)
+            return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        def fake_build_remote_crypto_server_command(env_values: dict[str, str], *, local_server_script: Path | None = None) -> str:
+            del local_server_script
+            captured["env_values"] = dict(env_values)
+            return "echo start-remote-server"
+
+        with (
+            patch("server.fetch_json_direct", side_effect=RuntimeError("status down")),
+            patch("server.resolve_local_crypto_server", return_value=(Path("/tmp/ICCompetition2026/scripts/tcp_server.py"), [])),
+            patch.object(state, "_sync_remote_mlkem_server_assets", return_value={"updated": False}),
+            patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+            patch("server.build_remote_crypto_server_command", side_effect=fake_build_remote_crypto_server_command),
+            patch("server.time.sleep", return_value=None),
+        ):
+            state._ensure_board_tcp_server(board_access)
+
+        self.assertEqual(captured["env_values"]["MLKEM_REMOTE_SERVER_SCRIPT"], "/home/demo-user/tcp_server.py")
+        self.assertIn("echo start-remote-server", captured["commands"])
+
     def test_ensure_board_tcp_server_restarts_when_running_process_uses_shell_wrapped_tvm_python(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
