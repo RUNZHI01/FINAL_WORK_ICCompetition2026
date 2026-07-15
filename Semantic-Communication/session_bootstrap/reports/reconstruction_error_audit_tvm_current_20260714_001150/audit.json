@@ -1,0 +1,64 @@
+{
+  "original_dir": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reference_current",
+  "recon_dir": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reconstructions",
+  "sample_size_requested": 1,
+  "seed": 0,
+  "recon_suffix": "_recon",
+  "candidate_count": 1,
+  "audited_count": 1,
+  "aggregate": {
+    "ok_count": 0,
+    "shape_mismatch_count": 1,
+    "mean_mse": null,
+    "min_mse": null,
+    "max_mse": null,
+    "mean_rmse": null,
+    "min_rmse": null,
+    "max_rmse": null,
+    "mean_mae": null,
+    "min_mae": null,
+    "max_mae": null,
+    "mean_max_abs_diff": null,
+    "min_max_abs_diff": null,
+    "max_max_abs_diff": null,
+    "mean_p95_abs_diff": null,
+    "min_p95_abs_diff": null,
+    "max_p95_abs_diff": null,
+    "mean_psnr_db": null,
+    "min_psnr_db": null,
+    "max_psnr_db": null,
+    "mean_ssim": null,
+    "min_ssim": null,
+    "max_ssim": null,
+    "mean_pixel_equal_ratio": null,
+    "min_pixel_equal_ratio": null,
+    "max_pixel_equal_ratio": null
+  },
+  "records": [
+    {
+      "stem": "Places365_val_00000208",
+      "status": "shape_mismatch",
+      "original_path": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reference_current\\Places365_val_00000208.png",
+      "reconstruction_path": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reconstructions\\Places365_val_00000208_recon.png",
+      "original_shape": [
+        249,
+        249,
+        3
+      ],
+      "reconstruction_shape": [
+        256,
+        256,
+        3
+      ],
+      "shape_match": false,
+      "mse": null,
+      "rmse": null,
+      "mae": null,
+      "max_abs_diff": null,
+      "p95_abs_diff": null,
+      "psnr_db": null,
+      "ssim": null,
+      "pixel_equal_ratio": null
+    }
+  ]
+}

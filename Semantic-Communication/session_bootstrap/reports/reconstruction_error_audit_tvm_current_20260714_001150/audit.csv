@@ -1,0 +1,2 @@
+stem,status,shape_match,original_path,reconstruction_path,original_shape,reconstruction_shape,mse,rmse,mae,max_abs_diff,p95_abs_diff,psnr_db,ssim,pixel_equal_ratio
+Places365_val_00000208,shape_mismatch,False,Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_20260714_001150\reference_current\Places365_val_00000208.png,Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_20260714_001150\reconstructions\Places365_val_00000208_recon.png,249x249x3,256x256x3,,,,,,,,

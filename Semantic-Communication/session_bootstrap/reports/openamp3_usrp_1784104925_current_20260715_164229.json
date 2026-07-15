@@ -1,0 +1,304 @@
+{
+  "status": "ok",
+  "run_id": "openamp3_usrp_1784104925_current_20260715_164229",
+  "runner": "run_big_little_pipeline.sh",
+  "env_file": null,
+  "variant": "current",
+  "remote_mode": "ssh",
+  "log_file": "E:/Main/Career/集创赛/FINAL_WORK_ICCompetition2026/FINAL_WORK_ICCompetition2026/Semantic-Communication/session_bootstrap/logs/openamp3_usrp_1784104925_current_20260715_164229.log",
+  "pipeline": {
+    "status": "ok",
+    "mode": "big_little_pipeline",
+    "execution_mode": "pipeline",
+    "backend": "processes",
+    "variant": "current",
+    "dry_run": false,
+    "mock_infer_ms": null,
+    "artifact_path": "/home/user/Downloads/jscc-test/jscc_opus_final_mean4_v7_20260406/tvm_tune_logs/optimized_model.so",
+    "artifact_sha256": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+    "artifact_sha256_expected": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+    "artifact_sha256_match": true,
+    "input_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-1784104925_rx",
+    "output_dir": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784104925_current",
+    "output_count": 3,
+    "processed_count": 3,
+    "input_count": 3,
+    "available_input_count": 3,
+    "load_ms": 3.684,
+    "vm_init_ms": 0.486,
+    "run_samples_ms": [
+      254.416,
+      247.944,
+      243.624
+    ],
+    "run_count": 3,
+    "run_median_ms": 247.944,
+    "run_mean_ms": 248.661,
+    "run_min_ms": 243.624,
+    "run_max_ms": 254.416,
+    "run_variance_ms2": 19.669392,
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_dtype": "float32",
+    "preload_load_samples_ms": [
+      6.579,
+      4.023,
+      1.552
+    ],
+    "preload_awgn_samples_ms": [
+      4.01,
+      3.173,
+      2.881
+    ],
+    "save_samples_ms": [
+      167.705,
+      75.2,
+      73.066
+    ],
+    "preload_load_summary": {
+      "count": 3,
+      "median_ms": 4.023,
+      "mean_ms": 4.051,
+      "min_ms": 1.552,
+      "max_ms": 6.579,
+      "variance_ms2": 4.211654
+    },
+    "preload_awgn_summary": {
+      "count": 3,
+      "median_ms": 3.173,
+      "mean_ms": 3.355,
+      "min_ms": 2.881,
+      "max_ms": 4.01,
+      "variance_ms2": 0.22888
+    },
+    "save_summary": {
+      "count": 3,
+      "median_ms": 75.2,
+      "mean_ms": 105.324,
+      "min_ms": 73.066,
+      "max_ms": 167.705,
+      "variance_ms2": 1946.481744
+    },
+    "total_wall_ms": 2741.881,
+    "images_per_sec": 1.094,
+    "ms_per_image": 913.96,
+    "snr": 10.0,
+    "batch_size": 1,
+    "max_inputs": 3,
+    "seed": 0,
+    "big_cores": [
+      2
+    ],
+    "little_cores": [
+      0,
+      1
+    ],
+    "input_queue_size": 4,
+    "output_queue_size": 4,
+    "input_chunk_size": 10,
+    "save_format": "png",
+    "tvm_version": "0.24.dev0",
+    "affinity": {
+      "preloader": {
+        "role": "preloader",
+        "requested": [
+          0,
+          1
+        ],
+        "before": [
+          0,
+          1,
+          2
+        ],
+        "after": [
+          0,
+          1
+        ],
+        "status": "applied",
+        "error": null
+      },
+      "inferencer": {
+        "role": "inferencer",
+        "requested": [
+          2
+        ],
+        "before": [
+          0,
+          1,
+          2
+        ],
+        "after": [
+          2
+        ],
+        "status": "applied",
+        "error": null
+      },
+      "postprocessor": {
+        "role": "postprocessor",
+        "requested": [
+          0,
+          1
+        ],
+        "before": [
+          0,
+          1,
+          2
+        ],
+        "after": [
+          0,
+          1
+        ],
+        "status": "applied",
+        "error": null
+      }
+    },
+    "stages": {
+      "preloader": {
+        "role": "preloader",
+        "status": "ok",
+        "affinity": {
+          "role": "preloader",
+          "requested": [
+            0,
+            1
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            0,
+            1
+          ],
+          "status": "applied",
+          "error": null
+        },
+        "queued_count": 3,
+        "available_input_count": 3,
+        "input_wait_timeout_sec": 60.0,
+        "input_poll_sec": 0.05,
+        "input_chunk_size": 10,
+        "load_samples_ms": [
+          6.579,
+          4.023,
+          1.552
+        ],
+        "awgn_samples_ms": [
+          4.01,
+          3.173,
+          2.881
+        ],
+        "load_summary": {
+          "count": 3,
+          "median_ms": 4.023,
+          "mean_ms": 4.051,
+          "min_ms": 1.552,
+          "max_ms": 6.579,
+          "variance_ms2": 4.211654
+        },
+        "awgn_summary": {
+          "count": 3,
+          "median_ms": 3.173,
+          "mean_ms": 3.355,
+          "min_ms": 2.881,
+          "max_ms": 4.01,
+          "variance_ms2": 0.22888
+        }
+      },
+      "inferencer": {
+        "role": "inferencer",
+        "status": "ok",
+        "affinity": {
+          "role": "inferencer",
+          "requested": [
+            2
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            2
+          ],
+          "status": "applied",
+          "error": null
+        },
+        "artifact_path": "/home/user/Downloads/jscc-test/jscc_opus_final_mean4_v7_20260406/tvm_tune_logs/optimized_model.so",
+        "artifact_sha256": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+        "artifact_sha256_expected": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+        "artifact_sha256_match": true,
+        "dry_run": false,
+        "mock_infer_ms": null,
+        "tvm_version": "0.24.dev0",
+        "runtime_preload_py": null,
+        "load_ms": 3.684,
+        "vm_init_ms": 0.486,
+        "processed_count": 3,
+        "run_samples_ms": [
+          254.416,
+          247.944,
+          243.624
+        ],
+        "run_summary": {
+          "count": 3,
+          "median_ms": 247.944,
+          "mean_ms": 248.661,
+          "min_ms": 243.624,
+          "max_ms": 254.416,
+          "variance_ms2": 19.669392
+        },
+        "output_shape": [
+          1,
+          3,
+          256,
+          256
+        ],
+        "output_dtype": "float32"
+      },
+      "postprocessor": {
+        "role": "postprocessor",
+        "status": "ok",
+        "affinity": {
+          "role": "postprocessor",
+          "requested": [
+            0,
+            1
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            0,
+            1
+          ],
+          "status": "applied",
+          "error": null
+        },
+        "output_count": 3,
+        "save_samples_ms": [
+          167.705,
+          75.2,
+          73.066
+        ],
+        "save_summary": {
+          "count": 3,
+          "median_ms": 75.2,
+          "mean_ms": 105.324,
+          "min_ms": 73.066,
+          "max_ms": 167.705,
+          "variance_ms2": 1946.481744
+        },
+        "last_output_path": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784104925_current/reconstructions/00000002_recon.png"
+      }
+    },
+    "errors": []
+  }
+}

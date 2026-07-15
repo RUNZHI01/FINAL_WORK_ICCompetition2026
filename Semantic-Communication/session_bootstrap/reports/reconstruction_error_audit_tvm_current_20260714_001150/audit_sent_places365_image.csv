@@ -1,0 +1,2 @@
+stem,status,shape_match,original_path,reconstruction_path,original_shape,reconstruction_shape,mse,rmse,mae,max_abs_diff,p95_abs_diff,psnr_db,ssim,pixel_equal_ratio
+Places365_val_00000208,ok,True,E:\Main\Career\集创赛\jscc-test\smallTest\Places365_val_00000208.jpg,Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_20260714_001150\reconstructions\Places365_val_00000208_recon.png,256x256x3,256x256x3,427.3948974609375,20.673531325367165,15.124720573425293,162.0,42.0,21.82251027920034,0.8910453877382074,0.0

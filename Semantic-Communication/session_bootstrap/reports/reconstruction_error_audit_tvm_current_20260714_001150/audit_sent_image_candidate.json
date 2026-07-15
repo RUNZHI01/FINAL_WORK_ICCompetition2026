@@ -1,0 +1,64 @@
+{
+  "original_dir": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reference_sent_image_candidate",
+  "recon_dir": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reconstructions",
+  "sample_size_requested": 1,
+  "seed": 0,
+  "recon_suffix": "_recon",
+  "candidate_count": 1,
+  "audited_count": 1,
+  "aggregate": {
+    "ok_count": 1,
+    "shape_mismatch_count": 0,
+    "mean_mse": 6657.337890625,
+    "min_mse": 6657.337890625,
+    "max_mse": 6657.337890625,
+    "mean_rmse": 81.5925112410753,
+    "min_rmse": 81.5925112410753,
+    "max_rmse": 81.5925112410753,
+    "mean_mae": 68.99115753173828,
+    "min_mae": 68.99115753173828,
+    "max_mae": 68.99115753173828,
+    "mean_max_abs_diff": 255.0,
+    "min_max_abs_diff": 255.0,
+    "max_max_abs_diff": 255.0,
+    "mean_p95_abs_diff": 156.0,
+    "min_p95_abs_diff": 156.0,
+    "max_p95_abs_diff": 156.0,
+    "mean_psnr_db": 9.897797609073926,
+    "min_psnr_db": 9.897797609073926,
+    "max_psnr_db": 9.897797609073926,
+    "mean_ssim": 0.14531106697392954,
+    "min_ssim": 0.14531106697392954,
+    "max_ssim": 0.14531106697392954,
+    "mean_pixel_equal_ratio": 0.0,
+    "min_pixel_equal_ratio": 0.0,
+    "max_pixel_equal_ratio": 0.0
+  },
+  "records": [
+    {
+      "stem": "Places365_val_00000208",
+      "status": "ok",
+      "original_path": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reference_sent_image_candidate\\Places365_val_00000208.jpg",
+      "reconstruction_path": "Semantic-Communication\\session_bootstrap\\reports\\reconstruction_error_audit_tvm_current_20260714_001150\\reconstructions\\Places365_val_00000208_recon.png",
+      "original_shape": [
+        256,
+        256,
+        3
+      ],
+      "reconstruction_shape": [
+        256,
+        256,
+        3
+      ],
+      "shape_match": true,
+      "mse": 6657.337890625,
+      "rmse": 81.5925112410753,
+      "mae": 68.99115753173828,
+      "max_abs_diff": 255.0,
+      "p95_abs_diff": 156.0,
+      "psnr_db": 9.897797609073926,
+      "ssim": 0.14531106697392954,
+      "pixel_equal_ratio": 0.0
+    }
+  ]
+}
