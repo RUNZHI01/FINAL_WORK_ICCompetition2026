@@ -13,6 +13,7 @@ param(
     [string]$BoardPassword = "user",
     [int]$BoardPort = 22,
     [string]$BoardInterface = "eth0",
+    [switch]$Fast,
     [string]$GitBashPath = ""
 )
 
@@ -198,11 +199,40 @@ function New-BoardRemoteCommand {
     $scriptPath = "/home/user/USRP292x/SetupUsrp2922BoardNetwork.sh"
     $quotedScript = ConvertTo-ShellSingleQuoted $scriptPath
     $quotedPass = ConvertTo-ShellSingleQuoted $BoardPassword
-    $envArgs = ""
+    $envPairs = @()
     if ($BoardInterface) {
-        $envArgs = "USRP2922_BOARD_IFACE=$(ConvertTo-ShellSingleQuoted $BoardInterface) "
+        $envPairs += "USRP2922_BOARD_IFACE=$(ConvertTo-ShellSingleQuoted $BoardInterface)"
     }
-    return "SCRIPT=$quotedScript; if [ ! -x " + '"$SCRIPT"' + " ]; then echo board network script not found or not executable: " + '"$SCRIPT"' + " >&2; exit 1; fi; printf '%s\n' $quotedPass | sudo -S env ${envArgs}" + '"$SCRIPT"'
+    if ($Fast) {
+        $envPairs += "USRP2922_PROBE_UHD=0"
+        $envPairs += "USRP2922_SKIP_CLEANUP=1"
+        $envPairs += "USRP2922_DISABLE_SAMBA=0"
+        $envPairs += "USRP2922_PING_COUNT=1"
+    }
+    $envArgs = ""
+    if ($envPairs.Count -gt 0) {
+        $envArgs = ($envPairs -join " ") + " "
+    }
+
+    $remoteLines = @()
+    if ($Fast -and $BoardInterface) {
+        $quotedIface = ConvertTo-ShellSingleQuoted $BoardInterface
+        $remoteLines += "FAST_IFACE=$quotedIface"
+        $remoteLines += "FAST_DEVICE='192.168.10.22'"
+        $remoteLines += 'if command -v ping >/dev/null 2>&1 && ping -c 1 -W 1 -I "$FAST_IFACE" "$FAST_DEVICE" >/dev/null 2>&1; then'
+        $remoteLines += '  echo "[fast] board USRP link already reachable: ${FAST_IFACE} -> ${FAST_DEVICE}"'
+        $remoteLines += '  exit 0'
+        $remoteLines += 'fi'
+    }
+    $remoteLines += "SCRIPT=$quotedScript"
+    $remoteLines += 'if [ ! -x "$SCRIPT" ]; then'
+    $remoteLines += '  echo "board network script not found or not executable: $SCRIPT" >&2'
+    $remoteLines += '  exit 1'
+    $remoteLines += 'fi'
+    $remoteLines += "printf '%s\n' $quotedPass | sudo -S env ${envArgs}" + '"$SCRIPT"'
+    $remoteScript = ($remoteLines -join "`n") + "`n"
+    $encodedScript = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
+    return "printf %s $encodedScript | base64 -d | bash"
 }
 
 function Configure-BoardLink {
@@ -224,14 +254,25 @@ function Configure-BoardLink {
         Write-DemoLog "board interface override: $BoardInterface"
     }
     if ($PSCmdlet.ShouldProcess("$BoardUser@$BoardHost", "run SetupUsrp2922BoardNetwork.sh")) {
-        Write-DemoLog "waiting for board NetworkManager and UHD probe; this can take about 30-60 seconds"
+        if ($Fast) {
+            Write-DemoLog "fast board recovery: ping precheck first; fallback skips cleanup, Samba changes, and UHD probe"
+        }
+        else {
+            Write-DemoLog "waiting for board NetworkManager and UHD probe; this can take about 30-60 seconds"
+        }
+        $sshTimeoutSec = 60
+        if ($Fast) {
+            $sshTimeoutSec = 30
+        }
         & python $paramikoScript `
             --host $BoardHost `
             --user $BoardUser `
             --pass-env USRP_DEMO_BOARD_PASS `
             --port $BoardPort `
-            --timeout-sec 60 `
+            --timeout-sec $sshTimeoutSec `
             -- `
+            bash `
+            -lc `
             $remoteCommand
         if ($LASTEXITCODE -ne 0) {
             throw "board network configuration failed with exit code $LASTEXITCODE"

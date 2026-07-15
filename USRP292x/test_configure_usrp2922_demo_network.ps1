@@ -29,6 +29,7 @@ foreach ($requiredParam in @(
     "BoardPassword",
     "BoardPort",
     "BoardInterface",
+    "Fast",
     "GitBashPath"
 )) {
     if ($paramNames -notcontains $requiredParam) {
@@ -46,7 +47,11 @@ foreach ($requiredText in @(
     "SetupUsrp2922BoardNetwork.sh",
     "ssh_with_password_paramiko.py",
     "Get-NetRoute",
-    "New-NetRoute"
+    "New-NetRoute",
+    "USRP2922_PROBE_UHD=0",
+    "USRP2922_SKIP_CLEANUP=1",
+    "USRP2922_PING_COUNT=1",
+    "-lc"
 )) {
     if (-not $content.Contains($requiredText)) {
         throw "missing required text: $requiredText"
@@ -55,6 +60,22 @@ foreach ($requiredText in @(
 
 if (-not $content.Contains('[string]$BoardInterface = "eth0"')) {
     throw "BoardInterface must default to eth0 for the demo wiring."
+}
+
+$canonicalScript = Join-Path (Split-Path $PSScriptRoot -Parent) "scripts\setup_usrp2922_network.sh"
+if (-not (Test-Path $canonicalScript)) {
+    throw "missing canonical script: $canonicalScript"
+}
+
+$canonicalContent = Get-Content -Raw $canonicalScript
+foreach ($requiredText in @(
+    "USRP2922_PROBE_UHD",
+    "USRP2922_SKIP_CLEANUP",
+    "USRP2922_PING_COUNT"
+)) {
+    if (-not $canonicalContent.Contains($requiredText)) {
+        throw "canonical script missing fast-init support: $requiredText"
+    }
 }
 
 $boardWhatIf = powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath `

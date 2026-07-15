@@ -51,11 +51,19 @@ USRP2922 网口恢复入口按用途分开：
 # 管理员 PowerShell：配置上位机/TX 网口，网卡名按 Status 输出填写
 .\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target UpperHost -InterfaceAlias "以太网"
 
-# 如需同时触发板端/RX 网口恢复
-.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73
+# 板端/RX 网口默认由 systemd 开机自恢复；不通时先跑快速兜底
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73 -Fast
 ```
 
 Windows 入口采用 `192.168.10.1/32 + 192.168.10.2/32` 显式 host route，避免现场多网卡或旧 `/24` 配置把 USRP 包路由到错误网口。
+
+板端自启动服务为 `usrp2922-board-autostart.service`，一次性安装入口在板端运行：
+
+```bash
+bash /home/user/USRP292x/InstallBoardUsrp2922Autostart.sh
+```
+
+服务会在开机后检查 `eth0 -> 192.168.10.22`，不通时用快速恢复重建板端 USRP 网口；完整排障时再使用不带 `-Fast` 的 `ConfigureUsrp2922DemoNetwork.ps1 -Target Board`。
 
 ```bash
 # 上位机/TX 侧：本机网口 192.168.10.1/32 -> USRP 192.168.10.2

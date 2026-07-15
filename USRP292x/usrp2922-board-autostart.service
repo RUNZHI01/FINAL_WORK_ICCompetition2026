@@ -1,0 +1,14 @@
+[Unit]
+Description=Restore board-side USRP2922 Ethernet link
+Wants=NetworkManager.service
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=USRP2922_BOARD_IFACE=eth0
+ExecStart=/home/user/USRP292x/BoardUsrp2922BootConnect.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

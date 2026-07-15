@@ -1,7 +1,7 @@
 # HANDOFF
 
-更新时间：2026-07-13
-当前分支：`feat/restore-248`
+更新时间：2026-07-15
+当前分支：`main`
 交接前代码保存点：以当前分支最新提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
 
 ## 当前主线
@@ -31,7 +31,7 @@
 | IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 默认 ARQ5、burst-miss retry、low-sync retry；仍需注意现场 RF 环境和天线位置 |
 | 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
 | 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
-| 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数 |
+| 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数；板端 USRP RX 网口可由 systemd 开机自恢复 |
 | 板卡会话 | 地址、密码、目录参数容易散落在脚本里 | Cockpit 可写入 board access；板卡地址、RX 目录、链路模式向参数化收敛 |
 | 文档和测试 | 资料分散在运行日志和零散报告里 | 新增/更新 runbook、安全审计、HANDOFF、layout tests、crypto scope/gate/auth 负测 |
 
@@ -64,11 +64,19 @@ USRP2922 网口恢复脚本按用途分开。上位机/TX 侧使用：
 # 管理员 PowerShell 中配置上位机/TX 网口
 .\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target UpperHost -InterfaceAlias "以太网"
 
-# 通过 SSH 触发板端/RX 网口恢复，默认 user/user
-.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73
+# 板端/RX 网口默认开机自恢复；不通时先用快速兜底
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73 -Fast
 ```
 
 这个入口只用于现场恢复。Windows 上位机侧目标形态是 `192.168.10.1/32` 加 `192.168.10.2/32` 显式路由，不依赖整段 `/24` 子网，避免多网卡时路由跑偏。
+
+板端自启动服务为 `usrp2922-board-autostart.service`，一次性安装入口：
+
+```bash
+bash /home/user/USRP292x/InstallBoardUsrp2922Autostart.sh
+```
+
+服务会在开机后检查 `eth0 -> 192.168.10.22`，不通时使用快速恢复；完整排障再运行不带 `-Fast` 的 `ConfigureUsrp2922DemoNetwork.ps1 -Target Board`。
 
 ```bash
 sudo ./USRP292x/SetupUsrp2922UpperHostNetwork.sh

@@ -39,6 +39,10 @@ BOARD_DEVICE="${USRP2922_BOARD_DEVICE:-192.168.10.22}"
 STALE_USRP_CONNECTIONS="${USRP2922_STALE_CONNECTIONS:-USRP2922,USRP2922-A,USRP2922-B}"
 LEGACY_WIRED_CONNECTIONS="${USRP2922_LEGACY_CONNECTIONS:-Win11File,Wired connection 1,Wired connection 2}"
 DISABLE_SAMBA="${USRP2922_DISABLE_SAMBA:-1}"
+SKIP_CLEANUP="${USRP2922_SKIP_CLEANUP:-0}"
+PROBE_UHD="${USRP2922_PROBE_UHD:-1}"
+PING_COUNT="${USRP2922_PING_COUNT:-2}"
+PING_TIMEOUT_SEC="${USRP2922_PING_TIMEOUT_SEC:-1}"
 
 usage() {
     cat <<EOF
@@ -67,6 +71,9 @@ Useful overrides:
   USRP2922_BOARD_ADDR=192.168.10.11/32
   USRP2922_HOST_DEVICE=192.168.10.2
   USRP2922_BOARD_DEVICE=192.168.10.22
+  USRP2922_SKIP_CLEANUP=1
+  USRP2922_PROBE_UHD=0
+  USRP2922_PING_COUNT=1
 
 Notes:
   - Device IPs are persistent on the USRP side; this script only configures host NICs.
@@ -131,6 +138,10 @@ disable_connection_if_exists() {
 }
 
 cleanup_stale_profiles() {
+    if [[ "${SKIP_CLEANUP}" == "1" ]]; then
+        echo "[cleanup] skipped by USRP2922_SKIP_CLEANUP=1"
+        return
+    fi
     for_csv_item "${STALE_USRP_CONNECTIONS}" delete_connection_if_exists
     for_csv_item "${LEGACY_WIRED_CONNECTIONS}" disable_connection_if_exists
 }
@@ -185,9 +196,11 @@ probe_link() {
     local device_addr="$3"
 
     echo "[probe] ${label}: ${iface} -> ${device_addr}"
-    if ping -c 2 -W 1 -I "${iface}" "${device_addr}"; then
-        if command -v uhd_find_devices >/dev/null 2>&1; then
+    if ping -c "${PING_COUNT}" -W "${PING_TIMEOUT_SEC}" -I "${iface}" "${device_addr}"; then
+        if [[ "${PROBE_UHD}" == "1" ]] && command -v uhd_find_devices >/dev/null 2>&1; then
             uhd_find_devices --args "addr=${device_addr}" || true
+        elif [[ "${PROBE_UHD}" != "1" ]]; then
+            echo "[probe] ${label}: UHD probe skipped by USRP2922_PROBE_UHD=0"
         fi
     else
         echo "[probe] ${label}: ping failed"
