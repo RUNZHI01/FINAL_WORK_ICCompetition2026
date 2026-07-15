@@ -12,27 +12,33 @@
 |---|---|---|
 | 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
-| 能连上飞腾派和 Tailscale | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
+| 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP IQ 直传、认证加密默认开启、5 张隐藏预热 |
+| 要跑旧交付容器入口 | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
 | 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |
 
 ## 当前演示 Quick Start
 
-现场演示主线是 `Cockpit Desktop -> USRP IQ 直传 -> 板端 TVM big.LITTLE 重建`。Windows 日常调试用 Git Bash 只作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
+现场演示主线是 `Cockpit Desktop -> USRP IQ 直传 -> 板端 TVM big.LITTLE 重建`。Windows 现场入口已经封装成 PowerShell 脚本；它会查找 Git Bash 作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
-$env:REMOTE_PASS = 'user'   # 比赛现场改为实际板卡 SSH 密码，或等待脚本提示输入
-& 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026\Semantic-Communication\cockpit_desktop
+.\start-demo.ps1
 ```
 
-交付包入口仍可直接运行：
+`start-demo.ps1` 默认按当前板卡恢复口径使用 `user/user`。如果现场改过板卡地址或密码，用参数覆盖：
+
+```powershell
+.\start-demo.ps1 -BoardHost '<board-ip>' -BoardUser '<board-user>' -BoardPassword '<board-password>'
+```
+
+`start-demo.ps1` 是当前推荐入口。`start-dev.sh` 仍是底层 Git Bash 入口，保留给调试；`docker/run-demo-tailscale.ps1` 是旧交付容器入口，也可以直接运行：
 
 ```powershell
 .\docker\run-demo-tailscale.ps1
 ```
 
-当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。板卡密码不写入仓库；启动预热需要临时设置 `REMOTE_PASS` 或按脚本提示输入，当前验证环境是 `user / user`。
+当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_PASS=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。
 
 `start-dev.sh` 会在显示 Cockpit Desktop 前静默完成 5 张 `USRP IQ + TVM` warm-up，并清掉隐藏 batch 状态，避免第一张冷启动 decode / TVM 尾部污染演示指标。如需调试界面而跳过预热，可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
 
@@ -51,6 +57,19 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 写材料时优先引用这些典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；板端 TVM 重建 median `241.20 ms`、p95 `242.59 ms`；预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
 当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧的 `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md` 只作为历史参考。
+
+## 板端备份与恢复边界
+
+`board_deps/` 是板端文件备份包，不是上位机程序目录。它保存可恢复飞腾派环境的 aarch64 runtime、模型、输入、OpenAMP 固件/DTB、UHD images、ML-KEM 远端脚本快照和公钥材料；上位机启动脚本在 `Semantic-Communication/cockpit_desktop/` 和 `docker/`。当前仓库内 `board_deps/` 约 718 MB，共 38 个文件，配有 `FILES.txt` 和 `SHA256SUMS`。2026-07-15 已做两项校验：本地 `sha256sum -c board_deps/SHA256SUMS` 通过，当前板卡执行 `board_deps/verify-board-deps.sh` 返回 `board-deps-ok`。
+
+板端备份刷新入口是 `docker/pull-board-deps.ps1` / `.sh`，会从当前飞腾派拉取运行时、模型、固件、OpenAMP 材料和 ML-KEM helper 到 `board_deps/`。这一步会改动大文件，只在确认板端状态比仓库更新时使用。恢复干净板卡时，把仓库放到板端后运行：
+
+```bash
+bash board_deps/install-board-deps.sh
+bash board_deps/verify-board-deps.sh
+```
+
+当前板卡默认 SSH 账号口令是 `user/user`，已写入现场启动脚本，方便断电或换机后快速恢复。Tailscale 凭据和私钥不进入仓库；`board_deps/crypto/public_keys/` 只保存演示需要的公钥归档。
 
 如果要抽查原图和重建图误差，不需要接入主 demo，直接跑独立脚本：
 

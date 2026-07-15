@@ -1,6 +1,21 @@
-# 板端依赖
+# 板端文件备份
 
-本目录保存飞腾派真机演示和板端 CLI 性能复现需要的运行时、模型、输入、OpenAMP 固件与源码材料。这些文件来自本项目验证过的飞腾派环境；实际连接地址由上层 Docker 脚本通过 `REMOTE_HOST` 或 `TAILSCALE_PING_TARGET` 指定。
+本目录只放飞腾派板端需要的文件备份：运行时、模型、输入、OpenAMP 固件/DTB、UHD images、ML-KEM 远端 helper、公钥和校验清单。上位机启动脚本不放在这里；它们在 `Semantic-Communication/cockpit_desktop/` 和 `docker/`。
+
+这些文件来自本项目验证过的飞腾派环境。当前仓库内本目录约 718 MB，共 38 个文件，`FILES.txt` 记录文件大小，`SHA256SUMS` 记录完整性校验。2026-07-15 已确认：本地 `sha256sum -c SHA256SUMS` 通过；当前板卡执行 `verify-board-deps.sh` 返回 `board-deps-ok`。
+
+需要从当前板卡刷新备份时，在上位机运行 `docker/pull-board-deps.ps1` 或 `docker/pull-board-deps.sh`。该操作会覆盖/更新本目录的大文件，只在确认板端状态比仓库更新时使用。
+
+## 板端 / 上位机边界
+
+| 类型 | 位置 | 用途 |
+|---|---|---|
+| 板端备份 | `board_deps/` | 恢复飞腾派 runtime、模型、固件、输入和安全信道 helper |
+| 上位机 Cockpit | `Semantic-Communication/cockpit_desktop/` | Windows/Electron 启动、UI、5 张隐藏预热 |
+| 上位机 Docker/SSH/TX | `docker/` | Docker runner、Tailscale、板端 smoke、备份拉取 |
+| USRP 数据面代码 | `USRP292x/` | 上位机 TX、板端 RX、QPSK/IQ 直传 runner |
+
+当前板卡默认 SSH 账号口令是 `user/user`，用于快速恢复演示。不要把 Tailscale 凭据或私钥放入本目录；`crypto/public_keys/` 只保存公钥归档。
 
 ## 内容清单
 

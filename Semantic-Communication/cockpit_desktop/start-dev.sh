@@ -370,12 +370,36 @@ usrp = request_json("POST", "/api/usrp-control/start", {}, timeout=90.0)
 if usrp.get("status") != "ready":
     raise SystemExit(f"USRP control did not become ready: {usrp}")
 
-started = request_json(
-    "POST",
-    "/api/run-inference-batch",
-    {"count": count, "allow_preflight_degraded": True, "warmup": True},
-    timeout=30.0,
-)
+try:
+    started = request_json(
+        "POST",
+        "/api/run-inference-batch",
+        {"count": count, "allow_preflight_degraded": True, "warmup": True},
+        timeout=90.0,
+    )
+except Exception as exc:
+    # The backend may keep the HTTP request open while the warm-up job is
+    # already queued. Do not abort the one-click startup until batch-state
+    # proves that no hidden warm-up exists.
+    print(f"启动预热提交未及时返回，转为轮询后端状态: {exc}", flush=True)
+    started = {}
+    start_deadline = time.monotonic() + min(timeout_sec, 120.0)
+    while time.monotonic() < start_deadline:
+        state = request_json("GET", "/api/batch-state", timeout=10.0)
+        state_status = str(state.get("status") or "")
+        state_total = int(state.get("total") or 0)
+        if state.get("warmup") and state_total == count and state_status in {
+            "running",
+            "done",
+            "completed",
+        }:
+            started = {
+                "status": "started" if state_status == "running" else "done",
+                "batch_job_id": state.get("batch_job_id") or "",
+            }
+            break
+        time.sleep(2.0)
+
 if started.get("status") not in {"started", "done"}:
     raise SystemExit(f"warm-up batch did not start: {started}")
 job_id = str(started.get("batch_job_id") or "")
