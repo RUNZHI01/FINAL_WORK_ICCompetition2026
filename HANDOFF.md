@@ -57,6 +57,19 @@ $env:REMOTE_PASS = 'user'
 
 USRP2922 网口恢复脚本按用途分开。上位机/TX 侧使用：
 
+```powershell
+# Windows 上位机先看状态，不改配置
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Status
+
+# 管理员 PowerShell 中配置上位机/TX 网口
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target UpperHost -InterfaceAlias "以太网"
+
+# 通过 SSH 触发板端/RX 网口恢复，默认 user/user
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73
+```
+
+这个入口只用于现场恢复。Windows 上位机侧目标形态是 `192.168.10.1/32` 加 `192.168.10.2/32` 显式路由，不依赖整段 `/24` 子网，避免多网卡时路由跑偏。
+
 ```bash
 sudo ./USRP292x/SetupUsrp2922UpperHostNetwork.sh
 ```

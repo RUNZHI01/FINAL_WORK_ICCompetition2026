@@ -44,6 +44,19 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 
 USRP2922 网口恢复入口按用途分开：
 
+```powershell
+# Windows 上位机现场入口：先只看状态，不改配置
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Status
+
+# 管理员 PowerShell：配置上位机/TX 网口，网卡名按 Status 输出填写
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target UpperHost -InterfaceAlias "以太网"
+
+# 如需同时触发板端/RX 网口恢复
+.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73
+```
+
+Windows 入口采用 `192.168.10.1/32 + 192.168.10.2/32` 显式 host route，避免现场多网卡或旧 `/24` 配置把 USRP 包路由到错误网口。
+
 ```bash
 # 上位机/TX 侧：本机网口 192.168.10.1/32 -> USRP 192.168.10.2
 sudo ./USRP292x/SetupUsrp2922UpperHostNetwork.sh
