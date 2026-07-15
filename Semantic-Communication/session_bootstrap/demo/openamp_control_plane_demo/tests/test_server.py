@@ -324,6 +324,60 @@ def test_usrp_remote_command_timeout_kills_windows_process_tree() -> None:
     assert run_mock.call_args.args[0][4] == "12345"
 
 
+def test_usrp_remote_command_uses_paramiko_runner_from_board_access_env() -> None:
+    access = usrp_runtime.BoardAccessConfig(
+        host="demo-board",
+        user="user",
+        password="secret",
+        port="2200",
+        env_file=None,
+        env_values={"OPENAMP_SSH_RUNNER": "paramiko"},
+        source_summary="test",
+    )
+    popen_calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeStdin:
+        def __init__(self) -> None:
+            self.data = b""
+            self.closed = False
+
+        def write(self, data: bytes) -> int:
+            self.data += data
+            return len(data)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakePopen:
+        returncode = 0
+        pid = 12345
+
+        def __init__(self, command, **kwargs):  # type: ignore[no-untyped-def]
+            self.args = list(command)
+            self.stdin = FakeStdin() if kwargs.get("stdin") is subprocess.PIPE else None
+            popen_calls.append((self.args, dict(kwargs)))
+
+        def wait(self, timeout=None):  # type: ignore[no-untyped-def]
+            return 0
+
+    with (
+        patch("usrp_runtime.PYTHON_SSH_HELPER", Path("ssh_with_password_paramiko.py")),
+        patch("usrp_runtime.subprocess.Popen", side_effect=FakePopen),
+    ):
+        result = usrp_runtime._run_remote_command(access, "cat >/tmp/payload", timeout=9.0, input_data=b"payload")
+
+    assert result.returncode == 0
+    assert len(popen_calls) == 1
+    cmd, kwargs = popen_calls[0]
+    assert cmd[:3] == [sys.executable, "ssh_with_password_paramiko.py", "--host"]
+    assert "--pass-env" in cmd
+    assert kwargs["stdin"] is subprocess.PIPE
+    env = kwargs["env"]
+    assert isinstance(env, dict)
+    assert env["OPENAMP_REMOTE_PASS"] == "secret"
+    assert env["OPENAMP_SSH_TIMEOUT_SEC"] == "9.0"
+
+
 def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
     access = usrp_runtime.BoardAccessConfig(
         host="demo-board",
@@ -2505,6 +2559,59 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["execution_mode"], "prerecorded")
         self.assertEqual(payload["data_transport"], "prerecorded")
         self.assertIn("不走 USRP", str(payload["source_label"]))
+
+    def test_run_baseline_in_prerecorded_mode_launches_direct_pytorch_reference(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "demo-pass",
+                    "port": "22",
+                    "transport_mode": "tcp",
+                }
+            ).encode("utf-8"),
+        )
+
+        fake_live_job = FakeInferenceJob(
+            [
+                {
+                    "status": "running",
+                    "request_state": "running",
+                    "status_category": "running",
+                    "execution_mode": "live",
+                    "variant": "baseline",
+                    "control_transport": "none",
+                    "data_transport": "tcp",
+                    "runner_summary": {},
+                    "wrapper_summary": {},
+                    "diagnostics": {},
+                    "progress": live_progress_payload("真实在线执行（控制面降级）", "running", 76, "板端执行中"),
+                    "artifacts": {},
+                }
+            ],
+            job_id="pytorch-baseline-direct-001",
+        )
+
+        with (
+            patch("server.query_live_status", side_effect=AssertionError("PyTorch baseline should not use OpenAMP admission")),
+            patch.object(state, "_arm_mlkem_security_context", side_effect=AssertionError("PyTorch baseline should not arm ML-KEM control")),
+            patch("server.launch_remote_reconstruction_job", return_value=fake_live_job) as launch_job,
+        ):
+            payload = state.run_demo_inference(variant="baseline", image_index=0, max_inputs=300)
+
+        launch_job.assert_called_once()
+        _, kwargs = launch_job.call_args
+        self.assertEqual(kwargs["variant"], "baseline")
+        self.assertEqual(kwargs["max_inputs"], 300)
+        self.assertEqual(kwargs["control_transport"], "none")
+        self.assertEqual(payload["job_id"], "pytorch-baseline-direct-001")
+        self.assertEqual(payload["variant"], "baseline")
+        self.assertEqual(payload["status"], "running")
 
     def test_run_demo_inference_blocks_nontrusted_current_when_admission_stays_legacy_sha(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -6010,15 +6117,15 @@ class ServerMainTest(unittest.TestCase):
             f"{hashlib.sha256(local_path.read_bytes()).hexdigest()}  {remote_path}\n"
             for local_path, remote_path in asset_pairs
         ).encode("utf-8")
-        calls: list[list[str]] = []
+        calls: list[str] = []
 
-        def fake_run(cmd, **_kwargs):
-            calls.append(list(cmd))
-            if "scp" in cmd:
+        def fake_run_remote_command(_access, remote_command, **_kwargs):  # type: ignore[no-untyped-def]
+            calls.append(str(remote_command))
+            if "scp" in remote_command:
                 raise AssertionError("matching remote IQ assets should not be uploaded")
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=stdout, stderr=b"")
+            return subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=stdout, stderr=b"")
 
-        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+        with patch("usrp_runtime._run_remote_command", side_effect=fake_run_remote_command):
             result = usrp_runtime._sync_iq_decode_assets_on_remote(
                 access,
                 remote_project_root="/home/user",
@@ -6026,9 +6133,7 @@ class ServerMainTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "current")
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], usrp_runtime.resolve_bash_executable())
-        self.assertEqual(calls[0][1], str(usrp_runtime.SSH_HELPER))
-        self.assertIn("sha256sum", calls[0][-1])
+        self.assertIn("sha256sum", calls[0])
 
     def test_sync_iq_decode_assets_uploads_tar_through_ssh_helper(self) -> None:
         usrp_runtime._IQ_DECODE_ASSET_SYNC_CACHE.clear()
@@ -6041,17 +6146,17 @@ class ServerMainTest(unittest.TestCase):
             env_values={},
             source_summary="test",
         )
-        calls: list[tuple[list[str], dict[str, object]]] = []
+        calls: list[tuple[str, dict[str, object]]] = []
 
-        def fake_run(cmd, **kwargs):
-            calls.append((list(cmd), dict(kwargs)))
-            self.assertNotIn("scp", cmd)
+        def fake_run_remote_command(_access, remote_command, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((str(remote_command), dict(kwargs)))
+            self.assertNotIn("scp", remote_command)
             if len(calls) == 1:
-                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
-            self.assertGreater(len(kwargs.get("input") or b""), 0)
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+                return subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"", stderr=b"")
+            self.assertGreater(len(kwargs.get("input_data") or b""), 0)
+            return subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"", stderr=b"")
 
-        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+        with patch("usrp_runtime._run_remote_command", side_effect=fake_run_remote_command):
             result = usrp_runtime._sync_iq_decode_assets_on_remote(
                 access,
                 remote_project_root="/home/user",
@@ -6059,9 +6164,7 @@ class ServerMainTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "uploaded")
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[1][0][0], usrp_runtime.resolve_bash_executable())
-        self.assertEqual(calls[1][0][1], str(usrp_runtime.SSH_HELPER))
-        self.assertIn("tar xzf", calls[1][0][-1])
+        self.assertIn("tar xzf", calls[1][0])
         self.assertGreaterEqual(float(calls[1][1]["timeout"]), 90.0)
 
     def test_sync_iq_decode_assets_reuses_successful_sync_in_process(self) -> None:
@@ -6075,16 +6178,16 @@ class ServerMainTest(unittest.TestCase):
             env_values={},
             source_summary="test",
         )
-        calls: list[tuple[list[str], dict[str, object]]] = []
+        calls: list[tuple[str, dict[str, object]]] = []
 
-        def fake_run(cmd, **kwargs):
-            calls.append((list(cmd), dict(kwargs)))
+        def fake_run_remote_command(_access, remote_command, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((str(remote_command), dict(kwargs)))
             if len(calls) == 1:
-                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
-            self.assertGreater(len(kwargs.get("input") or b""), 0)
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"", stderr=b"")
+                return subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"", stderr=b"")
+            self.assertGreater(len(kwargs.get("input_data") or b""), 0)
+            return subprocess.CompletedProcess(args=["ssh"], returncode=0, stdout=b"", stderr=b"")
 
-        with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+        with patch("usrp_runtime._run_remote_command", side_effect=fake_run_remote_command):
             first = usrp_runtime._sync_iq_decode_assets_on_remote(
                 access,
                 remote_project_root="/home/user",

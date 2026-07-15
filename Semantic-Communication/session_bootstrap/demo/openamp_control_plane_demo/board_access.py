@@ -14,6 +14,8 @@ HOST_KEYS = ("REMOTE_HOST", "PHYTIUM_PI_HOST")
 USER_KEYS = ("REMOTE_USER", "PHYTIUM_PI_USER")
 PASSWORD_KEYS = ("REMOTE_PASS", "PHYTIUM_PI_PASSWORD")
 PORT_KEYS = ("REMOTE_SSH_PORT", "PHYTIUM_PI_PORT")
+SSH_RUNNER_KEY = "OPENAMP_SSH_RUNNER"
+WINDOWS_DEFAULT_SSH_RUNNER = "paramiko"
 TRANSPORT_MODE_KEYS = ("MLKEM_TRANSPORT_MODE", "MLKEM_DATA_TRANSPORT", "MLKEM_TRANSPORT")
 INPUT_SOURCE_MODE_KEYS = ("OPENAMP_DEMO_INPUT_SOURCE_MODE", "REMOTE_INPUT_SOURCE_MODE")
 REMOTE_USRP_RX_DIR_KEYS = ("REMOTE_USRP_RX_DIR",)
@@ -589,6 +591,8 @@ def merge_env_values(
     else:
         for key in PASSWORD_KEYS:
             values.pop(key, None)
+    if os.name == "nt" and not str(values.get(SSH_RUNNER_KEY, "") or "").strip():
+        values[SSH_RUNNER_KEY] = WINDOWS_DEFAULT_SSH_RUNNER
     return apply_trusted_current_artifact_binding(values)
 
 

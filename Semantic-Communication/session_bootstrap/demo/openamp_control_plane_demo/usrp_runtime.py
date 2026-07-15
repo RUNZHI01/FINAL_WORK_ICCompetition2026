@@ -88,6 +88,13 @@ SSH_HELPER = (
     / "scripts"
     / "ssh_with_password.sh"
 )
+PYTHON_SSH_HELPER = (
+    REPO_ROOT
+    / "Semantic-Communication"
+    / "session_bootstrap"
+    / "scripts"
+    / "ssh_with_password_paramiko.py"
+)
 
 RUNNER_SCRIPT_KEYS = ("MLKEM_USRP_RUNNER_SCRIPT", "USRP_RUNNER_SCRIPT")
 INPUT_DIR_KEYS = ("MLKEM_USRP_INPUT_DIR", "USRP_INPUT_DIR")
@@ -535,21 +542,42 @@ def _run_remote_command(
     timeout: float = 20.0,
     input_data: bytes | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
-    cmd = [
-        resolve_bash_executable(),
-        str(SSH_HELPER),
-        "--host",
-        access.host,
-        "--user",
-        access.user,
-        "--pass",
-        access.password,
-        "--port",
-        access.port,
-        "--",
-        command,
-    ]
     env = os.environ.copy()
+    runner = str(access.env_values.get("OPENAMP_SSH_RUNNER") or env.get("OPENAMP_SSH_RUNNER") or "").strip().lower()
+    use_paramiko = runner == "paramiko" or (os.name == "nt" and runner != "docker" and PYTHON_SSH_HELPER.is_file())
+    if use_paramiko:
+        env["OPENAMP_REMOTE_PASS"] = access.password
+        cmd = [
+            sys.executable,
+            str(PYTHON_SSH_HELPER),
+            "--host",
+            access.host,
+            "--user",
+            access.user,
+            "--pass-env",
+            "OPENAMP_REMOTE_PASS",
+            "--port",
+            str(access.port),
+            "--timeout-sec",
+            str(max(1.0, timeout)),
+            "--",
+            command,
+        ]
+    else:
+        cmd = [
+            resolve_bash_executable(),
+            str(SSH_HELPER),
+            "--host",
+            access.host,
+            "--user",
+            access.user,
+            "--pass",
+            access.password,
+            "--port",
+            access.port,
+            "--",
+            command,
+        ]
     env.setdefault("OPENAMP_SSH_TIMEOUT_SEC", str(max(1.0, timeout)))
     stdout_path: Path | None = None
     stderr_path: Path | None = None

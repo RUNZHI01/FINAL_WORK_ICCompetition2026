@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -198,13 +199,21 @@ def run_live_probe(
             command = build_probe_command(env_file)
         else:
             command = build_probe_command(env_file, env_values=env_values)
+        subprocess_kwargs: dict[str, Any] = {}
+        if env_values is not None:
+            subprocess_env = os.environ.copy()
+            subprocess_env.update({str(key): str(value) for key, value in env_values.items()})
+            subprocess_env.setdefault("OPENAMP_SSH_TIMEOUT_SEC", str(timeout_sec))
+            subprocess_kwargs["env"] = subprocess_env
         result = subprocess.run(
             command,
             cwd=PROJECT_ROOT,
             check=False,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=timeout_sec,
+            **subprocess_kwargs,
         )
     except subprocess.TimeoutExpired:
         return {

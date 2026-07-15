@@ -5,12 +5,14 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 DEMO_ROOT = Path(__file__).resolve().parents[1]
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
+import board_access  # noqa: E402
 from board_access import (  # noqa: E402
     DEFAULT_INFERENCE_ENV_CANDIDATES,
     apply_trusted_current_artifact_binding,
@@ -297,6 +299,20 @@ class DemoBoardAccessDefaultsTest(unittest.TestCase):
         self.assertTrue(access.connection_ready)
         self.assertEqual(access.missing_connection_fields(), [])
         self.assertEqual(access.build_env()["REMOTE_PASS"], "demo-pass")
+
+    def test_windows_subprocess_env_defaults_to_paramiko_ssh_runner(self) -> None:
+        with (
+            patch.dict(board_access.os.environ, {"OPENAMP_SSH_RUNNER": ""}, clear=False),
+            patch.object(board_access.os, "name", "nt"),
+        ):
+            access = build_board_access_config(
+                {"host": "demo-board", "user": "demo-user", "password": "demo-pass"},
+                fallback=None,
+            )
+            env = access.build_subprocess_env()
+
+        self.assertEqual(env["REMOTE_PASS"], "demo-pass")
+        self.assertEqual(env["OPENAMP_SSH_RUNNER"], "paramiko")
 
     def test_explicit_env_file_preserves_validated_torch_sidecar_when_older_env_blanks_it(self) -> None:
         defaults = build_demo_default_board_access(None)

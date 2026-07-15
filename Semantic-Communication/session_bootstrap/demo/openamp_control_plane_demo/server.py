@@ -9350,7 +9350,27 @@ class DashboardState:
             )
             return payload
 
-        if board_access.configured:
+        if variant == "baseline" and board_access.configured:
+            active_record = self._running_inference_job_record()
+            if active_record is not None:
+                with self._lock:
+                    stale = str(active_record.get("job_id", ""))
+                    if stale and stale in self._inference_jobs:
+                        del self._inference_jobs[stale]
+            live_job = launch_remote_reconstruction_job(
+                live_board_access,
+                variant=variant,
+                max_inputs=max_inputs,
+                control_transport="none",
+                link_health_profile=self._current_link_health_profile_id(),
+            )
+            event_record, payload = self._register_live_job(
+                live_job=live_job,
+                variant=variant,
+                image_index=image_index,
+                security_context=None,
+            )
+        elif board_access.configured:
             active_record = self._running_inference_job_record()
             if active_record is not None:
                 with self._lock:

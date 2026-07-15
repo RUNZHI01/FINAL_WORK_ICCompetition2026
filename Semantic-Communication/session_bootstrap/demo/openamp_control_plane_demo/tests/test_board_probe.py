@@ -240,6 +240,7 @@ class RunLiveProbeTest(unittest.TestCase):
             command,
             cwd=PROJECT_ROOT,
             check=False,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=12.5,
@@ -257,6 +258,35 @@ class RunLiveProbeTest(unittest.TestCase):
                 "diagnostics": {},
             },
         )
+
+    def test_runtime_env_values_are_forwarded_to_probe_subprocess(self) -> None:
+        command = ["bash", "fake-connect"]
+        completed = subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({"hostname": "phytium-demo", "remoteproc": [], "rpmsg_devices": [], "firmware": {}}) + "\n",
+            stderr="",
+        )
+        env_values = {
+            "REMOTE_HOST": "demo-board",
+            "REMOTE_USER": "demo-user",
+            "REMOTE_PASS": "demo-pass",
+            "OPENAMP_SSH_RUNNER": "paramiko",
+        }
+
+        with (
+            patch("board_probe.build_probe_command", return_value=command) as build_command,
+            patch("board_probe.subprocess.run", return_value=completed) as run_mock,
+        ):
+            payload = run_live_probe(timeout_sec=9.0, env_values=env_values)
+
+        build_command.assert_called_once_with(None, env_values=env_values)
+        _, kwargs = run_mock.call_args
+        self.assertIs(kwargs["stdin"], subprocess.DEVNULL)
+        self.assertEqual(kwargs["env"]["OPENAMP_SSH_RUNNER"], "paramiko")
+        self.assertEqual(kwargs["env"]["OPENAMP_SSH_TIMEOUT_SEC"], "9.0")
+        self.assertEqual(kwargs["env"]["REMOTE_PASS"], "demo-pass")
+        self.assertEqual(payload["status"], "success")
 
     def test_timeout_returns_timeout_payload(self) -> None:
         command = ["bash", "fake-connect"]
@@ -276,6 +306,7 @@ class RunLiveProbeTest(unittest.TestCase):
             command,
             cwd=PROJECT_ROOT,
             check=False,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=3.0,
@@ -339,6 +370,7 @@ class RunLiveProbeTest(unittest.TestCase):
             command,
             cwd=PROJECT_ROOT,
             check=False,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=9.0,
@@ -406,6 +438,7 @@ class RunLiveProbeTest(unittest.TestCase):
             command,
             cwd=PROJECT_ROOT,
             check=False,
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             timeout=6.0,
