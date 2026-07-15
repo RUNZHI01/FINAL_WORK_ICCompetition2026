@@ -179,3 +179,17 @@ test('baseline fallback reference result still hydrates comparison from timings'
     quality: undefined,
   })
 })
+
+test('baseline reference result with zero timing is not shown as a comparison result', () => {
+  const result = comparisonResultFromInferencePayload({
+    status: 'success',
+    execution_mode: 'prerecorded',
+    variant: 'baseline',
+    timings: {
+      total_ms: 0,
+      payload_ms: 0,
+    },
+  })
+
+  assert.equal(result, undefined)
+})

@@ -172,6 +172,9 @@ export function comparisonResultFromInferencePayload(
   if (reconstructionMs == null) {
     return undefined
   }
+  if (engine === 'pytorch' && reconstructionMs <= 0) {
+    return undefined
+  }
 
   return {
     engine,

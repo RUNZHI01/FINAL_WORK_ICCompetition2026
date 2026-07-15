@@ -1064,7 +1064,7 @@ export function DashboardPageMinimal() {
                       {`点击上方「启动 TVM 推理 (${batchTargetLabel})」或「MNN ${batchTargetLabel}」开始在线推进`}
                     </div>
                     <div className={s.emptyDescription}>
-                      推理完成后将展示 TVM/MNN vs PyTorch 参考重建时间对比；TVM 单图结果会附带 PSNR/SSIM 质量指标
+                      推理完成后将展示 TVM/MNN 重建时间；PyTorch 仅在预录参考数据有效时参与对比
                     </div>
                   </div>
                 )}
