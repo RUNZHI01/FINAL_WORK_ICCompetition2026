@@ -2040,6 +2040,20 @@ def test_ssh_base_args_uses_stable_password_options_for_local_runner(monkeypatch
     assert "PreferredAuthentications=password,keyboard-interactive" in args
 
 
+def test_remote_path_probe_worker_inline_script_uses_single_line_launcher():
+    argv = analog_batch._remote_python_inline_script_argv(
+        "python3",
+        analog_batch.RemotePathProbeWorker._SCRIPT,
+    )
+
+    assert argv[:3] == ["python3", "-u", "-c"]
+    assert "\n" not in argv[-1]
+    assert "base64.b64decode" in argv[-1]
+    assert "'" not in argv[-1]
+    assert '"' not in argv[-1]
+    compile(argv[-1], "<remote-probe-launcher>", "exec")
+
+
 def test_ssh_start_control_master_skips_docker_runner(monkeypatch):
     monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
 

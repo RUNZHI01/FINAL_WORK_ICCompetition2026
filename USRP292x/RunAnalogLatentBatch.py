@@ -12,6 +12,7 @@ image_*/merged_round*.bin without knowing the PHY changed.
 from __future__ import annotations
 
 import argparse
+import base64
 import io
 import json
 import math
@@ -1929,6 +1930,13 @@ def remote_python_for_decode(args: argparse.Namespace) -> str:
     return "/home/user/venv/bin/python"
 
 
+def _remote_python_inline_script_argv(python_executable: str, script: str) -> list[str]:
+    encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
+    encoded_bytes = ",".join(str(value) for value in encoded.encode("ascii"))
+    launcher = f"import base64;exec(base64.b64decode(bytes([{encoded_bytes}])).decode())"
+    return [python_executable, "-u", "-c", launcher]
+
+
 def remote_analog_link_path(args: argparse.Namespace) -> str:
     """Remote path to AnalogLatentLink.py for remote-decode mode.
 
@@ -2179,12 +2187,7 @@ for line in sys.stdin:
         control_socket: str | None = None,
     ) -> "RemotePathProbeWorker":
         startup_started = time.monotonic()
-        remote_argv = [
-            remote_python_for_decode(args),
-            "-u",
-            "-c",
-            cls._SCRIPT,
-        ]
+        remote_argv = _remote_python_inline_script_argv(remote_python_for_decode(args), cls._SCRIPT)
         remote_cmd = " ".join(shlex.quote(arg) for arg in remote_argv)
         full = _ssh_base_args(timeout=15, control_socket=control_socket) + [target, remote_cmd]
         log_path.parent.mkdir(parents=True, exist_ok=True)
