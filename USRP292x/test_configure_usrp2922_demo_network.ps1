@@ -44,13 +44,28 @@ foreach ($requiredText in @(
     "192.168.10.22",
     "/32",
     "SetupUsrp2922BoardNetwork.sh",
-    "ssh_with_password.sh",
+    "ssh_with_password_paramiko.py",
     "Get-NetRoute",
     "New-NetRoute"
 )) {
     if (-not $content.Contains($requiredText)) {
         throw "missing required text: $requiredText"
     }
+}
+
+if (-not $content.Contains('[string]$BoardInterface = "eth0"')) {
+    throw "BoardInterface must default to eth0 for the demo wiring."
+}
+
+$boardWhatIf = powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath `
+    -Target Board `
+    -BoardHost "demo-board" `
+    -BoardUser "user" `
+    -BoardPassword "user" `
+    -WhatIf 2>&1
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Board -WhatIf failed:`n$($boardWhatIf | Out-String)"
 }
 
 Write-Host "configure-usrp2922-demo-network-ok"

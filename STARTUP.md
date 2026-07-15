@@ -1,7 +1,6 @@
 # Demo Startup
 
 1. 上电板卡，等 2 分钟。确认 Docker Desktop 已启动。
-
 2. 在仓库根目录打开 PowerShell：
 
 ```powershell
@@ -20,7 +19,7 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetitio
 .\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target UpperHost -InterfaceAlias "以太网"
 ```
 
-如板端 USRP 网口也要恢复：
+板端 USRP 网口恢复，当前固定使用 `eth0`：
 
 ```powershell
 .\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Board -BoardHost 100.121.87.73

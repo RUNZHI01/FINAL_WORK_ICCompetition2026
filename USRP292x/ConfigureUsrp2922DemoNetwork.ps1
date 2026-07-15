@@ -12,12 +12,13 @@ param(
     [string]$BoardUser = "user",
     [string]$BoardPassword = "user",
     [int]$BoardPort = 22,
-    [string]$BoardInterface = "",
+    [string]$BoardInterface = "eth0",
     [string]$GitBashPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$Script:DemoScriptRoot = $PSScriptRoot
 
 # Demo address plan:
 #   UpperHost/TX: 192.168.10.1/32 -> USRP 192.168.10.2/32
@@ -188,68 +189,49 @@ function Configure-UpperHostLink {
     Show-UpperHostStatus -DeviceAddress $UpperUsrpAddress -HostAddress $UpperHostAddress
 }
 
-function ConvertTo-Base64Utf8 {
+function ConvertTo-ShellSingleQuoted {
     param([string]$Text)
-    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Text))
+    return "'" + ($Text -replace "'", "'\\''") + "'"
 }
 
-function New-BoardRemoteScript {
-    $passwordB64 = ConvertTo-Base64Utf8 $BoardPassword
-    $ifaceB64 = ConvertTo-Base64Utf8 $BoardInterface
-    $script = @"
-set -euo pipefail
-decode_b64() {
-  printf '%s' "`$1" | base64 -d
-}
-SUDO_PASS="`$(decode_b64 '$passwordB64')"
-BOARD_IFACE="`$(decode_b64 '$ifaceB64')"
-SCRIPT='/home/user/USRP292x/SetupUsrp2922BoardNetwork.sh'
-if [ ! -x "`$SCRIPT" ]; then
-  echo "board network script not found or not executable: `$SCRIPT" >&2
-  exit 1
-fi
-if [ -n "`$BOARD_IFACE" ]; then
-  export USRP2922_BOARD_IFACE="`$BOARD_IFACE"
-fi
-printf '%s\n' "`$SUDO_PASS" | sudo -S "`$SCRIPT"
-"@
-    return $script
+function New-BoardRemoteCommand {
+    $scriptPath = "/home/user/USRP292x/SetupUsrp2922BoardNetwork.sh"
+    $quotedScript = ConvertTo-ShellSingleQuoted $scriptPath
+    $quotedPass = ConvertTo-ShellSingleQuoted $BoardPassword
+    $envArgs = ""
+    if ($BoardInterface) {
+        $envArgs = "USRP2922_BOARD_IFACE=$(ConvertTo-ShellSingleQuoted $BoardInterface) "
+    }
+    return "SCRIPT=$quotedScript; if [ ! -x " + '"$SCRIPT"' + " ]; then echo board network script not found or not executable: " + '"$SCRIPT"' + " >&2; exit 1; fi; printf '%s\n' $quotedPass | sudo -S env ${envArgs}" + '"$SCRIPT"'
 }
 
 function Configure-BoardLink {
-    $bash = Find-GitBash -ExplicitPath $GitBashPath
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $scriptDir = $Script:DemoScriptRoot
+    if (-not $scriptDir) {
+        throw "Cannot resolve script directory for board network configuration."
+    }
     $repoRoot = Resolve-Path (Join-Path $scriptDir "..")
-    $remoteScriptB64 = ConvertTo-Base64Utf8 (New-BoardRemoteScript)
+    $remoteCommand = New-BoardRemoteCommand
+    $paramikoScript = Join-Path $repoRoot.Path "Semantic-Communication\session_bootstrap\scripts\ssh_with_password_paramiko.py"
+    if (-not (Test-Path $paramikoScript)) {
+        throw "Paramiko SSH helper not found: $paramikoScript"
+    }
 
-    $env:USRP_DEMO_REPO_ROOT_WIN = $repoRoot.Path
-    $env:USRP_DEMO_BOARD_HOST = $BoardHost
-    $env:USRP_DEMO_BOARD_USER = $BoardUser
     $env:USRP_DEMO_BOARD_PASS = $BoardPassword
-    $env:USRP_DEMO_BOARD_PORT = [string]$BoardPort
-    $env:USRP_DEMO_REMOTE_SCRIPT_B64 = $remoteScriptB64
-    $env:OPENAMP_SSH_RUNNER = if ($env:OPENAMP_SSH_RUNNER) { $env:OPENAMP_SSH_RUNNER } else { "paramiko" }
-
-    $bashScript = @'
-set -euo pipefail
-repo_root="$(cygpath -u "$USRP_DEMO_REPO_ROOT_WIN")"
-ssh_helper="$repo_root/Semantic-Communication/session_bootstrap/scripts/ssh_with_password.sh"
-remote_cmd="printf '%s' '$USRP_DEMO_REMOTE_SCRIPT_B64' | base64 -d | bash"
-"$ssh_helper" \
-  --host "$USRP_DEMO_BOARD_HOST" \
-  --user "$USRP_DEMO_BOARD_USER" \
-  --pass "$USRP_DEMO_BOARD_PASS" \
-  --port "$USRP_DEMO_BOARD_PORT" \
-  -- \
-  "$remote_cmd"
-'@
 
     Write-DemoLog "configuring board RX link through SSH: ${BoardUser}@${BoardHost}:${BoardPort}"
     if ($BoardInterface) {
         Write-DemoLog "board interface override: $BoardInterface"
     }
     if ($PSCmdlet.ShouldProcess("$BoardUser@$BoardHost", "run SetupUsrp2922BoardNetwork.sh")) {
-        & $bash -lc $bashScript
+        & python $paramikoScript `
+            --host $BoardHost `
+            --user $BoardUser `
+            --pass-env USRP_DEMO_BOARD_PASS `
+            --port $BoardPort `
+            --timeout-sec 60 `
+            -- `
+            $remoteCommand
         if ($LASTEXITCODE -ne 0) {
             throw "board network configuration failed with exit code $LASTEXITCODE"
         }
