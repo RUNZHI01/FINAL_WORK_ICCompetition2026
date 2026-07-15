@@ -203,6 +203,21 @@ artifact SHA matched
 - TCP/ML-KEM 路径：latent payload、ACK、结果经 ML-KEM 派生密钥和 SM4/AES AEAD 保护。
 - USRP IQ 直传路径：ML-KEM + SM4 + ML-DSA + SM2 用作控制/认证面准入 gate；IQ 无线数据面仍是 USRP RF 链路。
 
+为什么不能直接把 AEAD 套到 IQ 数据面：
+
+- AEAD 处理的是字节流，输出是 `ciphertext + tag`，要求接收端 bit-exact 还原。
+- JSCC/IQ 直传处理的是连续 latent 复符号，允许无线链路带来小幅模拟误差，再由 TVM 重建吸收误差。
+- 如果对 IQ 数据面做 AEAD，任意 1 bit 错误都会导致 tag 校验失败，必须重新引入强纠错、重传和比特同步，链路会退回传统可靠数字传输，失去 IQ 直传的低时延优势。
+
+答辩推荐口径：
+
+> 当前方案不是把 USRP IQ 数据面包装成密码学加密链路，而是把安全职责放在控制面、会话面和身份认证面。ML-KEM + SM4-GCM/AES-GCM AEAD 保护 TCP 安全信道中的元数据、控制结果、ACK 和重建结果；ML-DSA + SM2 认证板端身份并绑定握手 transcript。USRP 数据面传输的是 JSCC 编码后的连续语义 latent，不是原图明文字节，但这不等价于密码学保密。
+
+可选扩展：
+
+- `AnalogLatentLink.py` 已有 `ANALOG_SCRAMBLE_KEY` / `--scramble-key` 机制，可对 IQ symbol 做 keyed permutation/sign scrambling。
+- 这只能作为数据面扰码或混淆增强来讲，不能叫标准加密，除非后续把 key 从安全信道派生并完成整链路回归。
+
 `/api/crypto-status` 已返回：
 
 ```text
