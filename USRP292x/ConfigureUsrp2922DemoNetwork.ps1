@@ -224,6 +224,7 @@ function Configure-BoardLink {
         Write-DemoLog "board interface override: $BoardInterface"
     }
     if ($PSCmdlet.ShouldProcess("$BoardUser@$BoardHost", "run SetupUsrp2922BoardNetwork.sh")) {
+        Write-DemoLog "waiting for board NetworkManager and UHD probe; this can take about 30-60 seconds"
         & python $paramikoScript `
             --host $BoardHost `
             --user $BoardUser `
