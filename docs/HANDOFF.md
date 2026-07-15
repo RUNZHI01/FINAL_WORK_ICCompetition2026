@@ -288,12 +288,11 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 | `mlkem_link/` | ML-KEM/SM4 安全信道和认证实现 |
 | `scripts/` | TCP client/server、TVM/MNN/PyTorch 辅助脚本 |
 | `docker/` | Docker/演示启动脚本 |
-| `docs/` | 当前交接、集成状态、runbook、安全审计和设计说明 |
-| `docs/archive/` | 历史 handoff、旧计划和 jscc_tran 原始交接，保留参考，不是当前入口 |
+| `docs/` | 当前 README、现场 STARTUP、HANDOFF、设计说明和安全部署说明 |
 | `logs/`、`runtime_logs/`、`local_logs/`、`.logs/`、`tmp/`、`artifacts/` | 运行输出或临时产物，不作为源码入口 |
 | `keys/` | 本地认证公钥/密钥材料，不要提交私钥 |
 
-赛前不要再移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些源码目录，很多脚本仍依赖现有相对路径；新增说明文档默认放入 `docs/`，过期材料放入 `docs/archive/`。
+赛前不要再移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些源码目录，很多脚本仍依赖现有相对路径；新增说明文档默认放入 `docs/`，历史 handoff、旧计划、过程审计和运行记录仅本地保留，不作为提交入口。
 
 ## 验证命令
 
@@ -319,8 +318,10 @@ npm run typecheck
 
 ## 文档入口
 
-- `docs/runbooks/cockpit_usrp_qpsk_tvm_runbook.md`：USRP/IQ/QPSK 运行记录和参数历史。
-- `docs/security/security_crypto_auth_audit_20260713.md`：加密与认证作用范围审计。
+- `docs/README.md`：当前仓库总览、典型指标和板端备份边界。
+- `docs/runbooks/STARTUP.md`：现场断电后最短启动流程。
+- `docs/HANDOFF.md`：交接、默认参数、实验开关和验证命令。
+- `docs/security/mlkem_auth_setup.md`：ML-KEM/SM4 与认证通道部署说明。
 - `docs/design/analog_latent_iq_phy.md`：analog latent-IQ PHY 设计说明。
 
 ## 去 Git Bash 的判断

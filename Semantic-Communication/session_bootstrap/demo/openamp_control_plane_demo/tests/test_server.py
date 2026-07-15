@@ -9972,7 +9972,7 @@ class DemoHTTPServerTest(unittest.TestCase):
 
     def test_docs_endpoint_renders_repo_relative_markdown_document(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
-        doc_path = "session_bootstrap/demo/openamp_control_plane_demo/README.md"
+        doc_path = "session_bootstrap/reports/openamp_control_plane_evidence_package_20260315/summary_report.md"
         expected_line = (REPO_ROOT / doc_path).read_text(encoding="utf-8").splitlines()[0]
 
         status, headers, body = request_text(state, "GET", f"/docs?path={quote(doc_path, safe='')}")
