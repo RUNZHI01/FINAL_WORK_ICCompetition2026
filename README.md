@@ -22,7 +22,7 @@
 现场演示主线是 `Cockpit Desktop -> USRP IQ 直传 -> 板端 TVM big.LITTLE 重建`。Windows 现场入口已经封装成 PowerShell 脚本；它会查找 Git Bash 作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026\Semantic-Communication\cockpit_desktop
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\Semantic-Communication\cockpit_desktop
 .\start-demo.ps1
 ```
 

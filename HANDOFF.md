@@ -40,7 +40,7 @@
 当前仍保留 Git Bash 启动外壳，Bash/SSH 热路径优先走 Docker，不用 WSL。
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 $env:REMOTE_PASS = 'user'
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
@@ -299,7 +299,7 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 ## 验证命令
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 
 python -m pytest mlkem_link/tests/test_auth.py::TestTranscript `
   mlkem_link/tests/test_auth.py::TestWireCodec `

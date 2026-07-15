@@ -166,7 +166,7 @@ IQ 直传跳过量化、QPSK 调制、CRC/ARQ。8-bit 量化引入的等效噪�
   因此远端接收端 **还不是一套完整可用的 IQ 直传接收环境**。
 
 - **后续同步原则**
-  1. 继续以 `FINAL_WORK_ICCompetition2026/FINAL_WORK_ICCompetition2026` 为唯一主修改面。
+  1. 继续以摊平后的 `FINAL_WORK_ICCompetition2026` 为唯一主修改面。
   2. 真正同步远端前，先在本地 FINAL_WORK 内冻结一版 IQ 直传所需文件集合。
   3. 远端同步时默认只做覆盖/新增，不主动删除远端历史文件；确需清理时单独审计。
 

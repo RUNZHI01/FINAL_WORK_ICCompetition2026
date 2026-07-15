@@ -7,7 +7,7 @@
 日常拉起 Cockpit Desktop 用仓库内一键脚本。Windows 上 Git Bash 只作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 

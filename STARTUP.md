@@ -4,7 +4,7 @@
 2. 在仓库根目录打开 PowerShell：
 
 ```powershell
-cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\FINAL_WORK_ICCompetition2026
+cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 ```
 
 3. 检查 USRP 网口：
