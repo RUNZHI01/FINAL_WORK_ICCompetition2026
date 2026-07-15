@@ -288,13 +288,12 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 | `mlkem_link/` | ML-KEM/SM4 安全信道和认证实现 |
 | `scripts/` | TCP client/server、TVM/MNN/PyTorch 辅助脚本 |
 | `docker/` | Docker/演示启动脚本 |
-| `docs/` | 现在应该优先看这里的 runbook 和安全审计 |
-| `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md`、`plan_20260710.md` | 历史交接和计划，保留参考，不是当前入口 |
+| `docs/` | 当前交接、集成状态、runbook、安全审计和设计说明 |
+| `docs/archive/` | 历史 handoff、旧计划和 jscc_tran 原始交接，保留参考，不是当前入口 |
 | `logs/`、`runtime_logs/`、`local_logs/`、`.logs/`、`tmp/`、`artifacts/` | 运行输出或临时产物，不作为源码入口 |
 | `keys/` | 本地认证公钥/密钥材料，不要提交私钥 |
-| `nul` | Windows 误生成文件，保持不提交 |
 
-目前不建议赛前重排文件树。真正需要清理时，先只归档旧 handoff 文档和运行日志，不要移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些路径，很多脚本仍依赖现有相对路径。
+赛前不要再移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些源码目录，很多脚本仍依赖现有相对路径；新增说明文档默认放入 `docs/`，过期材料放入 `docs/archive/`。
 
 ## 验证命令
 

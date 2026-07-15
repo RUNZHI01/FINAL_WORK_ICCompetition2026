@@ -2,7 +2,7 @@
 
 记录 `feat/iq-direct-tx` 分支上 analog latent-IQ 直传链路相对于最终目标 `JSCC Enc → IQ → Channel → IQ → JSCC Dec` 的集成进度。给接手者一个明确的"哪些已 wire、哪些待办、风险在哪"的清单。
 
-本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)，PHY 层设计原理见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`JSCC_TRAN_HANDOFF.md`](./JSCC_TRAN_HANDOFF.md)。
+本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`mlkem_auth_setup.md`](./mlkem_auth_setup.md)，PHY 层设计原理见 [`analog_latent_iq_phy.md`](./analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`analog_latent_iq_phy_full_proposal.md`](./analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`archive/jscc/JSCC_TRAN_HANDOFF.md`](./archive/jscc/JSCC_TRAN_HANDOFF.md)。
 
 ## 当前 live 状态（2026-07-10）
 

@@ -77,7 +77,7 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 
 写材料时优先引用这些典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；板端 TVM 重建 median `241.20 ms`、p95 `242.59 ms`；预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
-当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧的 `handoff_20260710*.md`、`JSCC_TRAN_HANDOFF.md` 只作为历史参考。
+当前交接入口是 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧的 handoff、计划和 JSCC 参考文档已归档到 `docs/archive/`。
 
 ## 板端备份与恢复边界
 
@@ -110,7 +110,7 @@ python scripts/audit_reconstruction_error.py `
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和报告。
 - `mlkem_link/`：ML-KEM + SM2 + ML-DSA 安全信道 Python 包（kem、auth、kdf、secure_channel、session）。
 - `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
-- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，当前 USRP 默认），以及原有 QPSK/CRC/ARQ 可靠字节链路兜底（详见 `INTEGRATION_STATUS.md`）。
+- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，当前 USRP 默认），以及原有 QPSK/CRC/ARQ 可靠字节链路兜底（详见 `docs/INTEGRATION_STATUS.md`）。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
 实际演示时主要分成三块：数据面负责把 latent 或现场输入送到板端；控制面负责下发任务、读取状态和收集日志；Electron 负责把链路状态、重建结果和耗时展示出来。
@@ -406,8 +406,7 @@ gcc -O2 -fPIC -shared /workspace/docker/tongsuo_sig_bridge.c \
 ```text
 FINAL_WORK_ICCompetition2026/
 ├── README.md
-├── INTEGRATION_STATUS.md      # IQ 直传路线当前集成状态和待办（WIP）
-├── JSCC_TRAN_HANDOFF.md       # jscc_tran 分支原始 handoff（PHY 设计参考）
+├── STARTUP.md                 # 现场最短启动流程
 ├── requirements.txt
 ├── docker/                    # Docker 复现、Electron、Tailscale、板端 smoke 入口
 ├── board_deps/                # 板端固件、runtime、模型、输入和校验清单
@@ -417,7 +416,7 @@ FINAL_WORK_ICCompetition2026/
 ├── Semantic-Communication/    # Electron 上位机、OpenAMP 控制面和板端脚本
 ├── liboqs/                    # liboqs 源码，Docker 构建时编译安装
 ├── host_pic_to_latent/        # JSCC / latent 编解码辅助代码
-└── docs/                      # analog latent-IQ PHY 设计、ML-KEM 部署、完整方案文档
+└── docs/                      # 当前交接、集成状态、设计说明和 archive 历史文档
 ```
 
 ## 8. IQ 直传路线（WIP）
@@ -451,4 +450,4 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 - 仍未做：真机线缆 + 30 dB 衰减器系统化扫描、TX/RX gain 配对调优、长批量 p95/outlier 抑制。
 - 已知 OpenAMP 控制面问题：`control_guard_state=PROBE_ERROR`、`board status endpoint unavailable: timed out`，与 ML-KEM 数据面相互独立，不影响握手和加密通道本身。
 
-详细差距清单、待办优先级、风险点和软件验证命令见 [`INTEGRATION_STATUS.md`](./INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。
+详细差距清单、待办优先级、风险点和软件验证命令见 [`docs/INTEGRATION_STATUS.md`](./docs/INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。
