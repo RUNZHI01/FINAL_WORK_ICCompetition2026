@@ -399,7 +399,7 @@ gcc -O2 -fPIC -shared /workspace/docker/tongsuo_sig_bridge.c \
 
 编译输出会有 `EC_KEY_*` deprecation 警告，无害。Ubuntu 22.04 自带的 vanilla OpenSSL 3.0.2 支持 SM2 sign/verify（走 deprecated `EC_KEY` 路径），**但不支持** SM2 keygen via `EVP_PKEY_Q_keygen("SM2")`，调用会返回 `rc=-1`。这不影响容器使用，因为容器只验签，keygen 在板端 Tongsuo 里完成。
 
-详细部署指南、典型故障和健康检查脚本见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)。
+详细部署指南、典型故障和健康检查脚本见 [`docs/security/mlkem_auth_setup.md`](./docs/security/mlkem_auth_setup.md)。
 
 ## 7. 仓库结构
 
@@ -450,4 +450,4 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 - 仍未做：真机线缆 + 30 dB 衰减器系统化扫描、TX/RX gain 配对调优、长批量 p95/outlier 抑制。
 - 已知 OpenAMP 控制面问题：`control_guard_state=PROBE_ERROR`、`board status endpoint unavailable: timed out`，与 ML-KEM 数据面相互独立，不影响握手和加密通道本身。
 
-详细差距清单、待办优先级、风险点和软件验证命令见 [`docs/INTEGRATION_STATUS.md`](./docs/INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/analog_latent_iq_phy.md`](./docs/analog_latent_iq_phy.md) 与 [`docs/analog_latent_iq_phy_full_proposal.md`](./docs/analog_latent_iq_phy_full_proposal.md)。
+详细差距清单、待办优先级、风险点和软件验证命令见 [`docs/INTEGRATION_STATUS.md`](./docs/INTEGRATION_STATUS.md)。设计原理和完整 0-16 Pro 方案见 [`docs/design/analog_latent_iq_phy.md`](./docs/design/analog_latent_iq_phy.md) 与 [`docs/design/analog_latent_iq_phy_full_proposal.md`](./docs/design/analog_latent_iq_phy_full_proposal.md)。

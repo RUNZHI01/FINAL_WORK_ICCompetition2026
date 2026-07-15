@@ -2,7 +2,7 @@
 
 记录 `feat/iq-direct-tx` 分支上 analog latent-IQ 直传链路相对于最终目标 `JSCC Enc → IQ → Channel → IQ → JSCC Dec` 的集成进度。给接手者一个明确的"哪些已 wire、哪些待办、风险在哪"的清单。
 
-本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`mlkem_auth_setup.md`](./mlkem_auth_setup.md)，PHY 层设计原理见 [`analog_latent_iq_phy.md`](./analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`analog_latent_iq_phy_full_proposal.md`](./analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`archive/jscc/JSCC_TRAN_HANDOFF.md`](./archive/jscc/JSCC_TRAN_HANDOFF.md)。
+本文件随实际进度更新。ML-KEM 安全信道部署指南见 [`security/mlkem_auth_setup.md`](./security/mlkem_auth_setup.md)，PHY 层设计原理见 [`design/analog_latent_iq_phy.md`](./design/analog_latent_iq_phy.md)，完整 0-16 Pro 方案见 [`design/analog_latent_iq_phy_full_proposal.md`](./design/analog_latent_iq_phy_full_proposal.md)，jscc_tran 原始 handoff 见 [`archive/jscc/JSCC_TRAN_HANDOFF.md`](./archive/jscc/JSCC_TRAN_HANDOFF.md)。
 
 ## 当前 live 状态（2026-07-10）
 
@@ -42,7 +42,7 @@ ML-KEM + SM2 + ML-DSA 控制面 **已端到端打通**，与 IQ 直传数据面�
 - 策略：`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`（SM2 + ML-DSA 双签同时校验），默认启用。
 - 角色：容器（x86_64）= Initiator/client，飞腾派（aarch64）= Responder/server。
 - 入口：`scripts/start_server_auth.sh`（容器端，15 个 `MLKEM_AUTH_*` env 全配齐）。
-- 容器端 x86_64 SM2 桥接库已编译并验证（见 [`docs/mlkem_auth_setup.md`](./docs/mlkem_auth_setup.md)）。
+- 容器端 x86_64 SM2 桥接库已编译并验证（见 [`security/mlkem_auth_setup.md`](./security/mlkem_auth_setup.md)）。
 
 剩余的安全面相关任务：
 

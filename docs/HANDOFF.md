@@ -319,9 +319,9 @@ npm run typecheck
 
 ## 文档入口
 
-- `docs/cockpit_usrp_qpsk_tvm_runbook.md`：USRP/IQ/QPSK 运行记录和参数历史。
-- `docs/security_crypto_auth_audit_20260713.md`：加密与认证作用范围审计。
-- `docs/analog_latent_iq_phy.md`：analog latent-IQ PHY 设计说明。
+- `docs/runbooks/cockpit_usrp_qpsk_tvm_runbook.md`：USRP/IQ/QPSK 运行记录和参数历史。
+- `docs/security/security_crypto_auth_audit_20260713.md`：加密与认证作用范围审计。
+- `docs/design/analog_latent_iq_phy.md`：analog latent-IQ PHY 设计说明。
 
 ## 去 Git Bash 的判断
 

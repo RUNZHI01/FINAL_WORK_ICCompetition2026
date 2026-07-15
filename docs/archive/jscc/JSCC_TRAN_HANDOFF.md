@@ -14,11 +14,11 @@ LGJSCC raw float latent -> analog I/Q waveform -> USRP sc16 -> recovered noisy l
 USRP292x/AnalogLatentLink.py
 USRP292x/RunAnalogLatentBatch.py
 USRP292x/README.md
-docs/analog_latent_iq_phy.md
-docs/analog_latent_iq_phy_full_proposal.md
+docs/design/analog_latent_iq_phy.md
+docs/design/analog_latent_iq_phy_full_proposal.md
 ```
 
-先读 `docs/analog_latent_iq_phy_full_proposal.md`。那份是完整 0-16 Pro 方案，包括总体链路、TX/RX 算法、manifest、安全面、runner、TVM/Generator 修改、参数表、验证路线和坑位。`docs/analog_latent_iq_phy.md` 是本分支实现版说明。
+先读 `docs/design/analog_latent_iq_phy_full_proposal.md`。那份是完整 0-16 Pro 方案，包括总体链路、TX/RX 算法、manifest、安全面、runner、TVM/Generator 修改、参数表、验证路线和坑位。`docs/design/analog_latent_iq_phy.md` 是本分支实现版说明。
 
 ## 为什么 USRP292x 只有三个新文件
 

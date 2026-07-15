@@ -5,7 +5,7 @@
 完整 0-16 Pro 方案见：
 
 ```text
-docs/analog_latent_iq_phy_full_proposal.md
+docs/design/analog_latent_iq_phy_full_proposal.md
 ```
 
 ## 数据链路
@@ -40,7 +40,7 @@ scripts/latent_transport.py
 scripts/tvm_inference_helper.py
 scripts/test_tvm_inference_channel_mode.py
 host_pic_to_latent/jscc/src/test_model.py
-docs/analog_latent_iq_phy.md
+docs/design/analog_latent_iq_phy.md
 ```
 
 没有修改 USRP C++ persistent TX/RX 服务。
