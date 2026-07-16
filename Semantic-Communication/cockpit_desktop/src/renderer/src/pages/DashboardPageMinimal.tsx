@@ -1303,20 +1303,17 @@ export function DashboardPageMinimal() {
                         <span className={s.pathValue}>{boardInputDir || '未配置'}</span>
                       </div>
                     )}
-                    <div className={s.pathItem}>
+                    <div className={`${s.pathItem} ${s.pathItemEditable}`}>
                       <span className={s.pathLabel}>板端重建输出目录</span>
-                      <div className={s.pathOutputContent}>
-                        <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
-                        <button
-                          type="button"
-                          className={s.pathComparisonButton}
-                          onClick={handleOpenReconstructionBrowser}
-                          disabled={reconstructionBrowserMut.isPending || !boardSessionReady || !boardOutputDir}
-                        >
-                          <Icons.Image size={14} />
-                          {reconstructionBrowserMut.isPending ? '启动中...' : '本次重建对比图'}
-                        </button>
-                      </div>
+                      <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
+                      <button
+                        type="button"
+                        className={s.btnFilledSm}
+                        onClick={handleOpenReconstructionBrowser}
+                        disabled={reconstructionBrowserMut.isPending || !boardSessionReady || !boardOutputDir}
+                      >
+                        {reconstructionBrowserMut.isPending ? '启动中...' : '本次重建对比图'}
+                      </button>
                     </div>
                   </div>
                 </div>

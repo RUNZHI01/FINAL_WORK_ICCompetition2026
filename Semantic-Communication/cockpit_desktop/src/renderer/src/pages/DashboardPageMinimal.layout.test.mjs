@@ -49,9 +49,9 @@ test('remote USRP RX directory save action is colocated with the board input pat
   assert.match(tsx, /板端输入\/RX 目录[\s\S]*handleSaveRemoteUsrPRxDir/)
 })
 
-test('reconstruction comparison entry follows the board output directory', () => {
-  assert.match(tsx, /板端重建输出目录[\s\S]*本次重建对比图/)
-  assert.match(css, /\.pathOutputContent\s*\{[\s\S]*display:\s*grid;/)
+test('reconstruction comparison action shares the applied directory button layout', () => {
+  assert.match(tsx, /className={`\$\{s\.pathItem\} \$\{s\.pathItemEditable\}`}>[\s\S]*板端重建输出目录[\s\S]*className=\{s\.btnFilledSm\}[\s\S]*本次重建对比图/)
+  assert.doesNotMatch(tsx, /className=\{s\.pathComparisonButton\}/)
 })
 
 test('external comparison link is restricted to loopback http', () => {
