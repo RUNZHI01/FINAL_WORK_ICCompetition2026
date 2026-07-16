@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,6 +32,8 @@ class FakeStream(io.BytesIO):
 class FakeSftp:
     def __init__(self) -> None:
         self.files: dict[str, bytes] = {}
+        self.file_sequences: dict[str, list[bytes]] = {}
+        self.entries: dict[str, list[SimpleNamespace]] = {}
         self.download_calls: list[str] = []
 
     def get(self, remote: str, local: str, callback=None) -> None:
@@ -41,6 +45,14 @@ class FakeSftp:
 
     def close(self) -> None:
         return
+
+    def listdir_attr(self, path: str):
+        return self.entries[path]
+
+    def open(self, path: str, mode: str = "rb"):
+        if path in self.file_sequences:
+            return io.BytesIO(self.file_sequences[path].pop(0))
+        return io.BytesIO(self.files[path])
 
 
 class FakeSsh:
@@ -66,20 +78,20 @@ def config() -> BoardConnectionConfig:
 
 
 def test_jobs_are_newest_first() -> None:
-    ssh = FakeSsh(
-        [
-            "100.0|/outputs/job-old/reconstructions\n"
-            "300.0|/outputs/job-new/reconstructions\n"
-        ]
-    )
+    sftp = FakeSftp()
+    sftp.entries["/outputs"] = [
+        SimpleNamespace(filename="job-old", st_mtime=100.0, st_mode=stat.S_IFDIR),
+        SimpleNamespace(filename="job-new", st_mtime=300.0, st_mode=stat.S_IFDIR),
+        SimpleNamespace(filename="summary.json", st_mtime=400.0, st_mode=stat.S_IFREG),
+    ]
+    ssh = FakeSsh([], sftp)
     client = BoardSftpClient(config(), ssh_factory=lambda _: ssh)
 
     jobs = client.list_jobs("/outputs")
 
     assert [job.name for job in jobs] == ["job-new", "job-old"]
     assert jobs[0].path == "/outputs/job-new/reconstructions"
-    assert "for candidate in" in ssh.commands[0]
-    assert "find " not in ssh.commands[0]
+    assert ssh.commands == []
 
 
 def test_cache_key_includes_host_and_job(tmp_path: Path) -> None:
@@ -134,12 +146,13 @@ def test_proc_parsers_report_cpu_and_memory_percent() -> None:
 
 
 def test_resource_guard_rejects_download_before_sftp_transfer() -> None:
-    ssh = FakeSsh(
-        [
-            "cpu  100 0 100 800 0 0 0 0 0 0\nMemTotal: 1000 kB\nMemAvailable: 50 kB\n",
-            "cpu  150 0 150 900 0 0 0 0 0 0\nMemTotal: 1000 kB\nMemAvailable: 50 kB\n",
-        ]
-    )
+    sftp = FakeSftp()
+    sftp.file_sequences["/proc/stat"] = [
+        b"cpu  100 0 100 800 0 0 0 0 0 0\n",
+        b"cpu  150 0 150 900 0 0 0 0 0 0\n",
+    ]
+    sftp.file_sequences["/proc/meminfo"] = [b"MemTotal: 1000 kB\nMemAvailable: 50 kB\n"]
+    ssh = FakeSsh([], sftp)
     client = BoardSftpClient(config(), ssh_factory=lambda _: ssh, sleep=lambda _: None)
 
     with pytest.raises(ResourceAborted):

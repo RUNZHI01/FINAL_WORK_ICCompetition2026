@@ -310,9 +310,6 @@ class ComparisonServiceState:
 
     def pull(self, job_id: str, index: int) -> dict[str, Any]:
         _, cached = self._download_pair(job_id, index)
-        for adjacent in (index - 1, index + 1):
-            if adjacent >= 0:
-                self._worker.submit(self._prefetch, job_id, adjacent, self._scan_generation)
         return {
             "status": "ok",
             "job_id": job_id,
@@ -322,16 +319,6 @@ class ComparisonServiceState:
             "reconstruction_url": f"/api/image/reconstruction?job_id={job_id}&index={index}",
             "quality": self._quality_payload(job_id, index),
         }
-
-    def _prefetch(self, job_id: str, index: int, generation: int) -> None:
-        if generation != self._scan_generation:
-            return
-        try:
-            _, pair = self._pair(job_id, index)
-            if pair.reconstruction is not None:
-                self._download_pair(job_id, index)
-        except (KeyError, FileNotFoundError, ResourcePaused, ResourceAborted, RuntimeError):
-            return
 
     def set_quality_assistance(self, enabled: bool, job_id: str = "") -> dict[str, Any]:
         with self._lock:

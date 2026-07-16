@@ -113,6 +113,7 @@ from inference_runner import (
 from openamp_control_wrapper import resolve_bash_executable
 from reconstruction_browser import ReconstructionBrowserConfig, ReconstructionBrowserManager
 from usrp_runtime import (
+    DEFAULT_RUN_ROOT,
     DEFAULT_RX_CONTROL_PORT,
     DEFAULT_TX_CONTROL_PORT,
     INFERENCE_ENGINE_MNN,
@@ -2788,7 +2789,7 @@ class DashboardState:
                 board_port=int(board_access.port or 22),
                 original_dir=Path(original_dir).resolve(),
                 remote_root=remote_root,
-                manifest_root=PACKAGE_ROOT / "USRP292x" / "analog_latent_runs",
+                manifest_root=DEFAULT_RUN_ROOT,
             )
         )
         return {"status": "ok", "url": url}

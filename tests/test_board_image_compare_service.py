@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -98,6 +99,26 @@ def test_pull_downloads_requested_image_and_reuses_cache(tmp_path: Path) -> None
     assert second["cached"] is True
     assert len(remote.download_calls) == 1
     state.close()
+
+
+def test_pull_does_not_prefetch_adjacent_images(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+    write_image(state._config.original_dir / "frame_0001.png", (20, 40, 80))
+    remote.list_job_images = lambda job_path: [
+        PurePosixPath(f"{job_path}/00000000_recon.png"),
+        PurePosixPath(f"{job_path}/00000001_recon.png"),
+    ]
+    state.list_jobs()
+    state.job_detail("new")
+
+    state.pull("new", 0)
+    for _ in range(20):
+        if len(remote.download_calls) > 1:
+            break
+        time.sleep(0.05)
+    state.close()
+
+    assert remote.download_calls == ["/outputs/job-new/reconstructions/00000000_recon.png"]
 
 
 def test_quality_assistance_defaults_to_disabled(tmp_path: Path) -> None:

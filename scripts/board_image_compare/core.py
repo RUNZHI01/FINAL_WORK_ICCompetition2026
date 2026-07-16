@@ -49,7 +49,11 @@ def pair_images(
             reconstruction_by_index.setdefault(index, path)
 
     names = manifest_names or {}
-    pair_count = max(len(ordered_originals), max(reconstruction_by_index, default=-1) + 1)
+    task_last_index = max(
+        max(reconstruction_by_index, default=-1),
+        max(names, default=-1),
+    )
+    pair_count = task_last_index + 1 if task_last_index >= 0 else len(ordered_originals)
     pairs: list[ImagePair] = []
     for index in range(pair_count):
         manifest_name = str(names.get(index, "")).strip()

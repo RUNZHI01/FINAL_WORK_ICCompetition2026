@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shlex
+import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -42,8 +42,6 @@ class RemoteJob:
 
 
 class SshClientLike(Protocol):
-    def exec_command(self, command: str, timeout: float | None = None): ...
-
     def open_sftp(self): ...
 
     def close(self) -> None: ...
@@ -121,62 +119,55 @@ class BoardSftpClient:
             self._ssh = self._ssh_factory(self.config)
         return self._ssh
 
-    def _exec(self, command: str, *, timeout: float = 10.0) -> str:
-        with self._lock:
-            _, stdout, stderr = self._connect().exec_command(command, timeout=timeout)
-            output = stdout.read().decode("utf-8", errors="replace")
-            error = stderr.read().decode("utf-8", errors="replace")
-            status = stdout.channel.recv_exit_status()
-        if status != 0:
-            raise RuntimeError(error.strip() or f"remote command failed with status {status}")
-        return output
+    def _sftp_client(self):
+        if self._sftp is None:
+            self._sftp = self._connect().open_sftp()
+        return self._sftp
 
     def list_jobs(self, remote_root: str) -> list[RemoteJob]:
-        root = shlex.quote(str(PurePosixPath(remote_root)))
-        output = self._exec(
-            f"for candidate in {root}/*/reconstructions; do "
-            "[ -d \"$candidate\" ] || continue; "
-            "stat -c '%Y|%n' \"$candidate\"; "
-            "done 2>/dev/null"
-        )
+        root = str(PurePosixPath(remote_root))
+        with self._lock:
+            entries = list(self._sftp_client().listdir_attr(root))
         jobs: list[RemoteJob] = []
-        for line in output.splitlines():
-            modified, separator, path = line.partition("|")
-            if not separator or not path.strip():
+        for entry in entries:
+            mode = int(getattr(entry, "st_mode", 0) or 0)
+            if mode and not stat.S_ISDIR(mode):
                 continue
-            normalized = str(PurePosixPath(path.strip()))
-            parent = PurePosixPath(normalized).parent.name
+            name = str(getattr(entry, "filename", "")).strip()
+            if not name or name.startswith("."):
+                continue
+            normalized = str(PurePosixPath(root) / name / "reconstructions")
             job_id = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-            jobs.append(RemoteJob(job_id, parent, normalized, float(modified)))
+            jobs.append(RemoteJob(job_id, name, normalized, float(getattr(entry, "st_mtime", 0.0) or 0.0)))
         return sorted(jobs, key=lambda item: (-item.modified_at, natural_key(item.name)))
 
     def list_job_images(self, job_path: str) -> list[PurePosixPath]:
-        quoted_path = shlex.quote(str(PurePosixPath(job_path)))
-        output = self._exec(
-            f"find {quoted_path} -mindepth 1 -maxdepth 1 -type f -printf '%p\\n' 2>/dev/null"
-        )
-        images = [
-            PurePosixPath(line.strip())
-            for line in output.splitlines()
-            if PurePosixPath(line.strip()).suffix.casefold() in SUPPORTED_IMAGE_EXTENSIONS
-        ]
+        normalized = str(PurePosixPath(job_path))
+        with self._lock:
+            entries = list(self._sftp_client().listdir_attr(normalized))
+        images: list[PurePosixPath] = []
+        for entry in entries:
+            mode = int(getattr(entry, "st_mode", 0) or 0)
+            name = str(getattr(entry, "filename", "")).strip()
+            if mode and not stat.S_ISREG(mode):
+                continue
+            if name and PurePosixPath(name).suffix.casefold() in SUPPORTED_IMAGE_EXTENSIONS:
+                images.append(PurePosixPath(normalized) / name)
         return sorted(images, key=lambda path: natural_key(path.name))
 
     def read_text(self, remote_path: str, *, max_bytes: int = 1024 * 1024) -> str:
         with self._lock:
-            if self._sftp is None:
-                self._sftp = self._connect().open_sftp()
-            with self._sftp.open(remote_path, "rb") as stream:
+            with self._sftp_client().open(remote_path, "rb") as stream:
                 return stream.read(max_bytes).decode("utf-8", errors="replace")
 
     def sample_resources(self) -> ResourceSnapshot:
-        command = "head -n 1 /proc/stat; cat /proc/meminfo"
-        previous = self._exec(command, timeout=5.0)
+        previous = self.read_text("/proc/stat", max_bytes=4096)
         self._sleep(0.25)
-        current = self._exec(command, timeout=5.0)
+        current = self.read_text("/proc/stat", max_bytes=4096)
+        meminfo = self.read_text("/proc/meminfo", max_bytes=64 * 1024)
         return ResourceSnapshot(
             cpu_percent=calculate_cpu_percent(previous, current),
-            memory_percent=parse_meminfo_percent(current),
+            memory_percent=parse_meminfo_percent(meminfo),
         )
 
     def ensure_resources_available(self, gate: ResourceGate) -> tuple[ResourceSnapshot, GateDecision]:
@@ -196,9 +187,7 @@ class BoardSftpClient:
         callback: Callable[[int, int], None] | None = None,
     ) -> None:
         with self._lock:
-            if self._sftp is None:
-                self._sftp = self._connect().open_sftp()
-            self._sftp.get(remote_path, str(local_path), callback=callback)
+            self._sftp_client().get(remote_path, str(local_path), callback=callback)
 
     def close(self) -> None:
         with self._lock:

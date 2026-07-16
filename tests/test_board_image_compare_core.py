@@ -39,6 +39,19 @@ def test_missing_side_stays_at_same_index(tmp_path: Path) -> None:
     assert pairs[1].reconstruction == PurePosixPath("/remote/00000001_recon.png")
 
 
+def test_reconstruction_batch_does_not_include_trailing_source_images(tmp_path: Path) -> None:
+    originals = [tmp_path / f"{index:08d}.jpg" for index in range(5)]
+    reconstructions = [
+        PurePosixPath("/remote/00000000_recon.png"),
+        PurePosixPath("/remote/00000001_recon.png"),
+    ]
+
+    pairs = pair_images(originals, reconstructions)
+
+    assert len(pairs) == 2
+    assert [pair.original for pair in pairs] == originals[:2]
+
+
 def test_color_noise_requires_low_similarity_and_chroma_error() -> None:
     noisy = QualityMetrics(
         psnr_db=9.0,
