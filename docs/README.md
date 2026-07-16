@@ -40,7 +40,7 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\Semantic-Communication\
 
 当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_PASS=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`OPENAMP_IQ_SEGMENT_SIZE=30`、`OPENAMP_IQ_SEGMENT_REPAIR_PASSES=2`、`ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=10`。
 
-`start-dev.sh` 会在显示 Cockpit Desktop 前静默尝试 10 张 `USRP IQ + TVM` warm-up；默认至少 5 张有效完成即可放行 UI，并清掉隐藏 batch 状态，避免第一批冷启动 decode / TVM 尾部污染演示指标。这 10 张只是冷启动预热，不是 IQ streaming 微批。如需调试界面而跳过预热，可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
+`start-dev.sh` 会在显示 Cockpit Desktop 前静默尝试 10 张 `USRP IQ + TVM` warm-up；默认至少 5 张有效完成即可放行 UI，并清掉隐藏 batch 状态，避免第一批冷启动 decode / TVM 尾部污染演示指标。预热还会建立常驻 ML-KEM daemon，正式批次会先复用该会话，不再重复同步板端 helper 和执行热修检查。这 10 张只是冷启动预热，不是 IQ streaming 微批。现场不要关闭预热；仅调试界面时可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
 
 USRP2922 网口恢复入口按用途分开：
 
@@ -75,7 +75,7 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 
 通用诊断入口是 `./USRP292x/Usrp2922Network.sh detect|probe|auto-init|status`。板端当前部署在 `/home/user/USRP292x/`，若自动探测选错双网口设备，可显式加 `USRP2922_BOARD_IFACE=eth0`。
 
-写材料时优先引用当前严格可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM 重建 median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 可作为单独优化记录，不能与当前严格 profile 混写。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
+2026-07-17 热启动验收中，USRP IQ + TVM 100 张从点击到完成为 `240.19 s`，`100/100` accepted、fallback `0`，正式 POST 仅 `0.857 s`；TVM median `244.92 ms`。写材料时还应保留当前严格 300 张可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 只能作为单独优化记录。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`。图像质量口径见 `HANDOFF.md`，不要混用原图-TVM与 PyTorch-TVM。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
 批次结束后，可在 Cockpit 的“板端输出目录”下点击“本次重建对比图”。按钮会启动仅监听 `127.0.0.1:8786` 的上位机服务，并在浏览器中打开左右对照页。左侧显示本地原图，右侧按时间倒序选择板端 job；重建图只在点击“拉取”后通过 SFTP 下载到 `artifacts/board_image_cache/`。质量辅助默认关闭，打开后会自动标记疑似彩色噪点图。服务在板端 CPU 或内存达到 85% 时暂停新下载，达到 90% 时终止扫描，降到 80% 以下才恢复。历史 job 的原图映射来自 `USRP292x/qpsk_batch_spool_arq_runs/cockpit_usrp_<id>/image_*/manifest.json`，不要改回 `analog_latent_runs`。
 

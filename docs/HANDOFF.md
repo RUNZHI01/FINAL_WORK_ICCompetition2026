@@ -211,20 +211,25 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | 路径 | 样本 | 传输/解包 | TVM 重建 | 备注 |
 |---|---:|---:|---:|---|
 | 预录 TVM big.LITTLE | 300 | 无 USRP | median `243.30 ms`, mean `252.91 ms`, p95 `311.88 ms` | 250 ms 参考线 |
+| USRP IQ 热启动验收（2026-07-17） | 100 | `104.061 s` 总计，261 次 OTA，`100/100` accepted | core wall `85.212 s`，median `244.92 ms`，mean `261.75 ms` | 点击到完成 `240.19 s`；POST `0.857 s`；CPU/MEM 峰值 `92.38%/62.56%` |
 | USRP IQ 严格可靠性 profile | 300 | median `411.59 ms`, p95 `3423.45 ms`, `300/300` accepted | median `245.42 ms`, mean `254.71 ms`, p95 `301.73 ms` | 30 张分段；11 次 RESET 共 `448.69 ms`；10 次 worker 清理共 `522.72 ms` |
 | USRP IQ 历史速度 profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 历史 accepted 速度记录，不代表当前严格可靠性默认值 |
 | QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
+
+100 张热启动验收对应 `batch-1784222195-100` / `cockpit_usrp_usrp-1784222195`。正式点击复用了隐藏预热建立的 ML-KEM daemon，因此没有再次执行板端 helper 同步和热修。隐藏预热不能关闭，否则首次正式任务会重新承担约 80 秒的安全服务冷启动。该轮保持 `sync metric >= 0.75`、`pilot gain ratio >= 0.85`：261 次 OTA 中 100 次通过，116 次被质量门限拒绝后重试，45 次未形成可用同步。
 
 给写文档同学的典型值口径：
 
 | 可写项 | 推荐写法 |
 |---|---|
 | 主链路 | USRP IQ 直传 + 板端 TVM big.LITTLE 重建 |
+| 100 张演示时长 | 热启动点击到完成 `240.19 s`，即约 4 分钟；`100/100` accepted，fallback `0` |
 | IQ 传输/解包 | 当前严格 300 张 profile：median `411.59 ms`，p95 `3423.45 ms`，`300/300` accepted；历史速度 profile 可单独标注 median `166.63 ms` |
 | TVM 重建 | 当前严格 300 张 profile：median `245.42 ms`，mean `254.71 ms`，p95 `301.73 ms` |
 | 250 ms 参考线 | 预录 TVM 300 张 median `243.30 ms`，mean `252.91 ms` |
 | QPSK 对照 | 约 `2.96 s/image`，作为稳定 fallback，不作为速度主线 |
 | 图像质量 | PSNR `37.0445`，SSIM `0.97494`，artifact SHA matched |
+| Cockpit 双口径质量 | PyTorch-TVM `35.6942 dB / 0.97284`（归档参考均值）；原图-TVM `22.1991 dB / 0.94213`（最近一次 30 张审计），均不是本轮 100 张逐图审计 |
 | 安全口径 | ML-KEM+SM4 和 ML-DSA+SM2 用于控制/认证面准入；USRP IQ payload 不宣称已加密 |
 
 图像质量按当前 accepted IQ/TVM 路径保持：
