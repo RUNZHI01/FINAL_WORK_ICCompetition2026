@@ -51,14 +51,16 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 
 7. 图片对比目录：
 
-- 发送原图（上位机）：`E:\Main\Career\集创赛\jscc-test\smallTest`
+- 发送原图（上位机）：`E:\Main\Career\集创赛\原始图像`
 - 预录 latent 输入（板端）：`/home/user/Downloads/jscc-test/简化版latent`
 - USRP IQ 接收解包（板端）：`/home/user/cockpit_usrp_rx/cockpit_usrp_*_rx`
 - 预录 TVM 重建（板端）：`/home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_handwritten_mean4_v7_big_little_current/reconstructions`
 - USRP TVM 重建（板端）：`/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_*_current/reconstructions`
 - 本地抽查结果（上位机）：`Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_300_20260714_153238`
 
-现场展示时优先打开“发送原图”和当前 run 的重建图。可在上位机一键拉取最新板端 USRP TVM 图片并生成本地图库：
+现场首选：在 Cockpit 的“板端输出目录”下点击“本次重建对比图”。浏览器会打开 `http://127.0.0.1:8786/`；选择倒序排列的 job，再点击“拉取”查看当前序号。需要筛查异常图时再打开质量辅助。该页面只在上位机运行，板端不部署 Web 服务。
+
+Cockpit 不可用时，使用离线兜底脚本拉取最新板端 USRP TVM 图片：
 
 ```powershell
 .\scripts\pull_board_images.ps1
