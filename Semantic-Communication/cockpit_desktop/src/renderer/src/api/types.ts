@@ -288,6 +288,14 @@ export type InferenceQuality = {
   is_lossless?: boolean
 }
 
+export type InferenceQualityPair = InferenceQuality & {
+  label?: string
+  scope?: string
+  report_path?: string
+}
+
+export type InferenceQualityPairs = Record<string, InferenceQualityPair | undefined>
+
 export type InferenceSample = {
   label?: string
   index?: number
@@ -408,6 +416,7 @@ export type RunInferenceResponse = {
   artifact_sha?: string
   timings?: InferenceTimings
   quality?: InferenceQuality
+  quality_pairs?: InferenceQualityPairs
   inference_engine?: string
   control_transport?: string
   data_transport?: string

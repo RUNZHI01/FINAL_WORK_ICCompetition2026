@@ -12,7 +12,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = PROJECT_ROOT.parent
-WORKSPACE_ROOT = PROJECT_ROOT.parents[2] if len(PROJECT_ROOT.parents) > 2 else REPO_ROOT
+WORKSPACE_ROOT = REPO_ROOT.parent
 REPORTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "reports"
 PACKAGE_ROOT = REPORTS_ROOT / "openamp_control_plane_evidence_package_20260315"
 SCRIPTS_ROOT = PROJECT_ROOT / "session_bootstrap" / "scripts"
@@ -597,6 +597,92 @@ def quality_metrics_by_relative_path(report_path_value: str) -> dict[str, dict[s
         for item in payload.get("per_image", [])
         if isinstance(item, dict) and item.get("relative_path")
     }
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isfinite(result):
+        return result
+    return None
+
+
+def _quality_report_mean(report_path: Path, metric_name: str) -> float | None:
+    try:
+        payload = read_json(report_path)
+    except (OSError, json.JSONDecodeError):
+        return None
+    aggregate = payload.get("aggregate") if isinstance(payload.get("aggregate"), dict) else {}
+    metric = aggregate.get(metric_name) if isinstance(aggregate.get(metric_name), dict) else {}
+    return _safe_float(metric.get("mean"))
+
+
+def _latest_report_file(patterns: tuple[str, ...]) -> Path | None:
+    candidates: list[Path] = []
+    for pattern in patterns:
+        candidates.extend(path for path in REPORTS_ROOT.glob(pattern) if path.is_file())
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _original_tvm_report_for_mode(mode: str) -> Path | None:
+    mode_key = str(mode or "").strip().lower()
+    if mode_key == "usrp":
+        return _latest_report_file(
+            (
+                "reconstruction_error_audit_usrp_iq_tvm_*/report.json",
+                "reconstruction_error_audit_usrp_iq_streaming_tvm_*/report.json",
+            )
+        )
+    return _latest_report_file(
+        (
+            "reconstruction_error_audit_tvm_current_*/audit*.json",
+            "reconstruction_error_audit_tvm_current_*/report.json",
+        )
+    )
+
+
+def _original_tvm_quality(mode: str) -> dict[str, Any] | None:
+    report_path = _original_tvm_report_for_mode(mode)
+    if report_path is None:
+        return None
+    try:
+        payload = read_json(report_path)
+    except (OSError, json.JSONDecodeError):
+        return None
+    aggregate = payload.get("aggregate") if isinstance(payload.get("aggregate"), dict) else {}
+    psnr_db = _safe_float(aggregate.get("mean_psnr_db"))
+    ssim = _safe_float(aggregate.get("mean_ssim"))
+    if psnr_db is None and ssim is None:
+        return None
+    return {
+        "label": "原图-TVM",
+        "psnr_db": psnr_db,
+        "ssim": ssim,
+        "scope": "latest_original_reconstruction_audit",
+        "report_path": repo_relative(report_path),
+    }
+
+
+def build_quality_pairs_snapshot(mode: str = "prerecorded") -> dict[str, Any]:
+    pairs: dict[str, Any] = {}
+    pytorch_psnr = _quality_report_mean(QUALITY_CURRENT_REPORT, "psnr_db")
+    pytorch_ssim = _quality_report_mean(QUALITY_CURRENT_REPORT, "ssim")
+    if pytorch_psnr is not None or pytorch_ssim is not None:
+        pairs["pytorch_tvm"] = {
+            "label": "PyTorch-TVM",
+            "psnr_db": pytorch_psnr,
+            "ssim": pytorch_ssim,
+            "scope": "archived_pytorch_reference_mean",
+            "report_path": repo_relative(QUALITY_CURRENT_REPORT),
+        }
+    original_tvm = _original_tvm_quality(mode)
+    if original_tvm is not None:
+        pairs["original_tvm"] = original_tvm
+    return pairs
 
 
 @lru_cache(maxsize=1)
@@ -1572,6 +1658,7 @@ def build_prerecorded_inference_result(image_index: int, variant: str) -> dict[s
             "psnr_db": quality_entry.get("psnr_db"),
             "ssim": quality_entry.get("ssim"),
         },
+        "quality_pairs": build_quality_pairs_snapshot("prerecorded"),
         "artifact_sha": (
             comparison["trusted_current_sha"]
             if variant_key == "current"

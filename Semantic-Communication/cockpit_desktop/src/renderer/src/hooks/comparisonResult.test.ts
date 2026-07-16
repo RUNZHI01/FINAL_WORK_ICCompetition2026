@@ -76,6 +76,43 @@ test('current live result preserves quality metrics for display', () => {
   })
 })
 
+test('current live result preserves grouped quality metrics for debugging display', () => {
+  const result = comparisonResultFromInferencePayload({
+    status: 'success',
+    execution_mode: 'live',
+    variant: 'current',
+    timings: {
+      total_ms: 251.4,
+      payload_ms: 239.8,
+    },
+    quality_pairs: {
+      original_tvm: {
+        label: '原图-TVM',
+        psnr_db: 22.1991,
+        ssim: 0.9421,
+      },
+      pytorch_tvm: {
+        label: 'PyTorch-TVM',
+        psnr_db: 35.6942,
+        ssim: 0.9728,
+      },
+    },
+  })
+
+  assert.deepEqual(result?.qualityPairs, {
+    original_tvm: {
+      label: '原图-TVM',
+      psnr_db: 22.1991,
+      ssim: 0.9421,
+    },
+    pytorch_tvm: {
+      label: 'PyTorch-TVM',
+      psnr_db: 35.6942,
+      ssim: 0.9728,
+    },
+  })
+})
+
 test('current live ML-KEM TVM result uses board inference time for reconstruction KPI', () => {
   const result = comparisonResultFromInferencePayload({
     status: 'success',

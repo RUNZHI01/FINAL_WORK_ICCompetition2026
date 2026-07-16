@@ -48,7 +48,11 @@ test('remote USRP RX directory save action is colocated with the board input pat
 })
 
 test('IQ audit panel is gated to IQ-direct USRP mode', () => {
-  assert.match(tsx, /showIqAuditPanel\s*=\s*activeTransport === 'usrp'[\s\S]*activeLinkMode === 'iq-direct'/)
+  const panelGate = tsx.match(/const showIqAuditPanel[\s\S]*?\n  const inputModeLabel/)
+  assert.ok(panelGate, 'showIqAuditPanel declaration should exist')
+  assert.match(tsx, /const selectedLinkMode\s*=\s*pendingJsccLinkMode \?\? configuredLinkMode/)
+  assert.match(panelGate[0], /activeTransport === 'usrp'[\s\S]*selectedLinkMode === 'iq-direct'/)
+  assert.doesNotMatch(panelGate[0], /activeLinkMode === 'iq-direct'/)
 })
 
 test('IQ audit panel renders batch IQ tail audit metrics, not runtime profiling', () => {
@@ -96,14 +100,13 @@ test('USRP progress headline avoids duplicating current-stage wording', () => {
   assert.doesNotMatch(tsx, /:\s*'当前阶段：等待启动'/)
 })
 
-test('USRP idle progress does not render a duplicate pending detail', () => {
-  assert.doesNotMatch(tsx, /mainProgressStageDetail\s*=\s*isRunning \|\| isDone[\s\S]*:\s*progressSuffix/)
-  assert.match(tsx, /\{mainProgressStageDetail && <span>\{mainProgressStageDetail\}<\/span>\}/)
+test('active batch total overrides the live job default progress total', () => {
+  assert.match(tsx, /liveExpectedCount\s*=\s*Math\.max\(1,\s*activeBatch\?\.total\s*\?\?\s*liveProgress\?\.expected_count\s*\?\?\s*1\)/)
 })
 
-test('USRP completed progress hides the duplicate right-side count', () => {
-  assert.doesNotMatch(tsx, /mainProgressStageDetail\s*=\s*isRunning \|\| isDone/)
-  assert.match(tsx, /mainProgressStageDetail\s*=\s*isRunning\s*\?[\s\S]*`进度 \$\{progress\}\/\$\{totalImages\}`[\s\S]*:\s*''/)
+test('USRP progress headline omits the redundant numeric progress control', () => {
+  assert.doesNotMatch(tsx, /mainProgressStageDetail/)
+  assert.doesNotMatch(tsx, /`进度 \$\{progress\}\/\$\{totalImages\}`/)
 })
 
 test('USRP idle progress headline says ready instead of waiting to start', () => {

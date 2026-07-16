@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 
 import {
   batchMatchesCurrentServiceMode,
+  isDashboardBatchRunning,
+  isDashboardWorkRunning,
   shouldDisplayDashboardBatch,
 } from './dashboardBatchDisplayState.ts'
 
@@ -47,6 +49,21 @@ test('keeps matching ROI batch visible while ROI mode is active', () => {
       null,
       'ROI_ONLY',
     ),
+    true,
+  )
+})
+
+test('treats launching batches as active dashboard work', () => {
+  assert.equal(isDashboardBatchRunning({ status: 'launching' }), true)
+})
+
+test('keeps dashboard work running when system active inference has already refreshed', () => {
+  assert.equal(
+    isDashboardWorkRunning(undefined, {
+      running: true,
+      request_state: 'running',
+      progress: { current_stage: 'USRP 数据面 0/300' },
+    }),
     true,
   )
 })

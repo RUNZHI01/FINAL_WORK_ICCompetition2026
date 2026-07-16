@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { RunInferenceResponse } from '../api/types'
+import type { InferenceQualityPairs, RunInferenceResponse } from '../api/types'
 
 export type ComparisonEngineKey = 'pytorch' | 'tvm' | 'mnn'
 
@@ -14,6 +14,7 @@ export type ComparisonResult = {
     psnr_db?: number
     ssim?: number
   }
+  qualityPairs?: InferenceQualityPairs
 }
 
 type AppState = {

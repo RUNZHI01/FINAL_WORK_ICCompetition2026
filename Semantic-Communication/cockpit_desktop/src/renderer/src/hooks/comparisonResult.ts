@@ -176,7 +176,7 @@ export function comparisonResultFromInferencePayload(
     return undefined
   }
 
-  return {
+  const result: ComparisonResult = {
     engine,
     label: engine === 'pytorch' ? 'PyTorch参考' : (engine === 'mnn' ? 'MNN重建' : 'TVM重建'),
     reconstructionMs,
@@ -184,4 +184,8 @@ export function comparisonResultFromInferencePayload(
     sampleCount: pickSampleCount(payload),
     quality: payload.quality,
   }
+  if (payload.quality_pairs) {
+    result.qualityPairs = payload.quality_pairs
+  }
+  return result
 }

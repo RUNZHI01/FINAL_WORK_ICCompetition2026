@@ -221,6 +221,13 @@ export type BatchStateResponse = {
     psnr_db?: number
     ssim?: number
   }
+  quality_pairs?: Record<string, {
+    label?: string
+    psnr_db?: number
+    ssim?: number
+    scope?: string
+    report_path?: string
+  } | undefined>
   status_category?: string
   execution_mode?: string
   source_label?: string

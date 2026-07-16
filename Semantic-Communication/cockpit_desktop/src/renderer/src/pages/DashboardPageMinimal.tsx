@@ -22,10 +22,16 @@ import { Icons } from '../components/icons'
 import { CountUp } from '../components/shared/CountUp'
 import type { BatchStageProgress, IqTailAudit } from '../api/types/crypto'
 import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
-import { shouldDisplayDashboardBatch } from '../hooks/dashboardBatchDisplayState'
+import {
+  isDashboardBatchRunning,
+  isDashboardWorkRunning,
+  shouldDisplayDashboardBatch,
+} from '../hooks/dashboardBatchDisplayState'
 import {
   extractIqRadioMetrics,
   extractJsccLinkMode,
+  type InferenceQualityPair,
+  type InferenceQualityPairs,
   type IqRadioMetrics,
   type JsccLinkMode,
   type JsonObject,
@@ -71,6 +77,10 @@ function numericValue(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined
   }
   return undefined
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
 }
 
 function normalizeStageProgress(stage: BatchStageProgress | null | undefined, fallbackTotal: number) {
@@ -358,6 +368,8 @@ export function DashboardPageMinimal() {
   const baselineMut = useRunBaseline()
   const boardAccessMut = useSetBoardAccess()
   const status = system.data
+  const activeInference = status?.active_inference
+  const activeInferenceProgress = activeInference?.progress
   const boardAccess = status?.board_access
   const activeTransport = normalizeTransportMode(boardAccess?.transport_mode)
 
@@ -539,6 +551,27 @@ export function DashboardPageMinimal() {
   const maxComparisonMs = Math.max(...comparisonRows.map((item) => item.reconstructionMs), 1)
   const pytorchReferenceMs = pytorchComparison?.reconstructionMs
   const resultQuality = tvmComparison?.quality ?? mnnComparison?.quality
+  const rawQualityPairs =
+    tvmComparison?.qualityPairs
+    ?? mnnComparison?.qualityPairs
+    ?? currentResult?.quality_pairs
+    ?? recentResults?.tvm?.quality_pairs
+    ?? recentResults?.mnn?.quality_pairs
+    ?? recentResults?.current?.quality_pairs
+  const fallbackQualityPairs: InferenceQualityPairs | undefined = resultQuality
+    ? {
+        pytorch_tvm: {
+          label: 'PyTorch-TVM',
+          psnr_db: resultQuality.psnr_db,
+          ssim: resultQuality.ssim,
+        },
+      }
+    : undefined
+  const resultQualityPairs = rawQualityPairs ?? fallbackQualityPairs
+  const qualityPairRows = [
+    resultQualityPairs?.original_tvm,
+    resultQualityPairs?.pytorch_tvm,
+  ].filter((item): item is InferenceQualityPair => Boolean(item && (item.psnr_db != null || item.ssim != null)))
   const hasPositiveSpeedup = comparisonRows.some((row) => (
     row.engine !== 'pytorch'
     && pytorchReferenceMs != null
@@ -548,17 +581,17 @@ export function DashboardPageMinimal() {
 
   const liveJob = inferenceProgress.data
   const liveProgress = liveJob?.live_progress
+  const activeBatch = batch && shouldDisplayDashboardBatch(batch, pendingBatchJobId, currentMode)
+    ? batch
+    : undefined
   const isSingleLiveRunning = Boolean(activeJobId) && liveJob?.request_state !== 'completed'
   const liveEngineLabel = liveJob?.variant === 'baseline'
     ? 'PyTorch'
     : liveJob?.variant === 'current'
       ? 'TVM'
       : 'Live'
-  const liveExpectedCount = Math.max(1, liveProgress?.expected_count ?? 1)
+  const liveExpectedCount = Math.max(1, activeBatch?.total ?? liveProgress?.expected_count ?? 1)
   const liveCompletedCount = Math.max(0, Math.min(liveProgress?.completed_count ?? 0, liveExpectedCount))
-  const activeBatch = batch && shouldDisplayDashboardBatch(batch, pendingBatchJobId, currentMode)
-    ? batch
-    : undefined
   const batchServiceMode = activeBatch?.service_mode as string | undefined
   const batchEngine = (activeBatch?.engine === 'mnn' ? 'mnn' : 'tvm') as 'mnn' | 'tvm'
   const batchEngineLabel = batchEngine === 'mnn' ? 'MNN' : 'TVM'
@@ -566,7 +599,7 @@ export function DashboardPageMinimal() {
   const batchProgress = Math.max(0, Math.min(activeBatch?.completed ?? 0, batchTotalImages))
   const batchSuccess = Math.max(0, activeBatch?.success ?? 0)
   const batchFallback = Math.max(0, activeBatch?.fallback ?? 0)
-  const isBatchRunning = activeBatch?.status === 'running'
+  const isBatchRunning = isDashboardBatchRunning(activeBatch)
   const isBatchDone = activeBatch?.status === 'done'
   const useUsrpProgressLayout = !isSingleLiveRunning && activeTransport === 'usrp'
   const hasStageProgress = useUsrpProgressLayout && Boolean(activeBatch?.host_preprocess_progress || activeBatch?.transport_progress || activeBatch?.inference_progress)
@@ -582,26 +615,31 @@ export function DashboardPageMinimal() {
         activeBatch?.source_label ? `来源: ${activeBatch.source_label}` : '',
       ].filter(Boolean).join(' · ')
     : ''
-  const isRunning = isSingleLiveRunning || isBatchRunning
+  const isRunning = isSingleLiveRunning || isDashboardWorkRunning(activeBatch, activeInference)
   const isDone = !isSingleLiveRunning && isBatchDone
   const modeTag = batchServiceMode === 'ROI_ONLY' ? ' (降采样 3:1)' : ''
   const totalImages = isSingleLiveRunning ? liveExpectedCount : batchTotalImages
   const progress = isSingleLiveRunning ? liveCompletedCount : batchProgress
   const progressPercent = totalImages > 0 ? Math.round((progress / totalImages) * 100) : 0
   const progressEngineLabel = isSingleLiveRunning ? liveEngineLabel : batchEngineLabel
+  const activeInferenceStage = stringValue(activeInferenceProgress?.current_stage) || stringValue(activeInferenceProgress?.label) || ''
   const currentStage = isSingleLiveRunning
     ? (liveProgress?.current_stage || liveProgress?.label || `${liveEngineLabel} Live 执行中`)
     : isBatchRunning
-      ? batchEngine === 'mnn'
-        ? (batchProgress > 0 ? `MNN 动态尺寸批量 ${batchProgress}/${batchTotalImages}` : 'MNN 动态尺寸批量执行中')
-        : `TVM 在线推进 ${batchProgress}/${batchTotalImages}${modeTag}`
-    : isDone
-      ? batchFallback > 0
-        ? `批量结束：成功 ${batchSuccess}，回退 ${batchFallback}`
-        : batchEngine === 'mnn'
-          ? `MNN 批量完成：${batchProgress}/${batchTotalImages}`
-          : `批量完成：${batchProgress}/${batchTotalImages}${modeTag}`
-      : `等待操作员启动 TVM ${batchCount} 张`
+      ? activeInferenceStage || (
+          batchEngine === 'mnn'
+            ? (batchProgress > 0 ? `MNN 动态尺寸批量 ${batchProgress}/${batchTotalImages}` : 'MNN 动态尺寸批量执行中')
+            : `TVM 在线推进 ${batchProgress}/${batchTotalImages}${modeTag}`
+        )
+      : activeInferenceStage
+        ? activeInferenceStage
+        : isDone
+          ? batchFallback > 0
+            ? `批量结束：成功 ${batchSuccess}，回退 ${batchFallback}`
+            : batchEngine === 'mnn'
+              ? `MNN 批量完成：${batchProgress}/${batchTotalImages}`
+              : `批量完成：${batchProgress}/${batchTotalImages}${modeTag}`
+          : `等待操作员启动 TVM ${batchCount} 张`
   const progressBadge = isRunning
     ? '运行中'
     : isDone
@@ -644,13 +682,10 @@ export function DashboardPageMinimal() {
   })
   const activeMainStage = mainProgressStages.find((stage) => stage.state === 'active')
   const mainProgressStageText = isRunning
-    ? activeMainStage?.label ?? currentStage
+    ? (hasStageProgress ? activeMainStage?.label ?? currentStage : currentStage)
     : isDone
       ? currentStage
       : '就绪'
-  const mainProgressStageDetail = isRunning
-    ? `进度 ${progress}/${totalImages}`
-    : ''
   const boardOnline = status?.live?.board_online ?? false
   const hostInputDir = boardAccess?.local_usrp_image_dir
     || boardAccess?.local_usrp_input_dir
@@ -666,8 +701,9 @@ export function DashboardPageMinimal() {
   const pendingJsccLinkMode = boardAccessMut.variables?.jscc_link_mode
     ? normalizeJsccLinkModeValue(boardAccessMut.variables.jscc_link_mode)
     : undefined
+  const selectedLinkMode = pendingJsccLinkMode ?? configuredLinkMode
   const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
-  const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? configuredLinkMode
+  const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? selectedLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
   const iqTailAudit = cryptoData?.batch_iq_tail_audit ?? null
   const iqTailSampleCount = iqTailCount(iqTailAudit, 'record_count') ?? iqRadioMetrics?.sample_count ?? null
@@ -698,7 +734,7 @@ export function DashboardPageMinimal() {
       : undefined,
   ].filter((item): item is { key: string; label: string; value: string } => Boolean(item?.value))
   const showIqAuditPanel = activeTransport === 'usrp'
-    && activeLinkMode === 'iq-direct'
+    && selectedLinkMode === 'iq-direct'
     && (iqTailAuditItems.length > 0 || iqTailDistributionItems.length > 0 || iqRadioMetricItems.length > 0)
   const inputModeLabel = activeTransport === 'usrp'
     ? activeLinkMode === 'iq-direct'
@@ -831,7 +867,6 @@ export function DashboardPageMinimal() {
                   <>
                     <div className={s.progressCount}>
                       <strong className={s.progressStageText}>{mainProgressStageText}</strong>
-                      {mainProgressStageDetail && <span>{mainProgressStageDetail}</span>}
                     </div>
 
                     <div className={s.mainStageTrack} aria-label="推理阶段进度">
@@ -1035,20 +1070,25 @@ export function DashboardPageMinimal() {
                         )
                       })}
                     </div>
-                    {resultQuality && (
+                    {qualityPairRows.length > 0 && (
                       <div className={s.qualityMetrics}>
-                        {resultQuality.psnr_db != null && (
-                          <div className={s.qualityItem}>
-                            <span className={s.qualityLabel}>PSNR</span>
-                            <span className={s.qualityValue}>{resultQuality.psnr_db.toFixed(2)} dB</span>
+                        {qualityPairRows.map((quality) => (
+                          <div key={quality.label ?? quality.scope ?? 'quality'} className={s.qualityGroup}>
+                            <span className={s.qualityGroupTitle}>{quality.label ?? '质量指标'}</span>
+                            {quality.psnr_db != null && (
+                              <div className={s.qualityItem}>
+                                <span className={s.qualityLabel}>PSNR</span>
+                                <span className={s.qualityValue}>{quality.psnr_db.toFixed(2)} dB</span>
+                              </div>
+                            )}
+                            {quality.ssim != null && (
+                              <div className={s.qualityItem}>
+                                <span className={s.qualityLabel}>SSIM</span>
+                                <span className={s.qualityValue}>{quality.ssim.toFixed(4)}</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {resultQuality.ssim != null && (
-                          <div className={s.qualityItem}>
-                            <span className={s.qualityLabel}>SSIM</span>
-                            <span className={s.qualityValue}>{resultQuality.ssim.toFixed(4)}</span>
-                          </div>
-                        )}
+                        ))}
                       </div>
                     )}
                   </>
