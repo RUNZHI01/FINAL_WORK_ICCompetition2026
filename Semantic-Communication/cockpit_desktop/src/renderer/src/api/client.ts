@@ -11,6 +11,7 @@ import type {
   HealthResponse,
   LinkDirectorStatus,
   LinkDirectorSwitchResponse,
+  OpenReconstructionBrowserResponse,
   ProbeBoardResponse,
   RecoverResponse,
   RunInferenceResponse,
@@ -167,6 +168,10 @@ export async function postLinkDirectorProfile(profileId: string): Promise<LinkDi
 
 export async function postBoardAccess(payload: BoardAccessPayload): Promise<{ status: string; board_access: BoardAccessResponse }> {
   return postJson('/api/session/board-access', payload)
+}
+
+export async function postOpenReconstructionBrowser(): Promise<OpenReconstructionBrowserResponse> {
+  return postJson<OpenReconstructionBrowserResponse>('/api/reconstruction-browser/open')
 }
 
 export async function postJobManifestGatePreview(variant = 'current'): Promise<GatePreviewResponse> {

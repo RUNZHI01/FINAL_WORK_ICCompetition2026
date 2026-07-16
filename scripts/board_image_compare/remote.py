@@ -1,0 +1,231 @@
+from __future__ import annotations
+
+import hashlib
+import os
+import stat
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Callable, Protocol
+
+import paramiko
+
+from .core import GateDecision, ResourceGate, ResourceSnapshot, natural_key
+
+
+SUPPORTED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
+
+
+class ResourcePaused(RuntimeError):
+    pass
+
+
+class ResourceAborted(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class BoardConnectionConfig:
+    host: str
+    user: str
+    password: str
+    port: int = 22
+
+
+@dataclass(frozen=True)
+class RemoteJob:
+    id: str
+    name: str
+    path: str
+    modified_at: float
+
+
+class SshClientLike(Protocol):
+    def open_sftp(self): ...
+
+    def close(self) -> None: ...
+
+
+def _cpu_fields(line: str) -> tuple[float, float]:
+    fields = line.split()
+    if not fields or fields[0] != "cpu" or len(fields) < 5:
+        raise ValueError("invalid /proc/stat cpu line")
+    values = [float(value) for value in fields[1:]]
+    idle = values[3] + (values[4] if len(values) > 4 else 0.0)
+    return sum(values), idle
+
+
+def calculate_cpu_percent(previous: str, current: str) -> float:
+    previous_total, previous_idle = _cpu_fields(previous.splitlines()[0])
+    current_total, current_idle = _cpu_fields(current.splitlines()[0])
+    total_delta = current_total - previous_total
+    idle_delta = current_idle - previous_idle
+    if total_delta <= 0.0:
+        return 0.0
+    return max(0.0, min(100.0, 100.0 * (total_delta - idle_delta) / total_delta))
+
+
+def parse_meminfo_percent(meminfo: str) -> float:
+    values: dict[str, float] = {}
+    for line in meminfo.splitlines():
+        name, separator, remainder = line.partition(":")
+        if not separator:
+            continue
+        token = remainder.strip().split()[0] if remainder.strip() else ""
+        if token:
+            values[name] = float(token)
+    total = values.get("MemTotal", 0.0)
+    available = values.get("MemAvailable", 0.0)
+    if total <= 0.0:
+        raise ValueError("MemTotal is missing from /proc/meminfo")
+    return max(0.0, min(100.0, 100.0 * (total - available) / total))
+
+
+def _default_ssh_factory(config: BoardConnectionConfig) -> SshClientLike:
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(
+        hostname=config.host,
+        port=config.port,
+        username=config.user,
+        password=config.password,
+        timeout=8.0,
+        banner_timeout=8.0,
+        auth_timeout=8.0,
+        look_for_keys=False,
+        allow_agent=False,
+    )
+    return client
+
+
+class BoardSftpClient:
+    def __init__(
+        self,
+        config: BoardConnectionConfig,
+        *,
+        ssh_factory: Callable[[BoardConnectionConfig], SshClientLike] = _default_ssh_factory,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.config = config
+        self._ssh_factory = ssh_factory
+        self._sleep = sleep
+        self._ssh: SshClientLike | None = None
+        self._sftp = None
+        self._lock = threading.RLock()
+
+    def _connect(self) -> SshClientLike:
+        if self._ssh is None:
+            self._ssh = self._ssh_factory(self.config)
+        return self._ssh
+
+    def _sftp_client(self):
+        if self._sftp is None:
+            self._sftp = self._connect().open_sftp()
+        return self._sftp
+
+    def list_jobs(self, remote_root: str) -> list[RemoteJob]:
+        root = str(PurePosixPath(remote_root))
+        with self._lock:
+            entries = list(self._sftp_client().listdir_attr(root))
+        jobs: list[RemoteJob] = []
+        for entry in entries:
+            mode = int(getattr(entry, "st_mode", 0) or 0)
+            if mode and not stat.S_ISDIR(mode):
+                continue
+            name = str(getattr(entry, "filename", "")).strip()
+            if not name or name.startswith("."):
+                continue
+            normalized = str(PurePosixPath(root) / name / "reconstructions")
+            job_id = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+            jobs.append(RemoteJob(job_id, name, normalized, float(getattr(entry, "st_mtime", 0.0) or 0.0)))
+        return sorted(jobs, key=lambda item: (-item.modified_at, natural_key(item.name)))
+
+    def list_job_images(self, job_path: str) -> list[PurePosixPath]:
+        normalized = str(PurePosixPath(job_path))
+        with self._lock:
+            entries = list(self._sftp_client().listdir_attr(normalized))
+        images: list[PurePosixPath] = []
+        for entry in entries:
+            mode = int(getattr(entry, "st_mode", 0) or 0)
+            name = str(getattr(entry, "filename", "")).strip()
+            if mode and not stat.S_ISREG(mode):
+                continue
+            if name and PurePosixPath(name).suffix.casefold() in SUPPORTED_IMAGE_EXTENSIONS:
+                images.append(PurePosixPath(normalized) / name)
+        return sorted(images, key=lambda path: natural_key(path.name))
+
+    def read_text(self, remote_path: str, *, max_bytes: int = 1024 * 1024) -> str:
+        with self._lock:
+            with self._sftp_client().open(remote_path, "rb") as stream:
+                return stream.read(max_bytes).decode("utf-8", errors="replace")
+
+    def sample_resources(self) -> ResourceSnapshot:
+        previous = self.read_text("/proc/stat", max_bytes=4096)
+        self._sleep(0.25)
+        current = self.read_text("/proc/stat", max_bytes=4096)
+        meminfo = self.read_text("/proc/meminfo", max_bytes=64 * 1024)
+        return ResourceSnapshot(
+            cpu_percent=calculate_cpu_percent(previous, current),
+            memory_percent=parse_meminfo_percent(meminfo),
+        )
+
+    def ensure_resources_available(self, gate: ResourceGate) -> tuple[ResourceSnapshot, GateDecision]:
+        snapshot = self.sample_resources()
+        decision = gate.evaluate(snapshot)
+        if decision.action == "abort":
+            raise ResourceAborted(decision.reason)
+        if decision.action == "pause":
+            raise ResourcePaused(decision.reason)
+        return snapshot, decision
+
+    def download(
+        self,
+        remote_path: str,
+        local_path: Path,
+        *,
+        callback: Callable[[int, int], None] | None = None,
+    ) -> None:
+        with self._lock:
+            self._sftp_client().get(remote_path, str(local_path), callback=callback)
+
+    def close(self) -> None:
+        with self._lock:
+            if self._sftp is not None:
+                self._sftp.close()
+                self._sftp = None
+            if self._ssh is not None:
+                self._ssh.close()
+                self._ssh = None
+
+
+class ImageCache:
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+
+    def path_for(self, host: str, job_path: str, remote_file: str) -> Path:
+        cache_key = hashlib.sha256(f"{host}\0{job_path}".encode("utf-8")).hexdigest()[:20]
+        safe_host = "".join(character if character.isalnum() or character in ".-" else "_" for character in host)
+        return self.root / safe_host / cache_key / PurePosixPath(remote_file).name
+
+    def download_atomic(
+        self,
+        client: BoardSftpClient,
+        remote_file: str,
+        target: Path,
+        *,
+        callback: Callable[[int, int], None] | None = None,
+    ) -> Path:
+        target = Path(target)
+        if target.is_file():
+            return target
+        target.parent.mkdir(parents=True, exist_ok=True)
+        partial = target.with_suffix(target.suffix + ".partial")
+        partial.unlink(missing_ok=True)
+        try:
+            client.download(remote_file, partial, callback=callback)
+            os.replace(partial, target)
+        except Exception:
+            partial.unlink(missing_ok=True)
+            raise
+        return target

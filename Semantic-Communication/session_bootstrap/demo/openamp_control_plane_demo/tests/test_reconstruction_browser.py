@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+
+DEMO_ROOT = Path(__file__).resolve().parents[1]
+if str(DEMO_ROOT) not in sys.path:
+    sys.path.insert(0, str(DEMO_ROOT))
+
+from reconstruction_browser import ReconstructionBrowserConfig, ReconstructionBrowserManager
+
+
+class FakeProcess:
+    def __init__(self) -> None:
+        self.running = True
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return None if self.running else 0
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.running = False
+
+    def wait(self, timeout=None) -> int:
+        return 0
+
+    def kill(self) -> None:
+        self.killed = True
+        self.running = False
+
+
+def config(tmp_path: Path) -> ReconstructionBrowserConfig:
+    originals = tmp_path / "originals"
+    originals.mkdir(exist_ok=True)
+    return ReconstructionBrowserConfig(
+        board_host="board-a",
+        board_user="user",
+        board_password="user",
+        board_port=22,
+        original_dir=originals,
+        remote_root="/outputs",
+        manifest_root=tmp_path / "manifests",
+    )
+
+
+def test_open_reuses_healthy_process_and_reconfigures(tmp_path: Path) -> None:
+    process = FakeProcess()
+    process_calls: list[list[str]] = []
+    configured_payloads: list[dict] = []
+    healthy = False
+
+    def process_factory(command: list[str]):
+        nonlocal healthy
+        process_calls.append(command)
+        healthy = True
+        return process
+
+    def http_json(method: str, url: str, payload=None, timeout=1.0):
+        if url.endswith("/api/health"):
+            if not healthy:
+                raise OSError("not started")
+            return {"status": "ok"}
+        configured_payloads.append(payload)
+        return {"status": "ok"}
+
+    manager = ReconstructionBrowserManager(
+        script_path=tmp_path / "server.py",
+        cache_root=tmp_path / "cache",
+        process_factory=process_factory,
+        http_json=http_json,
+        sleep=lambda _: None,
+    )
+
+    assert manager.open(config(tmp_path)) == "http://127.0.0.1:8786/"
+    assert manager.open(config(tmp_path)) == "http://127.0.0.1:8786/"
+    assert len(process_calls) == 1
+    assert len(configured_payloads) == 2
+    assert configured_payloads[0]["board_password"] == "user"
+
+
+def test_close_terminates_owned_process(tmp_path: Path) -> None:
+    process = FakeProcess()
+    manager = ReconstructionBrowserManager(
+        script_path=tmp_path / "server.py",
+        cache_root=tmp_path / "cache",
+        process_factory=lambda _command: process,
+        http_json=lambda *_args, **_kwargs: {"status": "ok"},
+        sleep=lambda _: None,
+    )
+    manager._process = process
+
+    manager.close()
+
+    assert process.terminated is True

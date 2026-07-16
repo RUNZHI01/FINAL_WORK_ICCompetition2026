@@ -10,6 +10,7 @@ import {
   postJobManifestGatePreview,
   postRunInferenceBatch,
   postRunMnnBatch,
+  postOpenReconstructionBrowser,
 } from '../api/client'
 import { useAppStore } from '../stores/appStore'
 import { isCompletedInferenceResult, shouldTrackInferenceJob } from './inferenceStateMachine'
@@ -100,6 +101,10 @@ export function useSetBoardAccess() {
     mutationFn: postBoardAccess,
     onSuccess: inv,
   })
+}
+
+export function useOpenReconstructionBrowser() {
+  return useMutation({ mutationFn: postOpenReconstructionBrowser })
 }
 
 export function useGatePreview() {

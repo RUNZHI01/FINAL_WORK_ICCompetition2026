@@ -605,3 +605,9 @@ export type EventSpineSummary = {
   last_event_at?: string
   archive_enabled?: boolean
 }
+
+export type OpenReconstructionBrowserResponse = {
+  status: string
+  url: string
+  message?: string
+}

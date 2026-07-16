@@ -656,6 +656,43 @@ def write_archive_session(
 
 
 class DashboardStateTest(unittest.TestCase):
+    def test_reconstruction_browser_uses_usrp_job_manifests(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = server.BoardAccessConfig(
+            host="demo-board",
+            user="user",
+            password="user",
+            port="22",
+            env_file=None,
+            env_values={},
+            source_summary="test",
+        )
+        with (
+            patch.object(state, "_discover_default_local_usrp_image_dir", return_value=str(server.PACKAGE_ROOT)),
+            patch.object(state._reconstruction_browser_manager, "open", return_value="http://127.0.0.1:8786/") as open_browser,
+        ):
+            state.open_reconstruction_browser()
+
+        config = open_browser.call_args.args[0]
+        self.assertEqual(config.manifest_root.name, "qpsk_batch_spool_arq_runs")
+
+    def test_reconstruction_browser_route_returns_local_url(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        with patch.object(
+            state,
+            "open_reconstruction_browser",
+            return_value={"status": "ok", "url": "http://127.0.0.1:8786/"},
+        ):
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/reconstruction-browser/open",
+                body=b"{}",
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["url"], "http://127.0.0.1:8786/")
+
     def test_parse_json_stdout_payload_skips_trailing_non_json_lines(self) -> None:
         raw = "\n".join(
             [
