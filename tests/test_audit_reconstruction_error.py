@@ -127,3 +127,47 @@ def test_cli_samples_deterministically_and_writes_json_csv(tmp_path: Path) -> No
         rows = list(csv.DictReader(handle))
     assert [row["stem"] for row in rows] == first_stems
     assert all(row["status"] == "ok" for row in rows)
+
+
+def test_audit_reconstructions_can_map_usrp_manifest_original_names(tmp_path: Path) -> None:
+    originals = tmp_path / "originals"
+    recons = tmp_path / "recons"
+    run_dir = tmp_path / "usrp_run"
+    originals.mkdir()
+    recons.mkdir()
+    image_dir = run_dir / "image_0000"
+    image_dir.mkdir(parents=True)
+
+    base = np.zeros((2, 2, 3), dtype=np.uint8)
+    changed = base.copy()
+    changed[0, 0, :] = 10
+    write_rgb(originals / "00000015.jpg", base)
+    write_rgb(recons / "00000000_recon.png", changed)
+    (image_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "source_info": {
+                    "source_meta": {
+                        "original_filename": "00000015",
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = audit_reconstructions(
+        original_dir=originals,
+        recon_dir=recons,
+        sample_size=0,
+        seed=0,
+        manifest_run_dir=run_dir,
+    )
+
+    assert result["matching_mode"] == "usrp_manifest"
+    assert result["candidate_count"] == 1
+    assert result["audited_count"] == 1
+    record = result["records"][0]
+    assert record["stem"] == "00000015"
+    assert record["reconstruction_path"].endswith("00000000_recon.png")
+    assert record["psnr_db"] == pytest.approx(34.1514, rel=1e-4)

@@ -24,6 +24,7 @@ import os
 import sys
 import time
 import traceback
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -37,6 +38,19 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, 'jscc'))
 from src import utils
 from src.network import encoder
 from default_config import ModelModes
+
+
+def resolve_checkpoint_path(ckpt_dir, config_str):
+    ckpt_name = '1snr_lpips_{}_openimages_gan.pt'.format(config_str)
+    script_dir = Path(SCRIPT_DIR)
+    candidates = [
+        Path(ckpt_dir) / 'origin' / ckpt_name,
+        script_dir.parent.parent / 'jscc-test' / 'origin' / ckpt_name,
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return str(candidates[0])
 
 
 def calculate_scale_and_zero_point(tensor, qmin=0, qmax=255):
@@ -67,8 +81,7 @@ def pad_factor(input_image, spatial_dims, factor):
 
 def load_encoder(ckpt_dir, config_str, device='cpu'):
     """加载编码器权重，返回 Encoder 模型和 args"""
-    ckpt_path = os.path.join(ckpt_dir, 'origin',
-                             '1snr_lpips_{}_openimages_gan.pt'.format(config_str))
+    ckpt_path = resolve_checkpoint_path(ckpt_dir, config_str)
     if not os.path.isfile(ckpt_path):
         raise FileNotFoundError(
             f"Checkpoint not found: {ckpt_path}\n"

@@ -77,6 +77,51 @@ def find_candidates(original_dir: Path, recon_dir: Path, recon_suffix: str = "_r
     return sorted(candidates, key=lambda item: str(item["stem"]))
 
 
+def original_stem_from_manifest(manifest_path: Path) -> str:
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    source_info = payload.get("source_info") if isinstance(payload, dict) else {}
+    source_meta = source_info.get("source_meta") if isinstance(source_info, dict) else {}
+    value = source_meta.get("original_filename") if isinstance(source_meta, dict) else ""
+    return str(value or "").strip()
+
+
+def find_usrp_manifest_candidates(
+    original_dir: Path,
+    recon_dir: Path,
+    manifest_run_dir: Path,
+    recon_suffix: str = "_recon",
+) -> list[dict[str, Any]]:
+    originals = build_original_index(original_dir)
+    candidates: list[dict[str, Any]] = []
+    for image_dir in sorted(manifest_run_dir.glob("image_*")):
+        if not image_dir.is_dir():
+            continue
+        try:
+            image_index = int(image_dir.name.split("_", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        stem = original_stem_from_manifest(image_dir / "manifest.json")
+        if not stem:
+            continue
+        original_path = originals.get(stem)
+        recon_path = recon_dir / f"{image_index:08d}{recon_suffix}.png"
+        if original_path is None or not recon_path.is_file():
+            continue
+        candidates.append(
+            {
+                "stem": stem,
+                "original_path": original_path,
+                "reconstruction_path": recon_path,
+                "manifest_path": image_dir / "manifest.json",
+                "image_index": image_index,
+            }
+        )
+    return sorted(candidates, key=lambda item: int(item["image_index"]))
+
+
 def choose_sample(candidates: list[dict[str, Any]], sample_size: int, seed: int) -> list[dict[str, Any]]:
     if sample_size <= 0 or sample_size >= len(candidates):
         return list(candidates)
@@ -167,6 +212,7 @@ def audit_reconstructions(
     sample_size: int = 20,
     seed: int = 0,
     recon_suffix: str = "_recon",
+    manifest_run_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     original_root = Path(original_dir)
     recon_root = Path(recon_dir)
@@ -175,7 +221,16 @@ def audit_reconstructions(
     if not recon_root.is_dir():
         raise FileNotFoundError(f"reconstruction directory not found: {recon_root}")
 
-    candidates = find_candidates(original_root, recon_root, recon_suffix=recon_suffix)
+    manifest_root = Path(manifest_run_dir) if manifest_run_dir else None
+    if manifest_root is not None and not manifest_root.is_dir():
+        raise FileNotFoundError(f"manifest run directory not found: {manifest_root}")
+
+    matching_mode = "usrp_manifest" if manifest_root is not None else "filename"
+    candidates = (
+        find_usrp_manifest_candidates(original_root, recon_root, manifest_root, recon_suffix=recon_suffix)
+        if manifest_root is not None
+        else find_candidates(original_root, recon_root, recon_suffix=recon_suffix)
+    )
     sampled = choose_sample(candidates, sample_size=sample_size, seed=seed)
     records = [
         compare_pair(
@@ -188,6 +243,8 @@ def audit_reconstructions(
     return {
         "original_dir": str(original_root),
         "recon_dir": str(recon_root),
+        "manifest_run_dir": str(manifest_root) if manifest_root is not None else None,
+        "matching_mode": matching_mode,
         "sample_size_requested": sample_size,
         "seed": seed,
         "recon_suffix": recon_suffix,
@@ -240,6 +297,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-size", type=int, default=20, help="Number of matched pairs to audit; <=0 audits all.")
     parser.add_argument("--seed", type=int, default=0, help="Seed for deterministic random sampling.")
     parser.add_argument("--recon-suffix", default="_recon", help="Suffix removed from reconstruction stems.")
+    parser.add_argument(
+        "--manifest-run-dir",
+        default="",
+        help="Optional USRP run directory containing image_XXXX/manifest.json files.",
+    )
     parser.add_argument("--output-json", default="", help="Optional JSON report path.")
     parser.add_argument("--output-csv", default="", help="Optional CSV report path.")
     return parser
@@ -253,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         sample_size=args.sample_size,
         seed=args.seed,
         recon_suffix=args.recon_suffix,
+        manifest_run_dir=args.manifest_run_dir or None,
     )
     if args.output_json:
         write_json(payload, Path(args.output_json))
