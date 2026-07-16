@@ -111,6 +111,7 @@ from inference_runner import (
     load_signed_manifest_summary,
 )
 from openamp_control_wrapper import resolve_bash_executable
+from reconstruction_browser import ReconstructionBrowserConfig, ReconstructionBrowserManager
 from usrp_runtime import (
     DEFAULT_RX_CONTROL_PORT,
     DEFAULT_TX_CONTROL_PORT,
@@ -2495,6 +2496,11 @@ class DashboardState:
         self._mlkem_session_mgr: MlkemSessionManager | None = None
         self._mlkem_remote_asset_signatures: dict[str, str] = {}
         self._mlkem_board_start_lock = Lock()
+        self._reconstruction_browser_manager = ReconstructionBrowserManager(
+            script_path=PACKAGE_ROOT / "scripts" / "board_image_compare_server.py",
+            cache_root=PACKAGE_ROOT / "artifacts" / "board_image_cache",
+            port=int(os.environ.get("BOARD_IMAGE_COMPARE_PORT", "8786") or 8786),
+        )
 
         cached_probe = load_probe_output(probe_cache_path) if probe_cache_path else None
         if is_successful_probe(cached_probe):
@@ -2759,6 +2765,36 @@ class DashboardState:
                 ).start()
         self._ensure_local_aircraft_position_bridge_thread()
         return config.to_public_dict()
+
+    def open_reconstruction_browser(self) -> dict[str, Any]:
+        with self._lock:
+            board_access = self._board_access
+        if not board_access.connection_ready:
+            raise RuntimeError("板卡会话未就绪，无法打开本次重建对比图")
+        public_access = board_access.to_public_dict()
+        original_dir = str(public_access.get("local_usrp_image_dir") or "").strip()
+        if not original_dir:
+            original_dir = self._discover_default_local_usrp_image_dir()
+        remote_root = str(public_access.get("remote_reconstruction_output_base") or "").strip()
+        if not remote_root:
+            remote_root = f"{DEFAULT_USRP_REMOTE_OUTPUT_ROOT}/tvm"
+        if not original_dir:
+            raise RuntimeError("上位机原图目录未配置")
+        url = self._reconstruction_browser_manager.open(
+            ReconstructionBrowserConfig(
+                board_host=board_access.host,
+                board_user=board_access.user,
+                board_password=board_access.password,
+                board_port=int(board_access.port or 22),
+                original_dir=Path(original_dir).resolve(),
+                remote_root=remote_root,
+                manifest_root=PACKAGE_ROOT / "USRP292x" / "analog_latent_runs",
+            )
+        )
+        return {"status": "ok", "url": url}
+
+    def close(self) -> None:
+        self._reconstruction_browser_manager.close()
 
     def get_usrp_control_status(self) -> dict[str, Any]:
         with self._lock:
@@ -10324,6 +10360,14 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
                     return
                 self.respond_json(HTTPStatus.OK, {"status": "ok", "board_access": payload})
                 return
+            if parsed.path == "/api/reconstruction-browser/open":
+                try:
+                    payload = self.server.app_state.open_reconstruction_browser()
+                except RuntimeError as exc:
+                    self.respond_json(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "message": str(exc)})
+                    return
+                self.respond_json(HTTPStatus.OK, payload)
+                return
             if parsed.path == "/api/usrp-control/start":
                 payload = self.server.app_state.start_usrp_control()
                 self.respond_json(HTTPStatus.OK, payload)
@@ -10569,7 +10613,11 @@ def main() -> int:
     server = DemoHTTPServer((args.host, args.port), DemoRequestHandler, app_state)
     print(f"Feiteng semantic visual return demo dashboard: http://{args.host}:{args.port}")
     print(f"Project root: {PROJECT_ROOT}")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        app_state.close()
     return 0
 
 
