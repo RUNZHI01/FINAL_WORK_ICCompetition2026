@@ -2776,9 +2776,12 @@ class DashboardState:
         original_dir = str(public_access.get("local_usrp_image_dir") or "").strip()
         if not original_dir:
             original_dir = self._discover_default_local_usrp_image_dir()
-        remote_root = str(public_access.get("remote_reconstruction_output_base") or "").strip()
-        if not remote_root:
-            remote_root = f"{DEFAULT_USRP_REMOTE_OUTPUT_ROOT}/tvm"
+        usrp_output_root = first_config_value(
+            board_access.build_env(),
+            keys=USRP_REMOTE_OUTPUT_ROOT_KEYS,
+            default=DEFAULT_USRP_REMOTE_OUTPUT_ROOT,
+        )
+        remote_root = f"{usrp_output_root.rstrip('/')}/tvm"
         if not original_dir:
             raise RuntimeError("上位机原图目录未配置")
         url = self._reconstruction_browser_manager.open(

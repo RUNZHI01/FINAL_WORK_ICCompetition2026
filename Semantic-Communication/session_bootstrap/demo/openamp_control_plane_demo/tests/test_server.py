@@ -664,7 +664,7 @@ class DashboardStateTest(unittest.TestCase):
             password="user",
             port="22",
             env_file=None,
-            env_values={},
+            env_values={"REMOTE_OUTPUT_BASE": "/home/user/Downloads/jscc-test/jscc/infer_outputs"},
             source_summary="test",
         )
         with (
@@ -675,6 +675,7 @@ class DashboardStateTest(unittest.TestCase):
 
         config = open_browser.call_args.args[0]
         self.assertEqual(config.manifest_root.name, "qpsk_batch_spool_arq_runs")
+        self.assertEqual(config.remote_root, f"{server.DEFAULT_USRP_REMOTE_OUTPUT_ROOT}/tvm")
 
     def test_reconstruction_browser_route_returns_local_url(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
