@@ -230,9 +230,7 @@ public:
             }
         }
 
-        uhd::stream_args_t stream_args("sc16", opts_.wirefmt);
-        stream_args.channels = {opts_.channel};
-        tx_stream_ = usrp_->get_tx_stream(stream_args);
+        create_streamer();
         std::cout << "Persistent TX ready on rate=" << actual_rate_ << "\n";
     }
 
@@ -313,7 +311,23 @@ public:
         return last_;
     }
 
+    Snapshot reset_streamer()
+    {
+        // Each SEND already terminates its burst with EOB. Keep the UHD TX
+        // streamer resident: repeated recreation eventually exhausts FIFO
+        // control acknowledgements on the competition USRP.
+        last_ = Snapshot{};
+        return last_;
+    }
+
 private:
+    void create_streamer()
+    {
+        uhd::stream_args_t stream_args("sc16", opts_.wirefmt);
+        stream_args.channels = {opts_.channel};
+        tx_stream_ = usrp_->get_tx_stream(stream_args);
+    }
+
     Options opts_;
     uhd::usrp::multi_usrp::sptr usrp_;
     uhd::tx_streamer::sptr tx_stream_;
@@ -439,6 +453,9 @@ int main(int argc, char** argv)
                         }
                         const Snapshot snap = tx.send_file(file_it->second);
                         send_line(client, format_snapshot(snap.ok ? "OK" : "ERR", snap));
+                    } else if (cmd == "RESET") {
+                        tx.reset_streamer();
+                        send_line(client, "OK reset=1 busy=0");
                     } else if (cmd == "QUIT") {
                         send_line(client, "OK bye=1");
                         running = false;

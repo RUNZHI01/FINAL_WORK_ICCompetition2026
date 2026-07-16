@@ -274,9 +274,7 @@ public:
             }
         }
 
-        uhd::stream_args_t stream_args("sc16", opts_.wirefmt);
-        stream_args.channels = {opts_.channel};
-        rx_stream_ = usrp_->get_rx_stream(stream_args);
+        create_streamer();
         std::cout << "Persistent RX ready on rate=" << actual_rate_
                   << " max_num_samps=" << rx_stream_->get_max_num_samps() << "\n";
     }
@@ -402,9 +400,36 @@ public:
         return snap;
     }
 
+    Snapshot reset_streamer(double timeout_sec)
+    {
+        Snapshot snap = stop_and_wait(timeout_sec);
+        if (snap.busy) {
+            throw std::runtime_error("capture worker did not stop before RESET");
+        }
+        join_finished();
+        rx_stream_.reset();
+        create_streamer();
+        stop_requested_.store(false);
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            state_ = Snapshot{};
+            state_.done = true;
+            state_.phase = "reset";
+            snap = state_;
+        }
+        return snap;
+    }
+
     double actual_rate() const { return actual_rate_; }
 
 private:
+    void create_streamer()
+    {
+        uhd::stream_args_t stream_args("sc16", opts_.wirefmt);
+        stream_args.channels = {opts_.channel};
+        rx_stream_ = usrp_->get_rx_stream(stream_args);
+    }
+
     static bool job_id_matches_snapshot(const Snapshot& snap, std::uint64_t expected_job_id)
     {
         return expected_job_id == 0 || snap.job_id == expected_job_id;
@@ -778,6 +803,12 @@ int main(int argc, char** argv)
                         const std::uint64_t job_id = optional_job_id(kv);
                         const Snapshot snap = rx.stop_and_wait(timeout, job_id);
                         send_line(client, format_snapshot((!snap.ok && snap.error == "job_id_mismatch") ? "ERR" : "OK", snap));
+                    } else if (cmd == "RESET") {
+                        const double timeout = kv.count("timeout")
+                            ? std::stod(kv.at("timeout"))
+                            : static_cast<double>(opts.stop_wait_ms) / 1000.0;
+                        rx.reset_streamer(timeout);
+                        send_line(client, "OK reset=1 busy=0");
                     } else if (cmd == "QUIT") {
                         rx.stop();
                         rx.wait_done(5.0);

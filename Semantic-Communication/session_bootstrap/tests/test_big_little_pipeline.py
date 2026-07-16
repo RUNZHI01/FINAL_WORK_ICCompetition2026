@@ -92,6 +92,14 @@ class BigLittlePipelineTest(unittest.TestCase):
             script,
         )
 
+    def test_wrapper_converts_msys_paths_before_windows_python_reads_them(self) -> None:
+        script = WRAPPER_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn("local_python_path()", script)
+        self.assertIn('input_path="$(local_python_path "$1")"', script)
+        self.assertIn('pipeline_json_file_py="$(local_python_path "$pipeline_json_file")"', script)
+        self.assertIn('pipeline_json_file_py="$(local_python_path "$PIPELINE_JSON_FILE")"', script)
+
     def test_python_runner_dry_run_writes_summary_outputs(self) -> None:
         with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

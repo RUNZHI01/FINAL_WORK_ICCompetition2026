@@ -7,9 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="${SCRIPT_DIR}/OtaTxPersistentServer"
 
-if [[ ! -x "${BIN}" ]]; then
-    echo "Missing ${BIN}; run ${SCRIPT_DIR}/BuildOtaTools.sh first." >&2
-    exit 1
+if [[ ! -x "${BIN}" || "${SCRIPT_DIR}/OtaTxPersistentServer.cpp" -nt "${BIN}" ]]; then
+    OTA_TARGETS="OtaTxPersistentServer" bash "${SCRIPT_DIR}/BuildOtaTools.sh"
 fi
 
 DEVICE_ARGS="${DEVICE_ARGS:-addr=192.168.10.2}"

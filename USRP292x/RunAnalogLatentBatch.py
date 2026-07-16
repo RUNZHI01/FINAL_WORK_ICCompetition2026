@@ -84,6 +84,58 @@ def env_optional_float(name: str) -> float | None:
     return None if raw is None or str(raw).strip() == "" else float(raw)
 
 
+def _optional_summary_float(summary: dict[str, Any], key: str) -> float | None:
+    value = summary.get(key)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def iq_decode_quality_failure(summary: dict[str, Any], args: argparse.Namespace) -> str:
+    if not env_bool("ANALOG_IQ_QUALITY_GATE", True):
+        return ""
+    if not bool(summary.get("sync_success", True)):
+        return "IQ quality gate failed: sync_success is false"
+    if not bool(summary.get("frame_complete", True)):
+        return "IQ quality gate failed: frame is incomplete"
+
+    sync_metric = _optional_summary_float(summary, "sync_metric")
+    min_sync_metric = env_optional_float("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC")
+    if min_sync_metric is None:
+        min_sync_metric = max(0.75, float(getattr(args, "min_sync_metric", 0.0) or 0.0))
+    if sync_metric is None and min_sync_metric > 0.0:
+        return "IQ quality gate failed: missing sync metric"
+    if sync_metric is not None and min_sync_metric > 0.0 and sync_metric < min_sync_metric:
+        return f"IQ quality gate failed: sync metric {sync_metric:.6f} below {min_sync_metric:.6f}"
+
+    pilot_ratio = _optional_summary_float(summary, "pilot_gain_min_over_initial")
+    min_pilot_ratio = env_float("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", 0.85)
+    if pilot_ratio is None and min_pilot_ratio > 0.0:
+        return "IQ quality gate failed: missing pilot gain ratio"
+    if pilot_ratio is not None and min_pilot_ratio > 0.0 and pilot_ratio < min_pilot_ratio:
+        return f"IQ quality gate failed: pilot gain ratio {pilot_ratio:.6f} below {min_pilot_ratio:.6f}"
+
+    evm_rms = _optional_summary_float(summary, "evm_rms")
+    max_evm_rms = env_float("ANALOG_IQ_MAX_EVM_RMS", 0.75)
+    if evm_rms is not None and max_evm_rms > 0.0 and evm_rms > max_evm_rms:
+        return f"IQ quality gate failed: EVM {evm_rms:.6f} above {max_evm_rms:.6f}"
+
+    snr_db = _optional_summary_float(summary, "estimated_snr_db")
+    min_snr_db = env_float("ANALOG_IQ_MIN_SNR_DB", 3.0)
+    if snr_db is not None and snr_db < min_snr_db:
+        return f"IQ quality gate failed: SNR {snr_db:.3f} dB below {min_snr_db:.3f} dB"
+
+    max_latent_mse = env_optional_float("ANALOG_IQ_MAX_LATENT_MSE")
+    latent_mse = _optional_summary_float(summary, "latent_mse_vs_tx")
+    if max_latent_mse is not None and latent_mse is not None and latent_mse > max_latent_mse:
+        return f"IQ quality gate failed: latent MSE {latent_mse:.6f} above {max_latent_mse:.6f}"
+
+    return ""
+
+
 def env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     return default if raw is None or str(raw).strip() == "" else int(raw)
@@ -94,6 +146,24 @@ def env_bool(name: str, default: bool) -> bool:
     if raw is None or str(raw).strip() == "":
         return default
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def iq_segment_size(args: argparse.Namespace, *, pipeline_enabled: bool) -> int:
+    if pipeline_enabled:
+        return 0
+    return max(0, int(getattr(args, "iq_segment_size", 30) or 0))
+
+
+def iq_segment_repair_passes(args: argparse.Namespace) -> int:
+    return max(0, int(getattr(args, "iq_segment_repair_passes", 2) or 0))
+
+
+def partition_image_segments(images: list[ImageRecord], segment_size: int) -> list[list[ImageRecord]]:
+    if not images:
+        return []
+    if segment_size <= 0:
+        return [list(images)]
+    return [list(images[start:start + segment_size]) for start in range(0, len(images), segment_size)]
 
 
 def parse_args() -> argparse.Namespace:
@@ -145,6 +215,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk-bytes", type=int, default=0)
     parser.add_argument("--fast-arq-profile", action="store_true")
     parser.add_argument("--batch-size", type=int, default=0)
+    parser.add_argument(
+        "--iq-segment-size",
+        type=int,
+        default=env_int("ANALOG_IQ_SEGMENT_SIZE", 30),
+        help="Serial IQ transport group size. 0 preserves the continuous compatibility path.",
+    )
+    parser.add_argument(
+        "--iq-segment-repair-passes",
+        type=int,
+        default=env_int("ANALOG_IQ_SEGMENT_REPAIR_PASSES", 2),
+        help="Failed-subset repair passes after each serial IQ transport group.",
+    )
     parser.add_argument("--rx-capture-mode", choices=("local", "remote-pull", "remote-decode"), default=os.environ.get("RX_CAPTURE_MODE", "local"))
     parser.add_argument(
         "--remote-cleanup-mode",
@@ -393,6 +475,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rrc-beta", type=float, default=env_float("ANALOG_RRC_BETA", 0.35))
     parser.add_argument("--rrc-span", type=int, default=env_int("ANALOG_RRC_SPAN", 8))
     parser.add_argument("--amp", type=int, default=env_int("AMPLITUDE", 3000))
+    parser.add_argument(
+        "--tx-normalization-reference-peak",
+        type=float,
+        default=env_float("ANALOG_TX_NORMALIZATION_REFERENCE_PEAK", 6.0),
+        help="Fixed waveform normalization divisor; 0 restores per-frame peak normalization.",
+    )
     parser.add_argument("--zero-guard-samples", type=int, default=env_int("ANALOG_ZERO_GUARD_SAMPLES", 4096))
     parser.add_argument("--tail-guard-samples", type=int, default=env_int("ANALOG_TAIL_GUARD_SAMPLES", 4096))
     parser.add_argument("--cfo-pilot-symbols", type=int, default=env_int("ANALOG_CFO_PILOT_SYMBOLS", 1024))
@@ -811,6 +899,65 @@ def stop_rx_capture(
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(entries).rstrip() + "\n", encoding="utf-8")
     return "\n".join(entries)
+
+
+def reset_iq_segment_boundary(
+    args: argparse.Namespace,
+    session: Any | None,
+    log_dir: Path,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    close_preconnected_control(session)
+    clear_shared_rx_control_session(args, session)
+    if bool(getattr(args, "dry_run", False)):
+        return {
+            "ok": True,
+            "skipped": "dry-run",
+            "wall_sec": time.monotonic() - started,
+        }
+
+    timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
+    reset_retries = max(0, env_int("ANALOG_IQ_SEGMENT_RESET_RETRIES", 2))
+
+    def reset_control(name: str, host: str, port: int) -> tuple[str, int]:
+        errors: list[str] = []
+        for attempt in range(reset_retries + 1):
+            try:
+                response = run_control(
+                    host,
+                    port,
+                    "RESET",
+                    log_dir / f"{name}_reset_attempt{attempt + 1}.log",
+                    timeout,
+                )
+                if response.startswith("OK"):
+                    return response, attempt + 1
+                errors.append(response)
+            except Exception as exc:
+                errors.append(f"{type(exc).__name__}: {exc}")
+            if attempt < reset_retries:
+                time.sleep(0.1)
+        raise RuntimeError(f"{name} RESET failed after {reset_retries + 1} attempts: {'; '.join(errors)}")
+
+    rx_reset, rx_reset_attempts = reset_control(
+        "rx",
+        str(getattr(args, "rx_control_host", "")),
+        int(getattr(args, "rx_control_port", 0)),
+    )
+    tx_reset, tx_reset_attempts = reset_control(
+        "tx",
+        str(getattr(args, "tx_control_host", "")),
+        int(getattr(args, "tx_control_port", 0)),
+    )
+    return {
+        "ok": True,
+        "wall_sec": time.monotonic() - started,
+        "rx_reset": rx_reset,
+        "tx_reset": tx_reset,
+        "rx_reset_attempts": rx_reset_attempts,
+        "tx_reset_attempts": tx_reset_attempts,
+    }
 
 
 def stop_rx_capture_after_arm_failure(args: argparse.Namespace, log_path: Path, *, job_id: int | None = None) -> str:
@@ -1874,6 +2021,59 @@ def build_remote_run_dir(args: argparse.Namespace, image: ImageRecord) -> str:
     return f"{root}/{args.run_id}/image_{image.index:04d}"
 
 
+def segment_capture_cleanup_command(args: argparse.Namespace, images: list[ImageRecord]) -> str:
+    remote_dirs = sorted({build_remote_run_dir(args, image) for image in images})
+    quoted_dirs = " ".join(shlex.quote(path) for path in remote_dirs)
+    return f"find {quoted_dirs} -mindepth 1 -maxdepth 1 -type f -delete"
+
+
+def cleanup_iq_segment_capture_files(
+    args: argparse.Namespace,
+    images: list[ImageRecord],
+    target: str,
+    log_path: Path,
+    *,
+    control_socket: str | None = None,
+    decode_worker: Any | None = None,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    record: dict[str, Any] = {
+        "ok": False,
+        "image_count": len(images),
+        "image_indexes": [image.index for image in images],
+    }
+    if not images or not target:
+        record["wall_sec"] = time.monotonic() - started
+        return record
+    remote_dirs = sorted({build_remote_run_dir(args, image) for image in images})
+    if decode_worker is not None:
+        try:
+            response = decode_worker.cleanup(remote_dirs, timeout=5.0)
+            record.update({
+                "ok": True,
+                "transport": "decode-worker",
+                "removed_count": int(response.get("removed_count") or 0),
+            })
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(json.dumps(response, ensure_ascii=False) + "\n", encoding="utf-8")
+        except Exception as exc:
+            record["error"] = f"{type(exc).__name__}: {exc}"
+        record["wall_sec"] = time.monotonic() - started
+        return record
+    full = _ssh_base_args(control_socket=control_socket) + [
+        target,
+        "bash -lc " + shlex.quote(segment_capture_cleanup_command(args, images)),
+    ]
+    try:
+        _run_external(full, log_path, check=True, timeout=30.0)
+        record["ok"] = True
+        record["transport"] = "ssh"
+    except (RuntimeError, subprocess.TimeoutExpired) as exc:
+        record["error"] = f"{type(exc).__name__}: {exc}"
+    record["wall_sec"] = time.monotonic() - started
+    return record
+
+
 def precreate_remote_capture_dirs(
     args: argparse.Namespace,
     images: list[ImageRecord],
@@ -1981,7 +2181,14 @@ def remote_decode_request_timeout(args: argparse.Namespace, capture_timeout: flo
 
 
 def remote_decode_soft_complete_sec(args: argparse.Namespace) -> float:
-    return max(0.0, float(getattr(args, "remote_decode_soft_complete_sec", 0.0) or 0.0))
+    configured = max(0.0, float(getattr(args, "remote_decode_soft_complete_sec", 0.0) or 0.0))
+    if (
+        configured > 0.0
+        and env_bool("ANALOG_IQ_QUALITY_GATE", True)
+        and not env_bool("ANALOG_IQ_ALLOW_SOFT_COMPLETE_WITH_QUALITY_GATE", False)
+    ):
+        return 0.0
+    return configured
 
 
 def remote_decode_response_mode(args: argparse.Namespace) -> str:
@@ -2449,6 +2656,7 @@ class RemoteAnalogDecodeWorker:
             f"PYTHONPATH={remote_pythonpath_for_decode(args)}",
             f"ANALOG_DECODE_PIPELINE_WARMUP={os.environ.get('ANALOG_DECODE_PIPELINE_WARMUP', '1') or '1'}",
             f"ANALOG_DECODE_WARMUP_SHAPE={os.environ.get('ANALOG_DECODE_WARMUP_SHAPE', '1,32,32,32') or '1,32,32,32'}",
+            f"ANALOG_SYNC_FFT_WARMUP={os.environ.get('ANALOG_SYNC_FFT_WARMUP', '0') or '0'}",
             f"RATE={float(getattr(args, 'rate', 5_000_000.0) or 5_000_000.0)}",
             f"ANALOG_SPS={int(getattr(args, 'sps', 4) or 4)}",
             f"ANALOG_AMPLITUDE={amp}",
@@ -2607,6 +2815,23 @@ class RemoteAnalogDecodeWorker:
             raise RuntimeError(str(response.get("error") or "remote decode worker failed"))
         return subprocess.CompletedProcess(args=["decode-server"], returncode=0, stdout=line, stderr="")
 
+    def cleanup(self, paths: list[str], *, timeout: float = 5.0) -> dict[str, Any]:
+        if self.proc.poll() is not None:
+            raise RuntimeError(f"remote decode worker exited with status {self.proc.returncode}")
+        if self.proc.stdin is None:
+            raise RuntimeError("remote decode worker stdin is closed")
+        request = {
+            "cmd": "cleanup",
+            "paths": list(paths),
+            "request_id": f"cleanup:{time.monotonic_ns()}:{id(self)}",
+        }
+        self.proc.stdin.write(json.dumps(request, ensure_ascii=True) + "\n")
+        self.proc.stdin.flush()
+        _line, response = self._wait_for_response(self._request_match_key(request), timeout)
+        if str(response.get("status") or "").lower() != "ok":
+            raise RuntimeError(str(response.get("error") or "remote cleanup failed"))
+        return response
+
     def close(self, *, kill: bool = False) -> None:
         try:
             if self.proc.poll() is None and self.proc.stdin is not None and not kill:
@@ -2680,6 +2905,8 @@ def analog_make_args(args: argparse.Namespace, image: ImageRecord, tx_sc16: Path
         str(args.rrc_span),
         "--amp",
         str(args.amp),
+        "--tx-normalization-reference-peak",
+        str(float(getattr(args, "tx_normalization_reference_peak", 6.0) or 0.0)),
         "--zero-guard-samples",
         str(args.zero_guard_samples),
         "--tail-guard-samples",
@@ -2722,6 +2949,7 @@ def analog_make_namespace(args: argparse.Namespace, image: ImageRecord, tx_sc16:
         rrc_beta=float(args.rrc_beta),
         rrc_span=int(args.rrc_span),
         amp=int(args.amp),
+        tx_normalization_reference_peak=float(getattr(args, "tx_normalization_reference_peak", 6.0) or 0.0),
         zero_guard_samples=int(args.zero_guard_samples),
         tail_guard_samples=int(args.tail_guard_samples),
         cfo_pilot_symbols=int(args.cfo_pilot_symbols),
@@ -3107,6 +3335,7 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
     rx_capture_control = None
     rx_needs_failure_stop = False
     rx_failure_stop_done = False
+    iq_quality_error = ""
 
     try:
         if (
@@ -3514,13 +3743,15 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
                 if remote_decode_result_mode == "remote-dir":
                     pulled_summary = read_json(decode_summary) if decode_summary.is_file() else {}
                     status_ok = str(pulled_summary.get("status") or "").strip().lower() in {"", "ok", "success"}
-                    image.status = 0 if (decode_summary.is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))) else 1
+                    base_ok = decode_summary.is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))
+                    iq_quality_error = iq_decode_quality_failure(pulled_summary, args) if base_ok else ""
+                    image.status = 0 if (base_ok and not iq_quality_error) else 1
                     image.passed = image.status == 0
                 else:
                     image.status = 0 if (out_wire.is_file() and decode_summary.is_file()) else 1
                     image.passed = out_wire.is_file() and decode_summary.is_file()
                 if not image.passed:
-                    image.error = "remote decode completed but expected outputs are missing"
+                    image.error = iq_quality_error or "remote decode completed but expected outputs are missing"
             else:
                 # local + remote-pull: decode locally
                 if use_in_process_local_codec:
@@ -3618,6 +3849,12 @@ def process_image(args: argparse.Namespace, image: ImageRecord) -> ImageRecord:
             "estimated_cfo_hz": summary_data.get("estimated_cfo_hz"),
             "evm_rms": summary_data.get("evm_rms"),
             "estimated_snr_db": summary_data.get("estimated_snr_db"),
+            "pilot_gain_min_abs": summary_data.get("pilot_gain_min_abs"),
+            "pilot_gain_max_abs": summary_data.get("pilot_gain_max_abs"),
+            "pilot_gain_min_over_initial": summary_data.get("pilot_gain_min_over_initial"),
+            "latent_mse_vs_tx": summary_data.get("latent_mse_vs_tx"),
+            "iq_quality_gate_ok": not bool(iq_quality_error),
+            "iq_quality_gate_error": iq_quality_error or None,
             "rx_clipping_ratio": summary_data.get("rx_clipping_ratio"),
             "simulated_cfo_hz": float(args.sim_cfo_hz) if args.dry_run and simulated_channel_enabled(args) else None,
             "simulated_snr_db": float(args.sim_snr_db) if args.dry_run and simulated_channel_enabled(args) and args.sim_snr_db is not None else None,
@@ -4074,6 +4311,7 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
     remote_wire = ""
     remote_summary = ""
     decode_started = 0.0
+    iq_quality_error = ""
     try:
         decode_started = time.monotonic()
         remote_decode_result_mode = str(ctx["remote_decode_result_mode"])
@@ -4200,12 +4438,14 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
         if remote_decode_result_mode == "remote-dir":
             pulled_summary = read_json(ctx["decode_summary"]) if ctx["decode_summary"].is_file() else {}
             status_ok = str(pulled_summary.get("status") or "").strip().lower() in {"", "ok", "success"}
-            image.status = 0 if (ctx["decode_summary"].is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))) else 1
+            base_ok = ctx["decode_summary"].is_file() and status_ok and bool(pulled_summary.get("frame_complete", True))
+            iq_quality_error = iq_decode_quality_failure(pulled_summary, args) if base_ok else ""
+            image.status = 0 if (base_ok and not iq_quality_error) else 1
             image.passed = image.status == 0
         else:
             image.status = 0 if (ctx["out_wire"].is_file() and ctx["decode_summary"].is_file()) else 1
             image.passed = ctx["out_wire"].is_file() and ctx["decode_summary"].is_file()
-        image.error = "" if image.passed else "remote decode completed but expected outputs are missing"
+        image.error = "" if image.passed else (iq_quality_error or "remote decode completed but expected outputs are missing")
 
         cleanup_started = time.monotonic()
         if str(ctx["remote_cleanup_mode"]) != "skip":
@@ -4263,6 +4503,12 @@ def _finalize_remote_decode_pipeline_attempt(args: argparse.Namespace, ctx: dict
             "estimated_cfo_hz": summary_data.get("estimated_cfo_hz"),
             "evm_rms": summary_data.get("evm_rms"),
             "estimated_snr_db": summary_data.get("estimated_snr_db"),
+            "pilot_gain_min_abs": summary_data.get("pilot_gain_min_abs"),
+            "pilot_gain_max_abs": summary_data.get("pilot_gain_max_abs"),
+            "pilot_gain_min_over_initial": summary_data.get("pilot_gain_min_over_initial"),
+            "latent_mse_vs_tx": summary_data.get("latent_mse_vs_tx"),
+            "iq_quality_gate_ok": not bool(iq_quality_error),
+            "iq_quality_gate_error": iq_quality_error or None,
             "rx_clipping_ratio": summary_data.get("rx_clipping_ratio"),
             "simulated_cfo_hz": None,
             "simulated_snr_db": None,
@@ -4927,6 +5173,13 @@ def main() -> int:
     remote_capture_dirs_precreated = False
     rx_batch_session_max_images = max(0, int(getattr(args, "rx_batch_session_max_images", 0) or 0))
     rx_batch_session_images_since_open = 0
+    configured_iq_segment_size = max(0, int(getattr(args, "iq_segment_size", 30) or 0))
+    active_iq_segment_size = 0
+    iq_segment_count = 0
+    iq_segment_repair_group_count = 0
+    iq_segment_repaired_indexes: set[int] = set()
+    iq_segment_resets: list[dict[str, Any]] = []
+    iq_segment_cleanups: list[dict[str, Any]] = []
     remote_mode = str(getattr(args, "rx_capture_mode", "") or "").strip().lower()
     remote_target = str(getattr(args, "remote_rx_ssh_target", "") or "").strip()
     remote_decode_result_mode = str(
@@ -5030,7 +5283,18 @@ def main() -> int:
             )
             pipeline_stats["pipeline_enabled"] = True
         else:
-            for image in images:
+            active_iq_segment_size = iq_segment_size(args, pipeline_enabled=False)
+            segments = partition_image_segments(images, active_iq_segment_size)
+            iq_segment_count = len(segments)
+            completed_by_index: dict[int, ImageRecord] = {}
+            transport_group_count = 0
+            stop_requested = False
+
+            def ensure_rx_batch_session() -> None:
+                nonlocal shared_rx_control_session
+                nonlocal rx_batch_session_control_active
+                nonlocal rx_batch_session_control_unavailable
+                nonlocal rx_batch_session_images_since_open
                 if rx_batch_session_control_requested and not rx_batch_session_control_unavailable:
                     current_session = getattr(args, "rx_control_session", None)
                     if (
@@ -5057,6 +5321,17 @@ def main() -> int:
                             setattr(args, "rx_control_session", shared_rx_control_session)
                             rx_batch_session_control_active = True
                             rx_batch_session_images_since_open = 0
+
+            def process_serial_image(
+                image: ImageRecord,
+                *,
+                segment_index: int,
+                segment_pass: int,
+                group_kind: str,
+            ) -> ImageRecord:
+                nonlocal shared_rx_control_session
+                nonlocal rx_batch_session_images_since_open
+                ensure_rx_batch_session()
                 max_attempts = max(1, 1 + int(getattr(args, "max_arq_rounds", 0) or 0))
                 extra_health_retries = 1 if rx_health_reset_on_stall_enabled(args) else 0
                 result = image
@@ -5066,9 +5341,12 @@ def main() -> int:
                     setattr(args, "current_decode_max_attempts", max_attempts)
                     result = process_image(args, image)
                     if result.records:
-                        result.records[-1]["round"] = attempt_index
+                        result.records[-1]["round"] = len(result.records) - 1
                         result.records[-1]["attempt"] = attempt_index + 1
                         result.records[-1]["max_attempts"] = max_attempts
+                        result.records[-1]["segment_index"] = segment_index
+                        result.records[-1]["segment_pass"] = segment_pass
+                        result.records[-1]["segment_group_kind"] = group_kind
                     health_reset = reset_rx_health_after_record(result)
                     if result.passed:
                         break
@@ -5087,9 +5365,110 @@ def main() -> int:
                     else:
                         shared_rx_control_session = None
                         rx_batch_session_images_since_open = 0
-                completed.append(result)
-                if args.stop_on_fail and not result.passed:
+                return result
+
+            def begin_transport_group(*, segment_index: int, segment_pass: int, group_kind: str) -> None:
+                nonlocal shared_rx_control_session
+                nonlocal rx_batch_session_images_since_open
+                nonlocal transport_group_count
+                if transport_group_count > 0:
+                    reset_index = len(iq_segment_resets)
+                    reset_record = reset_iq_segment_boundary(
+                        args,
+                        getattr(args, "rx_control_session", None),
+                        run_dir / "segment_resets" / f"reset_{reset_index:04d}",
+                    )
+                    reset_record.update({
+                        "reset_index": reset_index,
+                        "next_segment_index": segment_index,
+                        "next_segment_pass": segment_pass,
+                        "next_group_kind": group_kind,
+                    })
+                    iq_segment_resets.append(reset_record)
+                    shared_rx_control_session = None
+                    setattr(args, "rx_control_session", None)
+                    rx_batch_session_images_since_open = 0
+                transport_group_count += 1
+
+            repair_passes = iq_segment_repair_passes(args) if active_iq_segment_size > 0 else 0
+            for segment_index, segment in enumerate(segments):
+                begin_transport_group(segment_index=segment_index, segment_pass=0, group_kind="normal")
+                segment_results: list[ImageRecord] = []
+                for image in segment:
+                    result = process_serial_image(
+                        image,
+                        segment_index=segment_index,
+                        segment_pass=0,
+                        group_kind="normal",
+                    )
+                    completed_by_index[result.index] = result
+                    segment_results.append(result)
+                    if args.stop_on_fail and not result.passed:
+                        stop_requested = True
+                        break
+                if stop_requested:
+                    if (
+                        active_iq_segment_size > 0
+                        and remote_mode in {"remote-pull", "remote-decode"}
+                        and remote_target
+                        and not bool(getattr(args, "dry_run", False))
+                        and env_bool("ANALOG_IQ_SEGMENT_CLEANUP", True)
+                    ):
+                        cleanup_record = cleanup_iq_segment_capture_files(
+                            args,
+                            segment,
+                            remote_target,
+                            run_dir / "segment_cleanups" / f"segment_{segment_index:04d}.log",
+                            control_socket=shared_ssh_control_socket,
+                            decode_worker=remote_decode_worker,
+                        )
+                        cleanup_record["segment_index"] = segment_index
+                        iq_segment_cleanups.append(cleanup_record)
                     break
+
+                failed = [result for result in segment_results if not result.passed]
+                for repair_pass in range(1, repair_passes + 1):
+                    if not failed:
+                        break
+                    iq_segment_repair_group_count += 1
+                    begin_transport_group(
+                        segment_index=segment_index,
+                        segment_pass=repair_pass,
+                        group_kind="repair",
+                    )
+                    repaired_results: list[ImageRecord] = []
+                    for image in failed:
+                        result = process_serial_image(
+                            image,
+                            segment_index=segment_index,
+                            segment_pass=repair_pass,
+                            group_kind="repair",
+                        )
+                        completed_by_index[result.index] = result
+                        repaired_results.append(result)
+                        if result.passed:
+                            iq_segment_repaired_indexes.add(result.index)
+                    failed = [result for result in repaired_results if not result.passed]
+
+                if (
+                    active_iq_segment_size > 0
+                    and remote_mode in {"remote-pull", "remote-decode"}
+                    and remote_target
+                    and not bool(getattr(args, "dry_run", False))
+                    and env_bool("ANALOG_IQ_SEGMENT_CLEANUP", True)
+                ):
+                    cleanup_record = cleanup_iq_segment_capture_files(
+                        args,
+                        segment,
+                        remote_target,
+                        run_dir / "segment_cleanups" / f"segment_{segment_index:04d}.log",
+                        control_socket=shared_ssh_control_socket,
+                        decode_worker=remote_decode_worker,
+                    )
+                    cleanup_record["segment_index"] = segment_index
+                    iq_segment_cleanups.append(cleanup_record)
+
+            completed = [completed_by_index[index] for index in sorted(completed_by_index)]
             pipeline_stats["max_inflight"] = 1 if completed else 0
     finally:
         if (
@@ -5175,6 +5554,30 @@ def main() -> int:
         "rx_health_reset_on_stall": bool(rx_health_reset_on_stall_enabled(args)),
         "rx_health_stall_threshold_sec": rx_health_stall_threshold_sec(args),
         "rx_health_reset_count": int(rx_health_reset_count),
+        "iq_segmented": bool(not pipeline_stats.get("pipeline_enabled") and active_iq_segment_size > 0),
+        "iq_segment_compatibility_mode": bool(
+            not pipeline_stats.get("pipeline_enabled") and configured_iq_segment_size == 0
+        ),
+        "iq_segment_bypassed_for_pipeline": bool(
+            pipeline_stats.get("pipeline_enabled") and configured_iq_segment_size > 0
+        ),
+        "iq_segment_size": int(configured_iq_segment_size),
+        "iq_segment_effective_size": int(active_iq_segment_size),
+        "iq_segment_count": int(iq_segment_count),
+        "iq_segment_repair_passes": int(iq_segment_repair_passes(args)),
+        "iq_segment_repair_group_count": int(iq_segment_repair_group_count),
+        "iq_segment_repaired_image_count": len(iq_segment_repaired_indexes),
+        "iq_segment_repaired_indexes": sorted(iq_segment_repaired_indexes),
+        "iq_segment_reset_count": len(iq_segment_resets),
+        "iq_segment_reset_wall_sec": sum(
+            float(record.get("wall_sec") or 0.0) for record in iq_segment_resets
+        ),
+        "iq_segment_resets": iq_segment_resets,
+        "iq_segment_cleanup_count": len(iq_segment_cleanups),
+        "iq_segment_cleanup_wall_sec": sum(
+            float(record.get("wall_sec") or 0.0) for record in iq_segment_cleanups
+        ),
+        "iq_segment_cleanups": iq_segment_cleanups,
         "rx_arm_status_timeout_sec": rx_arm_status_timeout_sec(args),
         "rx_arm_status_poll_sec": rx_arm_status_poll_sec(args),
         "codec_warmup_wall_sec": codec_warmup_wall_sec,
@@ -5191,6 +5594,9 @@ def main() -> int:
         ),
         "rate": float(args.rate),
         "sps": int(args.sps),
+        "tx_normalization_reference_peak": float(
+            getattr(args, "tx_normalization_reference_peak", 6.0) or 0.0
+        ),
         "rx_post_quantize": bool(args.rx_post_quantize),
         "robust_sync": bool(args.robust_sync),
         "sync_profile": sync_profile_value(args),

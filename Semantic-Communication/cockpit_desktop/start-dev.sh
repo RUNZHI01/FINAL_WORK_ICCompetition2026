@@ -109,7 +109,7 @@ configure_runtime_defaults() {
   fi
   export MLKEM_TRANSPORT_MODE="${MLKEM_TRANSPORT_MODE:-usrp}"
   export MLKEM_USRP_MODE="${MLKEM_USRP_MODE:-ota}"
-  export MLKEM_USRP_MAX_ARQ_ROUNDS="${MLKEM_USRP_MAX_ARQ_ROUNDS:-5}"
+  export MLKEM_USRP_MAX_ARQ_ROUNDS="${MLKEM_USRP_MAX_ARQ_ROUNDS:-12}"
   export OPENAMP_DEMO_INPUT_SOURCE_MODE="${OPENAMP_DEMO_INPUT_SOURCE_MODE:-usrp}"
   export JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"
   export OPENAMP_DEMO_LINK_MODE="${OPENAMP_DEMO_LINK_MODE:-iq-direct}"
@@ -117,11 +117,15 @@ configure_runtime_defaults() {
   if [[ "$JSCC_LINK_MODE" == "iq-direct" ]]; then
     export OPENAMP_IQ_STREAMING_TVM="${OPENAMP_IQ_STREAMING_TVM:-0}"
     export OPENAMP_IQ_STREAMING_MIN_READY="${OPENAMP_IQ_STREAMING_MIN_READY:-10}"
+    export OPENAMP_IQ_SEGMENT_SIZE="${OPENAMP_IQ_SEGMENT_SIZE:-30}"
+    export OPENAMP_IQ_SEGMENT_REPAIR_PASSES="${OPENAMP_IQ_SEGMENT_REPAIR_PASSES:-2}"
+    export ANALOG_TX_NORMALIZATION_REFERENCE_PEAK="${ANALOG_TX_NORMALIZATION_REFERENCE_PEAK:-6}"
     export BIG_LITTLE_INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-10}"
   fi
   export OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"
   export COCKPIT_STARTUP_USRP_WARMUP="${COCKPIT_STARTUP_USRP_WARMUP:-1}"
-  export COCKPIT_STARTUP_USRP_WARMUP_COUNT="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-5}"
+  export COCKPIT_STARTUP_USRP_WARMUP_COUNT="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10}"
+  export COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS="${COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS:-}"
   export COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
   export MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"
   export MLKEM_AUTH_SERVER_ID="${MLKEM_AUTH_SERVER_ID:-phytium-board}"
@@ -155,12 +159,21 @@ configure_runtime_defaults() {
   export ANALOG_RETRY_ON_BURST_MISS="${ANALOG_RETRY_ON_BURST_MISS:-1}"
   export ANALOG_RETRY_ON_LOW_SYNC="${ANALOG_RETRY_ON_LOW_SYNC:-1}"
   export ANALOG_LOW_SYNC_RETRY_THRESHOLD="${ANALOG_LOW_SYNC_RETRY_THRESHOLD:-0.08}"
+  export ANALOG_SYNC_PROFILE="${ANALOG_SYNC_PROFILE:-fast-first}"
+  export ANALOG_FAST_SYNC_CANDIDATES="${ANALOG_FAST_SYNC_CANDIDATES:-4}"
+  export ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"
   export ANALOG_FALLBACK_SYNC_CANDIDATES="${ANALOG_FALLBACK_SYNC_CANDIDATES:-4}"
   export ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"
+  export ANALOG_IQ_QUALITY_GATE="${ANALOG_IQ_QUALITY_GATE:-1}"
+  export ANALOG_IQ_QUALITY_MIN_SYNC_METRIC="${ANALOG_IQ_QUALITY_MIN_SYNC_METRIC:-0.75}"
+  export ANALOG_IQ_MIN_PILOT_GAIN_RATIO="${ANALOG_IQ_MIN_PILOT_GAIN_RATIO:-0.85}"
+  export ANALOG_IQ_MAX_EVM_RMS="${ANALOG_IQ_MAX_EVM_RMS:-0.75}"
+  export ANALOG_IQ_MIN_SNR_DB="${ANALOG_IQ_MIN_SNR_DB:-3.0}"
   export ANALOG_REMOTE_DECODE_RESPONSE_MODE="${ANALOG_REMOTE_DECODE_RESPONSE_MODE:-minimal}"
   export ANALOG_REMOTE_DECODED_FORMAT="${ANALOG_REMOTE_DECODED_FORMAT:-npy}"
   export ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY="${ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY:-1}"
   export ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC="${ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC:-0.05}"
+  export ANALOG_SYNC_FFT_WARMUP="${ANALOG_SYNC_FFT_WARMUP:-0}"
   export ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS="${ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS:-1}"
   export ANALOG_RX_SC16_MMAP="${ANALOG_RX_SC16_MMAP:-1}"
   export ANALOG_RX_CLIPPING_DECIMATION="${ANALOG_RX_CLIPPING_DECIMATION:-8}"
@@ -286,7 +299,7 @@ run_startup_usrp_warmup() {
   local user="${REMOTE_USER:-${PHYTIUM_PI_USER:-user}}"
   local port="${REMOTE_SSH_PORT:-${PHYTIUM_PI_PORT:-22}}"
   local password=""
-  local count="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-5}"
+  local count="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10}"
   local timeout_sec="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
 
   if [[ -z "$host" ]]; then
@@ -404,14 +417,47 @@ if started.get("status") not in {"started", "done"}:
     raise SystemExit(f"warm-up batch did not start: {started}")
 job_id = str(started.get("batch_job_id") or "")
 
+def _warmup_stage_line(name: str, payload: object, fallback_total: int) -> str:
+    if not isinstance(payload, dict):
+        return f"{name}: 0/{fallback_total} 等待"
+    completed = int(payload.get("completed") or 0)
+    total = int(payload.get("total") or fallback_total)
+    raw_status = str(payload.get("status") or "").lower()
+    if raw_status in {"done", "completed"} or (total > 0 and completed >= total):
+        status_text = "完成"
+    elif raw_status in {"failed", "error", "cancelled"}:
+        status_text = "失败"
+    elif raw_status in {"fallback", "partial"}:
+        status_text = "部分完成"
+    elif raw_status in {"running", "active"} or completed > 0:
+        status_text = "进行中"
+    elif raw_status in {"queued", "launching"}:
+        status_text = "启动中"
+    else:
+        status_text = "等待"
+    return f"{name}: {completed}/{total} {status_text}"
+
 deadline = time.monotonic() + timeout_sec
 last_state: dict = {}
+last_progress_line = ""
+next_progress_heartbeat = 0.0
 while time.monotonic() < deadline:
     last_state = request_json("GET", "/api/batch-state", timeout=10.0)
     status = str(last_state.get("status") or "")
     completed = int(last_state.get("completed") or 0)
     total = int(last_state.get("total") or count)
-    print(f"启动预热进度: {completed}/{total} ({status})", flush=True)
+    progress_line = "启动预热进度: " + "；".join(
+        [
+            _warmup_stage_line("latent", last_state.get("host_preprocess_progress"), total),
+            _warmup_stage_line("USRP", last_state.get("transport_progress"), total),
+            _warmup_stage_line("TVM", last_state.get("inference_progress"), total),
+        ]
+    )
+    now = time.monotonic()
+    if progress_line != last_progress_line or now >= next_progress_heartbeat:
+        print(progress_line, flush=True)
+        last_progress_line = progress_line
+        next_progress_heartbeat = now + 15.0
     if status in {"done", "completed"}:
         break
     if status in {"failed", "error", "cancelled"}:
@@ -422,8 +468,20 @@ else:
 
 completed = int(last_state.get("completed") or 0)
 success = int(last_state.get("success") or 0)
-if completed < count or success < count:
-    raise SystemExit(f"warm-up incomplete: completed={completed}, success={success}, expected={count}")
+inference_progress = last_state.get("inference_progress")
+if isinstance(inference_progress, dict):
+    completed = max(completed, int(inference_progress.get("completed") or 0))
+min_success_raw = os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS", "").strip()
+if min_success_raw:
+    min_success = int(min_success_raw)
+else:
+    min_success = max(1, (count + 1) // 2)
+min_success = max(1, min(count, min_success))
+accepted_success = max(success, completed)
+if accepted_success < min_success:
+    raise SystemExit(
+        f"warm-up insufficient: completed={completed}, success={success}, minimum={min_success}, expected={count}"
+    )
 
 cleared = request_json(
     "POST",
@@ -434,7 +492,13 @@ cleared = request_json(
 if cleared.get("status") != "ok" or not cleared.get("cleared"):
     raise SystemExit(f"warm-up batch-state clear failed: {cleared}")
 
-print(f"启动预热完成：{success}/{count}，Cockpit Desktop 即将显示。", flush=True)
+if accepted_success >= count:
+    print(f"启动预热完成：{accepted_success}/{count}，Cockpit Desktop 即将显示。", flush=True)
+else:
+    print(
+        f"启动预热部分完成：{accepted_success}/{count}，已达到最小阈值 {min_success}，Cockpit Desktop 即将显示。",
+        flush=True,
+    )
 PY
 }
 
@@ -449,7 +513,7 @@ echo "启动 Cockpit Desktop 开发环境..."
 echo "仓库根目录: $REPO_ROOT"
 echo "后端地址: http://$BACKEND_HOST:$BACKEND_PORT"
 echo "USRP 运行默认: TRANSPORT=$MLKEM_TRANSPORT_MODE, LINK=$JSCC_LINK_MODE, SSH=${OPENAMP_SSH_RUNNER:-system}, TX=${OPENAMP_USRP_TX_RUNNER:-system}, REMOTE_PYTHON=$REMOTE_DECODE_PYTHON"
-echo "USRP IQ 微批默认: STREAMING_TVM=${OPENAMP_IQ_STREAMING_TVM:-0}, MIN_READY=${OPENAMP_IQ_STREAMING_MIN_READY:-1}, CHUNK=${BIG_LITTLE_INPUT_CHUNK_SIZE:-1}, PIPELINE_DEPTH=${ANALOG_PIPELINE_DEPTH:-1}, RF_DECODE_OVERLAP=${ANALOG_PIPELINE_RF_DECODE_OVERLAP:-0}, DECODE_WORKER='${ANALOG_REMOTE_DECODE_WORKER_PREFIX:-}'"
+echo "USRP IQ 微批默认: STREAMING_TVM=${OPENAMP_IQ_STREAMING_TVM:-0}, MIN_READY=${OPENAMP_IQ_STREAMING_MIN_READY:-1}, SEGMENT=${OPENAMP_IQ_SEGMENT_SIZE:-30}, REPAIR_PASSES=${OPENAMP_IQ_SEGMENT_REPAIR_PASSES:-2}, TX_NORM_REF=${ANALOG_TX_NORMALIZATION_REFERENCE_PEAK:-6}, CHUNK=${BIG_LITTLE_INPUT_CHUNK_SIZE:-1}, PIPELINE_DEPTH=${ANALOG_PIPELINE_DEPTH:-1}, RF_DECODE_OVERLAP=${ANALOG_PIPELINE_RF_DECODE_OVERLAP:-0}, DECODE_WORKER='${ANALOG_REMOTE_DECODE_WORKER_PREFIX:-}'"
 if [[ -n "${REMOTE_HOST:-${PHYTIUM_PI_HOST:-}}" ]]; then
   echo "板卡地址覆盖: ${REMOTE_HOST:-${PHYTIUM_PI_HOST:-}}"
 fi

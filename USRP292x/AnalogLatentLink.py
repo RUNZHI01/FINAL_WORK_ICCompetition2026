@@ -419,16 +419,28 @@ def symbols_to_rrc_waveform(symbols: np.ndarray, taps: np.ndarray, sps: int) -> 
     return np.convolve(upsampled, taps.astype(np.float32), mode="full").astype(np.complex64)
 
 
-def waveform_to_sc16(wave: np.ndarray, amplitude: int) -> tuple[np.ndarray, float, float]:
+def waveform_to_sc16(
+    wave: np.ndarray,
+    amplitude: int,
+    *,
+    normalization_reference_peak: float = 0.0,
+) -> tuple[np.ndarray, float, float, float]:
     peak = float(np.max(np.abs(wave)) + 1.0e-8)
-    normalized = wave / np.float32(peak)
+    reference_peak = max(0.0, float(normalization_reference_peak))
+    if reference_peak > 0.0:
+        sc16_headroom = 32760.0
+        clipping_safe_divisor = peak * max(float(amplitude), 1.0) / sc16_headroom
+        normalization_divisor = max(reference_peak, clipping_safe_divisor, 1.0e-8)
+    else:
+        normalization_divisor = peak
+    normalized = wave / np.float32(normalization_divisor)
     i = np.clip(np.real(normalized) * float(amplitude), -32767, 32767).astype(np.int16)
     q = np.clip(np.imag(normalized) * float(amplitude), -32767, 32767).astype(np.int16)
     interleaved = np.empty(i.size * 2, dtype=np.int16)
     interleaved[0::2] = i
     interleaved[1::2] = q
     clipping_ratio = float(np.mean((np.abs(i) >= 32767) | (np.abs(q) >= 32767)))
-    return interleaved, peak, clipping_ratio
+    return interleaved, peak, clipping_ratio, float(normalization_divisor)
 
 
 def normalized_complex_to_sc16(wave: np.ndarray, amplitude: int) -> tuple[np.ndarray, float]:
@@ -897,12 +909,21 @@ def recover_payload_symbols(sym_stream: np.ndarray, sync_start: int, manifest: d
             cursor += block_len
 
     payload = np.concatenate(payload_blocks).astype(np.complex64) if payload_blocks else np.zeros(0, dtype=np.complex64)
+    gain_abs_values = [float(abs(gain)) for gain in gains]
+    initial_gain_abs = gain_abs_values[0] if gain_abs_values else 0.0
+    min_gain_abs = min(gain_abs_values) if gain_abs_values else 0.0
+    max_gain_abs = max(gain_abs_values) if gain_abs_values else 0.0
     metrics = {
         "data_start_symbol": int(sync_start + sync_len),
         "data_end_symbol": int(cursor),
         "channel_gain_real": float(np.real(gains[0])),
         "channel_gain_imag": float(np.imag(gains[0])),
         "channel_gain_abs": float(abs(gains[0])),
+        "pilot_gain_min_abs": min_gain_abs,
+        "pilot_gain_max_abs": max_gain_abs,
+        "pilot_gain_min_over_initial": (
+            float(min_gain_abs / initial_gain_abs) if initial_gain_abs > EPS else None
+        ),
         "pilot_gains": [
             {"real": float(np.real(gain)), "imag": float(np.imag(gain)), "abs": float(abs(gain))}
             for gain in gains
@@ -1153,7 +1174,19 @@ def make_waveform(args: argparse.Namespace) -> dict[str, Any]:
             np.zeros(int(args.tail_guard_samples), dtype=np.complex64),
         ]
     )
-    interleaved, peak, clipping_ratio = waveform_to_sc16(guarded, int(args.amp))
+    normalization_reference_peak = float(
+        getattr(
+            args,
+            "tx_normalization_reference_peak",
+            _env_float("ANALOG_TX_NORMALIZATION_REFERENCE_PEAK", 6.0),
+        )
+        or 0.0
+    )
+    interleaved, peak, clipping_ratio, normalization_divisor = waveform_to_sc16(
+        guarded,
+        int(args.amp),
+        normalization_reference_peak=normalization_reference_peak,
+    )
     write_sc16(out_sc16, interleaved)
 
     waveform_samples = int(interleaved.size // 2)
@@ -1164,6 +1197,8 @@ def make_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "capture_nsamps": int(waveform_samples + int(args.capture_margin_samples)),
         "capture_margin_samples": int(args.capture_margin_samples),
         "tx_peak": peak,
+        "tx_normalization_reference_peak": normalization_reference_peak,
+        "tx_normalization_divisor": normalization_divisor,
         "tx_clipping_ratio": clipping_ratio,
         "airtime_ms": float(1000.0 * waveform_samples / float(args.rate)),
         "symbol_rate": float(args.rate) / float(args.sps),
@@ -1777,6 +1812,9 @@ DECODE_WORKER_MINIMAL_SUMMARY_KEYS = (
     "detected_airtime_ms",
     "evm_rms",
     "estimated_snr_db",
+    "pilot_gain_min_abs",
+    "pilot_gain_max_abs",
+    "pilot_gain_min_over_initial",
     "rx_clipping_ratio",
     "decode_total_ms",
     "decode_timing_ms",
@@ -1834,6 +1872,28 @@ def run_decode_server() -> int:
         if cmd in {"quit", "exit"}:
             print(json.dumps({"status": "bye"}, ensure_ascii=False), flush=True)
             return 0
+        if cmd == "cleanup":
+            removed_count = 0
+            try:
+                for raw_path in request.get("paths") or []:
+                    path = Path(str(raw_path))
+                    candidates = list(path.iterdir()) if path.is_dir() else [path]
+                    for candidate in candidates:
+                        if candidate.is_file():
+                            candidate.unlink()
+                            removed_count += 1
+                print(json.dumps({
+                    "status": "ok",
+                    "request_id": str(request.get("request_id") or ""),
+                    "removed_count": removed_count,
+                }, ensure_ascii=False), flush=True)
+            except Exception as exc:
+                print(json.dumps({
+                    "status": "error",
+                    "request_id": str(request.get("request_id") or ""),
+                    "error": str(exc),
+                }, ensure_ascii=False), flush=True)
+            continue
         if cmd != "decode":
             print(json.dumps({"status": "error", "error": f"unsupported cmd: {cmd}"}, ensure_ascii=False), flush=True)
             continue
@@ -2048,6 +2108,12 @@ def add_common_phy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--rrc-beta", type=float, default=DEFAULT_RRC_BETA)
     parser.add_argument("--rrc-span", type=int, default=DEFAULT_RRC_SPAN)
     parser.add_argument("--amp", type=int, default=DEFAULT_SC16_AMPLITUDE)
+    parser.add_argument(
+        "--tx-normalization-reference-peak",
+        type=float,
+        default=_env_float("ANALOG_TX_NORMALIZATION_REFERENCE_PEAK", 6.0),
+        help="Fixed waveform normalization divisor; 0 restores per-frame peak normalization.",
+    )
     parser.add_argument("--zero-guard-samples", type=int, default=DEFAULT_ZERO_GUARD_SAMPLES)
     parser.add_argument("--tail-guard-samples", type=int, default=DEFAULT_TAIL_GUARD_SAMPLES)
     parser.add_argument("--cfo-pilot-symbols", type=int, default=DEFAULT_CFO_PILOT_SYMBOLS)

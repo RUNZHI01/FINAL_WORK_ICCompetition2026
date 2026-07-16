@@ -81,6 +81,12 @@ if ($env:JSCC_LINK_MODE -eq "iq-direct") {
     if (-not $env:OPENAMP_IQ_STREAMING_MIN_READY) {
         $env:OPENAMP_IQ_STREAMING_MIN_READY = "10"
     }
+    if (-not $env:OPENAMP_IQ_SEGMENT_SIZE) {
+        $env:OPENAMP_IQ_SEGMENT_SIZE = "30"
+    }
+    if (-not $env:OPENAMP_IQ_SEGMENT_REPAIR_PASSES) {
+        $env:OPENAMP_IQ_SEGMENT_REPAIR_PASSES = "2"
+    }
     if (-not $env:BIG_LITTLE_INPUT_CHUNK_SIZE) {
         $env:BIG_LITTLE_INPUT_CHUNK_SIZE = "10"
     }
@@ -99,6 +105,9 @@ if (-not $env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC) {
 }
 if (-not $env:ANALOG_REMOTE_DECODED_FORMAT) {
     $env:ANALOG_REMOTE_DECODED_FORMAT = "npy"
+}
+if (-not $env:ANALOG_SYNC_FFT_WARMUP) {
+    $env:ANALOG_SYNC_FFT_WARMUP = "0"
 }
 if (-not $env:RX_ARM_WAIT_MS) {
     $env:RX_ARM_WAIT_MS = "500"
@@ -121,6 +130,9 @@ if (-not $env:ANALOG_SPS) {
 }
 if (-not $env:ANALOG_AMPLITUDE) {
     $env:ANALOG_AMPLITUDE = "6000"
+}
+if (-not $env:ANALOG_TX_NORMALIZATION_REFERENCE_PEAK) {
+    $env:ANALOG_TX_NORMALIZATION_REFERENCE_PEAK = "6"
 }
 if (-not $env:ANALOG_RX_POST_QUANTIZE) {
     $env:ANALOG_RX_POST_QUANTIZE = "0"
@@ -196,10 +208,10 @@ if (-not $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT) {
     $env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"
 }
 if (-not $env:MLKEM_USRP_MAX_ARQ_ROUNDS) {
-    $env:MLKEM_USRP_MAX_ARQ_ROUNDS = "5"
+    $env:MLKEM_USRP_MAX_ARQ_ROUNDS = "12"
 }
 if (-not $env:USRP_MAX_ARQ_ROUNDS) {
-    $env:USRP_MAX_ARQ_ROUNDS = "5"
+    $env:USRP_MAX_ARQ_ROUNDS = "12"
 }
 if (-not $env:ANALOG_RETRY_ON_BURST_MISS) {
     $env:ANALOG_RETRY_ON_BURST_MISS = "1"
@@ -210,11 +222,35 @@ if (-not $env:ANALOG_RETRY_ON_LOW_SYNC) {
 if (-not $env:ANALOG_LOW_SYNC_RETRY_THRESHOLD) {
     $env:ANALOG_LOW_SYNC_RETRY_THRESHOLD = "0.08"
 }
+if (-not $env:ANALOG_SYNC_PROFILE) {
+    $env:ANALOG_SYNC_PROFILE = "fast-first"
+}
+if (-not $env:ANALOG_FAST_SYNC_CANDIDATES) {
+    $env:ANALOG_FAST_SYNC_CANDIDATES = "4"
+}
+if (-not $env:ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS) {
+    $env:ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS = "1024"
+}
 if (-not $env:ANALOG_FALLBACK_SYNC_CANDIDATES) {
     $env:ANALOG_FALLBACK_SYNC_CANDIDATES = "4"
 }
 if (-not $env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS) {
     $env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = "1024"
+}
+if (-not $env:ANALOG_IQ_QUALITY_GATE) {
+    $env:ANALOG_IQ_QUALITY_GATE = "1"
+}
+if (-not $env:ANALOG_IQ_QUALITY_MIN_SYNC_METRIC) {
+    $env:ANALOG_IQ_QUALITY_MIN_SYNC_METRIC = "0.75"
+}
+if (-not $env:ANALOG_IQ_MIN_PILOT_GAIN_RATIO) {
+    $env:ANALOG_IQ_MIN_PILOT_GAIN_RATIO = "0.85"
+}
+if (-not $env:ANALOG_IQ_MAX_EVM_RMS) {
+    $env:ANALOG_IQ_MAX_EVM_RMS = "0.75"
+}
+if (-not $env:ANALOG_IQ_MIN_SNR_DB) {
+    $env:ANALOG_IQ_MIN_SNR_DB = "3.0"
 }
 if (-not $env:OPENAMP_TVM_BATCH_RUNNER) {
     $env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"

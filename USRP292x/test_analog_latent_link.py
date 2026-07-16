@@ -22,9 +22,204 @@ ANALOG_LINK = PROJECT_ROOT / "USRP292x" / "AnalogLatentLink.py"
 ANALOG_BATCH = PROJECT_ROOT / "USRP292x" / "RunAnalogLatentBatch.py"
 OTA_RX_SERVER = PROJECT_ROOT / "USRP292x" / "OtaRxPersistentServer.cpp"
 OTA_RX_SERVER_SCRIPT = PROJECT_ROOT / "USRP292x" / "OtaRxPersistentServer.sh"
+OTA_TX_SERVER = PROJECT_ROOT / "USRP292x" / "OtaTxPersistentServer.cpp"
 
 from USRP292x import AnalogLatentLink as analog  # noqa: E402
 from USRP292x import RunAnalogLatentBatch as analog_batch  # noqa: E402
+
+
+def test_waveform_reference_peak_keeps_pilot_level_with_payload_outlier():
+    wave = np.asarray([1.0 + 0.0j, 12.0 + 0.0j], dtype=np.complex64)
+
+    raw, peak, clipping_ratio, divisor = analog.waveform_to_sc16(
+        wave,
+        6000,
+        normalization_reference_peak=6.0,
+    )
+
+    assert peak == pytest.approx(12.0)
+    assert divisor == pytest.approx(6.0)
+    assert raw.tolist() == [1000, 0, 12000, 0]
+    assert clipping_ratio == 0.0
+
+
+def test_waveform_reference_peak_expands_divisor_to_preserve_sc16_headroom():
+    wave = np.asarray([100.0 + 0.0j], dtype=np.complex64)
+
+    raw, _peak, clipping_ratio, divisor = analog.waveform_to_sc16(
+        wave,
+        6000,
+        normalization_reference_peak=6.0,
+    )
+
+    assert divisor > 6.0
+    assert int(raw[0]) <= 32760
+    assert clipping_ratio == 0.0
+
+
+def test_partition_image_segments_keeps_short_final_group(tmp_path):
+    images = [
+        analog_batch.ImageRecord(
+            index=index,
+            input_path=tmp_path / f"{index}.bin",
+            image_dir=tmp_path / f"image_{index:04d}",
+        )
+        for index in range(35)
+    ]
+
+    groups = analog_batch.partition_image_segments(images, 30)
+
+    assert [len(group) for group in groups] == [30, 5]
+    assert [[image.index for image in group] for group in groups] == [list(range(30)), list(range(30, 35))]
+
+
+def test_iq_segment_size_zero_keeps_continuous_mode():
+    assert analog_batch.iq_segment_size(Namespace(iq_segment_size=0), pipeline_enabled=False) == 0
+
+
+def test_partition_image_segments_zero_keeps_one_continuous_group(tmp_path):
+    images = [
+        analog_batch.ImageRecord(index=index, input_path=tmp_path / f"{index}.bin", image_dir=tmp_path)
+        for index in range(3)
+    ]
+
+    assert analog_batch.partition_image_segments(images, 0) == [images]
+
+
+def test_iq_segment_size_is_disabled_for_pipeline():
+    assert analog_batch.iq_segment_size(Namespace(iq_segment_size=30), pipeline_enabled=True) == 0
+
+
+def test_iq_segment_repair_passes_clamps_negative_values():
+    assert analog_batch.iq_segment_repair_passes(Namespace(iq_segment_repair_passes=-1)) == 0
+
+
+def test_segment_capture_cleanup_deletes_files_but_preserves_directories(tmp_path):
+    args = Namespace(remote_rx_run_root="/dev/shm/usrp292x_remote_runs", run_id="demo-run")
+    images = [
+        analog_batch.ImageRecord(index=index, input_path=tmp_path / f"{index}.bin", image_dir=tmp_path)
+        for index in (30, 31)
+    ]
+
+    command = analog_batch.segment_capture_cleanup_command(args, images)
+
+    assert command.startswith("find ")
+    assert "/dev/shm/usrp292x_remote_runs/demo-run/image_0030" in command
+    assert "/dev/shm/usrp292x_remote_runs/demo-run/image_0031" in command
+    assert "-mindepth 1 -maxdepth 1 -type f -delete" in command
+    assert "rm -rf" not in command
+
+
+def test_segment_capture_cleanup_prefers_resident_decode_worker(tmp_path):
+    args = Namespace(remote_rx_run_root="/dev/shm/usrp292x_remote_runs", run_id="demo-run")
+    images = [analog_batch.ImageRecord(index=0, input_path=tmp_path / "0.bin", image_dir=tmp_path)]
+
+    class FakeWorker:
+        def cleanup(self, paths, *, timeout):
+            assert paths == ["/dev/shm/usrp292x_remote_runs/demo-run/image_0000"]
+            assert timeout == 5.0
+            return {"status": "ok", "removed_count": 4}
+
+    record = analog_batch.cleanup_iq_segment_capture_files(
+        args,
+        images,
+        "user@board",
+        tmp_path / "cleanup.log",
+        decode_worker=FakeWorker(),
+    )
+
+    assert record["ok"] is True
+    assert record["transport"] == "decode-worker"
+    assert record["removed_count"] == 4
+
+
+def test_segment_boundary_closes_session_before_resetting_both_streamers(tmp_path, monkeypatch):
+    events: list[str] = []
+
+    class FakeSession:
+        def close(self):
+            events.append("close")
+
+    session = FakeSession()
+    args = Namespace(
+        rx_control_session=session,
+        rx_control_host="rx",
+        rx_control_port=29220,
+        tx_control_host="tx",
+        tx_control_port=29221,
+        rx_timeout_sec=30.0,
+    )
+
+    def fake_run_control(_host, port, line, _log_path, _timeout):
+        events.append(f"control:{port}:{line}")
+        return "OK reset=1 busy=0"
+
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    record = analog_batch.reset_iq_segment_boundary(args, session, tmp_path / "segment_0001")
+
+    assert events == ["close", "control:29220:RESET", "control:29221:RESET"]
+    assert args.rx_control_session is None
+    assert record["ok"] is True
+    assert record["wall_sec"] >= 0.0
+
+
+def test_persistent_rx_reset_recreates_streamer_after_waiting_for_idle():
+    source = OTA_RX_SERVER.read_text(encoding="utf-8")
+    reset_branch = source[source.index('} else if (cmd == "RESET")'):source.index('} else if (cmd == "QUIT")')]
+
+    assert "Snapshot reset_streamer" in source
+    assert "stop_and_wait" in source
+    assert "join_finished" in source
+    assert "get_rx_stream" in source
+    assert "rx.reset_streamer" in reset_branch
+
+
+def test_persistent_tx_reset_keeps_resident_streamer():
+    source = OTA_TX_SERVER.read_text(encoding="utf-8")
+    reset_method = source[source.index("Snapshot reset_streamer()") : source.index("private:", source.index("Snapshot reset_streamer()"))]
+
+    assert "Snapshot reset_streamer" in source
+    assert "last_ = Snapshot{}" in reset_method
+    assert "tx_stream_.reset()" not in reset_method
+    assert "create_streamer()" not in reset_method
+
+
+def test_segment_boundary_retries_transient_control_reset_failure(tmp_path, monkeypatch):
+    events: list[str] = []
+    tx_attempts = 0
+
+    class FakeSession:
+        def close(self):
+            events.append("close")
+
+    args = Namespace(
+        rx_control_session=None,
+        rx_control_host="rx",
+        rx_control_port=29220,
+        tx_control_host="tx",
+        tx_control_port=29221,
+        rx_timeout_sec=30.0,
+    )
+
+    def fake_run_control(_host, port, line, _log_path, _timeout):
+        nonlocal tx_attempts
+        events.append(f"control:{port}:{line}")
+        if port == 29221:
+            tx_attempts += 1
+            if tx_attempts == 1:
+                raise RuntimeError("transient FIFO ACK timeout")
+        return "OK reset=1 busy=0"
+
+    monkeypatch.setenv("ANALOG_IQ_SEGMENT_RESET_RETRIES", "1")
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
+
+    record = analog_batch.reset_iq_segment_boundary(args, FakeSession(), tmp_path / "segment_0001")
+
+    assert record["ok"] is True
+    assert record["rx_reset_attempts"] == 1
+    assert record["tx_reset_attempts"] == 2
+    assert events == ["close", "control:29220:RESET", "control:29221:RESET", "control:29221:RESET"]
 
 
 def test_persistent_rx_startup_drain_can_be_stopped_before_stream_start():
@@ -357,6 +552,33 @@ def test_decode_server_reuses_process_for_json_decode_command(tmp_path):
     assert out_npz.is_file()
     assert out_wire.is_file()
     assert summary.is_file()
+
+
+def test_decode_server_cleanup_removes_files_without_removing_directories(tmp_path):
+    capture_dir = tmp_path / "image_0000"
+    capture_dir.mkdir()
+    (capture_dir / "batch_rx.sc16").write_bytes(b"iq")
+    (capture_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    proc = subprocess.Popen(
+        [sys.executable, str(ANALOG_LINK), "decode-server"],
+        cwd=PROJECT_ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.stdin is not None
+    proc.stdin.write(json.dumps({"cmd": "cleanup", "paths": [str(capture_dir)], "request_id": "clean-1"}) + "\n")
+    proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
+    proc.stdin.close()
+    stdout, stderr = proc.communicate(timeout=30)
+
+    assert proc.returncode == 0, stderr
+    responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+    assert responses[1] == {"status": "ok", "request_id": "clean-1", "removed_count": 2}
+    assert capture_dir.is_dir()
+    assert list(capture_dir.iterdir()) == []
 
 
 def test_decode_server_request_can_write_inline_manifest_json(tmp_path):
@@ -1206,6 +1428,7 @@ def test_remote_decode_worker_start_skips_non_json_stdout_preamble(tmp_path, mon
     remote_command = popen_commands[0][-1]
     assert "ANALOG_DECODE_PIPELINE_WARMUP=1" in remote_command
     assert "ANALOG_DECODE_WARMUP_SHAPE=1,32,32,32" in remote_command
+    assert "ANALOG_SYNC_FFT_WARMUP=0" in remote_command
     assert "ANALOG_SPS=2" in remote_command
     assert "ANALOG_AMPLITUDE=6000" in remote_command
     assert "ANALOG_MIN_SYNC_METRIC=0.05" in remote_command
@@ -2229,6 +2452,9 @@ def test_decode_worker_minimal_response_keeps_runner_summary_fields():
         "detected_airtime_ms": 9.5,
         "evm_rms": 0.02,
         "estimated_snr_db": 31.0,
+        "pilot_gain_min_abs": 0.62,
+        "pilot_gain_max_abs": 0.71,
+        "pilot_gain_min_over_initial": 0.88,
         "rx_clipping_ratio": 0.0,
         "decode_total_ms": 41.2,
         "decode_timing_ms": {"write_npz": 1.5},
@@ -2250,6 +2476,9 @@ def test_decode_worker_minimal_response_keeps_runner_summary_fields():
         "detected_airtime_ms": 9.5,
         "evm_rms": 0.02,
         "estimated_snr_db": 31.0,
+        "pilot_gain_min_abs": 0.62,
+        "pilot_gain_max_abs": 0.71,
+        "pilot_gain_min_over_initial": 0.88,
         "rx_clipping_ratio": 0.0,
         "decode_total_ms": 41.2,
         "decode_timing_ms": {"write_npz": 1.5},
@@ -4657,6 +4886,8 @@ def test_process_image_records_remote_decode_soft_completion(tmp_path, monkeypat
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "decode_total_ms": 42.0,
                         "decode_timing_ms": {
                             "matched_filter": 2.5,
@@ -4752,6 +4983,8 @@ def test_process_image_summaryless_request_uses_publish_event_without_path_probe
                     "status": "ok",
                     "frame_complete": True,
                     "sync_success": True,
+                    "sync_metric": 0.91,
+                    "pilot_gain_min_over_initial": 0.88,
                     "out_npz": request["out_npz"],
                     "decode_total_ms": 42.0,
                     "decode_timing_ms": {"write_npz": 1.0},
@@ -4818,12 +5051,14 @@ def test_process_image_summaryless_request_uses_publish_event_without_path_probe
             "status": "ok",
             "soft_completed": True,
             "summary_json": remote_summary,
-            "summary": {
-                "status": "ok",
-                "frame_complete": True,
-                "sync_success": True,
-                "out_npz": remote_output,
-            },
+                "summary": {
+                    "status": "ok",
+                    "frame_complete": True,
+                    "sync_success": True,
+                    "sync_metric": 0.91,
+                    "pilot_gain_min_over_initial": 0.88,
+                    "out_npz": remote_output,
+                },
         }
 
     monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
@@ -5170,7 +5405,13 @@ def test_process_image_remote_decode_can_publish_board_decoded_outputs_without_l
                 returncode=0,
                 stdout=json.dumps({
                     "status": "ok",
-                    "summary": {"status": "ok", "frame_complete": True, "sync_success": True},
+                    "summary": {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
+                    },
                 }),
                 stderr="",
             )
@@ -5259,6 +5500,8 @@ def test_process_image_remote_decode_can_skip_board_summary_file_when_response_o
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "decode_total_ms": 43.0,
                     },
                 }),
@@ -5316,6 +5559,175 @@ def test_process_image_remote_decode_can_skip_board_summary_file_when_response_o
     assert worker_requests[0]["out_npz"] == "/home/user/cockpit_usrp_rx/run42_rx/00000000.npz"
     assert json.loads((image.image_dir / "decode_summary.json").read_text(encoding="utf-8"))["decode_total_ms"] == 43.0
     assert result.records[0]["remote_decode_response_only_summary"] is True
+
+
+def test_iq_quality_gate_rejects_missing_core_metrics(monkeypatch):
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+    monkeypatch.setenv("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", "0.85")
+    args = Namespace(min_sync_metric=0.05)
+
+    error = analog_batch.iq_decode_quality_failure(
+        {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+        },
+        args,
+    )
+
+    assert "missing sync metric" in error
+
+
+def test_iq_quality_gate_allows_missing_optional_evm_snr(monkeypatch):
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+    monkeypatch.setenv("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", "0.85")
+    monkeypatch.setenv("ANALOG_IQ_MAX_EVM_RMS", "0.75")
+    monkeypatch.setenv("ANALOG_IQ_MIN_SNR_DB", "3.0")
+    args = Namespace(min_sync_metric=0.05)
+
+    error = analog_batch.iq_decode_quality_failure(
+        {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "sync_metric": 0.82,
+            "pilot_gain_min_over_initial": 0.91,
+        },
+        args,
+    )
+
+    assert error == ""
+
+
+def test_iq_quality_gate_uses_stricter_default_sync_threshold(monkeypatch):
+    monkeypatch.delenv("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC", raising=False)
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+    monkeypatch.setenv("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", "0.85")
+    args = Namespace(min_sync_metric=0.05)
+
+    error = analog_batch.iq_decode_quality_failure(
+        {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "sync_metric": 0.06,
+            "pilot_gain_min_over_initial": 1.0,
+        },
+        args,
+    )
+
+    assert "sync metric" in error
+    assert "below 0.750000" in error
+
+
+def test_iq_quality_gate_uses_stricter_default_pilot_threshold(monkeypatch):
+    monkeypatch.delenv("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", raising=False)
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC", "0.75")
+    args = Namespace(min_sync_metric=0.05)
+
+    error = analog_batch.iq_decode_quality_failure(
+        {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "sync_metric": 0.82,
+            "pilot_gain_min_over_initial": 0.60,
+        },
+        args,
+    )
+
+    assert "pilot gain ratio" in error
+    assert "below 0.850000" in error
+
+
+def test_remote_decode_soft_complete_disabled_by_default_with_iq_quality_gate(monkeypatch):
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+
+    assert analog_batch.remote_decode_soft_complete_sec(Namespace(remote_decode_soft_complete_sec=0.25)) == 0.0
+
+
+def test_remote_decode_soft_complete_allowed_when_iq_quality_gate_disabled(monkeypatch):
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "0")
+
+    assert analog_batch.remote_decode_soft_complete_sec(Namespace(remote_decode_soft_complete_sec=0.25)) == 0.25
+
+
+def test_process_image_remote_dir_rejects_collapsed_iq_pilot_gain(tmp_path, monkeypatch):
+    input_path = tmp_path / "case0.bin"
+    input_path.write_bytes(b"payload")
+    image = analog_batch.ImageRecord(index=0, input_path=input_path, image_dir=tmp_path / "image_0000")
+
+    class FakeWorker:
+        def decode(self, request, log_path, *, timeout):
+            log_path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=["decode-server"],
+                returncode=0,
+                stdout=json.dumps({
+                    "status": "ok",
+                    "summary": {
+                        "status": "ok",
+                        "frame_complete": True,
+                        "sync_success": True,
+                        "sync_metric": 0.89,
+                        "pilot_gain_min_over_initial": 0.08,
+                        "decode_total_ms": 43.0,
+                    },
+                }),
+                stderr="",
+            )
+
+    args = Namespace(
+        dry_run=False,
+        in_process_local_codec=True,
+        rx_capture_mode="remote-decode",
+        remote_decode_result_mode="remote-dir",
+        remote_decode_response_only_summary=True,
+        remote_decoded_output_dir="/home/user/cockpit_usrp_rx/run42_rx",
+        remote_decode_worker=FakeWorker(),
+        remote_rx_ssh_target="user@board",
+        remote_rx_run_root="/tmp/analog_runs",
+        run_id="run42",
+        tx_file_path_prefix_from="",
+        tx_file_path_prefix_to="",
+        rate=5_000_000.0,
+        tx_delay_sec=0.0,
+        rx_tail_sec=0.3,
+        rx_timeout_sec=30.0,
+        tx_timeout_sec=30.0,
+        rx_control_host="127.0.0.1",
+        rx_control_port=29220,
+        tx_control_host="127.0.0.1",
+        tx_control_port=29221,
+        sync_candidates=12,
+        min_sync_metric=0.25,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        robust_sync=True,
+        sync_search_window_symbols=4096,
+        scramble_key="",
+        scramble_key_hex="",
+        scramble_context="",
+        remote_cleanup_mode="skip",
+    )
+
+    def fake_make(_args, _image, tx_sc16, manifest_path, _log_path):
+        tx_sc16.write_bytes(b"\0" * 128)
+        manifest = {"capture_nsamps": 107584, "job_id": "case0"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr(analog_batch, "_ssh_start_control_master", lambda _target: None)
+    monkeypatch.setattr(analog_batch, "run_in_process_make", fake_make)
+    monkeypatch.setattr(analog_batch, "run_control", lambda _host, _port, line, _log_path, _timeout: f"OK {line}")
+
+    result = analog_batch.process_image(args, image)
+
+    assert result.passed is False
+    assert result.status == 1
+    assert "pilot gain" in result.error
+    assert result.records[0]["iq_quality_gate_ok"] is False
 
 
 def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, monkeypatch):
@@ -5386,6 +5798,91 @@ def test_batch_runner_retries_failed_iq_images_with_max_arq_rounds(tmp_path, mon
     assert summary["failed_count"] == 0
     assert summary["images"][0]["rounds"] == 2
     assert [record["round"] for record in summary["images"][0]["round_records"]] == [0, 1]
+
+
+def test_batch_runner_segmented_serial_repairs_only_failed_images(tmp_path, monkeypatch):
+    input_paths = [tmp_path / f"case{index}.bin" for index in range(5)]
+    for path in input_paths:
+        path.write_bytes(b"payload")
+    run_root = tmp_path / "runs"
+    args = Namespace(
+        input=None,
+        input_list=None,
+        input_dir=None,
+        pattern="*.bin",
+        count=5,
+        cycle_inputs=False,
+        run_root=run_root,
+        run_id="segmented-repair",
+        dry_run=True,
+        rx_capture_mode="local",
+        max_arq_rounds=0,
+        stop_on_fail=False,
+        in_process_local_codec=True,
+        pipeline_depth=1,
+        pipeline_rf_decode_overlap=False,
+        iq_segment_size=2,
+        iq_segment_repair_passes=1,
+        rx_session_control=False,
+        rx_batch_session_control=False,
+        rx_batch_session_max_images=0,
+        rx_health_reset_on_stall=False,
+        rate=5_000_000.0,
+        sps=16,
+        rx_post_quantize=True,
+        robust_sync=False,
+        sync_candidates=12,
+        min_sync_metric=0.08,
+        robust_cfo_max_hz=8000.0,
+        robust_cfo_step_hz=500.0,
+        scramble_key="",
+        scramble_key_hex="",
+        sim_cfo_hz=0.0,
+        sim_snr_db=None,
+        sim_gain=1.0,
+        sim_phase_deg=0.0,
+        sim_phase_drift_deg=0.0,
+        sim_dc_real=0.0,
+        sim_dc_imag=0.0,
+        sim_seed=1,
+    )
+    process_order: list[int] = []
+    calls_by_index: dict[int, int] = {}
+    reset_calls: list[str] = []
+
+    def fake_process_image(_args, image):
+        process_order.append(image.index)
+        calls_by_index[image.index] = calls_by_index.get(image.index, 0) + 1
+        image.passed = image.index not in {1, 3} or calls_by_index[image.index] > 1
+        image.status = 0 if image.passed else 1
+        image.error = "" if image.passed else "quality gate"
+        image.records.append({"error": image.error, "total_wall_sec": 0.1})
+        return image
+
+    def fake_reset(_args, _session, log_dir):
+        reset_calls.append(log_dir.name)
+        return {"ok": True, "wall_sec": 0.01}
+
+    monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
+    monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
+    monkeypatch.setattr(analog_batch, "load_inputs", lambda _args: input_paths)
+    monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
+    monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+    monkeypatch.setattr(analog_batch, "reset_iq_segment_boundary", fake_reset)
+
+    assert analog_batch.main() == 0
+
+    summary = json.loads((run_root / "segmented-repair" / "batch_spool_summary.json").read_text(encoding="utf-8"))
+    assert process_order == [0, 1, 1, 2, 3, 3, 4]
+    assert len(reset_calls) == 4
+    assert summary["completed_count"] == 5
+    assert summary["passed_count"] == 5
+    assert [image["index"] for image in summary["images"]] == [0, 1, 2, 3, 4]
+    assert summary["iq_segmented"] is True
+    assert summary["iq_segment_count"] == 3
+    assert summary["iq_segment_repair_group_count"] == 2
+    assert summary["iq_segment_repaired_image_count"] == 2
+    assert summary["iq_segment_reset_count"] == 4
 
 
 def test_batch_runner_marks_decode_attempt_before_process_image(tmp_path, monkeypatch):
@@ -5839,6 +6336,8 @@ def test_batch_runner_remote_decode_reuses_one_ssh_control_master(tmp_path, monk
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "detected_airtime_ms": 9.58,
                     },
                 }),
@@ -6266,6 +6765,8 @@ def test_batch_runner_does_not_retry_failed_ssh_control_master_per_image(tmp_pat
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "detected_airtime_ms": 9.58,
                     },
                 }),
@@ -6409,6 +6910,8 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "detected_airtime_ms": 9.58,
                     },
                 }),
@@ -6463,6 +6966,9 @@ def test_batch_runner_pipeline_depth_two_overlaps_next_capture_with_decode(tmp_p
     summary = json.loads((run_root / "pipeline-depth-2" / "batch_spool_summary.json").read_text(encoding="utf-8"))
     assert summary["pipeline_enabled"] is True
     assert summary["pipeline_depth"] == 2
+    assert summary["iq_segmented"] is False
+    assert summary["iq_segment_bypassed_for_pipeline"] is True
+    assert summary["iq_segment_reset_count"] == 0
     assert summary["max_inflight"] == 2
     assert summary["passed_count"] == 2
     assert events.index("capture_0001") < events.index("decode_done_0")
@@ -6561,6 +7067,8 @@ def test_batch_runner_pipeline_depth_two_guards_capture_from_decode_by_default(t
                         "status": "ok",
                         "frame_complete": True,
                         "sync_success": True,
+                        "sync_metric": 0.91,
+                        "pilot_gain_min_over_initial": 0.88,
                         "detected_airtime_ms": 9.58,
                     },
                 }),

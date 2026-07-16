@@ -80,6 +80,11 @@ DEFAULT_IQ_DIRECT_MIN_SYNC_METRIC = 0.05
 DEFAULT_IQ_DIRECT_ROBUST_SYNC = False
 DEFAULT_IQ_DIRECT_SYNC_SEARCH_WINDOW_SYMBOLS = 4096
 DEFAULT_IQ_DIRECT_LOW_SYNC_RETRY_THRESHOLD = 0.08
+DEFAULT_IQ_DIRECT_SYNC_PROFILE = "fast-first"
+DEFAULT_IQ_DIRECT_FAST_SYNC_CANDIDATES = 4
+DEFAULT_IQ_DIRECT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS = 1024
+DEFAULT_IQ_DIRECT_FALLBACK_SYNC_CANDIDATES = 4
+DEFAULT_IQ_DIRECT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = 1024
 LINK_MODE_KEYS = ("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE")
 SSH_HELPER = (
     REPO_ROOT
@@ -141,6 +146,11 @@ ANALOG_LOW_SYNC_RETRY_THRESHOLD_KEYS = ("ANALOG_LOW_SYNC_RETRY_THRESHOLD",)
 ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS = ("ANALOG_SYNC_SEARCH_WINDOW_SYMBOLS",)
 ANALOG_PIPELINE_DEPTH_KEYS = ("ANALOG_PIPELINE_DEPTH",)
 ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS = ("ANALOG_PIPELINE_RF_DECODE_OVERLAP",)
+IQ_SEGMENT_SIZE_KEYS = ("OPENAMP_IQ_SEGMENT_SIZE", "ANALOG_IQ_SEGMENT_SIZE")
+IQ_SEGMENT_REPAIR_PASSES_KEYS = (
+    "OPENAMP_IQ_SEGMENT_REPAIR_PASSES",
+    "ANALOG_IQ_SEGMENT_REPAIR_PASSES",
+)
 ANALOG_RX_SESSION_CONTROL_KEYS = ("ANALOG_RX_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_CONTROL_KEYS = ("ANALOG_RX_BATCH_SESSION_CONTROL",)
 ANALOG_RX_BATCH_SESSION_MAX_IMAGES_KEYS = ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES",)
@@ -690,6 +700,7 @@ def _ensure_usrp_control_servers(
     remote_run_root: str,
     remote_project_root: str,
     auto_start: bool,
+    require_reset: bool = False,
     log_dir: Path,
 ) -> tuple[bool, dict[str, Any]]:
     details: dict[str, Any] = {
@@ -701,6 +712,25 @@ def _ensure_usrp_control_servers(
     tx_ready, tx_response = _control_is_ready(tx_host, tx_port)
     details["rx_control"]["initial_response"] = rx_response
     details["tx_control"]["initial_response"] = tx_response
+
+    reset_verified = False
+    if require_reset and rx_ready and tx_ready:
+        rx_reset = _tcp_control_command(rx_host, rx_port, "RESET", timeout=CONTROL_SHUTDOWN_TIMEOUT_SEC)
+        tx_reset = _tcp_control_command(tx_host, tx_port, "RESET", timeout=CONTROL_SHUTDOWN_TIMEOUT_SEC)
+        details["rx_control"]["reset_response"] = rx_reset
+        details["tx_control"]["reset_response"] = tx_reset
+        reset_verified = rx_reset.startswith("OK") and tx_reset.startswith("OK")
+        if not reset_verified and auto_start:
+            details["reset_upgrade_shutdown"] = _shutdown_usrp_control_servers(
+                rx_host=rx_host,
+                rx_port=rx_port,
+                tx_host=tx_host,
+                tx_port=tx_port,
+                enabled=True,
+            )
+            rx_ready = False
+            tx_ready = False
+            time.sleep(0.25)
 
     if auto_start and not rx_ready and access.connection_ready and rx_host == access.host:
         details["rx_start"] = _start_remote_rx_server(
@@ -720,6 +750,15 @@ def _ensure_usrp_control_servers(
         if rx_ready and tx_ready:
             break
         time.sleep(0.25)
+
+    if require_reset and rx_ready and tx_ready and not reset_verified:
+        rx_reset = _tcp_control_command(rx_host, rx_port, "RESET", timeout=CONTROL_SHUTDOWN_TIMEOUT_SEC)
+        tx_reset = _tcp_control_command(tx_host, tx_port, "RESET", timeout=CONTROL_SHUTDOWN_TIMEOUT_SEC)
+        details["rx_control"]["reset_response"] = rx_reset
+        details["tx_control"]["reset_response"] = tx_reset
+        reset_verified = rx_reset.startswith("OK") and tx_reset.startswith("OK")
+        rx_ready = rx_ready and reset_verified
+        tx_ready = tx_ready and reset_verified
 
     details["rx_control"]["ready"] = rx_ready
     details["rx_control"]["final_response"] = rx_response
@@ -1644,6 +1683,11 @@ def _sync_iq_decode_assets_on_remote(
     assets = (
         (REPO_ROOT / "USRP292x" / "AnalogLatentLink.py", "USRP292x/AnalogLatentLink.py"),
         (ROOT_SCRIPTS / "latent_transport.py", "scripts/latent_transport.py"),
+        (REPO_ROOT / "USRP292x" / "OtaRxPersistentServer.cpp", "USRP292x/OtaRxPersistentServer.cpp"),
+        (REPO_ROOT / "USRP292x" / "OtaRxPersistentServer.sh", "USRP292x/OtaRxPersistentServer.sh"),
+        (REPO_ROOT / "USRP292x" / "OtaTxPersistentServer.cpp", "USRP292x/OtaTxPersistentServer.cpp"),
+        (REPO_ROOT / "USRP292x" / "OtaTxPersistentServer.sh", "USRP292x/OtaTxPersistentServer.sh"),
+        (REPO_ROOT / "USRP292x" / "BuildOtaTools.sh", "USRP292x/BuildOtaTools.sh"),
     )
     missing = [str(path) for path, _ in assets if not path.is_file()]
     if missing:
@@ -1671,7 +1715,17 @@ def _sync_iq_decode_assets_on_remote(
     probe_timeout = max(1.0, float(probe_timeout_sec or 15.0))
     upload_timeout = max(1.0, float(upload_timeout_sec or 90.0))
     probe_command = (
-        "if command -v sha256sum >/dev/null 2>&1; then "
+        "chmod +x "
+        + " ".join(
+            shlex.quote(remote_root + suffix)
+            for suffix in (
+                "/USRP292x/BuildOtaTools.sh",
+                "/USRP292x/OtaRxPersistentServer.sh",
+                "/USRP292x/OtaTxPersistentServer.sh",
+            )
+        )
+        + " 2>/dev/null || true; "
+        + "if command -v sha256sum >/dev/null 2>&1; then "
         + "sha256sum "
         + " ".join(shlex.quote(path) for path in local_hashes)
         + " 2>/dev/null || true; fi"
@@ -1703,7 +1757,10 @@ def _sync_iq_decode_assets_on_remote(
         f"set -e; mkdir -p {shlex.quote(remote_root)}; "
         f"cat > {shlex.quote(remote_tar_path)}; "
         f"tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_root)}; "
-        f"rm -f {shlex.quote(remote_tar_path)}"
+        f"rm -f {shlex.quote(remote_tar_path)}; "
+        f"chmod +x {shlex.quote(remote_root + '/USRP292x/BuildOtaTools.sh')} "
+        f"{shlex.quote(remote_root + '/USRP292x/OtaRxPersistentServer.sh')} "
+        f"{shlex.quote(remote_root + '/USRP292x/OtaTxPersistentServer.sh')}"
     )
     ssh_result = _run_remote_command(access, upload_command, timeout=upload_timeout, input_data=payload)
     if ssh_result.returncode != 0:
@@ -1713,11 +1770,25 @@ def _sync_iq_decode_assets_on_remote(
             or f"ssh rc={ssh_result.returncode}"
         )
         raise RuntimeError(f"IQ remote-decode 资产上传/解包失败: {detail}")
+    build_command = (
+        f"set -e; cd {shlex.quote(remote_root)}; "
+        "OTA_TARGETS='OtaRxPersistentServer OtaTxPersistentServer' bash USRP292x/BuildOtaTools.sh"
+    )
+    build_timeout = max(120.0, upload_timeout)
+    build_result = _run_remote_command(access, build_command, timeout=build_timeout)
+    if build_result.returncode != 0:
+        detail = (
+            build_result.stderr.decode("utf-8", errors="ignore").strip()
+            or build_result.stdout.decode("utf-8", errors="ignore").strip()
+            or f"ssh rc={build_result.returncode}"
+        )
+        raise RuntimeError(f"IQ persistent server 板端编译失败: {detail}")
     result = {
         "status": "uploaded",
         "remote_project_root": remote_root,
         "uploaded_bytes": len(payload),
         "files": [arcname for _, arcname in assets],
+        "native_build": "completed",
     }
     _IQ_DECODE_ASSET_SYNC_CACHE[cache_key] = dict(result)
     return result
@@ -2422,6 +2493,7 @@ class UsrpBatchSpoolJob:
                 remote_run_root=remote_run_root,
                 remote_project_root=remote_project_root,
                 auto_start=auto_start_control,
+                require_reset=self._link_mode == LINK_MODE_IQ_DIRECT,
                 log_dir=REPO_ROOT / "USRP292x" / "server_logs",
             )
             self._control_server_diagnostics = control_diagnostics
@@ -2687,18 +2759,46 @@ class UsrpBatchSpoolJob:
         sync_profile = _first_value(env_values, ANALOG_SYNC_PROFILE_KEYS).strip()
         if sync_profile:
             args.extend(["--sync-profile", sync_profile])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--sync-profile", DEFAULT_IQ_DIRECT_SYNC_PROFILE])
         fast_sync_candidates = _first_value(env_values, ANALOG_FAST_SYNC_CANDIDATES_KEYS)
         if fast_sync_candidates:
-            args.extend(["--fast-sync-candidates", str(_parse_int(fast_sync_candidates, 4))])
+            args.extend(["--fast-sync-candidates", str(_parse_int(fast_sync_candidates, DEFAULT_IQ_DIRECT_FAST_SYNC_CANDIDATES))])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend(["--fast-sync-candidates", str(DEFAULT_IQ_DIRECT_FAST_SYNC_CANDIDATES)])
         fast_sync_window = _first_value(env_values, ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
         if fast_sync_window:
-            args.extend(["--fast-sync-search-window-symbols", str(_parse_int(fast_sync_window, 1024))])
+            args.extend([
+                "--fast-sync-search-window-symbols",
+                str(_parse_int(fast_sync_window, DEFAULT_IQ_DIRECT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend([
+                "--fast-sync-search-window-symbols",
+                str(DEFAULT_IQ_DIRECT_FAST_SYNC_SEARCH_WINDOW_SYMBOLS),
+            ])
         fallback_sync_candidates = _first_value(env_values, ANALOG_FALLBACK_SYNC_CANDIDATES_KEYS)
         if fallback_sync_candidates:
-            args.extend(["--fallback-sync-candidates", str(_parse_int(fallback_sync_candidates, 12))])
+            args.extend([
+                "--fallback-sync-candidates",
+                str(_parse_int(fallback_sync_candidates, DEFAULT_IQ_DIRECT_FALLBACK_SYNC_CANDIDATES)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend([
+                "--fallback-sync-candidates",
+                str(DEFAULT_IQ_DIRECT_FALLBACK_SYNC_CANDIDATES),
+            ])
         fallback_sync_window = _first_value(env_values, ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS_KEYS)
         if fallback_sync_window:
-            args.extend(["--fallback-sync-search-window-symbols", str(_parse_int(fallback_sync_window, 4096))])
+            args.extend([
+                "--fallback-sync-search-window-symbols",
+                str(_parse_int(fallback_sync_window, DEFAULT_IQ_DIRECT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS)),
+            ])
+        elif self._link_mode == LINK_MODE_IQ_DIRECT:
+            args.extend([
+                "--fallback-sync-search-window-symbols",
+                str(DEFAULT_IQ_DIRECT_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS),
+            ])
         retry_on_burst_miss_raw = _first_value(env_values, ANALOG_RETRY_ON_BURST_MISS_KEYS)
         if retry_on_burst_miss_raw:
             args.append(
@@ -2756,6 +2856,12 @@ class UsrpBatchSpoolJob:
         pipeline_depth = _first_value(env_values, ANALOG_PIPELINE_DEPTH_KEYS)
         if pipeline_depth:
             args.extend(["--pipeline-depth", str(max(1, _parse_int(pipeline_depth, 1)))])
+        args.extend([
+            "--iq-segment-size",
+            str(max(0, _parse_int(_first_value(env_values, IQ_SEGMENT_SIZE_KEYS, "30"), 30))),
+            "--iq-segment-repair-passes",
+            str(max(0, _parse_int(_first_value(env_values, IQ_SEGMENT_REPAIR_PASSES_KEYS, "2"), 2))),
+        ])
         pipeline_rf_decode_overlap = _first_value(env_values, ANALOG_PIPELINE_RF_DECODE_OVERLAP_KEYS)
         if pipeline_rf_decode_overlap:
             args.append(

@@ -76,8 +76,26 @@ require_var() {
   fi
 }
 
+local_python_path() {
+  local path="$1"
+  if [[ -z "$path" ]]; then
+    printf '\n'
+    return 0
+  fi
+  case "$(uname -s 2>/dev/null || true)" in
+    MINGW*|MSYS*|CYGWIN*)
+      cygpath -w "$path"
+      ;;
+    *)
+      printf '%s\n' "$path"
+      ;;
+  esac
+}
+
 parse_last_json_line() {
-  python3 - "$1" <<'PY'
+  local input_path
+  input_path="$(local_python_path "$1")"
+  python3 - "$input_path" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -183,7 +201,13 @@ render_wrapper_report() {
   local variant="$6"
   local remote_mode="$7"
   local log_file="$8"
-  python3 - "$pipeline_json_file" "$report_json" "$report_md" "$run_id" "$env_file" "$variant" "$remote_mode" "$log_file" <<'PY'
+  local pipeline_json_file_py report_json_py report_md_py env_file_py log_file_py
+  pipeline_json_file_py="$(local_python_path "$pipeline_json_file")"
+  report_json_py="$(local_python_path "$report_json")"
+  report_md_py="$(local_python_path "$report_md")"
+  env_file_py="$(local_python_path "$env_file")"
+  log_file_py="$(local_python_path "$log_file")"
+  python3 - "$pipeline_json_file_py" "$report_json_py" "$report_md_py" "$run_id" "$env_file_py" "$variant" "$remote_mode" "$log_file_py" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -663,7 +687,8 @@ set -e
 if parse_last_json_line "$TMP_OUTPUT" >"$PIPELINE_JSON_FILE"; then
   WRAPPER_STDOUT="$(render_wrapper_report "$PIPELINE_JSON_FILE" "$REPORT_JSON" "$REPORT_MD" "$RUN_ID" "${ENV_FILE:-}" "$VARIANT" "$REMOTE_MODE" "$LOG_FILE")"
   printf '%s\n' "$WRAPPER_STDOUT"
-  PIPELINE_STATUS="$(python3 - "$PIPELINE_JSON_FILE" <<'PY'
+  pipeline_json_file_py="$(local_python_path "$PIPELINE_JSON_FILE")"
+  PIPELINE_STATUS="$(python3 - "$pipeline_json_file_py" <<'PY'
 import json
 import sys
 from pathlib import Path

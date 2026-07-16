@@ -35,7 +35,9 @@ def test_start_electron_has_tvm250_profile_and_fast_iq_defaults() -> None:
     assert 'ANALOG_REMOTE_DECODE_WORKER="${ANALOG_REMOTE_DECODE_WORKER:-1}"' in script
     assert 'ANALOG_DECODE_PIPELINE_WARMUP="${ANALOG_DECODE_PIPELINE_WARMUP:-1}"' in script
     assert 'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"' in script
-    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-5}"' in script
+    assert 'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-12}"' in script
+    assert 'OPENAMP_IQ_SEGMENT_SIZE="${OPENAMP_IQ_SEGMENT_SIZE:-30}"' in script
+    assert 'OPENAMP_IQ_SEGMENT_REPAIR_PASSES="${OPENAMP_IQ_SEGMENT_REPAIR_PASSES:-2}"' in script
     assert 'REMOTE_USRP_DECODE_PYTHON="${REMOTE_USRP_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
     assert 'OPENAMP_DEMO_REMOTE_DECODE_PYTHON="${OPENAMP_DEMO_REMOTE_DECODE_PYTHON:-/home/user/venv/bin/python}"' in script
 
@@ -47,6 +49,24 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
 
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"' in script
     assert 'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"' in script
+    assert 'COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10' in script
+    assert 'COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS' in script
+    assert 'warm-up incomplete' not in script
+    for expected in (
+        'ANALOG_SYNC_PROFILE="${ANALOG_SYNC_PROFILE:-fast-first}"',
+        'ANALOG_FAST_SYNC_CANDIDATES="${ANALOG_FAST_SYNC_CANDIDATES:-4}"',
+        'ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"',
+        'ANALOG_FALLBACK_SYNC_CANDIDATES="${ANALOG_FALLBACK_SYNC_CANDIDATES:-4}"',
+        'ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"',
+        'ANALOG_IQ_QUALITY_GATE="${ANALOG_IQ_QUALITY_GATE:-1}"',
+        'ANALOG_IQ_QUALITY_MIN_SYNC_METRIC="${ANALOG_IQ_QUALITY_MIN_SYNC_METRIC:-0.75}"',
+        'ANALOG_IQ_MIN_PILOT_GAIN_RATIO="${ANALOG_IQ_MIN_PILOT_GAIN_RATIO:-0.85}"',
+        'ANALOG_IQ_MAX_EVM_RMS="${ANALOG_IQ_MAX_EVM_RMS:-0.75}"',
+        'ANALOG_IQ_MIN_SNR_DB="${ANALOG_IQ_MIN_SNR_DB:-3.0}"',
+        'OPENAMP_IQ_SEGMENT_SIZE="${OPENAMP_IQ_SEGMENT_SIZE:-30}"',
+        'OPENAMP_IQ_SEGMENT_REPAIR_PASSES="${OPENAMP_IQ_SEGMENT_REPAIR_PASSES:-2}"',
+    ):
+        assert expected in script
     for name in (
         "MLKEM_AUTH_SERVER_SM2_KEY",
         "MLKEM_AUTH_SERVER_SM2_PUB",
@@ -54,6 +74,15 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
         "MLKEM_AUTH_SERVER_MLDSA_PUB",
     ):
         assert name in script.split('msys_env_exclusions="', 1)[1].split('"', 1)[0]
+
+
+def test_start_demo_defaults_to_full_iq_streaming_warmup_chunk() -> None:
+    script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-demo.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "[int]$WarmupCount = 10" in script
+    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)' in script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -104,6 +133,8 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "ANALOG_RX_BATCH_SESSION_CONTROL",
         "ANALOG_RX_BATCH_SESSION_MAX_IMAGES",
         "ANALOG_PIPELINE_DEPTH",
+        "OPENAMP_IQ_SEGMENT_SIZE",
+        "OPENAMP_IQ_SEGMENT_REPAIR_PASSES",
         "ANALOG_DECODE_PIPELINE_WARMUP",
         "ANALOG_DECODE_WARMUP_SHAPE",
         "ANALOG_REMOTE_DECODE_RESULT_MODE",
@@ -167,12 +198,15 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"',
         'OPENAMP_IQ_STREAMING_TVM="${OPENAMP_IQ_STREAMING_TVM:-0}"',
         'OPENAMP_IQ_STREAMING_MIN_READY="${OPENAMP_IQ_STREAMING_MIN_READY:-10}"',
+        'OPENAMP_IQ_SEGMENT_SIZE="${OPENAMP_IQ_SEGMENT_SIZE:-30}"',
+        'OPENAMP_IQ_SEGMENT_REPAIR_PASSES="${OPENAMP_IQ_SEGMENT_REPAIR_PASSES:-2}"',
         'BIG_LITTLE_INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-10}"',
         'ANALOG_REMOTE_DECODE_RESULT_MODE="${ANALOG_REMOTE_DECODE_RESULT_MODE:-remote-dir}"',
         'ANALOG_REMOTE_DECODE_RESPONSE_MODE="${ANALOG_REMOTE_DECODE_RESPONSE_MODE:-minimal}"',
         'ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY="${ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY:-1}"',
         'ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC="${ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC:-0.05}"',
         'ANALOG_REMOTE_DECODED_FORMAT="${ANALOG_REMOTE_DECODED_FORMAT:-npy}"',
+        'ANALOG_SYNC_FFT_WARMUP="${ANALOG_SYNC_FFT_WARMUP:-0}"',
         'RX_ARM_WAIT_MS="${RX_ARM_WAIT_MS:-500}"',
         'RX_STOP_WAIT_MS="${RX_STOP_WAIT_MS:-8000}"',
         'ANALOG_PIPELINE_DEPTH="${ANALOG_PIPELINE_DEPTH:-1}"',
@@ -202,9 +236,14 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK="${ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK:-80}"',
         'ANALOG_DECODE_PIPELINE_WARMUP="${ANALOG_DECODE_PIPELINE_WARMUP:-1}"',
         'OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"',
-        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-5}"',
+        'USRP_MAX_ARQ_ROUNDS="${USRP_MAX_ARQ_ROUNDS:-12}"',
         'ANALOG_FALLBACK_SYNC_CANDIDATES="${ANALOG_FALLBACK_SYNC_CANDIDATES:-4}"',
         'ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS="${ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS:-1024}"',
+        'ANALOG_IQ_QUALITY_GATE="${ANALOG_IQ_QUALITY_GATE:-1}"',
+        'ANALOG_IQ_QUALITY_MIN_SYNC_METRIC="${ANALOG_IQ_QUALITY_MIN_SYNC_METRIC:-0.75}"',
+        'ANALOG_IQ_MIN_PILOT_GAIN_RATIO="${ANALOG_IQ_MIN_PILOT_GAIN_RATIO:-0.85}"',
+        'ANALOG_IQ_MAX_EVM_RMS="${ANALOG_IQ_MAX_EVM_RMS:-0.75}"',
+        'ANALOG_IQ_MIN_SNR_DB="${ANALOG_IQ_MIN_SNR_DB:-3.0}"',
         'OPENAMP_TVM_BATCH_RUNNER="${OPENAMP_TVM_BATCH_RUNNER:-biglittle}"',
         'OPENAMP_DEMO_TVM_BATCH_RUNNER="${OPENAMP_DEMO_TVM_BATCH_RUNNER:-biglittle}"',
         'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"',
@@ -233,12 +272,15 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:MLKEM_CIPHER_SUITE = "SM4_GCM"',
         '$env:OPENAMP_IQ_STREAMING_TVM = "0"',
         '$env:OPENAMP_IQ_STREAMING_MIN_READY = "10"',
+        '$env:OPENAMP_IQ_SEGMENT_SIZE = "30"',
+        '$env:OPENAMP_IQ_SEGMENT_REPAIR_PASSES = "2"',
         '$env:BIG_LITTLE_INPUT_CHUNK_SIZE = "10"',
         '$env:ANALOG_REMOTE_DECODE_RESULT_MODE = "remote-dir"',
         '$env:ANALOG_REMOTE_DECODE_RESPONSE_MODE = "minimal"',
         '$env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY = "1"',
         '$env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC = "0.05"',
         '$env:ANALOG_REMOTE_DECODED_FORMAT = "npy"',
+        '$env:ANALOG_SYNC_FFT_WARMUP = "0"',
         '$env:RX_ARM_WAIT_MS = "500"',
         '$env:RX_STOP_WAIT_MS = "8000"',
         '$env:ANALOG_PIPELINE_DEPTH = "1"',
@@ -268,9 +310,14 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK = "80"',
         '$env:ANALOG_DECODE_PIPELINE_WARMUP = "1"',
         '$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT = "0"',
-        '$env:USRP_MAX_ARQ_ROUNDS = "5"',
+        '$env:USRP_MAX_ARQ_ROUNDS = "12"',
         '$env:ANALOG_FALLBACK_SYNC_CANDIDATES = "4"',
         '$env:ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS = "1024"',
+        '$env:ANALOG_IQ_QUALITY_GATE = "1"',
+        '$env:ANALOG_IQ_QUALITY_MIN_SYNC_METRIC = "0.75"',
+        '$env:ANALOG_IQ_MIN_PILOT_GAIN_RATIO = "0.85"',
+        '$env:ANALOG_IQ_MAX_EVM_RMS = "0.75"',
+        '$env:ANALOG_IQ_MIN_SNR_DB = "3.0"',
         '$env:OPENAMP_TVM_BATCH_RUNNER = "biglittle"',
         '$env:OPENAMP_DEMO_TVM_BATCH_RUNNER = "biglittle"',
         '$env:MLKEM_AUTH_ENABLED = "1"',
@@ -307,6 +354,11 @@ def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_al
         "USRP292x/RunAnalogLatentBatch.py",
         "USRP292x/AnalogLatentLink.py",
         "USRP292x/test_analog_latent_link.py",
+        "USRP292x/OtaRxPersistentServer.cpp",
+        "USRP292x/OtaRxPersistentServer.sh",
+        "USRP292x/OtaTxPersistentServer.cpp",
+        "USRP292x/OtaTxPersistentServer.sh",
+        "USRP292x/BuildOtaTools.sh",
         "host_pic_to_latent/jscc/src/test_model.py",
         "scripts/tvm_inference_helper.py",
         "scripts/latent_transport.py",
@@ -322,6 +374,7 @@ def test_prepare_iq_board_sync_manifest_activates_board_tvm_env_for_validation()
     assert "conda activate tvm310_safe" in validation_section
     assert "python -m pytest test_analog_latent_link.py -v" in validation_section
     assert "python /home/user/USRP292x/RunAnalogLatentBatch.py --help | head -3" in validation_section
+    assert "OTA_TARGETS='OtaRxPersistentServer OtaTxPersistentServer' bash BuildOtaTools.sh" in validation_section
     assert "python3 -m pytest test_analog_latent_link.py -v" not in validation_section
 
 

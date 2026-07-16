@@ -2,7 +2,7 @@ param(
     [string]$BoardHost = "100.121.87.73",
     [string]$BoardUser = "user",
     [int]$BoardPort = 22,
-    [int]$WarmupCount = 5,
+    [int]$WarmupCount = 10,
     [switch]$NoWarmup,
     [string]$GitBashPath = "",
     [string]$BoardPassword = "user"

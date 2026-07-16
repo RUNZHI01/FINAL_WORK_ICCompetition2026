@@ -53,19 +53,18 @@ TMPDIR="$TMP_ROOT" \
 COCKPIT_BACKEND_PORT=18079 \
 COCKPIT_FRONTEND_PORT=15173 \
 COCKPIT_STARTUP_USRP_WARMUP=1 \
-COCKPIT_STARTUP_USRP_WARMUP_COUNT=5 \
 REMOTE_HOST=100.121.87.73 \
 REMOTE_USER=user \
 REMOTE_PASS=user \
   "$COCKPIT_DIR/start-dev.sh" >"$TMP_ROOT/start-dev.out"
 
-if ! grep -q '^startup-warmup count=5$' "$EVENT_LOG"; then
+if ! grep -q '^startup-warmup count=10$' "$EVENT_LOG"; then
   echo "missing startup warm-up call" >&2
   cat "$EVENT_LOG" >&2
   exit 1
 fi
 
-warmup_line="$(grep -n '^startup-warmup count=5$' "$EVENT_LOG" | head -1 | cut -d: -f1)"
+warmup_line="$(grep -n '^startup-warmup count=10$' "$EVENT_LOG" | head -1 | cut -d: -f1)"
 frontend_line="$(grep -n '^frontend-start ' "$EVENT_LOG" | head -1 | cut -d: -f1)"
 if [[ -z "$frontend_line" ]]; then
   echo "missing frontend start" >&2
@@ -75,6 +74,12 @@ fi
 if (( warmup_line >= frontend_line )); then
   echo "frontend started before startup warm-up completed" >&2
   cat "$EVENT_LOG" >&2
+  exit 1
+fi
+
+if ! grep -q 'USRP IQ 微批默认: STREAMING_TVM=0' "$TMP_ROOT/start-dev.out"; then
+  echo "IQ streaming TVM should be disabled by default" >&2
+  cat "$TMP_ROOT/start-dev.out" >&2
   exit 1
 fi
 

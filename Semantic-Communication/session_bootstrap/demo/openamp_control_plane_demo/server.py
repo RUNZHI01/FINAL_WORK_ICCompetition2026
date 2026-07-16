@@ -83,6 +83,7 @@ from demo_data import (
     build_link_director_catalog,
     build_original_gallery_snapshot,
     build_prerecorded_inference_result,
+    build_quality_pairs_snapshot,
     build_recover_replay,
     build_snapshot,
     now_iso,
@@ -133,17 +134,18 @@ from usrp_runtime import (
 
 STATIC_ROOT = Path(__file__).resolve().parent / "static"
 PACKAGE_ROOT = REPO_ROOT.parent
-WORKSPACE_ROOT = REPO_ROOT.parents[2] if len(REPO_ROOT.parents) > 2 else PACKAGE_ROOT
+WORKSPACE_ROOT = PACKAGE_ROOT.parent
 DEFAULT_MNN_BATCH_ENV_FILE = REPO_ROOT / "session_bootstrap" / "config" / "mnn_benchmark.phytium_pi.example.env"
 REMOTE_MNN_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_mnn_reconstruction.sh"
 REMOTE_TVM_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_current_real_reconstruction.sh"
 BIG_LITTLE_PIPELINE_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
 DEFAULT_USRP_REMOTE_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
 USRP_REMOTE_OUTPUT_ROOT_KEYS = ("OPENAMP_DEMO_USRP_OUTPUT_ROOT", "USRP_REMOTE_OUTPUT_ROOT")
+DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR = PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_airfield300"
 DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
     PACKAGE_ROOT / "usrp_latent_input",
     WORKSPACE_ROOT / "jscc-test" / "encoder_outputs",
-    PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_airfield300",
+    DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR,
     PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs",
     PACKAGE_ROOT / "artifacts" / "host_pic_to_latent_300_smoke" / "encoder_outputs",
     PACKAGE_ROOT / "artifacts" / "host_pic_to_latent_smoke" / "encoder_outputs",
@@ -3827,6 +3829,8 @@ class DashboardState:
                 "ANALOG_RX_HEALTH_STALL_THRESHOLD_SEC",
                 "ANALOG_PIPELINE_DEPTH",
                 "ANALOG_PIPELINE_RF_DECODE_OVERLAP",
+                "OPENAMP_IQ_SEGMENT_SIZE",
+                "OPENAMP_IQ_SEGMENT_REPAIR_PASSES",
                 "OPENAMP_IQ_STREAMING_TVM",
                 "OPENAMP_IQ_STREAMING_MIN_READY",
                 "BIG_LITTLE_INPUT_CHUNK_SIZE",
@@ -3834,6 +3838,7 @@ class DashboardState:
                 "ANALOG_REMOTE_DECODED_FORMAT",
                 "ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY",
                 "ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC",
+                "ANALOG_SYNC_FFT_WARMUP",
                 "ANALOG_REMOTE_DECODE_WORKER_PREFIX",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS",
                 "ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS_CHUNK",
@@ -3850,6 +3855,12 @@ class DashboardState:
                 "ANALOG_RETRY_ON_BURST_MISS",
                 "ANALOG_RETRY_ON_LOW_SYNC",
                 "ANALOG_LOW_SYNC_RETRY_THRESHOLD",
+                "ANALOG_IQ_QUALITY_GATE",
+                "ANALOG_IQ_QUALITY_MIN_SYNC_METRIC",
+                "ANALOG_IQ_MIN_PILOT_GAIN_RATIO",
+                "ANALOG_IQ_MAX_EVM_RMS",
+                "ANALOG_IQ_MIN_SNR_DB",
+                "ANALOG_IQ_ALLOW_SOFT_COMPLETE_WITH_QUALITY_GATE",
                 "ANALOG_RX_WAIT_TIMEOUT_SEC",
                 "ANALOG_RX_STOP_ARM_FAIL_TIMEOUT_SEC",
                 "ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC",
@@ -3862,7 +3873,7 @@ class DashboardState:
             if normalize_jscc_link_mode(overrides.get("JSCC_LINK_MODE", ""), default="iq-direct") == "iq-direct":
                 for key, value in (
                     ("OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT", "0"),
-                    ("MLKEM_USRP_MAX_ARQ_ROUNDS", "5"),
+                    ("MLKEM_USRP_MAX_ARQ_ROUNDS", "12"),
                     ("REMOTE_USRP_RX_DIR", "/home/user/cockpit_usrp_rx"),
                     ("REMOTE_RX_RUN_ROOT", "/dev/shm/usrp292x_remote_runs"),
                     ("RX_ARM_WAIT_MS", "500"),
@@ -3875,18 +3886,29 @@ class DashboardState:
                     ("ANALOG_RX_BATCH_SESSION_MAX_IMAGES", "16"),
                     ("ANALOG_PIPELINE_DEPTH", "1"),
                     ("ANALOG_PIPELINE_RF_DECODE_OVERLAP", "0"),
+                    ("OPENAMP_IQ_SEGMENT_SIZE", "30"),
+                    ("OPENAMP_IQ_SEGMENT_REPAIR_PASSES", "2"),
                     ("OPENAMP_IQ_STREAMING_TVM", "0"),
                     ("OPENAMP_IQ_STREAMING_MIN_READY", "10"),
                     ("BIG_LITTLE_INPUT_CHUNK_SIZE", "10"),
                     ("ANALOG_RETRY_ON_BURST_MISS", "1"),
                     ("ANALOG_RETRY_ON_LOW_SYNC", "1"),
                     ("ANALOG_LOW_SYNC_RETRY_THRESHOLD", "0.08"),
+                    ("ANALOG_SYNC_PROFILE", "fast-first"),
+                    ("ANALOG_FAST_SYNC_CANDIDATES", "4"),
+                    ("ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS", "1024"),
                     ("ANALOG_FALLBACK_SYNC_CANDIDATES", "4"),
                     ("ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS", "1024"),
+                    ("ANALOG_IQ_QUALITY_GATE", "1"),
+                    ("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC", "0.75"),
+                    ("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", "0.85"),
+                    ("ANALOG_IQ_MAX_EVM_RMS", "0.75"),
+                    ("ANALOG_IQ_MIN_SNR_DB", "3.0"),
                     ("ANALOG_REMOTE_DECODE_RESPONSE_MODE", "minimal"),
                     ("ANALOG_REMOTE_DECODED_FORMAT", "npy"),
                     ("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", "1"),
                     ("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", "0.05"),
+                    ("ANALOG_SYNC_FFT_WARMUP", "0"),
                     ("ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS", "1"),
                     ("ANALOG_RX_SC16_MMAP", "1"),
                     ("ANALOG_RX_CLIPPING_DECIMATION", "8"),
@@ -3903,10 +3925,16 @@ class DashboardState:
             if local_image_dir:
                 overrides.setdefault("OPENAMP_DEMO_LOCAL_IMAGE_DIR", local_image_dir)
             if not str(payload.get("local_latent_dir") or "").strip():
-                local_latent_dir = self._discover_default_local_usrp_latent_dir()
-                if local_latent_dir:
-                    overrides.setdefault("OPENAMP_DEMO_LOCAL_LATENT_DIR", local_latent_dir)
-                    overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
+                if local_image_dir:
+                    image_latent_dir = str(DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR)
+                    overrides.setdefault("OPENAMP_DEMO_LOCAL_LATENT_DIR", image_latent_dir)
+                    overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR", image_latent_dir)
+                    overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "1")
+                else:
+                    local_latent_dir = self._discover_default_local_usrp_latent_dir()
+                    if local_latent_dir:
+                        overrides.setdefault("OPENAMP_DEMO_LOCAL_LATENT_DIR", local_latent_dir)
+                        overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
             else:
                 overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = str(payload.get("local_latent_dir") or "").strip()
                 overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
@@ -5439,7 +5467,7 @@ class DashboardState:
             if board_access.connection_ready and board_online:
                 self._start_board_telemetry_refresh(
                     board_access,
-                    timeout_sec=min(max(self._probe_timeout_sec, 2.0), 4.0),
+                    timeout_sec=min(max(self._probe_timeout_sec, 6.0), 12.0),
                 )
             return _board_telemetry_pending_status(
                 status="deferred",
@@ -5506,7 +5534,7 @@ class DashboardState:
 
         self._start_board_telemetry_refresh(
             board_access,
-            timeout_sec=min(max(self._probe_timeout_sec, 2.0), 4.0),
+            timeout_sec=min(max(self._probe_timeout_sec, 6.0), 12.0),
         )
         return _board_telemetry_pending_status(
             status="refreshing",
@@ -6177,9 +6205,18 @@ class DashboardState:
         count_source: str = "usrp_batch",
     ) -> dict[str, Any]:
         payload = self._build_prerecorded_payload_safe(image_index=0, variant="current")
+        is_usrp_mode = local_crypto_transport_mode(self._board_access.build_env()) == "usrp"
         engine_key = "mnn" if str(engine).lower() == "mnn" else "tvm"
         engine_label = "MNN" if engine_key == "mnn" else "TVM"
         data_plane_label = str(data_plane_label or "USRP 混合链路在线推进").strip()
+        display_source_label = str(source_label or "").strip()
+        if is_usrp_mode and display_source_label:
+            display_source_label = (
+                display_source_label
+                .replace(" + 归档样例图", "")
+                .replace("归档样例图", "")
+                .strip(" +/")
+            )
         processed = self._status_int(summary.get("processed_count")) or 0
         selected = self._status_int(
             summary.get("selected_input_count") or summary.get("input_count") or summary.get("max_inputs"),
@@ -6198,8 +6235,16 @@ class DashboardState:
                 "status_category": "success",
                 "variant": "current",
                 "job_id": job_id,
-                "source_label": source_label or f"{data_plane_label} + {engine_label} 板端推理 + 归档样例图",
-                "message": message or f"{data_plane_label}已完成 {engine_label} 板端推理；图像质量指标沿用当前归档样例口径。",
+                "source_label": display_source_label or (
+                    f"{data_plane_label} + {engine_label} 板端推理"
+                    if is_usrp_mode
+                    else f"{data_plane_label} + {engine_label} 板端推理 + 归档样例图"
+                ),
+                "message": message or (
+                    f"{data_plane_label}已完成 {engine_label} 板端推理；PSNR/SSIM 需使用离线重建审计报告。"
+                    if is_usrp_mode
+                    else f"{data_plane_label}已完成 {engine_label} 板端推理；图像质量指标沿用当前归档样例口径。"
+                ),
                 "timings": {
                     "payload_ms": run_ms,
                     "prepare_ms": None,
@@ -6237,7 +6282,9 @@ class DashboardState:
                 },
             }
         )
-        if local_crypto_transport_mode(self._board_access.build_env()) == "usrp":
+        if is_usrp_mode:
+            payload.pop("quality", None)
+            payload["quality_pairs"] = build_quality_pairs_snapshot("usrp")
             original_gallery = build_original_gallery_snapshot("usrp", count=total)
             payload["original_gallery"] = original_gallery
             preview_image_b64 = str(original_gallery.get("preview_image_b64") or "")
@@ -6389,10 +6436,11 @@ class DashboardState:
                         )
                     ),
                     "timings": self._empty_live_timings(),
-                    "quality": payload["quality"],
                     "live_attempt": live_attempt_payload,
                 }
             )
+            if usrp_mode:
+                payload.pop("quality", None)
             return payload
 
         if live_attempt.get("status") == "success":
@@ -6476,10 +6524,10 @@ class DashboardState:
                     "execution_mode": "live",
                     "status_category": "success",
                     "source_label": with_input_source(
-                        "ML-KEM 安全协议就绪 + USRP 混合链路在线推进 + 归档样例图"
+                        "ML-KEM 安全协议就绪 + USRP 混合链路在线推进"
                         if usrp_mode and security_armed
                         else (
-                            "USRP 混合链路在线推进 + 归档样例图"
+                            "USRP 混合链路在线推进"
                             if usrp_mode
                             else (
                                 "ML-KEM 安全协议就绪 + 真实在线执行（控制面降级） + 归档样例图"
@@ -6500,11 +6548,11 @@ class DashboardState:
                     or (
                         (
                             f"{security_summary} 数据面已通过 USRP 射频链路完成传输；图像对比继续使用归档样例，"
-                            "链路指标来自当前 2922 运行时。"
+                            "链路指标来自当前 2922 运行时；PSNR/SSIM 需使用离线重建审计报告。"
                             if usrp_mode and security_armed
                             else (
                                 "本次演示已通过 USRP 射频链路完成数据面传输；图像对比继续使用归档样例，"
-                                "链路指标来自当前 2922 运行时。"
+                                "链路指标来自当前 2922 运行时；PSNR/SSIM 需使用离线重建审计报告。"
                                 if usrp_mode
                                 else (
                                     (
@@ -6534,10 +6582,11 @@ class DashboardState:
                     "artifact_sha": board_summary.get("artifact_sha256") or summary.get("artifact_sha256") or payload["artifact_sha"],
                     "runner_summary": summary,
                     "wrapper_summary": wrapper_summary,
-                    "quality": payload["quality"],
                     "live_attempt": live_attempt_payload,
                 }
             )
+            if usrp_mode:
+                payload.pop("quality", None)
             return payload
 
         payload.update(
@@ -7394,8 +7443,15 @@ class DashboardState:
                         "BIG_LITTLE_INPUT_POLL_SEC": str(env_values.get("BIG_LITTLE_INPUT_POLL_SEC") or "0.05"),
                     }
                 )
-            if usrp_link_mode == "iq-direct" and not str(env_values.get("BIG_LITTLE_INPUT_CHUNK_SIZE") or "").strip():
-                chunk_size = max(1, parse_int_config(first_config_value(env_values, keys=IQ_STREAMING_MIN_READY_KEYS, default="10"), 10))
+            if usrp_link_mode == "iq-direct":
+                configured_chunk = str(env_values.get("BIG_LITTLE_INPUT_CHUNK_SIZE") or "").strip()
+                chunk_size = max(
+                    1,
+                    parse_int_config(
+                        configured_chunk or first_config_value(env_values, keys=IQ_STREAMING_MIN_READY_KEYS, default="10"),
+                        10,
+                    ),
+                )
                 env_overrides["BIG_LITTLE_INPUT_CHUNK_SIZE"] = str(min(max(1, count), chunk_size))
             if env_overrides:
                 access = access.with_env_overrides(env_overrides)
@@ -7630,7 +7686,8 @@ class DashboardState:
                     state["engine"] = "mnn"
                     state["runner_summary"] = inference_summary
                     if succeeded:
-                        state["quality"] = self._build_prerecorded_payload_safe(image_index=0, variant="current").get("quality")
+                        state.pop("quality", None)
+                        state["quality_pairs"] = build_quality_pairs_snapshot("usrp")
                     state["message"] = str(last_result.get("message") or worker_error or "")
                     state["status_category"] = str(last_result.get("status_category") or ("success" if succeeded else "error"))
                     if succeeded:
@@ -8237,9 +8294,13 @@ class DashboardState:
                         state["iq_tail_audit"] = iq_tail_audit
                         state["runner_summary"] = inference_summary or runner_summary
                         if is_live:
-                            state["quality"] = self._build_prerecorded_payload_safe(image_index=0, variant="current").get("quality")
+                            state.pop("quality", None)
+                            state["quality_pairs"] = build_quality_pairs_snapshot("usrp")
+                    elif is_live:
+                        state["quality_pairs"] = build_quality_pairs_snapshot("prerecorded")
                     if (
                         not warmup
+                        and not is_usrp_batch
                         and
                         last_result.get("request_state") == "completed"
                         and isinstance(last_result.get("sample"), dict)
@@ -10055,6 +10116,8 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC", ""),
         ("ANALOG_RX_STOP_DRAIN_POLL_SEC", ""),
         ("ANALOG_PIPELINE_DEPTH", ""),
+        ("OPENAMP_IQ_SEGMENT_SIZE", ""),
+        ("OPENAMP_IQ_SEGMENT_REPAIR_PASSES", ""),
         ("ANALOG_ROBUST_SYNC", ""),
         ("ANALOG_MIN_SYNC_METRIC", ""),
         ("ANALOG_ROBUST_CFO_MAX_HZ", ""),
@@ -10068,12 +10131,19 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
         ("ANALOG_RETRY_ON_BURST_MISS", ""),
         ("ANALOG_RETRY_ON_LOW_SYNC", ""),
         ("ANALOG_LOW_SYNC_RETRY_THRESHOLD", ""),
+        ("ANALOG_IQ_QUALITY_GATE", ""),
+        ("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC", ""),
+        ("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", ""),
+        ("ANALOG_IQ_MAX_EVM_RMS", ""),
+        ("ANALOG_IQ_MIN_SNR_DB", ""),
+        ("ANALOG_IQ_ALLOW_SOFT_COMPLETE_WITH_QUALITY_GATE", ""),
         ("ANALOG_REMOTE_DECODE_RESULT_MODE", ""),
         ("ANALOG_REMOTE_DECODED_OUTPUT_DIR", ""),
         ("ANALOG_REMOTE_DECODE_RESPONSE_MODE", ""),
         ("ANALOG_REMOTE_DECODED_FORMAT", ""),
         ("ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY", ""),
         ("ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC", ""),
+        ("ANALOG_SYNC_FFT_WARMUP", ""),
         ("ANALOG_REMOTE_DECODE_WORKER_PREFIX", ""),
         ("ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC", ""),
         ("ANALOG_REMOTE_DECODE_RESTART_ON_TIMEOUT", ""),
@@ -10108,11 +10178,21 @@ def demo_startup_env_overrides(args: argparse.Namespace) -> dict[str, str]:
     usrp_startup = usrp_startup or str(overrides.get("OPENAMP_DEMO_INPUT_SOURCE_MODE") or "").strip().lower() == "usrp"
     if usrp_startup:
         overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")
+        if not str(overrides.get("OPENAMP_DEMO_LOCAL_IMAGE_DIR") or "").strip():
+            local_image_dir = DashboardState._discover_default_local_usrp_image_dir()
+            if local_image_dir:
+                overrides["OPENAMP_DEMO_LOCAL_IMAGE_DIR"] = local_image_dir
         if not str(overrides.get("OPENAMP_DEMO_LOCAL_LATENT_DIR") or "").strip():
-            local_latent_dir = DashboardState._discover_default_local_usrp_latent_dir()
-            if local_latent_dir:
-                overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = local_latent_dir
-                overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
+            if str(overrides.get("OPENAMP_DEMO_LOCAL_IMAGE_DIR") or "").strip():
+                image_latent_dir = str(DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR)
+                overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = image_latent_dir
+                overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR", image_latent_dir)
+                overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "1")
+            else:
+                local_latent_dir = DashboardState._discover_default_local_usrp_latent_dir()
+                if local_latent_dir:
+                    overrides["OPENAMP_DEMO_LOCAL_LATENT_DIR"] = local_latent_dir
+                    overrides.setdefault("OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED", "0")
     return overrides
 
 
