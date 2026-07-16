@@ -78,6 +78,8 @@ def test_jobs_are_newest_first() -> None:
 
     assert [job.name for job in jobs] == ["job-new", "job-old"]
     assert jobs[0].path == "/outputs/job-new/reconstructions"
+    assert "for candidate in" in ssh.commands[0]
+    assert "find " not in ssh.commands[0]
 
 
 def test_cache_key_includes_host_and_job(tmp_path: Path) -> None:

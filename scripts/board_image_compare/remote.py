@@ -134,8 +134,10 @@ class BoardSftpClient:
     def list_jobs(self, remote_root: str) -> list[RemoteJob]:
         root = shlex.quote(str(PurePosixPath(remote_root)))
         output = self._exec(
-            f"find {root} -mindepth 2 -maxdepth 4 -type d -name reconstructions "
-            "-printf '%T@\\t%p\\n' 2>/dev/null"
+            f"for candidate in {root}/*/reconstructions; do "
+            "[ -d \"$candidate\" ] || continue; "
+            "stat -c '%Y\\t%n' \"$candidate\"; "
+            "done 2>/dev/null"
         )
         jobs: list[RemoteJob] = []
         for line in output.splitlines():
