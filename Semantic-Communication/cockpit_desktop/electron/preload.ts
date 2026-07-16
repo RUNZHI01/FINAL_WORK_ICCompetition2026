@@ -1,4 +1,4 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 function readArgument(prefix: string): string {
   const match = process.argv.find((arg) => arg.startsWith(prefix))
@@ -13,4 +13,5 @@ const backendUrl =
 contextBridge.exposeInMainWorld('cockpit', {
   platform: process.platform,
   backendUrl,
+  openExternal: (url: string) => ipcRenderer.invoke('cockpit:open-external', url),
 })

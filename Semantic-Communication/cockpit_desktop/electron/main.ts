@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
@@ -15,6 +15,18 @@ const WSL_SCALE = Number(process.env.WSL_SCALE_FACTOR ?? '1.25')
 
 let mainWindow: BrowserWindow | null = null
 let backend: RunningBackend | null = null
+
+function localComparisonUrl(rawUrl: string): string {
+  const parsed = new URL(rawUrl)
+  if (parsed.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(parsed.hostname)) {
+    throw new Error('只允许打开本机重建对比服务')
+  }
+  return parsed.toString()
+}
+
+ipcMain.handle('cockpit:open-external', async (_event, rawUrl: string) => {
+  await shell.openExternal(localComparisonUrl(String(rawUrl || '')))
+})
 
 function createWindow(runtimeConfig: BackendRuntimeConfig): void {
   mainWindow = new BrowserWindow({

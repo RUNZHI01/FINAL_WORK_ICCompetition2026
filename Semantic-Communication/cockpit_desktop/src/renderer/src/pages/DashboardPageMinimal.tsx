@@ -12,6 +12,7 @@ import {
   useRunMnnBatch,
   useRunBaseline,
   useSetBoardAccess,
+  useOpenReconstructionBrowser,
 } from '../hooks/useActions'
 import { HeroMetrics } from '../components/dashboard/HeroMetrics'
 import { MinimalStatusPanel } from '../components/dashboard/MinimalStatusPanel'
@@ -367,6 +368,7 @@ export function DashboardPageMinimal() {
   const mnnBatchMut = useRunMnnBatch()
   const baselineMut = useRunBaseline()
   const boardAccessMut = useSetBoardAccess()
+  const reconstructionBrowserMut = useOpenReconstructionBrowser()
   const status = system.data
   const activeInference = status?.active_inference
   const activeInferenceProgress = activeInference?.progress
@@ -757,6 +759,25 @@ export function DashboardPageMinimal() {
       ? '已生效'
       : '保存目录'
   const boardSessionReady = Boolean(boardAccess?.connection_ready)
+  const handleOpenReconstructionBrowser = useCallback(() => {
+    reconstructionBrowserMut.mutate(undefined, {
+      onSuccess: async (data) => {
+        try {
+          if (window.cockpit?.openExternal) {
+            await window.cockpit.openExternal(data.url)
+          } else {
+            window.open(data.url, '_blank', 'noopener,noreferrer')
+          }
+          showToast('重建图片对比页已打开', 'success')
+        } catch (error) {
+          showToast(`打开对比页失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+        }
+      },
+      onError: (error) => {
+        showToast(`启动对比服务失败: ${error.message}`, 'error')
+      },
+    })
+  }, [reconstructionBrowserMut, showToast])
   const handleSaveRemoteUsrPRxDir = useCallback(
     () => {
       const remoteRxDir = remoteUsrPRxDir.trim()
@@ -1284,7 +1305,18 @@ export function DashboardPageMinimal() {
                     )}
                     <div className={s.pathItem}>
                       <span className={s.pathLabel}>板端重建输出目录</span>
-                      <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
+                      <div className={s.pathOutputContent}>
+                        <span className={s.pathValue}>{boardOutputDir || '未配置'}</span>
+                        <button
+                          type="button"
+                          className={s.pathComparisonButton}
+                          onClick={handleOpenReconstructionBrowser}
+                          disabled={reconstructionBrowserMut.isPending || !boardSessionReady || !boardOutputDir}
+                        >
+                          <Icons.Image size={14} />
+                          {reconstructionBrowserMut.isPending ? '启动中...' : '本次重建对比图'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

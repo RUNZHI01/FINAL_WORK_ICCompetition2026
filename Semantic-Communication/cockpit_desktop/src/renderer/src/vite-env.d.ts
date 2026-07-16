@@ -3,6 +3,7 @@
 export type CockpitPreload = {
   platform: NodeJS.Platform
   backendUrl: string
+  openExternal: (url: string) => Promise<void>
 }
 
 declare global {

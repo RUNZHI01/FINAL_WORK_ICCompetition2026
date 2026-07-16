@@ -8,10 +8,12 @@ const cssPath = join(dirname(fileURLToPath(import.meta.url)), 'DashboardPageMini
 const tsxPath = join(dirname(fileURLToPath(import.meta.url)), 'DashboardPageMinimal.tsx')
 const cryptoPanelPath = join(dirname(fileURLToPath(import.meta.url)), '../components/dashboard/CryptoStatusPanel/CryptoStatusPanel.tsx')
 const cryptoPanelCssPath = join(dirname(fileURLToPath(import.meta.url)), '../components/dashboard/CryptoStatusPanel/CryptoStatusPanel.module.css')
+const electronMainPath = join(dirname(fileURLToPath(import.meta.url)), '../../../../electron/main.ts')
 const css = readFileSync(cssPath, 'utf8')
 const tsx = readFileSync(tsxPath, 'utf8')
 const cryptoPanelTsx = readFileSync(cryptoPanelPath, 'utf8')
 const cryptoPanelCss = readFileSync(cryptoPanelCssPath, 'utf8')
+const electronMain = readFileSync(electronMainPath, 'utf8')
 
 function cssBlockFrom(source, selector) {
   const match = source.match(new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([\\s\\S]*?)\\}`))
@@ -45,6 +47,16 @@ test('board password card owns the board session readiness badge', () => {
 
 test('remote USRP RX directory save action is colocated with the board input path row', () => {
   assert.match(tsx, /板端输入\/RX 目录[\s\S]*handleSaveRemoteUsrPRxDir/)
+})
+
+test('reconstruction comparison entry follows the board output directory', () => {
+  assert.match(tsx, /板端重建输出目录[\s\S]*本次重建对比图/)
+  assert.match(css, /\.pathOutputContent\s*\{[\s\S]*display:\s*grid;/)
+})
+
+test('external comparison link is restricted to loopback http', () => {
+  assert.match(electronMain, /parsed\.protocol !== 'http:'/)
+  assert.match(electronMain, /\['127\.0\.0\.1', 'localhost'\]\.includes\(parsed\.hostname\)/)
 })
 
 test('IQ audit panel is gated to IQ-direct USRP mode', () => {
