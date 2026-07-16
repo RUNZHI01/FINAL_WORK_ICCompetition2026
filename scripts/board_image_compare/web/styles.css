@@ -65,6 +65,8 @@ main { padding: 16px 24px 20px; }
 .image-stage img.visible { display: block; }
 .empty-state { color: #c4cbd2; font-size: 13px; padding: 24px; text-align: center; }
 .quality-marker { position: absolute; top: 10px; right: 10px; padding: 4px 7px; border: 1px solid rgba(183, 77, 52, 0.32); color: rgba(255, 196, 178, 0.72); background: rgba(22, 25, 29, 0.22); border-radius: 4px; font-size: 11px; }
+.quality-metrics { min-height: 38px; padding: 0 13px; display: flex; align-items: center; justify-content: flex-end; gap: 20px; border-top: 1px solid #dbe0e5; background: #f7f8fa; color: #586575; font-size: 12px; }
+.quality-metrics strong { color: #17202a; font-variant-numeric: tabular-nums; }
 
 .navigation { height: 50px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 9px; }
 .navigation label, .navigation span { font-size: 12px; color: #586575; }

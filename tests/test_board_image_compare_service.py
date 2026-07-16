@@ -167,6 +167,27 @@ def test_http_page_exposes_two_previews_and_quality_switch(tmp_path: Path) -> No
         state.close()
 
 
+def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        body = urlopen(f"{base_url}/", timeout=2).read().decode()
+        script = urlopen(f"{base_url}/app.js", timeout=2).read().decode()
+        assert 'id="quality-psnr"' in body
+        assert 'id="quality-ssim"' in body
+        assert "qualityPsnr" in script
+        assert "psnr.toFixed(2)" in script
+        assert "ssim.toFixed(4)" in script
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
 def test_config_endpoint_does_not_return_password(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     server = create_http_server("127.0.0.1", 0, state)

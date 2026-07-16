@@ -15,6 +15,8 @@ const elements = {
   originalName: document.querySelector('#original-name'),
   reconstructionName: document.querySelector('#reconstruction-name'),
   qualityMarker: document.querySelector('#quality-marker'),
+  qualityPsnr: document.querySelector('#quality-psnr'),
+  qualitySsim: document.querySelector('#quality-ssim'),
   previousImage: document.querySelector('#previous-image'),
   nextImage: document.querySelector('#next-image'),
   imageIndex: document.querySelector('#image-index'),
@@ -81,6 +83,11 @@ function renderPreview() {
   elements.previousImage.disabled = state.index <= 0
   elements.nextImage.disabled = state.index >= total - 1
   elements.pullImage.disabled = !pair || !pair.reconstruction_available
+  const quality = pair ? qualityFor(state.index) : null
+  const psnr = Number(quality?.psnr_db)
+  const ssim = Number(quality?.ssim)
+  elements.qualityPsnr.textContent = Number.isFinite(psnr) ? psnr.toFixed(2) : '--'
+  elements.qualitySsim.textContent = Number.isFinite(ssim) ? ssim.toFixed(4) : '--'
 
   if (!pair) {
     showImage(elements.originalPreview, elements.originalEmpty, '')
@@ -103,7 +110,6 @@ function renderPreview() {
   elements.reconstructionEmpty.textContent = pair.reconstruction_available
     ? '点击“拉取”获取当前图片'
     : '当前序号没有重建图'
-  const quality = qualityFor(state.index)
   const marked = state.qualityEnabled && quality?.suspected
   elements.qualityMarker.hidden = !marked
   elements.qualityMarker.title = marked
