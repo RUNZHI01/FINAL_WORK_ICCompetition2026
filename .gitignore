@@ -64,3 +64,4 @@ Semantic-Communication/session_bootstrap/config/*.secret.env
 Semantic-Communication/session_bootstrap/config/agent_loops/
 Semantic-Communication/session_bootstrap/state/
 Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/runtime/event_archives/
+.worktrees/
