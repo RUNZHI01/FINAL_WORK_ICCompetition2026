@@ -60,8 +60,8 @@ main { padding: 16px 24px 20px; }
 .preview-pane { margin: 0; min-width: 0; background: #fff; border: 1px solid #cbd2d9; border-radius: 6px; overflow: hidden; }
 .preview-pane figcaption { height: 42px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #dbe0e5; font-size: 13px; font-weight: 600; }
 .filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #667382; font-size: 11px; font-weight: 400; }
-.image-stage { position: relative; aspect-ratio: 4 / 3; min-height: 260px; display: grid; place-items: center; background: #20262d; }
-.image-stage img { display: none; width: 100%; height: 100%; object-fit: contain; }
+.image-stage { position: relative; overflow: hidden; aspect-ratio: 4 / 3; min-height: 260px; display: grid; place-items: center; background: #20262d; }
+.image-stage img { position: absolute; inset: 0; display: none; width: 100%; height: 100%; object-fit: contain; }
 .image-stage img.visible { display: block; }
 .empty-state { color: #c4cbd2; font-size: 13px; padding: 24px; text-align: center; }
 .quality-marker { position: absolute; top: 10px; right: 10px; padding: 4px 7px; border: 1px solid rgba(183, 77, 52, 0.32); color: rgba(255, 196, 178, 0.72); background: rgba(22, 25, 29, 0.22); border-radius: 4px; font-size: 11px; }

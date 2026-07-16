@@ -177,11 +177,14 @@ def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None
         base_url = f"http://127.0.0.1:{server.server_port}"
         body = urlopen(f"{base_url}/", timeout=2).read().decode()
         script = urlopen(f"{base_url}/app.js", timeout=2).read().decode()
+        styles = urlopen(f"{base_url}/styles.css", timeout=2).read().decode()
         assert 'id="quality-psnr"' in body
         assert 'id="quality-ssim"' in body
         assert "qualityPsnr" in script
         assert "psnr.toFixed(2)" in script
         assert "ssim.toFixed(4)" in script
+        assert ".image-stage { position: relative; overflow: hidden;" in styles
+        assert ".image-stage img { position: absolute; inset: 0;" in styles
     finally:
         server.shutdown()
         server.server_close()
