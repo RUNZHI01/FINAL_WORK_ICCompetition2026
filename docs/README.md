@@ -12,7 +12,7 @@
 |---|---|---|
 | 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
-| 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP IQ 直传、认证加密默认开启、5 张隐藏预热 |
+| 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP IQ 直传、认证加密默认开启、10 张隐藏预热 |
 | 要跑旧交付容器入口 | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
 | 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |
@@ -38,9 +38,9 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\Semantic-Communication\
 .\docker\run-demo-tailscale.ps1
 ```
 
-当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_PASS=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。
+当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_PASS=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、`OPENAMP_IQ_SEGMENT_SIZE=30`、`OPENAMP_IQ_SEGMENT_REPAIR_PASSES=2`、`ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6`、`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=10`。
 
-`start-dev.sh` 会在显示 Cockpit Desktop 前静默完成 5 张 `USRP IQ + TVM` warm-up，并清掉隐藏 batch 状态，避免第一张冷启动 decode / TVM 尾部污染演示指标。如需调试界面而跳过预热，可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
+`start-dev.sh` 会在显示 Cockpit Desktop 前静默尝试 10 张 `USRP IQ + TVM` warm-up；默认至少 5 张有效完成即可放行 UI，并清掉隐藏 batch 状态，避免第一批冷启动 decode / TVM 尾部污染演示指标。这 10 张只是冷启动预热，不是 IQ streaming 微批。如需调试界面而跳过预热，可临时设置 `COCKPIT_STARTUP_USRP_WARMUP=0`。
 
 USRP2922 网口恢复入口按用途分开：
 
@@ -75,7 +75,7 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 
 通用诊断入口是 `./USRP292x/Usrp2922Network.sh detect|probe|auto-init|status`。板端当前部署在 `/home/user/USRP292x/`，若自动探测选错双网口设备，可显式加 `USRP2922_BOARD_IFACE=eth0`。
 
-写材料时优先引用这些典型值：USRP IQ 传输/解包 median `166.63 ms`、p95 `198.46 ms`；板端 TVM 重建 median `241.20 ms`、p95 `242.59 ms`；预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
+写材料时优先引用当前严格可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM 重建 median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 可作为单独优化记录，不能与当前严格 profile 混写。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`；PSNR `37.0445`，SSIM `0.97494`。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
 当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧 handoff、计划、运行记录和过程审计仅本地保留，不作为提交入口。
 
@@ -170,11 +170,15 @@ Windows 现场优先使用原生 PowerShell + Docker，不走 WSL。用于启动
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 默认写入当前验证环境：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、Docker SSH runner、Docker USRP TX runner、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、板端 `/home/user/venv/bin/python`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_RX_TAIL_SEC=0.040`、`RX_ARM_WAIT_MS=500`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`MLKEM_USRP_MAX_ARQ_ROUNDS=5`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。板卡密码不进仓库；在 Electron 界面填写，或运行前临时设置 `REMOTE_PASS`。
+`run-demo-tailscale.*` 默认写入当前验证环境：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、Docker SSH runner、Docker USRP TX runner、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、板端 `/home/user/venv/bin/python`、`ANALOG_SPS=2`、`ANALOG_AMPLITUDE=6000`、`ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6`、`ANALOG_RX_TAIL_SEC=0.040`、`RX_ARM_WAIT_MS=500`、`ANALOG_MIN_SYNC_METRIC=0.05`、`ANALOG_SYNC_PROFILE=fast-first`、`ANALOG_FAST_SYNC_CANDIDATES=4`、`ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS=1024`、`ANALOG_FALLBACK_SYNC_CANDIDATES=4`、`ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS=1024`、`ANALOG_IQ_QUALITY_GATE=1`、`ANALOG_IQ_QUALITY_MIN_SYNC_METRIC=0.75`、`ANALOG_IQ_MIN_PILOT_GAIN_RATIO=0.85`、`ANALOG_IQ_MAX_EVM_RMS=0.75`、`ANALOG_IQ_MIN_SNR_DB=3.0`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`MLKEM_USRP_MAX_ARQ_ROUNDS=12`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。质量门限开启时 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` 会被安全地压成 0，等待完整 sync/pilot summary 后再放行 TVM。板卡密码不进仓库；在 Electron 界面填写，或运行前临时设置 `REMOTE_PASS`。
 
-这个入口仍保留 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本已经显式设置 USRP IQ 和认证默认值，所以当前演示按 USRP IQ 主线理解。若只想复现预录 TVM 250 ms，可临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并保持认证设置按测试目的单独说明。当前可汇报的 USRP IQ 300 张典型值为：传输/解包 median `166.63 ms`、p95 `198.46 ms`；后接 TVM median `241.20 ms`、p95 `242.59 ms`。预录 TVM 参考线为 median `243.30 ms`、mean `252.91 ms`。
+这个入口仍保留 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本已经显式设置 USRP IQ 和认证默认值，所以当前演示按 USRP IQ 主线理解。若只想复现预录 TVM 250 ms，可临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并保持认证设置按测试目的单独说明。2026-07-16 当前严格 profile 已完成 IQ `300/300` 和 TVM `300/300`：传输/解包 median `411.59 ms`、p95 `3423.45 ms`；后接 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。预录 TVM 参考线为 median `243.30 ms`、mean `252.91 ms`。
 
 切到 USRP 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面应由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 用于让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk` 兜底。快速 IQ profile 默认 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`，保持 TX/RX 常驻，避免每轮反复初始化；`RX_ARM_WAIT_MS=500` 给 RX server 更保守的启动确认窗口；`ANALOG_DECODE_PIPELINE_WARMUP=1` 会把板端 decode 冷启动挪到 worker startup；`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5` 只缩短未真正开始接收时的 arm-failure 恢复，不改变正常 `STOP` drain 的 8 秒保护；`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O，演示后可清理 `/tmp/usrp292x_remote_runs`。USRP 后接重建目前支持 TVM 和 MNN；PyTorch 在 cockpit 中只作为预录参考对照，不启动 USRP 数据面。Cockpit 的 USRP transport 对比优先显示 raw round records 的 median/p95，避免单个 RF/RX outlier 把结果卡片拉歪。
+
+IQ 串行长批次默认按 30 张分段。分段边界会重建 RX streamer，TX streamer 保持常驻并清空上一段发送状态，避免反复创建 TX streamer 导致 UHD FIFO ACK 超时。段内仍使用现有单图 ARQ 和质量门限，首轮失败项默认最多补传两轮；每段结束后通过常驻 decode worker 清理板端临时 capture，防止 `/dev/shm` 累积。所有图像 accepted 后才启动 TVM，不会把部分结果发布成有效重建。`OPENAMP_IQ_SEGMENT_SIZE=0` 可恢复旧的连续长批次；`OPENAMP_IQ_SEGMENT_REPAIR_PASSES=0` 只关闭段级失败项补传。`ANALOG_PIPELINE_DEPTH>1` 仍使用原 pipeline 路径，为避免存在在途 capture 时重置 RF，该路径不做分段 RESET。QPSK 不受此配置影响。
+
+IQ 波形默认使用固定参考峰值 `ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6`，避免高峰值 latent 把整帧导频一起压低。若波形可能触及 SC16 上限，编码器会自动增大实际除数并保留余量；`0` 可恢复旧的逐帧峰值归一化。该修复不改变 latent 数值或 TVM 输入，只稳定不同图片之间的导频发射幅度。
 
 如果临时绕开 Docker cockpit、直接在 Windows 原生后端调试，必须避免 `C:\Windows\System32\bash.exe` 的 WSL stub。使用 Git Bash，并让 SSH helper 走 Paramiko runner：
 

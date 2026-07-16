@@ -2,7 +2,7 @@
 
 ## Problem
 
-The 300-image IQ-direct run `cockpit_usrp_usrp-1784191178` completed only 260 images after 1,684 receive attempts. All captures contained the requested 317,890 samples and reported no RX timeout or overflow. The failures came from synchronization and pilot-quality gates, and became more frequent late in the run. Existing `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` only recycles the RX control TCP connection; it does not explicitly stop and drain the RF receive state.
+The 300-image IQ-direct run `cockpit_usrp_usrp-1784191178` completed only 260 images after 1,684 receive attempts. All captures contained the requested 317,890 samples and reported no RX timeout or overflow. The failures came from synchronization and pilot-quality gates, and became more frequent late in the run. Existing `ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16` only recycles the RX control TCP connection; it does not recreate the UHD streamers.
 
 The quality gates must stay in place. Relaxing them would allow the corrupted latent candidates that previously produced color-noise reconstructions to reach TVM.
 
@@ -13,9 +13,9 @@ Keep one Cockpit batch job, security channel, remote decode worker, and final TV
 At each segment boundary, except after the final segment:
 
 1. Finish all in-flight work for the current segment.
-2. Send `STOP` to the persistent RX server and wait until it reports idle.
-3. Close the shared RX control connection and open a new one.
-4. Check that the TX server is idle; do not restart it because each `SEND` is already finite.
+2. Close the shared RX control connection.
+3. Send `RESET` to the persistent RX server; it stops and joins any worker before recreating its UHD RX streamer.
+4. Send `RESET` to the persistent TX server and recreate its UHD TX streamer.
 5. Continue with the next segment without restarting SSH control masters, the remote decode worker, ML-KEM/authentication, or Cockpit.
 
 The default applies only to serial IQ-direct transport. QPSK behavior is unchanged. Pipeline mode remains available and keeps its existing execution path because a chunk boundary cannot safely reset RF state while captures are in flight.
@@ -32,7 +32,7 @@ If images still fail after the repair pass, finish the transport summary with th
 
 Add `ANALOG_IQ_SEGMENT_SIZE`, exposed by the Cockpit runtime as `OPENAMP_IQ_SEGMENT_SIZE`. Its default is `30` for IQ-direct serial runs. A value of `0` disables segmentation and restores the current continuous long-batch behavior.
 
-Add `ANALOG_IQ_SEGMENT_REPAIR_PASSES`, exposed as `OPENAMP_IQ_SEGMENT_REPAIR_PASSES`, with a default of `1`. A value of `0` keeps segmentation and boundary resets but disables failed-subset repair.
+Add `ANALOG_IQ_SEGMENT_REPAIR_PASSES`, exposed as `OPENAMP_IQ_SEGMENT_REPAIR_PASSES`, with a default of `2`. A value of `0` keeps segmentation and boundary resets but disables failed-subset repair. Hardware regression showed that a single repair pass could still leave a small number of low-sync images in a 300-image batch.
 
 Existing controls retain their meaning:
 
@@ -41,7 +41,9 @@ Existing controls retain their meaning:
 - `ANALOG_RX_BATCH_SESSION_MAX_IMAGES` remains a lower-level control-connection recycling limit.
 - `OPENAMP_IQ_STREAMING_TVM=0` keeps TVM after the complete transport gate.
 
-The summary records segment size, segment count, reset timings and failures, repair-pass counts, unique accepted images, total attempts, and whether compatibility mode was selected. Existing top-level pass/fail fields and output paths remain compatible with Cockpit.
+The summary records segment size, segment count, reset timings and responses, repair-pass counts, unique accepted images, total attempts, and whether compatibility mode was selected. Cockpit also probes `RESET` before an IQ job; legacy persistent servers are stopped, rebuilt from synchronized sources, and restarted. Existing top-level pass/fail fields and output paths remain compatible with Cockpit.
+
+Hardware validation also exposed a data-dependent failure outside the segment state: normalizing every waveform by its own maximum peak reduced pilot amplitude for high-peak latent samples. `ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6` now keeps a fixed waveform scale, expanding the divisor only when required to preserve SC16 headroom. Setting it to `0` restores the previous per-frame peak normalization.
 
 ## Expected Cost
 
@@ -60,3 +62,10 @@ Hardware validation runs in this order:
 5. A continuous-mode smoke run with segment size `0` to prove the previous mode remains usable.
 
 Record transport time, reset overhead, attempt count, failed indexes, TVM image count, reconstruction count, PSNR, and SSIM for each hardware run.
+
+## Validation Result (2026-07-16)
+
+- A 35-image boundary run passed `35/35`: two segments, two resets totaling `106.8 ms`, and two resident-worker cleanups totaling `67.6 ms`. TVM median was `247.21 ms`.
+- The first 300-image run exposed two data-dependent low-pilot samples under the old per-frame peak normalization. Both samples passed a focused OTA retest after fixed-reference normalization was added.
+- The final strict run passed IQ transport `300/300` and TVM `300/300`. It used ten segments, eleven resets totaling `448.69 ms`, ten resident-worker cleanups totaling `522.72 ms`, and reconstructed 300 images. TVM median was `245.42 ms`, mean `254.71 ms`, and p95 `301.73 ms`.
+- Board `/dev/shm` remained at 1% after the run. `OPENAMP_IQ_SEGMENT_SIZE=0` remains the continuous compatibility switch, and `ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=0` restores the prior waveform normalization.

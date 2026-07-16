@@ -57,7 +57,7 @@ parser.add_argument("--iq-segment-size", type=int, default=env_int("ANALOG_IQ_SE
 parser.add_argument(
     "--iq-segment-repair-passes",
     type=int,
-    default=env_int("ANALOG_IQ_SEGMENT_REPAIR_PASSES", 1),
+    default=env_int("ANALOG_IQ_SEGMENT_REPAIR_PASSES", 2),
 )
 
 def iq_segment_size(args, *, pipeline_enabled):
@@ -66,7 +66,7 @@ def iq_segment_size(args, *, pipeline_enabled):
     return max(0, int(getattr(args, "iq_segment_size", 30) or 0))
 
 def iq_segment_repair_passes(args):
-    return max(0, int(getattr(args, "iq_segment_repair_passes", 1) or 0))
+    return max(0, int(getattr(args, "iq_segment_repair_passes", 2) or 0))
 
 def partition_image_segments(images, segment_size):
     if segment_size <= 0:
@@ -198,7 +198,7 @@ Extend the IQ-direct command test to assert defaults:
 
 ```python
 self.assertEqual(command[command.index("--iq-segment-size") + 1], "30")
-self.assertEqual(command[command.index("--iq-segment-repair-passes") + 1], "1")
+self.assertEqual(command[command.index("--iq-segment-repair-passes") + 1], "2")
 ```
 
 Add an override case with both values `0` and assert the command preserves them. Extend board-access default tests to assert both `OPENAMP_*` values.
@@ -217,7 +217,7 @@ Add key tuples in `usrp_runtime.py`, read them only in the IQ-direct branch, and
 if not str(env.get("OPENAMP_IQ_SEGMENT_SIZE") or "").strip():
     env["OPENAMP_IQ_SEGMENT_SIZE"] = "30"
 if not str(env.get("OPENAMP_IQ_SEGMENT_REPAIR_PASSES") or "").strip():
-    env["OPENAMP_IQ_SEGMENT_REPAIR_PASSES"] = "1"
+    env["OPENAMP_IQ_SEGMENT_REPAIR_PASSES"] = "2"
 ```
 
 Explicit `0` must survive because it selects compatibility mode.
@@ -251,7 +251,8 @@ Add a concise table containing:
 ```text
 OPENAMP_IQ_SEGMENT_SIZE=30             default serial IQ grouping
 OPENAMP_IQ_SEGMENT_SIZE=0              previous continuous mode
-OPENAMP_IQ_SEGMENT_REPAIR_PASSES=1     retry failed subset once after RF reset
+OPENAMP_IQ_SEGMENT_REPAIR_PASSES=2     retry failed subset up to twice after RF reset
+ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6 keep pilot power independent of latent peaks
 ANALOG_PIPELINE_DEPTH=1                 quality-first serial mode
 ANALOG_PIPELINE_DEPTH>1                 preserved experimental pipeline path
 ```

@@ -33,7 +33,7 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 .\Semantic-Communication\cockpit_desktop\start-demo.ps1 -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
 ```
 
-默认会启用 USRP IQ 直传、ML-KEM+SM4、ML-DSA+SM2，并在显示界面前静默预热 5 张。
+默认会启用 USRP IQ 直传、ML-KEM+SM4、ML-DSA+SM2，并在显示界面前静默预热 10 张。隐藏预热默认至少 5 张有效完成即可放行界面；正式 IQ 串行任务默认每 30 张重建一次 RX/TX streamer，全部传输通过后才进入 TVM。
 
 5. 界面出现后检查：
 
@@ -58,6 +58,22 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 - USRP TVM 重建（板端）：`/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_*_current/reconstructions`
 - 本地抽查结果（上位机）：`Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_300_20260714_153238`
 
-现场展示时优先打开“发送原图”和当前 run 的 `reconstructions` 目录；最新 run 的准确输出目录以 Cockpit 报告里的 `output_dir` 为准。
+现场展示时优先打开“发送原图”和当前 run 的重建图。可在上位机一键拉取最新板端 USRP TVM 图片并生成本地图库：
+
+```powershell
+.\scripts\pull_board_images.ps1
+```
+
+默认输出到 `artifacts\board_images\<timestamp>_usrp-tvm_...\index.html`。若要拉指定板端目录：
+
+```powershell
+.\scripts\pull_board_images.ps1 -RemotePath "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_xxx_current/reconstructions"
+```
+
+若需要临时本地 Web 访问，加 `-Serve`：
+
+```powershell
+.\scripts\pull_board_images.ps1 -Serve -Port 8765
+```
 
 若出现 `board status endpoint unavailable`，先重新保存板卡密码或重启 Cockpit；不要切到 WSL。

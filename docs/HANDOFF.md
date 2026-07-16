@@ -23,12 +23,12 @@
 |---|---|---|
 | 主数据面 | 以预录/传统 live 路径为主，USRP 更接近验证链路 | 默认 USRP IQ 直传，QPSK 作为稳定 fallback |
 | TVM 指标 | 需要恢复约 250 ms 的 big.LITTLE 预录指标 | 预录 TVM 已恢复，300 张 median `243.30 ms`，mean `252.91 ms` |
-| IQ 直传 | 不是主演示路径 | 已接入 Cockpit、板端 remote-dir、TVM big.LITTLE；accepted 300 张 IQ transport p95 `198.46 ms` |
+| IQ 直传 | 不是主演示路径 | 已接入 Cockpit、板端 remote-dir、TVM big.LITTLE；2026-07-16 严格质量门限下 `300/300` 通过 |
 | QPSK | 还在调试和性能对比 | 已能 300/300 跑通，但约 `2.96 s/image`，不再继续优化 |
 | 推理引擎 | TVM 主线，MNN/PyTorch 状态不稳定 | TVM 是主路径；MNN 预录和 USRP remote-dir 已恢复；PyTorch 在 USRP 下保留预录参考 |
 | Cockpit UI | 控件堆叠，左右栏职责不清，USRP 指标展示不完整 | 左栏管数据面和 IQ 诊断，右栏管地图、硬件、板卡密码、安全信道；USRP 有三阶段进度和独立 benchmark |
 | 结果对比 | USRP/批量结果有时不刷新或显示旧状态 | USRP 三种模式会更新推理结果对比框，切换模式会清理旧进度状态 |
-| IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 默认 ARQ5、burst-miss retry、low-sync retry；仍需注意现场 RF 环境和天线位置 |
+| IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 30 张分段、两轮失败子集补传、固定峰值导频和质量门限已完成 300 张回归；仍需注意现场 RF 环境和天线位置 |
 | 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
 | 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
 | 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数；板端 USRP RX 网口可由 systemd 开机自恢复 |
@@ -45,7 +45,7 @@ $env:REMOTE_PASS = 'user'
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 
-比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=5`。脚本会先在后端静默跑完 5 张 `USRP IQ + TVM`，清掉隐藏 batch-state，然后才启动/显示 Cockpit Desktop 前端。这样第一张冷启动 decode worker、TVM 和文件路径初始化尾部不会进入评委可见界面。启动前请临时设置 `REMOTE_PASS`，或在脚本提示时输入；若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
+比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=10`。脚本会先在后端静默尝试 10 张 `USRP IQ + TVM`；默认至少 5 张进入有效完成即可放行 UI，然后清掉隐藏 batch-state，再启动/显示 Cockpit Desktop 前端。这 10 张只是冷启动预热，不是 streaming 微批。正式 IQ 串行长批次默认每 30 张重建 RX/TX streamer。启动前请临时设置 `REMOTE_PASS`，或在脚本提示时输入；若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
 
 启动后：
 
@@ -125,18 +125,32 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | SM2 和 ML-DSA 都要通过 |
 | `MLKEM_AUTH_SERVER_ID` | `phytium-board` | UI 中显示的服务端标识 |
 | `MLKEM_CIPHER_SUITE` | `SM4_GCM` | TCP 安全信道默认密码套件 |
-| `MLKEM_USRP_MAX_ARQ_ROUNDS` | `5` | IQ 弱同步/漏帧兜底重试 |
+| `MLKEM_USRP_MAX_ARQ_ROUNDS` | `12` | IQ 弱同步/漏帧兜底重试；严格质量门限下给 RF 抖动留恢复空间 |
 | `REMOTE_USRP_RX_DIR` | `/home/user/cockpit_usrp_rx` | TVM/MNN 消费的板端 decoded latent 目录 |
 | `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
 | `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
 | `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT` | `0` | 保持 TX/RX 常驻，减少反复初始化 |
+| `OPENAMP_IQ_SEGMENT_SIZE` | `30` | IQ 串行长批次每段张数；段间重建 RX streamer，并重置常驻 TX 的发送状态 |
+| `OPENAMP_IQ_SEGMENT_REPAIR_PASSES` | `2` | 段内首轮失败项的子集补传次数；默认两轮用于覆盖偶发低同步率 |
 | `COCKPIT_STARTUP_USRP_WARMUP` | `1` | 显示 Cockpit 前先做 USRP IQ + TVM 启动预热 |
-| `COCKPIT_STARTUP_USRP_WARMUP_COUNT` | `5` | 启动预热张数 |
+| `COCKPIT_STARTUP_USRP_WARMUP_COUNT` | `10` | 启动预热张数；对齐 IQ streaming 的 10 张微批 |
+| `COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS` | 空，默认 `ceil(count/2)` | 启动预热最小有效完成数；低于该值才阻止 UI 显示 |
 | `COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC` | `360` | 预热完成等待上限 |
 | `ANALOG_SPS` | `2` | IQ 直传每符号采样数 |
 | `ANALOG_AMPLITUDE` | `6000` | 当前验证环境下的 TX 幅度 |
+| `ANALOG_TX_NORMALIZATION_REFERENCE_PEAK` | `6` | 固定 IQ 波形归一化参考峰值，使导频功率不随 latent 峰值变化；`0` 恢复旧的逐帧峰值归一化 |
 | `ANALOG_RX_TAIL_SEC` | `0.040` | RX capture 尾部保护 |
 | `ANALOG_MIN_SYNC_METRIC` | `0.05` | IQ 同步通过阈值 |
+| `ANALOG_SYNC_PROFILE` | `fast-first` | 先短窗口同步，失败再 fallback/retry |
+| `ANALOG_FAST_SYNC_CANDIDATES` | `4` | fast-first 候选数 |
+| `ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS` | `1024` | fast-first 搜索窗口 |
+| `ANALOG_FALLBACK_SYNC_CANDIDATES` | `4` | fallback 候选数，演示默认保持轻量 |
+| `ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS` | `1024` | fallback 搜索窗口 |
+| `ANALOG_IQ_QUALITY_GATE` | `1` | decoded latent 进入 TVM 前做质量门限 |
+| `ANALOG_IQ_QUALITY_MIN_SYNC_METRIC` | `0.75` | TVM 前质量门限的同步下限；好 run（如 `1784140407`、`1784139032`）均高于该值，低于该值更可能出现彩色噪点 |
+| `ANALOG_IQ_MIN_PILOT_GAIN_RATIO` | `0.85` | mid-pilot 增益塌陷时触发 ARQ/失败；用于阻止弱导频 latent 进入 TVM |
+| `ANALOG_IQ_MAX_EVM_RMS` | `0.75` | payload EVM 过高时拒绝坏帧 |
+| `ANALOG_IQ_MIN_SNR_DB` | `3.0` | 估计 SNR 过低时拒绝坏帧 |
 | `OPENAMP_IQ_STREAMING_TVM` | `0` | 默认不边收边跑 TVM |
 | `ANALOG_PIPELINE_DEPTH` | `1` | 默认串行推进，避免队列尾部扩大 |
 | `ANALOG_PIPELINE_RF_DECODE_OVERLAP` | `0` | 默认不让 RF/decode 重叠 |
@@ -150,7 +164,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `ANALOG_REMOTE_DECODE_RESULT_MODE` | `remote-dir` | 板端就地解码并通过目录交付 latent |
 | `ANALOG_REMOTE_DECODE_RESPONSE_MODE` | `minimal` | 减小 decode worker 响应体 |
 | `ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY` | `1` | 响应只带 summary，降低控制面负载 |
-| `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` | `0.05` | decode 结果软完成等待 |
+| `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` | `0.05` | decode 结果软完成等待；`ANALOG_IQ_QUALITY_GATE=1` 时默认压成 0，等待完整 summary 再判定 |
 | `ANALOG_REMOTE_DECODED_FORMAT` | `npy` | decoded latent 默认写 `.npy` |
 | `ANALOG_DECODE_PIPELINE_WARMUP` | `1` | 启动时预热板端 decode worker |
 | `ANALOG_REMOTE_CLEANUP_MODE` | `skip` | 热路径不做后台清理，演示后手动清 |
@@ -171,6 +185,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | 开关 | 不默认启用的原因 |
 |---|---|
 | `OPENAMP_IQ_STREAMING_TVM=1` / `USRP_IQ_STREAMING_TVM=1` | 已试过边收边推理，板端 CPU/IO 争用使总耗时和 p95 变差 |
+| `OPENAMP_IQ_SEGMENT_SIZE=0` | 仅用于回归旧连续模式；长批次可能随时间退化，演示不要开 |
+| `OPENAMP_IQ_SEGMENT_REPAIR_PASSES=0` | 保留分段但关闭失败子集补传；只用于分离评估 RESET 和 repair 开销 |
 | `ANALOG_PIPELINE_RF_DECODE_OVERLAP=1` | 目标是“收下一批时解上一批”，但当前收益不稳，容易扩大尾部 |
 | `ANALOG_PIPELINE_DEPTH>1` | 深队列增加并发复杂度；之前未形成稳定收益 |
 | `ANALOG_REMOTE_DECODE_REQUEST_TIMEOUT_SEC` | 适合定位 decode worker 卡顿；默认开启会把 timeout/restart 成本带入 p95 |
@@ -182,6 +198,9 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `ANALOG_RX_STOP_DRAIN_TIMEOUT_SEC=0.2` 等 short drain | 容易留下 RX 残留状态，影响下一轮 |
 | `ANALOG_RX_WAIT_TIMEOUT_SEC<1.0` | 会更快暴露等待超时，但容易放大 retry 和 p95；当前默认保留 `1.0` |
 | `ANALOG_ROBUST_SYNC=1` | 可以救部分弱同步帧，但慢速 CFO fallback 会明显拖慢尾部 |
+| `ANALOG_IQ_QUALITY_GATE=0` | 只能用于定位旧行为；关闭后坏 latent 可能被送入 TVM，出现 300/300 但重建是彩色噪声 |
+| `ANALOG_IQ_ALLOW_SOFT_COMPLETE_WITH_QUALITY_GATE=1` | 只能用于性能实验；会在质量门限开启时恢复 soft-complete，可能缺少 sync/pilot 指标，演示不要开 |
+| 放宽 `ANALOG_IQ_*` 质量阈值 | 可能提升表面通过率，但会降低重建视觉质量；演示前必须重新跑图像质量 gate |
 
 注意：`ANALOG_PRECONNECT_CONTROL=1`、`ANALOG_RX_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_CONTROL=1` 现在是启动脚本默认值，不再按早期 runbook 的“纯实验”口径处理。若要改它们，必须重新跑 20/300 张硬件回归。
 
@@ -192,7 +211,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | 路径 | 样本 | 传输/解包 | TVM 重建 | 备注 |
 |---|---:|---:|---:|---|
 | 预录 TVM big.LITTLE | 300 | 无 USRP | median `243.30 ms`, mean `252.91 ms`, p95 `311.88 ms` | 250 ms 参考线 |
-| USRP IQ 直传 accepted profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 当前速度结果，max 是已恢复的 RF/RX outlier |
+| USRP IQ 严格可靠性 profile | 300 | median `411.59 ms`, p95 `3423.45 ms`, `300/300` accepted | median `245.42 ms`, mean `254.71 ms`, p95 `301.73 ms` | 30 张分段；11 次 RESET 共 `448.69 ms`；10 次 worker 清理共 `522.72 ms` |
+| USRP IQ 历史速度 profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 历史 accepted 速度记录，不代表当前严格可靠性默认值 |
 | QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
 
 给写文档同学的典型值口径：
@@ -200,8 +220,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | 可写项 | 推荐写法 |
 |---|---|
 | 主链路 | USRP IQ 直传 + 板端 TVM big.LITTLE 重建 |
-| IQ 传输/解包 | median `166.63 ms`，p95 `198.46 ms`；不要用单次 max 表示典型体验 |
-| TVM 重建 | median `241.20 ms`，p95 `242.59 ms` |
+| IQ 传输/解包 | 当前严格 300 张 profile：median `411.59 ms`，p95 `3423.45 ms`，`300/300` accepted；历史速度 profile 可单独标注 median `166.63 ms` |
+| TVM 重建 | 当前严格 300 张 profile：median `245.42 ms`，mean `254.71 ms`，p95 `301.73 ms` |
 | 250 ms 参考线 | 预录 TVM 300 张 median `243.30 ms`，mean `252.91 ms` |
 | QPSK 对照 | 约 `2.96 s/image`，作为稳定 fallback，不作为速度主线 |
 | 图像质量 | PSNR `37.0445`，SSIM `0.97494`，artifact SHA matched |
@@ -263,7 +283,7 @@ usrp_payload_encrypted=false
 通常是遥测轮询暂停或板端状态服务不可达。跑 USRP 批量时本来会推迟部分 SSH 轮询，避免干扰热路径。
 
 USRP 卡在 299/300 或显示未进入有效重建链路
-优先看 IQ sync/ARQ 日志。当前默认已启用 ARQ5、burst-miss retry、low-sync retry，仍可能受天线位置和现场 RF 环境影响。
+优先看 IQ sync/ARQ 日志和 summary 中的 `iq_segment_resets`。当前默认为单图 ARQ12、30 张分段、1 次失败子集补传；只有全部 accepted 后才启动 TVM。若 RESET 返回 `unknown command`，Cockpit 会退出旧服务、从同步源码重建并重启。
 
 MNN/PyTorch 与 USRP
 TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式下仍作为预录参考，不启动 USRP 传输。
