@@ -136,12 +136,12 @@ class BoardSftpClient:
         output = self._exec(
             f"for candidate in {root}/*/reconstructions; do "
             "[ -d \"$candidate\" ] || continue; "
-            "stat -c '%Y\\t%n' \"$candidate\"; "
+            "stat -c '%Y|%n' \"$candidate\"; "
             "done 2>/dev/null"
         )
         jobs: list[RemoteJob] = []
         for line in output.splitlines():
-            modified, separator, path = line.partition("\t")
+            modified, separator, path = line.partition("|")
             if not separator or not path.strip():
                 continue
             normalized = str(PurePosixPath(path.strip()))

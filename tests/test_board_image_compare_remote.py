@@ -68,8 +68,8 @@ def config() -> BoardConnectionConfig:
 def test_jobs_are_newest_first() -> None:
     ssh = FakeSsh(
         [
-            "100.0\t/outputs/job-old/reconstructions\n"
-            "300.0\t/outputs/job-new/reconstructions\n"
+            "100.0|/outputs/job-old/reconstructions\n"
+            "300.0|/outputs/job-new/reconstructions\n"
         ]
     )
     client = BoardSftpClient(config(), ssh_factory=lambda _: ssh)
