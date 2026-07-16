@@ -7859,8 +7859,23 @@ class DashboardState:
             )
 
         env_values = board_access.build_env()
-        self._ensure_board_tcp_server(board_access)
         mgr = self._get_mlkem_session_manager(board_access, env_values)
+        ping: dict[str, Any] | None = None
+
+        # A live daemon already proves that the board service and its assets were
+        # initialized. Keep asset sync/hotfix work on the recovery path instead
+        # of repeating it before every USRP batch.
+        if mgr is not None and bool(getattr(mgr, "is_alive", False)):
+            try:
+                mgr.ensure_alive()
+                ping = mgr.ping()
+            except Exception:
+                self._close_mlkem_session_manager()
+                mgr = None
+
+        if ping is None:
+            self._ensure_board_tcp_server(board_access)
+            mgr = self._get_mlkem_session_manager(board_access, env_values)
         if mgr is None:
             tcp_client, searched_paths = resolve_local_crypto_client(env_values)
             searched_text = ", ".join(str(path) for path in (searched_paths or [])[:5]) or "no candidate paths"
@@ -7880,20 +7895,21 @@ class DashboardState:
                 expected_count=expected_count,
             )
 
-        try:
-            mgr.ensure_alive()
-            ping = mgr.ping()
-        except Exception as exc:
-            return None, self._build_blocked_inference_payload(
-                variant=variant,
-                image_index=image_index,
-                status_category="crypto_unavailable",
-                source_label="ML-KEM 安全协议未就绪，回退展示（归档样例）",
-                message="ML-KEM 安全协议未建立，本次按安全策略不发起 Current live 重建。",
-                detail=str(exc),
-                diagnostics={"crypto_enabled": True},
-                expected_count=expected_count,
-            )
+        if ping is None:
+            try:
+                mgr.ensure_alive()
+                ping = mgr.ping()
+            except Exception as exc:
+                return None, self._build_blocked_inference_payload(
+                    variant=variant,
+                    image_index=image_index,
+                    status_category="crypto_unavailable",
+                    source_label="ML-KEM 安全协议未就绪，回退展示（归档样例）",
+                    message="ML-KEM 安全协议未建立，本次按安全策略不发起 Current live 重建。",
+                    detail=str(exc),
+                    diagnostics={"crypto_enabled": True},
+                    expected_count=expected_count,
+                )
 
         handshake_ms = mgr._handshake_ms if mgr._handshake_ms > 0 else None
         return {

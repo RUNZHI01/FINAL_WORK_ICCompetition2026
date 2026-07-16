@@ -2457,6 +2457,87 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(payload["engine"], "mnn")
         start_mnn.assert_called_once_with(count=300)
 
+    def test_arm_mlkem_security_context_reuses_healthy_daemon_without_board_bootstrap(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        manager = Mock(is_alive=True, _handshake_ms=8.5)
+        manager.ensure_alive.return_value = None
+        manager.ping.return_value = {"status": "ok"}
+
+        with (
+            patch.object(state, "_get_mlkem_session_manager", return_value=manager),
+            patch.object(
+                state,
+                "_ensure_board_tcp_server",
+                side_effect=AssertionError("healthy daemon must skip board bootstrap"),
+            ) as ensure_server,
+        ):
+            context, blocked = state._arm_mlkem_security_context(
+                board_access=board_access,
+                variant="current",
+                image_index=0,
+                expected_count=30,
+            )
+
+        ensure_server.assert_not_called()
+        manager.ensure_alive.assert_called_once_with()
+        manager.ping.assert_called_once_with()
+        self.assertIsNone(blocked)
+        self.assertEqual(context["protocol"], "mlkem_control")
+        self.assertEqual(context["handshake_ms"], 8.5)
+
+    def test_arm_mlkem_security_context_recovers_stale_daemon_with_board_bootstrap(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._crypto_enabled = True
+        board_access = server.build_board_access_config(
+            {
+                "host": "demo-board",
+                "user": "demo-user",
+                "password": "demo-pass",
+                "port": "22",
+            },
+            fallback=state._board_access,
+        )
+
+        stale_manager = Mock(is_alive=True, _handshake_ms=0.0)
+        stale_manager.ensure_alive.side_effect = RuntimeError("stale channel")
+        fresh_manager = Mock(is_alive=False, _handshake_ms=9.25)
+        fresh_manager.ensure_alive.return_value = None
+        fresh_manager.ping.return_value = {"status": "ok"}
+
+        with (
+            patch.object(
+                state,
+                "_get_mlkem_session_manager",
+                side_effect=[stale_manager, fresh_manager],
+            ),
+            patch.object(state, "_close_mlkem_session_manager", return_value=True) as close_manager,
+            patch.object(state, "_ensure_board_tcp_server", return_value=None) as ensure_server,
+        ):
+            context, blocked = state._arm_mlkem_security_context(
+                board_access=board_access,
+                variant="current",
+                image_index=0,
+                expected_count=30,
+            )
+
+        close_manager.assert_called_once_with()
+        ensure_server.assert_called_once_with(board_access)
+        fresh_manager.ensure_alive.assert_called_once_with()
+        fresh_manager.ping.assert_called_once_with()
+        self.assertIsNone(blocked)
+        self.assertEqual(context["handshake_ms"], 9.25)
+
     def test_run_demo_inference_with_crypto_uses_standard_live_job_with_security_context(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state._crypto_enabled = True
