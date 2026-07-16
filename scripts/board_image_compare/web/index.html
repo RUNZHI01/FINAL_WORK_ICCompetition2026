@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>重建图片对比</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>重建图片对比</h1>
+      <p id="service-status">正在连接上位机服务</p>
+    </div>
+    <label class="quality-toggle" for="quality-assistance">
+      <input id="quality-assistance" type="checkbox">
+      <span>质量辅助</span>
+    </label>
+  </header>
+
+  <main>
+    <section class="directory-grid" aria-label="对比目录">
+      <div class="directory-band">
+        <span class="label">原图目录</span>
+        <strong id="original-directory">未配置</strong>
+        <span id="original-count" class="meta">0 张</span>
+      </div>
+      <div class="directory-band reconstruction-directory">
+        <div class="directory-copy">
+          <span class="label">本次重建目录</span>
+          <strong id="reconstruction-directory">未选择 job</strong>
+          <span id="board-resource" class="meta">板端资源待采样</span>
+        </div>
+        <div class="job-controls">
+          <select id="job-select" aria-label="选择重建 job"></select>
+          <button id="refresh-jobs" class="button secondary" type="button">刷新</button>
+          <button id="pull-image" class="button primary" type="button">拉取</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="preview-grid" aria-label="图片对比预览">
+      <figure class="preview-pane">
+        <figcaption>
+          <span>原图</span>
+          <span id="original-name" class="filename">未选择</span>
+        </figcaption>
+        <div class="image-stage">
+          <img id="original-preview" alt="原图预览">
+          <div id="original-empty" class="empty-state">选择 job 后显示原图</div>
+        </div>
+      </figure>
+
+      <figure class="preview-pane">
+        <figcaption>
+          <span>重建图</span>
+          <span id="reconstruction-name" class="filename">未拉取</span>
+        </figcaption>
+        <div class="image-stage">
+          <img id="reconstruction-preview" alt="重建图预览">
+          <div id="reconstruction-empty" class="empty-state">点击“拉取”获取当前图片</div>
+          <span id="quality-marker" class="quality-marker" hidden>质量提示</span>
+        </div>
+      </figure>
+    </section>
+
+    <nav class="navigation" aria-label="同步图片导航">
+      <button id="previous-image" class="icon-button" type="button" title="上一张" aria-label="上一张">&#8592;</button>
+      <label for="image-index">图片序号</label>
+      <input id="image-index" type="number" min="1" value="1">
+      <span id="image-total">/ 0</span>
+      <button id="next-image" class="icon-button" type="button" title="下一张" aria-label="下一张">&#8594;</button>
+      <span id="pull-status" class="pull-status">等待选择 job</span>
+    </nav>
+
+    <div id="thumbnail-strip" class="thumbnail-strip" aria-label="图片序号缩略导航"></div>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
+
