@@ -4,7 +4,7 @@
 
 **Goal:** Reconstruct all 5000 source images with the existing PyTorch JSCC baseline, expose those references in the comparison page, and produce a reproducible shortlist whose final 300 samples prioritize real USRP retry evidence and reconstruction quality.
 
-**Architecture:** Keep model inference in the existing PyTorch reference runner and add two focused host-side modules: one canonical image-quality implementation and one manifest-driven ranking tool. The ranking tool first probes reproducibility, conditionally averages three fixed-seed runs, then merges PyTorch quality with real USRP retry records. The comparison service resolves either the original image or the PyTorch manifest entry without copying all board data eagerly.
+**Architecture:** Verify and reuse the board-side PyTorch helper, JSCC source, model, and settings on the host, then run the 5,000-image reference workload locally. Add two focused host-side modules: one canonical image-quality implementation and one manifest-driven ranking tool. The ranking tool first probes reproducibility, conditionally averages three fixed-seed runs, then merges PyTorch quality with real USRP retry records.
 
 **Tech Stack:** Python 3, PyTorch CPU, Pillow, NumPy, pytest, existing host HTTP comparison service, vanilla HTML/CSS/JavaScript.
 
@@ -12,6 +12,7 @@
 
 - Source set is `E:\Main\Career\集创赛\原始图像`, containing `00000001.jpg` through `00005000.jpg`.
 - Reuse `board_deps/pytorch/compressed_gan.pt`, `host_pic_to_latent/jscc`, SNR 10 dB, and the existing prerecorded PyTorch inference implementation.
+- Final reference data is generated on the host only after helper/source/model hashes have been checked against the board-side PyTorch runtime.
 - Runtime images, latents, manifests, and reports remain untracked; only code, tests, and concise documentation are committed.
 - Canonical metrics are exact-shape RGB PSNR, global SSIM, and chroma MAE; no silent resizing or fallback reference substitution.
 - A same-seed mismatch forces investigation; cross-seed ranking instability triggers three full fixed-seed runs and mean/std aggregation.
@@ -22,10 +23,10 @@
 ### Task 1: Canonical Quality Metrics and Ranking Core
 
 **Files:**
-- Create: `Semantic-Communication/session_bootstrap/scripts/image_quality_metrics.py`
-- Create: `Semantic-Communication/session_bootstrap/scripts/rank_showcase_samples.py`
-- Create: `Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py`
-- Modify: `Semantic-Communication/session_bootstrap/scripts/board_image_compare/core.py`
+- Create: `scripts/image_quality_metrics.py`
+- Create: `scripts/rank_showcase_samples.py`
+- Create: `tests/test_showcase_sample_ranking.py`
+- Modify: `scripts/board_image_compare/core.py`
 
 **Interfaces:**
 - Produces: `measure_rgb_quality(reference: Path, candidate: Path) -> QualityMetrics`.
@@ -49,7 +50,7 @@ def test_rank_requires_usrp_evidence_before_retry_priority():
 
 - [ ] **Step 2: Run tests and verify the missing-module failure**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py -v`
+Run: `python -m pytest tests/test_showcase_sample_ranking.py -v`
 
 Expected: FAIL because `image_quality_metrics` and `rank_showcase_samples` do not exist.
 
@@ -77,14 +78,14 @@ Make `board_image_compare.core.measure_quality` delegate to the canonical implem
 
 - [ ] **Step 4: Run focused tests**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_core.py -v`
+Run: `python -m pytest tests/test_showcase_sample_ranking.py tests/test_board_image_compare_core.py -v`
 
 Expected: PASS.
 
 - [ ] **Step 5: Commit the ranking core**
 
 ```powershell
-git add Semantic-Communication/session_bootstrap/scripts/image_quality_metrics.py Semantic-Communication/session_bootstrap/scripts/rank_showcase_samples.py Semantic-Communication/session_bootstrap/scripts/board_image_compare/core.py Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py
+git add scripts/image_quality_metrics.py scripts/rank_showcase_samples.py scripts/board_image_compare/core.py tests/test_showcase_sample_ranking.py
 git commit -m "feat(quality): add reproducible showcase ranking"
 ```
 
@@ -92,8 +93,8 @@ git commit -m "feat(quality): add reproducible showcase ranking"
 
 **Files:**
 - Modify: `Semantic-Communication/session_bootstrap/scripts/pytorch_reference_reconstruction.py`
-- Create: `Semantic-Communication/session_bootstrap/tests/test_pytorch_reference_reconstruction.py`
-- Modify: `Semantic-Communication/session_bootstrap/scripts/rank_showcase_samples.py`
+- Create: `tests/test_pytorch_reference_reconstruction.py`
+- Modify: `scripts/rank_showcase_samples.py`
 
 **Interfaces:**
 - Consumes: the existing latent manifest and per-file deterministic seed behavior.
@@ -115,7 +116,7 @@ def test_unstable_cross_seed_probe_requires_three_runs():
 
 - [ ] **Step 2: Run tests and verify failure**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_pytorch_reference_reconstruction.py Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py -v`
+Run: `python -m pytest tests/test_pytorch_reference_reconstruction.py tests/test_showcase_sample_ranking.py -v`
 
 Expected: FAIL on missing provenance fields and stability function.
 
@@ -125,27 +126,27 @@ Run two identical seed-0 probes and require identical output hashes. Run seeds 0
 
 - [ ] **Step 4: Run focused tests**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_pytorch_reference_reconstruction.py Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py -v`
+Run: `python -m pytest tests/test_pytorch_reference_reconstruction.py tests/test_showcase_sample_ranking.py -v`
 
 Expected: PASS.
 
 - [ ] **Step 5: Commit provenance and stability logic**
 
 ```powershell
-git add Semantic-Communication/session_bootstrap/scripts/pytorch_reference_reconstruction.py Semantic-Communication/session_bootstrap/scripts/rank_showcase_samples.py Semantic-Communication/session_bootstrap/tests/test_pytorch_reference_reconstruction.py Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py
+git add Semantic-Communication/session_bootstrap/scripts/pytorch_reference_reconstruction.py scripts/rank_showcase_samples.py tests/test_pytorch_reference_reconstruction.py tests/test_showcase_sample_ranking.py
 git commit -m "feat(pytorch): record reference provenance and stability"
 ```
 
 ### Task 3: Original and PyTorch Reference Selector
 
 **Files:**
-- Modify: `Semantic-Communication/session_bootstrap/scripts/board_image_compare/service.py`
-- Modify: `Semantic-Communication/session_bootstrap/scripts/board_image_compare/web/index.html`
-- Modify: `Semantic-Communication/session_bootstrap/scripts/board_image_compare/web/app.js`
-- Modify: `Semantic-Communication/session_bootstrap/scripts/board_image_compare/web/styles.css`
+- Modify: `scripts/board_image_compare/service.py`
+- Modify: `scripts/board_image_compare/web/index.html`
+- Modify: `scripts/board_image_compare/web/app.js`
+- Modify: `scripts/board_image_compare/web/styles.css`
 - Modify: `Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/reconstruction_browser.py`
 - Modify: `Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py`
-- Modify: `Semantic-Communication/session_bootstrap/tests/test_board_image_compare_service.py`
+- Modify: `tests/test_board_image_compare_service.py`
 
 **Interfaces:**
 - Consumes: `pytorch_manifest_paths: list[str]` in comparison-service configuration.
@@ -166,13 +167,13 @@ def test_missing_pytorch_reference_does_not_fall_back(client):
 
 - [ ] **Step 2: Run service tests and verify failure**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_board_image_compare_service.py -v`
+Run: `python -m pytest tests/test_board_image_compare_service.py -v`
 
 Expected: FAIL because the reference endpoint and PyTorch manifest config are absent.
 
 - [ ] **Step 3: Implement backend reference resolution and cache separation**
 
-Parse PyTorch manifests by `source_name`, return explicit `404` JSON when absent, and keep existing original-image URLs compatible. Pass the runtime manifest path from `server.py` through `ReconstructionBrowserConfig`.
+Parse host-side PyTorch manifests by `source_name`, return explicit `404` JSON when absent, and keep existing original-image URLs compatible. Pass the local output root and manifest path from `server.py` through `ReconstructionBrowserConfig`.
 
 - [ ] **Step 4: Add the segmented control**
 
@@ -187,14 +188,14 @@ Switching mode clears the selected reference and metric display, reloads only th
 
 - [ ] **Step 5: Run service and browser source tests**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_board_image_compare_service.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_remote.py -v`
+Run: `python -m pytest tests/test_board_image_compare_service.py tests/test_board_image_compare_remote.py -v`
 
 Expected: PASS.
 
 - [ ] **Step 6: Commit the selector**
 
 ```powershell
-git add Semantic-Communication/session_bootstrap/scripts/board_image_compare Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/reconstruction_browser.py Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_service.py
+git add scripts/board_image_compare Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/reconstruction_browser.py Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py tests/test_board_image_compare_service.py
 git commit -m "feat(compare): select original or PyTorch reference"
 ```
 
@@ -220,16 +221,16 @@ Verify exactly 5000 manifest records, unique source names, and unique latent pat
 
 - [ ] **Step 2: Run the 100-image reproducibility probe**
 
-Run seed 0 twice and seeds 1 and 2 once using `pytorch_reference_reconstruction.py --max-images 100`. Feed all probe manifests to `rank_showcase_samples.py probe`; abort on same-seed hash mismatch. Record whether the full run count is one or three.
+After validating the host copy against the board, run seed 0 twice and seeds 1 and 2 once on the host with `pytorch_reference_reconstruction.py --max-images 100`. Feed all probe manifests to `rank_showcase_samples.py probe` and abort on same-seed hash mismatch. Record whether the full run count is one or three.
 
 - [ ] **Step 3: Run the required 5000-image PyTorch passes**
 
-Run seed 0 over all 5000 images. If the probe requires averaging, also run seeds 1 and 2. Preserve each output directory and manifest separately so interrupted runs can resume without overwriting completed evidence.
+Run seed 0 over all 5000 images on the host using the verified board-side code and model copy. If the probe requires averaging, also run seeds 1 and 2 on the host. Preserve each output directory and manifest separately so interrupted runs can resume without overwriting completed evidence.
 
 - [ ] **Step 4: Calculate metrics and emit the candidate pool**
 
 ```powershell
-python Semantic-Communication/session_bootstrap/scripts/rank_showcase_samples.py rank --original-dir 'E:\Main\Career\集创赛\原始图像' --pytorch-manifest Semantic-Communication/session_bootstrap/reports/pytorch_reference_5000/seed-0/manifest.json --output-dir Semantic-Communication/session_bootstrap/reports/showcase_ranking --candidate-limit 600 --final-limit 300
+python scripts/rank_showcase_samples.py rank --original-dir 'E:\Main\Career\集创赛\原始图像' --pytorch-manifest Semantic-Communication/session_bootstrap/reports/pytorch_reference_5000/seed-0/manifest.json --output-dir Semantic-Communication/session_bootstrap/reports/showcase_ranking --candidate-limit 600 --final-limit 300
 ```
 
 When three runs are required, pass all three manifests. The initial 600 are quality candidates; the final 300 file is emitted only after matching real USRP retry evidence.
@@ -240,7 +241,7 @@ Execute segmented serial USRP IQ + TVM batches for the candidate pool, then reru
 
 - [ ] **Step 6: Run full automated verification**
 
-Run: `python -m pytest Semantic-Communication/session_bootstrap/tests/test_showcase_sample_ranking.py Semantic-Communication/session_bootstrap/tests/test_pytorch_reference_reconstruction.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_core.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_service.py Semantic-Communication/session_bootstrap/tests/test_board_image_compare_remote.py -v`
+Run: `python -m pytest tests/test_showcase_sample_ranking.py tests/test_pytorch_reference_reconstruction.py tests/test_board_image_compare_core.py tests/test_board_image_compare_service.py tests/test_board_image_compare_remote.py -v`
 
 Expected: PASS.
 

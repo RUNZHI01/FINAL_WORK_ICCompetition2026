@@ -16,7 +16,7 @@ PyTorch uses SNR 10 and a fixed seed, matching the prerecorded baseline defaults
 
 Add an `原图 | PyTorch` segmented selector to the left directory band. `原图` remains the default. The selected reference controls the left preview and the per-image metrics shown against the right TVM reconstruction.
 
-The service receives a local PyTorch output directory and source-to-latent manifest. Reference images never use SFTP. Metric cache keys include `(job, image index, reference mode)` so values cannot leak between modes. A missing PyTorch result is shown as unavailable and does not silently fall back to the original.
+PyTorch reconstruction runs on the host using a verified copy of the board-side helper, JSCC source, model, and inference settings. Before the 5,000-image run, compare the host model and relevant source hashes with the board; pull any missing or mismatched files from the board. The comparison service reads the resulting host-side PyTorch output directly. Metric cache keys include `(job, image index, reference mode)` so values cannot leak between modes. A missing PyTorch result is shown as unavailable and does not silently fall back to the original.
 
 ## Quality Standard
 

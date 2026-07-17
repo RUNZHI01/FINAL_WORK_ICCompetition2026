@@ -7,8 +7,7 @@ from pathlib import Path, PurePosixPath
 from statistics import median
 from typing import Iterable, Mapping, Sequence
 
-import numpy as np
-from PIL import Image
+from scripts.image_quality_metrics import QualityMetrics, measure_rgb_quality
 
 
 RECONSTRUCTION_INDEX_PATTERN = re.compile(r"^(\d+)(?:_recon)?\.[^.]+$", re.IGNORECASE)
@@ -73,56 +72,13 @@ def pair_images(
 
 
 @dataclass(frozen=True)
-class QualityMetrics:
-    psnr_db: float | None
-    ssim: float | None
-    chroma_mae: float | None
-    shape_match: bool
-
-
-@dataclass(frozen=True)
 class QualityVerdict:
     suspected: bool
     reason: str
 
 
-def _global_ssim(original: np.ndarray, reconstruction: np.ndarray) -> float:
-    max_value = 255.0
-    c1 = (0.01 * max_value) ** 2
-    c2 = (0.03 * max_value) ** 2
-    mu_original = float(original.mean())
-    mu_reconstruction = float(reconstruction.mean())
-    var_original = float(original.var())
-    var_reconstruction = float(reconstruction.var())
-    covariance = float(((original - mu_original) * (reconstruction - mu_reconstruction)).mean())
-    numerator = (2.0 * mu_original * mu_reconstruction + c1) * (2.0 * covariance + c2)
-    denominator = (
-        (mu_original**2 + mu_reconstruction**2 + c1)
-        * (var_original + var_reconstruction + c2)
-    )
-    if denominator == 0.0:
-        return 1.0 if np.array_equal(original, reconstruction) else 0.0
-    return numerator / denominator
-
-
 def measure_quality(original_path: Path, reconstruction_path: Path) -> QualityMetrics:
-    with Image.open(original_path) as original_image:
-        original = np.asarray(original_image.convert("RGB"), dtype=np.float32)
-    with Image.open(reconstruction_path) as reconstruction_image:
-        reconstruction = np.asarray(reconstruction_image.convert("RGB"), dtype=np.float32)
-    if original.shape != reconstruction.shape:
-        return QualityMetrics(None, None, None, False)
-
-    difference = reconstruction - original
-    mse = float(np.mean(np.square(difference)))
-    psnr_db = math.inf if mse == 0.0 else 20.0 * math.log10(255.0) - 10.0 * math.log10(mse)
-    channel_spread = np.max(difference, axis=2) - np.min(difference, axis=2)
-    return QualityMetrics(
-        psnr_db=psnr_db,
-        ssim=float(_global_ssim(original, reconstruction)),
-        chroma_mae=float(np.mean(np.abs(channel_spread))),
-        shape_match=True,
-    )
+    return measure_rgb_quality(original_path, reconstruction_path)
 
 
 def _complete_history(history: Sequence[QualityMetrics]) -> list[QualityMetrics]:
