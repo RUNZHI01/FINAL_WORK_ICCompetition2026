@@ -9799,7 +9799,7 @@ class DashboardState:
             }
 
         self._event_spine.publish(
-            "SECURITY_FIT_VERIFIED",
+            "JOB_REJECTED",
             source="security-fit",
             plane="control",
             mode_scope=CONTROL_MODE_SCOPE,
