@@ -54,6 +54,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--input-dir", required=True, help="Directory containing latent .pt/.npz/.npy files.")
     parser.add_argument(
+        "--source-manifest",
+        default="",
+        help="Optional host image-to-latent manifest used to preserve source provenance.",
+    )
+    parser.add_argument(
         "--output-dir",
         required=True,
         help="Run output root. PNGs are written under <output-dir>/reconstructions/.",
@@ -310,6 +315,50 @@ def load_latent(path: Path) -> tuple[torch.Tensor, dict[str, Any]]:
     raise ValueError(f"unsupported latent file type: {path}")
 
 
+def load_source_manifest_index(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None:
+        return {}
+    if not path.is_file():
+        raise SystemExit(f"ERROR: source manifest not found: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        raise SystemExit(f"ERROR: invalid source manifest {path}: {err}") from err
+    records = payload.get("records") if isinstance(payload, dict) else None
+    if not isinstance(records, list):
+        raise SystemExit(f"ERROR: source manifest has no records list: {path}")
+
+    result: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        latent_name = Path(str(record.get("latent_rel") or record.get("latent") or "")).name
+        if latent_name:
+            result[latent_name] = record
+    return result
+
+
+def source_provenance(
+    input_path: Path,
+    latent_metadata: dict[str, Any],
+    source_index: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    record = source_index.get(input_path.name, {})
+    source_name = str(
+        record.get("source_image_rel")
+        or record.get("original_filename")
+        or latent_metadata.get("original_filename")
+        or ""
+    ).strip()
+    source_path = str(record.get("source_image") or "").strip() or None
+    source_sha256 = str(record.get("source_image_sha256") or "").strip() or None
+    return {
+        "source_name": source_name,
+        "source_path": source_path,
+        "source_sha256": source_sha256,
+    }
+
+
 def collect_input_files(input_dir: Path, max_images: int) -> list[Path]:
     patterns = ("*.pt", "*.npz", "*.npy")
     files: list[Path] = []
@@ -382,6 +431,7 @@ def main() -> None:
     generator_ckpt = Path(args.generator_ckpt)
     origin_ckpt = Path(args.origin_ckpt) if args.origin_ckpt else None
     input_dir = Path(args.input_dir)
+    source_manifest = Path(args.source_manifest) if args.source_manifest else None
     output_dir = Path(args.output_dir)
     reconstructions_dir = output_dir / "reconstructions"
     manifest_path = output_dir / args.manifest_name
@@ -400,6 +450,7 @@ def main() -> None:
     if not all_input_files:
         raise SystemExit(f"ERROR: no latent files found in {input_dir}")
     input_files = all_input_files[: args.max_images] if args.max_images > 0 else all_input_files
+    source_index = load_source_manifest_index(source_manifest)
 
     generator_ckpt_sha256 = file_sha256(generator_ckpt)
     expected_sha256 = str(args.expected_sha256 or "").strip().lower()
@@ -462,6 +513,7 @@ def main() -> None:
                     "input_sha256": file_sha256(input_path),
                     "base_name": base_name,
                     "sample_seed": sample_seed,
+                    "run_seed": args.seed,
                     "noise_mode": args.noise_mode,
                     "snr": args.snr,
                     "latent_shape": list(latent.shape),
@@ -471,6 +523,7 @@ def main() -> None:
                     "output_path": str(save_path),
                     "output_sha256": file_sha256(save_path),
                     "latent_metadata": json_ready(latent_meta),
+                    **source_provenance(input_path, latent_meta, source_index),
                 }
             )
             print(
@@ -503,6 +556,10 @@ def main() -> None:
         "origin_ckpt_sha256": None if origin_ckpt is None or not origin_ckpt.is_file() else file_sha256(origin_ckpt),
         "origin_ckpt_metadata": None if origin_ckpt is None else load_origin_checkpoint_metadata(origin_ckpt),
         "input_dir": str(input_dir),
+        "source_manifest": None if source_manifest is None else str(source_manifest),
+        "source_manifest_sha256": (
+            None if source_manifest is None else file_sha256(source_manifest)
+        ),
         "input_count": len(input_files),
         "output_dir": str(output_dir),
         "reconstructions_dir": str(reconstructions_dir),

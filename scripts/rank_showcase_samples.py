@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass
 from statistics import fmean, pstdev
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,67 @@ class RankedSample:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class StabilityReport:
+    stable: bool
+    full_run_count: int
+    minimum_spearman: float
+    minimum_top_overlap: float
+
+
+def _spearman(reference: Sequence[str], candidate: Sequence[str]) -> float:
+    if len(reference) != len(candidate) or set(reference) != set(candidate):
+        return 0.0
+    if len(reference) < 2:
+        return 1.0
+    candidate_positions = {name: index for index, name in enumerate(candidate)}
+    squared_difference = sum(
+        (index - candidate_positions[name]) ** 2
+        for index, name in enumerate(reference)
+    )
+    count = len(reference)
+    return 1.0 - (6.0 * squared_difference) / (count * (count**2 - 1))
+
+
+def assess_ranking_stability(
+    *,
+    same_seed_hash_runs: Sequence[Mapping[str, str]],
+    cross_seed_rankings: Sequence[Sequence[str]],
+    minimum_spearman: float = 0.98,
+    minimum_top_overlap: float = 0.90,
+) -> StabilityReport:
+    if len(same_seed_hash_runs) < 2:
+        raise ValueError("at least two same-seed hash runs are required")
+    baseline_hashes = dict(same_seed_hash_runs[0])
+    if any(dict(run) != baseline_hashes for run in same_seed_hash_runs[1:]):
+        raise ValueError("same-seed output mismatch")
+    if len(cross_seed_rankings) < 2:
+        raise ValueError("at least two cross-seed rankings are required")
+
+    reference = list(cross_seed_rankings[0])
+    top_count = max(1, math.ceil(len(reference) * 0.20))
+    reference_top = set(reference[:top_count])
+    correlations: list[float] = []
+    overlaps: list[float] = []
+    for candidate in cross_seed_rankings[1:]:
+        candidate_list = list(candidate)
+        correlations.append(_spearman(reference, candidate_list))
+        overlaps.append(len(reference_top & set(candidate_list[:top_count])) / top_count)
+
+    lowest_correlation = min(correlations)
+    lowest_overlap = min(overlaps)
+    stable = (
+        lowest_correlation >= minimum_spearman
+        and lowest_overlap >= minimum_top_overlap
+    )
+    return StabilityReport(
+        stable=stable,
+        full_run_count=1 if stable else 3,
+        minimum_spearman=lowest_correlation,
+        minimum_top_overlap=lowest_overlap,
+    )
 
 
 def aggregate_quality_runs(
