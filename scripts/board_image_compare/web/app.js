@@ -316,8 +316,11 @@ async function setQualityAssistance(enabled) {
 }
 
 async function pollState() {
+  const sourceEpoch = state.sourceEpoch
+  const sourceId = state.sourceId
   try {
     const payload = await requestJson('/api/state')
+    if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
     state.quality = payload.quality || {}
     const resources = payload.resources
     elements.boardResource.textContent = resources
@@ -325,6 +328,7 @@ async function pollState() {
       : '板端资源待采样'
     renderPreview()
   } catch (error) {
+    if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
     elements.serviceStatus.textContent = `服务状态不可用：${error.message}`
   }
 }

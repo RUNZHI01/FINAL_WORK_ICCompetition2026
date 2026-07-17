@@ -383,6 +383,24 @@ def test_http_page_invalidates_stale_source_job_and_pull_requests(tmp_path: Path
     assert "state.quality[`${jobId}:${index}:${referenceMode}`] = payload.quality" in script
 
 
+def test_http_page_ignores_stale_poll_state_responses(tmp_path: Path) -> None:
+    _, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    poll_start = script.index("async function pollState()")
+    state_request = script.index("const payload = await requestJson('/api/state')", poll_start)
+    source_epoch = script.index("const sourceEpoch = state.sourceEpoch", poll_start)
+    source_id = script.index("const sourceId = state.sourceId", poll_start)
+    success_guard = script.index("if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return", state_request)
+    quality_update = script.index("state.quality = payload.quality || {}", state_request)
+    error_guard = script.index("if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return", success_guard + 1)
+    status_update = script.index("elements.serviceStatus.textContent", error_guard)
+
+    assert source_epoch < state_request
+    assert source_id < state_request
+    assert success_guard < quality_update
+    assert error_guard < status_update
+
+
 def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     server = create_http_server("127.0.0.1", 0, state)
