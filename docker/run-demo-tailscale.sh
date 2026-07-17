@@ -15,7 +15,11 @@ export SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER="${SSH_WITH_PASSWORD_DISABLE_CONT
 export OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"
 export OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
 export OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="${OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET:-/host_workspace}"
-export OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-host}"
+default_tx_docker_network="host"
+if command -v powershell.exe >/dev/null 2>&1; then
+    default_tx_docker_network="bridge"
+fi
+export OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-$default_tx_docker_network}"
 export REMOTE_USRP_RX_DIR="${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}"
 export REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/dev/shm/usrp292x_remote_runs}"
 export REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"

@@ -139,7 +139,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
 | `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
 | `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT` | `0` | 保持 TX/RX 常驻，减少反复初始化 |
-| `OPENAMP_USRP_TX_DOCKER_NETWORK` | `host` | TX 的 USRP UDP 数据面绕过 Docker bridge；TCP 控制口由 `tcp_forward.py` 映射回 `127.0.0.1:29221` |
+| `OPENAMP_USRP_TX_DOCKER_NETWORK` | Windows `bridge`；Linux `host` | Windows Docker Desktop 直接发布 `127.0.0.1:29221`；Linux 保留 host network |
 | `OPENAMP_IQ_SEGMENT_SIZE` | `30` | IQ 串行长批次每段张数；段间重建 RX streamer，并重置常驻 TX 的发送状态 |
 | `OPENAMP_IQ_SEGMENT_REPAIR_PASSES` | `2` | 段内首轮失败项的子集补传次数；默认两轮用于覆盖偶发低同步率 |
 | `COCKPIT_STARTUP_USRP_WARMUP` | `1` | 显示 Cockpit 前先做 USRP IQ + TVM 启动预热 |
@@ -343,7 +343,7 @@ usrp_payload_encrypted=false
 2026-07-17 冷启动排查发现 KDE `baloo_file_extractor` 占用约 45% 内存并处于 D 状态，导致 SSH 和安全服务不稳。现场若复现，先执行 `balooctl disable`，再终止残留 `baloo_file_extractor`；当次处理后板端 used memory 从约 `1510 MB` 降到 `1090 MB`。
 
 TX 容器存在但 `127.0.0.1:29221` 不可达
-检查 `cockpit-usrp-tx-29221` 和 `cockpit-usrp-tx-proxy-29221` 两个容器。前者用 host network 连 USRP，后者只转发 TCP 控制命令。不要手工只拉起其中一个；停掉两者后重跑 `start-demo.ps1`。
+Windows 应只有直接发布端口的 `cockpit-usrp-tx-29221` 容器，`docker port cockpit-usrp-tx-29221` 应显示 `127.0.0.1:29221`。若仍出现旧的 `cockpit-usrp-tx-proxy-29221`，停掉两个旧容器后重跑 `start-demo.ps1`；不要在 Windows 强制设置 host network。
 
 USRP 卡在 299/300 或显示未进入有效重建链路
 优先看 IQ sync/ARQ 日志和 summary 中的 `iq_segment_resets`。当前默认为单图 ARQ12、30 张分段、2 次失败子集补传；只有全部 accepted 后才启动 TVM。若 RX server 端口仍在但连续收不到 UHD 样本，runner 会关闭旧会话并发送真实 `RESET`。若 RESET 返回 `unknown command`，Cockpit 会退出旧服务、从同步源码重建并重启。

@@ -24,7 +24,7 @@
 8. 长批次按 30 张分为 10 段。段间重置 RX streamer，TX streamer 保持常驻；段内失败项最多再做两轮子集修复。
 9. 当前关闭 streaming TVM。只有 300 张全部 accepted，后端才启动板端 big.LITTLE runner。0、1 号小核负责预取和保存，2 号大核执行 TVM 手写算子路径，输出写到 `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/<job>/`。
 
-本轮运行时实际参数为：TX `500 MHz / 5 Msps / 25 dB / TX-RX`，设备地址 `192.168.10.2`；RX `500 MHz / 5 Msps / 15 dB / RX2`，设备地址 `192.168.10.22`。TX 控制代理监听上位机 `127.0.0.1:29221`，板端 RX 控制服务监听 `29220`。
+本轮运行时实际参数为：TX `500 MHz / 5 Msps / 25 dB / TX-RX`，设备地址 `192.168.10.2`；RX `500 MHz / 5 Msps / 15 dB / RX2`，设备地址 `192.168.10.22`。TX 控制端口监听上位机 `127.0.0.1:29221`，板端 RX 控制服务监听 `29220`；Windows 由 Docker bridge 直接发布 TX 端口。
 
 单帧波形为 47888 个样本，纯空口约 `9.58 ms`。RX 实际还要覆盖启动偏移、capture margin 和 `0.040 s` tail，本轮 RX server 的稳定接收时间约 `63.60 ms`。因此“传输/解包”不能用空口时间替代。
 

@@ -42,7 +42,7 @@ if (-not $env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET) {
     $env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"
 }
 if (-not $env:OPENAMP_USRP_TX_DOCKER_NETWORK) {
-    $env:OPENAMP_USRP_TX_DOCKER_NETWORK = "host"
+    $env:OPENAMP_USRP_TX_DOCKER_NETWORK = "bridge"
 }
 if (-not $env:REMOTE_USRP_RX_DIR) {
     $env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"

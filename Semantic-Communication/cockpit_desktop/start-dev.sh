@@ -105,7 +105,7 @@ configure_runtime_defaults() {
     export MLKEM_LOCAL_CLIENT_DOCKER_IMAGE="${MLKEM_LOCAL_CLIENT_DOCKER_IMAGE:-$OPENAMP_SSH_DOCKER_IMAGE}"
     export OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"
     export OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
-    export OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-host}"
+    export OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-bridge}"
   fi
   if command -v cygpath >/dev/null 2>&1 || [[ -n "${MSYSTEM:-}" ]]; then
     local msys_env_exclusions

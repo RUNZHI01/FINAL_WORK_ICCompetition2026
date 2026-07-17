@@ -475,7 +475,7 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
         network_mode = _first_value(
             env_values,
             ("OPENAMP_USRP_TX_DOCKER_NETWORK", "USRP_TX_DOCKER_NETWORK"),
-            "host",
+            "bridge" if os.name == "nt" else "host",
         ).strip().lower()
         external_port = int(tx_port)
         internal_port = int(_first_value(

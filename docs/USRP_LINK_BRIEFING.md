@@ -22,7 +22,7 @@ QPSK 仍可运行，但只保留作可靠字节链路对照，不再参与本轮
 | 1. 会话准入 | 上位机 + 飞腾派 | ML-KEM-768 建立密钥，SM4-GCM 保护控制信道；SM2 和 ML-DSA-65 双签认证板端 | Cockpit 显示加密、认证和板卡就绪 |
 | 2. 图像编码 | 上位机 | 原图经 Deep JSCC encoder 得到 `float32` latent，当前形状通常为 `1x32x32x32` | latent manifest、编码进度 |
 | 3. IQ 成帧 | 上位机 | latent 展平后按全局 RMS 归一化，每两个实数配成一个复数 I/Q 符号；加入 CFO、同步和中插导频，再做 RRC 成形和 `sc16` 转换 | 波形、manifest、名义空口时长 |
-| 4. 无线发送 | 上位机 USRP | Docker host network 内常驻 TX server 使用 N210/USRP-2922 发射，默认 `500 MHz`、`5 Msps`、TX gain `25`、`TX/RX` 端口；Windows 只通过轻量代理访问 TCP 控制口 | TX server 状态、发送记录 |
+| 4. 无线发送 | 上位机 USRP | Docker 内常驻 TX server 使用 N210/USRP-2922 发射，默认 `500 MHz`、`5 Msps`、TX gain `25`、`TX/RX` 端口；Windows 以 bridge 直接发布 TCP 控制口 | TX server 状态、发送记录 |
 | 5. 射频传播 | 两台 USRP 之间 | IQ 波形直接经过实际无线信道；这一段不经过 Tailscale | 频谱仪可观察中心频率和占用带宽 |
 | 6. 无线接收 | 飞腾派 USRP | 常驻 RX server 使用 `192.168.10.22`、RX gain `15`、`RX2` 接收 `sc16` 样本 | 收样本数、timeout、capture 文件 |
 | 7. IQ 恢复 | 飞腾派 | 零保护段估计 DC，随后做 RRC 匹配滤波、定时/同步、CFO 校正、复增益和相位跟踪，再还原 noisy latent | sync、pilot gain、EVM、SNR、decode 时间 |
@@ -94,5 +94,5 @@ ML-KEM、SM4、ML-DSA 和 SM2 当前用于会话准入与控制信道。USRP IQ 
 - 修复了 RX 服务“端口仍在但 UHD 收不到样本”时只重连控制口的问题，现在会执行真实 RESET。
 - 修复了板端 RX server 启动成功但 SSH 命令等待约 60 秒的问题，改为 `setsid -f` 后启动约 4.6 秒返回。
 - 一键启动改为累计预热 `10/10` 才显示 UI；首轮不足时只补跑剩数量。最新全关后冷启动约 `99.6 s` 通过。
-- 上位机 TX 的 USRP UDP 数据面改走 Docker host network；只有 `29221` TCP 控制命令经轻量代理返回 Windows。这两段都不经 Tailscale。
+- 上位机 TX 的 USRP UDP 数据面由本机 Docker 容器访问物理 USRP；Windows 通过 bridge 直接映射 `29221` TCP 控制口，Linux 默认使用 host network。这些本机链路均不经 Tailscale。
 - 板端同步包已于 2026-07-17 重新生成并部署，关键文件 SHA-256 一致，`tvm310_safe` 运行时检查通过。

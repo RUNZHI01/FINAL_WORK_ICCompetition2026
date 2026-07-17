@@ -108,7 +108,7 @@ Set-DefaultEnv "MLKEM_LOCAL_CLIENT_RUNNER" "docker"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
 Set-DefaultEnv "OPENAMP_USRP_TX_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
-Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "host"
+Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "bridge"
 
 Set-DefaultEnv "MLKEM_TRANSPORT_MODE" "usrp"
 Set-DefaultEnv "OPENAMP_DEMO_INPUT_SOURCE_MODE" "usrp"

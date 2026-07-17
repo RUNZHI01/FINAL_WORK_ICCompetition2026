@@ -112,7 +112,7 @@ def test_start_demo_defaults_to_full_iq_streaming_warmup_chunk() -> None:
     assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)' in script
     assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)' in script
     assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS" "2"' in script
-    assert 'Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "host"' in script
+    assert 'Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "bridge"' in script
 
     shell_script = (
         PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-dev.sh"
@@ -222,7 +222,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"',
         'OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"',
         'OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="${OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET:-/host_workspace}"',
-        'OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-host}"',
+        'OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-$default_tx_docker_network}"',
         'REMOTE_USRP_RX_DIR="${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}"',
         'REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/dev/shm/usrp292x_remote_runs}"',
         'REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"',
@@ -297,7 +297,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:OPENAMP_USRP_TX_RUNNER = "docker"',
         '$env:OPENAMP_USRP_TX_DOCKER_IMAGE = "iccomp-usrp-tx:latest"',
         '$env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"',
-        '$env:OPENAMP_USRP_TX_DOCKER_NETWORK = "host"',
+        '$env:OPENAMP_USRP_TX_DOCKER_NETWORK = "bridge"',
         '$env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"',
         '$env:REMOTE_RX_RUN_ROOT = "/dev/shm/usrp292x_remote_runs"',
         '$env:REMOTE_USRP_PROJECT_ROOT = "/home/user"',

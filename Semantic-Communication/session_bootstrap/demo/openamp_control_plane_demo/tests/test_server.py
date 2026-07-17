@@ -5623,6 +5623,7 @@ class ServerMainTest(unittest.TestCase):
             env_values = {
                 "OPENAMP_USRP_TX_RUNNER": "docker",
                 "OPENAMP_USRP_TX_DOCKER_IMAGE": "iccomp-usrp-tx:latest",
+                "OPENAMP_USRP_TX_DOCKER_NETWORK": "host",
             }
             with (
                 patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=9999)),
@@ -5656,14 +5657,16 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(proxy_command[proxy_command.index("--target-port") + 1], "39221")
         self.assertEqual(tx_command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
 
-    def test_usrp_local_tx_server_can_opt_back_into_bridge_network(self) -> None:
+    def test_usrp_local_tx_server_defaults_to_bridge_network_on_windows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             result = Mock(returncode=0, stdout="container-123\n", stderr="")
             env_values = {
                 "OPENAMP_USRP_TX_RUNNER": "docker",
-                "OPENAMP_USRP_TX_DOCKER_NETWORK": "bridge",
             }
-            with patch("usrp_runtime.subprocess.run", return_value=result) as run:
+            with (
+                patch("usrp_runtime.os.name", "nt"),
+                patch("usrp_runtime.subprocess.run", return_value=result) as run,
+            ):
                 usrp_runtime._start_local_tx_server(
                     env_values,
                     log_dir=Path(temp_dir_name),
