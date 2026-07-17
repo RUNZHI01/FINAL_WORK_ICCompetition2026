@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -41,7 +42,23 @@ def config(tmp_path: Path) -> ReconstructionBrowserConfig:
         board_password="user",
         board_port=22,
         original_dir=originals,
-        remote_root="/outputs",
+        sources=(
+            {
+                "id": "prerecorded-tvm",
+                "label": "Prerecorded TVM",
+                "remote_root": "/prerecorded/tvm",
+                "include_prefixes": [],
+                "exclude_prefixes": ["pytorch_reference_reconstruction_"],
+            },
+            {
+                "id": "usrp-iq-direct",
+                "label": "USRP IQ direct",
+                "remote_root": "/usrp/iq-direct/tvm",
+                "include_prefixes": [],
+                "exclude_prefixes": [],
+            },
+        ),
+        default_source="usrp-iq-direct",
         manifest_root=tmp_path / "manifests",
     )
 
@@ -79,6 +96,65 @@ def test_open_reuses_healthy_process_and_reconfigures(tmp_path: Path) -> None:
     assert len(process_calls) == 1
     assert len(configured_payloads) == 2
     assert configured_payloads[0]["board_password"] == "user"
+    assert configured_payloads[0]["sources"] == list(config(tmp_path).sources)
+    assert configured_payloads[0]["default_source"] == "usrp-iq-direct"
+    assert "remote_root" not in configured_payloads[0]
+
+
+def test_open_starts_comparison_service_as_module(tmp_path: Path) -> None:
+    process = FakeProcess()
+    process_calls: list[list[str]] = []
+    healthy = False
+
+    def process_factory(command: list[str]):
+        nonlocal healthy
+        process_calls.append(command)
+        healthy = True
+        return process
+
+    def http_json(method: str, url: str, payload=None, timeout=1.0):
+        if url.endswith("/api/health"):
+            if not healthy:
+                raise OSError("not started")
+            return {"status": "ok"}
+        return {"status": "ok"}
+
+    manager = ReconstructionBrowserManager(
+        script_path=tmp_path / "scripts" / "board_image_compare_server.py",
+        cache_root=tmp_path / "cache",
+        process_factory=process_factory,
+        http_json=http_json,
+        sleep=lambda _: None,
+    )
+
+    manager.open(config(tmp_path))
+
+    assert process_calls[0][1:3] == ["-m", "scripts.board_image_compare_server"]
+
+
+def test_comparison_service_module_entrypoint_imports() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-c", "import scripts.board_image_compare_server"],
+        cwd=DEMO_ROOT.parents[3],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_comparison_service_direct_entrypoint_imports() -> None:
+    repo_root = DEMO_ROOT.parents[3]
+    completed = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "board_image_compare_server.py"), "--help"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_close_terminates_owned_process(tmp_path: Path) -> None:

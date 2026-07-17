@@ -244,6 +244,15 @@ artifact SHA matched
 
 Cockpit 的“板端输出目录”下有“本次重建对比图”按钮。它按需启动上位机服务 `scripts/board_image_compare_server.py`，默认地址为 `http://127.0.0.1:8786/`。页面左侧是原图目录和预览，右侧是倒序 job 选择、板端重建目录和预览；当前序号两侧同步切换，重建图只有点击“拉取”后才走 SFTP。
 
+| 输出类别 | 板端目录 |
+|---|---|
+| 预录 PyTorch / TVM | `/home/user/Downloads/jscc-test/jscc/infer_outputs` |
+| 预录 MNN | `/home/user/Downloads/jscc-test/mnn_benchmark_outputs` |
+| USRP QPSK TVM | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` |
+| USRP IQ 直传 TVM | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` |
+
+完整的五类来源、MNN USRP 叶目录和历史迁移证据见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。2026-07-17 已从 `/home/user/Downloads/jscc-test-usrp/tvm` 迁移 244 个历史 job；复跑 dry-run 得到 244 个 `already_moved`，一个无分类证据的 retry job 留在旧目录。
+
 实现边界：
 
 - 服务和缓存都在上位机，板端不新增常驻进程；缓存目录是 `artifacts/board_image_cache/`。

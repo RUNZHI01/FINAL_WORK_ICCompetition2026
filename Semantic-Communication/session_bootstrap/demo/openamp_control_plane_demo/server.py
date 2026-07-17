@@ -41,6 +41,7 @@ from board_access import (
     build_board_access_config,
     build_demo_default_board_access,
     current_input_source_mode,
+    current_jscc_link_mode,
     load_env_file,
     normalize_jscc_link_mode,
     normalize_transport_mode,
@@ -2782,7 +2783,44 @@ class DashboardState:
             keys=USRP_REMOTE_OUTPUT_ROOT_KEYS,
             default=DEFAULT_USRP_REMOTE_OUTPUT_ROOT,
         )
-        remote_root = f"{usrp_output_root.rstrip('/')}/tvm"
+        usrp_output_root = usrp_output_root.rstrip("/")
+        reconstruction_sources = (
+            {
+                "id": "prerecorded-pytorch",
+                "label": "预录 PyTorch",
+                "remote_root": "/home/user/Downloads/jscc-test/jscc/infer_outputs",
+                "include_prefixes": ["pytorch_reference_reconstruction_"],
+                "exclude_prefixes": [],
+            },
+            {
+                "id": "prerecorded-tvm",
+                "label": "预录 TVM",
+                "remote_root": "/home/user/Downloads/jscc-test/jscc/infer_outputs",
+                "include_prefixes": [],
+                "exclude_prefixes": ["pytorch_reference_reconstruction_"],
+            },
+            {
+                "id": "prerecorded-mnn",
+                "label": "预录 MNN",
+                "remote_root": "/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
+                "include_prefixes": [],
+                "exclude_prefixes": [],
+            },
+            {
+                "id": "usrp-qpsk",
+                "label": "USRP QPSK",
+                "remote_root": f"{usrp_output_root}/qpsk/tvm",
+                "include_prefixes": [],
+                "exclude_prefixes": [],
+            },
+            {
+                "id": "usrp-iq-direct",
+                "label": "USRP IQ直传",
+                "remote_root": f"{usrp_output_root}/iq-direct/tvm",
+                "include_prefixes": [],
+                "exclude_prefixes": [],
+            },
+        )
         if not original_dir:
             raise RuntimeError("上位机原图目录未配置")
         pytorch_manifest_value = str(
@@ -2800,7 +2838,8 @@ class DashboardState:
                 board_password=board_access.password,
                 board_port=int(board_access.port or 22),
                 original_dir=Path(original_dir).resolve(),
-                remote_root=remote_root,
+                sources=reconstruction_sources,
+                default_source="usrp-iq-direct",
                 manifest_root=DEFAULT_RUN_ROOT,
                 pytorch_manifest=pytorch_manifest if pytorch_manifest.is_file() else None,
             )
@@ -7456,8 +7495,9 @@ class DashboardState:
             keys=USRP_REMOTE_OUTPUT_ROOT_KEYS,
             default=DEFAULT_USRP_REMOTE_OUTPUT_ROOT,
         )
+        usrp_link_mode = current_jscc_link_mode(base_env)
         output_engine = "mnn" if str(engine).lower() == INFERENCE_ENGINE_MNN else "tvm"
-        usrp_output_base = f"{output_root.rstrip('/')}/{output_engine}"
+        usrp_output_base = f"{output_root.rstrip('/')}/{usrp_link_mode}/{output_engine}"
         return base_access.with_env_overrides(
             {
                 "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
@@ -7481,10 +7521,7 @@ class DashboardState:
         def _callback(remote_stage_manifest: dict[str, Any], progress: Any) -> dict[str, Any]:
             access = self._usrp_stage_access(base_access, remote_stage_manifest, engine=INFERENCE_ENGINE_TVM)
             env_values = access.build_env()
-            usrp_link_mode = normalize_jscc_link_mode(
-                first_config_value(env_values, keys=("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE"), default=""),
-                default="qpsk",
-            )
+            usrp_link_mode = current_jscc_link_mode(env_values)
             env_overrides: dict[str, str] = {}
             if not str(env_values.get("BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC") or "").strip():
                 env_overrides.update(

@@ -41,31 +41,55 @@ def pair_images(
     ordered_originals = sorted((Path(path) for path in originals), key=lambda path: natural_key(path.name))
     original_by_stem = {path.stem.casefold(): path for path in ordered_originals}
     reconstruction_by_index: dict[int, PurePosixPath] = {}
+    reconstruction_by_original_stem: dict[str, PurePosixPath] = {}
     for value in reconstructions:
         path = PurePosixPath(value)
         index = _reconstruction_index(path)
         if index is not None:
             reconstruction_by_index.setdefault(index, path)
+            continue
+        stem = path.stem.casefold()
+        if stem.endswith("_recon"):
+            reconstruction_by_original_stem.setdefault(stem.removesuffix("_recon"), path)
 
     names = manifest_names or {}
     task_last_index = max(
         max(reconstruction_by_index, default=-1),
         max(names, default=-1),
     )
-    pair_count = task_last_index + 1 if task_last_index >= 0 else len(ordered_originals)
+    pair_count = task_last_index + 1 if task_last_index >= 0 else 0
     pairs: list[ImagePair] = []
+    consumed_hash_reconstructions: set[PurePosixPath] = set()
     for index in range(pair_count):
         manifest_name = str(names.get(index, "")).strip()
         if manifest_name:
             original = original_by_stem.get(Path(manifest_name).stem.casefold())
         else:
             original = ordered_originals[index] if index < len(ordered_originals) else None
+        reconstruction = reconstruction_by_index.get(index)
+        if reconstruction is None and original is not None:
+            reconstruction = reconstruction_by_original_stem.get(original.stem.casefold())
+            if reconstruction is not None:
+                consumed_hash_reconstructions.add(reconstruction)
         pairs.append(
             ImagePair(
                 index=index,
                 original=original,
-                reconstruction=reconstruction_by_index.get(index),
+                reconstruction=reconstruction,
                 original_name=manifest_name,
+            )
+        )
+    for stem, reconstruction in sorted(
+        reconstruction_by_original_stem.items(),
+        key=lambda item: natural_key(item[1].name),
+    ):
+        if reconstruction in consumed_hash_reconstructions:
+            continue
+        pairs.append(
+            ImagePair(
+                index=len(pairs),
+                original=original_by_stem.get(stem),
+                reconstruction=reconstruction,
             )
         )
     return pairs

@@ -23,9 +23,11 @@ from .remote import (
     ResourcePaused,
     SUPPORTED_IMAGE_EXTENSIONS,
 )
+from .sources import ReconstructionSource, extract_usrp_token
 
 
 WEB_ROOT = Path(__file__).resolve().parent / "web"
+_USRP_SOURCE_IDS = frozenset({"usrp-qpsk", "usrp-iq-direct"})
 
 
 @dataclass(frozen=True)
@@ -35,7 +37,8 @@ class ComparisonConfig:
     board_password: str
     board_port: int
     original_dir: Path
-    remote_root: str
+    sources: tuple[ReconstructionSource, ...]
+    default_source: str
     manifest_root: Path | None = None
     pytorch_manifest: Path | None = None
 
@@ -70,6 +73,29 @@ def _quality_metrics_payload(metrics: QualityMetrics) -> dict[str, Any]:
     return payload
 
 
+def _sources_from_payload(payload: object) -> tuple[ReconstructionSource, ...]:
+    if not isinstance(payload, list):
+        raise ValueError("sources must be a JSON list")
+    sources: list[ReconstructionSource] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise ValueError("each reconstruction source must be an object")
+        include_prefixes = item.get("include_prefixes", [])
+        exclude_prefixes = item.get("exclude_prefixes", [])
+        if not isinstance(include_prefixes, list) or not isinstance(exclude_prefixes, list):
+            raise ValueError("reconstruction source prefixes must be lists")
+        sources.append(
+            ReconstructionSource(
+                id=str(item.get("id", "")).strip(),
+                label=str(item.get("label", "")).strip(),
+                remote_root=str(item.get("remote_root", "")).strip(),
+                include_prefixes=tuple(str(prefix) for prefix in include_prefixes),
+                exclude_prefixes=tuple(str(prefix) for prefix in exclude_prefixes),
+            )
+        )
+    return tuple(sources)
+
+
 class ComparisonServiceState:
     def __init__(
         self,
@@ -82,6 +108,7 @@ class ComparisonServiceState:
         self._config: ComparisonConfig | None = None
         self._remote: BoardSftpClient | None = None
         self._jobs: dict[str, RemoteJob] = {}
+        self._selected_source: str | None = None
         self._pairs: dict[str, list[ImagePair]] = {}
         self._pytorch_references: dict[str, Path] = {}
         self._quality: dict[tuple[str, int, str], tuple[QualityMetrics, dict[str, Any]]] = {}
@@ -99,7 +126,16 @@ class ComparisonServiceState:
             raise ValueError("board host and user are required")
         if not config.original_dir.is_dir():
             raise ValueError(f"original directory not found: {config.original_dir}")
-        if not config.remote_root.strip().startswith("/"):
+        source_ids = {source.id for source in config.sources}
+        if not source_ids:
+            raise ValueError("at least one reconstruction source is required")
+        if any(not source.id for source in config.sources):
+            raise ValueError("reconstruction source IDs must not be blank")
+        if len(source_ids) != len(config.sources):
+            raise ValueError("reconstruction source IDs must be unique")
+        if config.default_source not in source_ids:
+            raise ValueError("default reconstruction source is not configured")
+        if any(not source.remote_root.strip().startswith("/") for source in config.sources):
             raise ValueError("remote root must be an absolute POSIX path")
         with self._lock:
             if self._remote is not None:
@@ -114,6 +150,7 @@ class ComparisonServiceState:
                 )
             )
             self._jobs.clear()
+            self._selected_source = None
             self._pairs.clear()
             self._pytorch_references = self._load_pytorch_references(config.pytorch_manifest)
             self._quality.clear()
@@ -170,7 +207,15 @@ class ComparisonServiceState:
             "board_user": config.board_user,
             "board_port": config.board_port,
             "original_dir": str(config.original_dir),
-            "remote_root": config.remote_root,
+            "sources": [
+                {
+                    "id": source.id,
+                    "label": source.label,
+                    "remote_root": source.remote_root,
+                }
+                for source in config.sources
+            ],
+            "default_source": config.default_source,
             "manifest_root": str(config.manifest_root) if config.manifest_root else "",
             "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
         }
@@ -188,10 +233,31 @@ class ComparisonServiceState:
                 "resources": self._last_resource,
             }
 
-    def list_jobs(self) -> list[dict[str, Any]]:
+    def _source(self, source_id: str) -> ReconstructionSource:
         config = self._require_config()
-        jobs = self._require_remote().list_jobs(config.remote_root)
+        for source in config.sources:
+            if source.id == source_id:
+                return source
+        raise ValueError(f"unknown reconstruction source: {source_id}")
+
+    def list_jobs(self, source_id: str) -> list[dict[str, Any]]:
+        source = self._source(source_id)
         with self._lock:
+            if self._selected_source != source_id:
+                self._selected_source = source_id
+                self._jobs.clear()
+                self._pairs.clear()
+                self._quality.clear()
+                self._scan_generation += 1
+            generation = self._scan_generation
+        try:
+            jobs = self._require_remote().list_jobs(source.remote_root)
+        except FileNotFoundError:
+            jobs = []
+        jobs = [job for job in jobs if source.accepts(job.name)]
+        with self._lock:
+            if self._selected_source != source_id or self._scan_generation != generation:
+                return []
             self._jobs = {job.id: job for job in jobs}
             self._pairs = {job_id: pairs for job_id, pairs in self._pairs.items() if job_id in self._jobs}
         return [self._serialize_job(job) for job in jobs]
@@ -217,16 +283,25 @@ class ComparisonServiceState:
         root = config.manifest_root
         if root is None or not root.is_dir():
             return {}
-        numeric_tokens = [token for token in job.name.replace("-", "_").split("_") if token.isdigit()]
-        candidates = [path for path in root.iterdir() if path.is_dir()]
-        if numeric_tokens:
-            matching = [path for path in candidates if any(token in path.name for token in numeric_tokens)]
-            if matching:
-                candidates = matching
+        with self._lock:
+            source_id = self._selected_source
+        if source_id not in _USRP_SOURCE_IDS:
+            return {}
+        token = extract_usrp_token(job.name)
+        if token is None:
+            return {}
+        base_token = token.split("_", 1)[0]
+        candidate_names = {
+            f"cockpit_usrp_usrp-{token}",
+            f"cockpit_usrp_usrp-{base_token}",
+        }
+        candidates = [path for path in root.iterdir() if path.is_dir() and path.name in candidate_names]
         candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         for run_dir in candidates:
             names: dict[int, str] = {}
-            for image_dir in sorted(run_dir.glob("image_*")):
+            for image_dir in sorted(run_dir.glob("**/image_*")):
+                if not image_dir.is_dir():
+                    continue
                 try:
                     index = int(image_dir.name.split("_", 1)[1])
                     payload = json.loads((image_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -521,7 +596,10 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.state.public_config())
                 return
             if parsed.path == "/api/jobs":
-                self._json(HTTPStatus.OK, {"jobs": self.server.state.list_jobs()})
+                self._json(
+                    HTTPStatus.OK,
+                    {"jobs": self.server.state.list_jobs(params.get("source", [""])[0])},
+                )
                 return
             if parsed.path == "/api/job":
                 self._json(HTTPStatus.OK, self.server.state.job_detail(params.get("id", [""])[0]))
@@ -569,13 +647,15 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
         try:
             payload = self._read_json()
             if parsed.path == "/api/config":
+                sources = _sources_from_payload(payload.get("sources"))
                 config = ComparisonConfig(
                     board_host=str(payload.get("board_host", "")),
                     board_user=str(payload.get("board_user", "")),
                     board_password=str(payload.get("board_password", "")),
                     board_port=int(payload.get("board_port", 22)),
                     original_dir=Path(str(payload.get("original_dir", ""))).resolve(),
-                    remote_root=str(payload.get("remote_root", "")),
+                    sources=sources,
+                    default_source=str(payload.get("default_source") or (sources[0].id if sources else "")),
                     manifest_root=(
                         Path(str(payload["manifest_root"])).resolve()
                         if payload.get("manifest_root")

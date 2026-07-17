@@ -77,7 +77,7 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 
 2026-07-17 热启动验收中，USRP IQ + TVM 100 张从点击到完成为 `240.19 s`，`100/100` accepted、fallback `0`，正式 POST 仅 `0.857 s`；TVM median `244.92 ms`。写材料时还应保留当前严格 300 张可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 只能作为单独优化记录。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`。图像质量口径见 `HANDOFF.md`，不要混用原图-TVM与 PyTorch-TVM。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
-批次结束后，可在 Cockpit 的“板端输出目录”下点击“本次重建对比图”。按钮会启动仅监听 `127.0.0.1:8786` 的上位机服务，并在浏览器中打开左右对照页。左侧显示本地原图，右侧按时间倒序选择板端 job；重建图只在点击“拉取”后通过 SFTP 下载到 `artifacts/board_image_cache/`。质量辅助默认关闭，打开后会自动标记疑似彩色噪点图。服务在板端 CPU 或内存达到 85% 时暂停新下载，达到 90% 时终止扫描，降到 80% 以下才恢复。历史 job 的原图映射来自 `USRP292x/qpsk_batch_spool_arq_runs/cockpit_usrp_<id>/image_*/manifest.json`，不要改回 `analog_latent_runs`。
+批次结束后，可在 Cockpit 的“板端输出目录”下点击“本次重建对比图”。按钮会启动仅监听 `127.0.0.1:8786` 的上位机服务，并在浏览器中打开左右对照页。左侧显示本地原图，右侧按时间倒序选择板端 job；重建图只在点击“拉取”后通过 SFTP 下载到 `artifacts/board_image_cache/`。质量辅助默认关闭，打开后会自动标记疑似彩色噪点图。服务在板端 CPU 或内存达到 85% 时暂停新下载，达到 90% 时终止扫描，降到 80% 以下才恢复。历史 job 的原图映射来自 `USRP292x/qpsk_batch_spool_arq_runs/cockpit_usrp_<id>/image_*/manifest.json`，不要改回 `analog_latent_runs`。五类浏览来源、USRP 输出目录和历史迁移状态见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。
 
 当前交接入口是 [`HANDOFF.md`](./HANDOFF.md)。它面向下一位开发同学和写材料同学，包含默认参数、实验开关、典型指标、安全边界和文件组织现状；旧 handoff、计划、运行记录和过程审计仅本地保留，不作为提交入口。
 

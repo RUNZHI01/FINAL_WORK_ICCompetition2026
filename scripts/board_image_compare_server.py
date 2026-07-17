@@ -3,8 +3,15 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
-from board_image_compare.service import ComparisonServiceState, create_http_server
+if __package__:
+    from .board_image_compare.service import ComparisonServiceState, create_http_server
+else:
+    repo_root = Path(__file__).resolve().parent.parent
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from scripts.board_image_compare.service import ComparisonServiceState, create_http_server
 
 
 def main() -> int:
@@ -30,4 +37,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

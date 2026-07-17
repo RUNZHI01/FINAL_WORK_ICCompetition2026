@@ -1,0 +1,3952 @@
+{
+  "already_moved": [
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783594828_current",
+      "evidence": "cockpit_usrp_usrp-1783594828",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783594828_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783595262_current",
+      "evidence": "cockpit_usrp_usrp-1783595262",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783595262_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783596954_current",
+      "evidence": "cockpit_usrp_usrp-1783596954",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783596954_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783597414_current",
+      "evidence": "cockpit_usrp_usrp-1783597414",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783597414_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783597834_current",
+      "evidence": "cockpit_usrp_usrp-1783597834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783597834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1783608935_current",
+      "evidence": "cockpit_usrp_usrp-1783608935",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783608935_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783610422_current",
+      "evidence": "cockpit_usrp_usrp-1783610422",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783610422_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1783610673_current",
+      "evidence": "cockpit_usrp_usrp-1783610673",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783610673_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783622446_current",
+      "evidence": "cockpit_usrp_usrp-1783622446",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783622446_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783624256_current",
+      "evidence": "cockpit_usrp_usrp-1783624256",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783624256_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783624303_current",
+      "evidence": "cockpit_usrp_usrp-1783624303",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783624303_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783625245_current",
+      "evidence": "cockpit_usrp_usrp-1783625245",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783625245_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783625337_current",
+      "evidence": "cockpit_usrp_usrp-1783625337",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783625337_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783626818_current",
+      "evidence": "cockpit_usrp_usrp-1783626818",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783626818_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783626884_current",
+      "evidence": "cockpit_usrp_usrp-1783626884",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783626884_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783627996_current",
+      "evidence": "cockpit_usrp_usrp-1783627996",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783627996_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783628596_current",
+      "evidence": "cockpit_usrp_usrp-1783628596",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783628596_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783629764_current",
+      "evidence": "cockpit_usrp_usrp-1783629764",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783629764_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783631315_current",
+      "evidence": "cockpit_usrp_usrp-1783631315",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783631315_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783632169_current",
+      "evidence": "cockpit_usrp_usrp-1783632169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783632169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783632701_current",
+      "evidence": "cockpit_usrp_usrp-1783632701",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783632701_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783633562_current",
+      "evidence": "cockpit_usrp_usrp-1783633562",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783633562_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783633743_current",
+      "evidence": "cockpit_usrp_usrp-1783633743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783633743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783634669_current",
+      "evidence": "cockpit_usrp_usrp-1783634669",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783634669_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783635469_current",
+      "evidence": "cockpit_usrp_usrp-1783635469",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783635469_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783635568_current",
+      "evidence": "cockpit_usrp_usrp-1783635568",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783635568_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783636039_current",
+      "evidence": "cockpit_usrp_usrp-1783636039",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783636039_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783636541_current",
+      "evidence": "cockpit_usrp_usrp-1783636541",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783636541_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783637793_current",
+      "evidence": "cockpit_usrp_usrp-1783637793",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783637793_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783637904_current",
+      "evidence": "cockpit_usrp_usrp-1783637904",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783637904_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783638107_current",
+      "evidence": "cockpit_usrp_usrp-1783638107",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783638107_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783638234_current",
+      "evidence": "cockpit_usrp_usrp-1783638234",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783638234_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783639396_current",
+      "evidence": "cockpit_usrp_usrp-1783639396",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783639396_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783639944_current",
+      "evidence": "cockpit_usrp_usrp-1783639944",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783639944_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640049_current",
+      "evidence": "cockpit_usrp_usrp-1783640049",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640049_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640318_current",
+      "evidence": "cockpit_usrp_usrp-1783640318",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640318_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640401_current",
+      "evidence": "cockpit_usrp_usrp-1783640401",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640401_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783641924_current",
+      "evidence": "cockpit_usrp_usrp-1783641924",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783641924_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783642466_current",
+      "evidence": "cockpit_usrp_usrp-1783642466",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783642466_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783642640_current",
+      "evidence": "cockpit_usrp_usrp-1783642640",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783642640_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783643493_current",
+      "evidence": "cockpit_usrp_usrp-1783643493",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783643493_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783644743_current",
+      "evidence": "cockpit_usrp_usrp-1783644743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783644743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783650744_current",
+      "evidence": "cockpit_usrp_usrp-1783650744",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783650744_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783654447_current",
+      "evidence": "cockpit_usrp_usrp-1783654447",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783654447_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655547_current",
+      "evidence": "cockpit_usrp_usrp-1783655547",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655547_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655890_current",
+      "evidence": "cockpit_usrp_usrp-1783655890",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655890_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655994_current",
+      "evidence": "cockpit_usrp_usrp-1783655994",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655994_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783656535_current",
+      "evidence": "cockpit_usrp_usrp-1783656535",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783656535_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783656629_current",
+      "evidence": "cockpit_usrp_usrp-1783656629",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783656629_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783657728_current",
+      "evidence": "cockpit_usrp_usrp-1783657728",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783657728_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658102_current",
+      "evidence": "cockpit_usrp_usrp-1783658102",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658102_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658585_current",
+      "evidence": "cockpit_usrp_usrp-1783658585",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658585_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658922_current",
+      "evidence": "cockpit_usrp_usrp-1783658922",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658922_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659032_current",
+      "evidence": "cockpit_usrp_usrp-1783659032",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659032_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659322_current",
+      "evidence": "cockpit_usrp_usrp-1783659322",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659322_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659430_current",
+      "evidence": "cockpit_usrp_usrp-1783659430",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659430_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783661396_current",
+      "evidence": "cockpit_usrp_usrp-1783661396",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783661396_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783661701_current",
+      "evidence": "cockpit_usrp_usrp-1783661701",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783661701_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783662016_current",
+      "evidence": "cockpit_usrp_usrp-1783662016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783662016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783664275_current",
+      "evidence": "cockpit_usrp_usrp-1783664275",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783664275_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783665498_current",
+      "evidence": "cockpit_usrp_usrp-1783665498",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783665498_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666450_current",
+      "evidence": "cockpit_usrp_usrp-1783666450",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666450_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666694_current",
+      "evidence": "cockpit_usrp_usrp-1783666694",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666694_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666884_current",
+      "evidence": "cockpit_usrp_usrp-1783666884",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666884_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666960_current",
+      "evidence": "cockpit_usrp_usrp-1783666960",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666960_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783668000_current",
+      "evidence": "cockpit_usrp_usrp-1783668000",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783668000_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783671675_current",
+      "evidence": "cockpit_usrp_usrp-1783671675",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783671675_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783671744_current",
+      "evidence": "cockpit_usrp_usrp-1783671744",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783671744_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783672570_current",
+      "evidence": "cockpit_usrp_usrp-1783672570",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783672570_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783672642_current",
+      "evidence": "cockpit_usrp_usrp-1783672642",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783672642_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783674212_current",
+      "evidence": "cockpit_usrp_usrp-1783674212",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783674212_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783674397_current",
+      "evidence": "cockpit_usrp_usrp-1783674397",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783674397_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783676258_current",
+      "evidence": "cockpit_usrp_usrp-1783676258",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783676258_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783678227_current",
+      "evidence": "cockpit_usrp_usrp-1783678227",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783678227_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783678924_current",
+      "evidence": "cockpit_usrp_usrp-1783678924",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783678924_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783680558_current",
+      "evidence": "cockpit_usrp_usrp-1783680558",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783680558_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783681389_current",
+      "evidence": "cockpit_usrp_usrp-1783681389",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783681389_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783682083_current",
+      "evidence": "cockpit_usrp_usrp-1783682083",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783682083_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783682666_current",
+      "evidence": "cockpit_usrp_usrp-1783682666",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783682666_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783683491_current",
+      "evidence": "cockpit_usrp_usrp-1783683491",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783683491_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783683897_current",
+      "evidence": "cockpit_usrp_usrp-1783683897",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783683897_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783684070_current",
+      "evidence": "cockpit_usrp_usrp-1783684070",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783684070_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783686020_current",
+      "evidence": "cockpit_usrp_usrp-1783686020",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783686020_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783686930_current",
+      "evidence": "cockpit_usrp_usrp-1783686930",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783686930_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783688979_current",
+      "evidence": "cockpit_usrp_usrp-1783688979",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783688979_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690299_current",
+      "evidence": "cockpit_usrp_usrp-1783690299",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690299_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690852_current",
+      "evidence": "cockpit_usrp_usrp-1783690852",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690852_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690925_current",
+      "evidence": "cockpit_usrp_usrp-1783690925",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690925_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783691290_current",
+      "evidence": "cockpit_usrp_usrp-1783691290",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783691290_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783691806_current",
+      "evidence": "cockpit_usrp_usrp-1783691806",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783691806_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783693518_current",
+      "evidence": "cockpit_usrp_usrp-1783693518",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783693518_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783694251_current",
+      "evidence": "cockpit_usrp_usrp-1783694251",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783694251_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783695696_current",
+      "evidence": "cockpit_usrp_usrp-1783695696",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783695696_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783696115_current",
+      "evidence": "cockpit_usrp_usrp-1783696115",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783696115_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783696822_current",
+      "evidence": "cockpit_usrp_usrp-1783696822",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783696822_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783697847_current",
+      "evidence": "cockpit_usrp_usrp-1783697847",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783697847_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783697942_current",
+      "evidence": "cockpit_usrp_usrp-1783697942",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783697942_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783698593_current",
+      "evidence": "cockpit_usrp_usrp-1783698593",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783698593_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783700070_current",
+      "evidence": "cockpit_usrp_usrp-1783700070",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783700070_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783700726_current",
+      "evidence": "cockpit_usrp_usrp-1783700726",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783700726_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783701414_current",
+      "evidence": "cockpit_usrp_usrp-1783701414",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783701414_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783701712_current",
+      "evidence": "cockpit_usrp_usrp-1783701712",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783701712_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783703143_current",
+      "evidence": "cockpit_usrp_usrp-1783703143",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783703143_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783703433_current",
+      "evidence": "cockpit_usrp_usrp-1783703433",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783703433_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783704246_current",
+      "evidence": "cockpit_usrp_usrp-1783704246",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783704246_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783704792_current",
+      "evidence": "cockpit_usrp_usrp-1783704792",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783704792_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783706692_current",
+      "evidence": "cockpit_usrp_usrp-1783706692",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783706692_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707048_current",
+      "evidence": "cockpit_usrp_usrp-1783707048",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707048_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707439_current",
+      "evidence": "cockpit_usrp_usrp-1783707439",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707439_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707616_current",
+      "evidence": "cockpit_usrp_usrp-1783707616",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707616_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783709016_current",
+      "evidence": "cockpit_usrp_usrp-1783709016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783709016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783709766_current",
+      "evidence": "cockpit_usrp_usrp-1783709766",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783709766_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783710269_current",
+      "evidence": "cockpit_usrp_usrp-1783710269",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783710269_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783710850_current",
+      "evidence": "cockpit_usrp_usrp-1783710850",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783710850_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783711722_current",
+      "evidence": "cockpit_usrp_usrp-1783711722",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783711722_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783711834_current",
+      "evidence": "cockpit_usrp_usrp-1783711834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783711834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712214_current",
+      "evidence": "cockpit_usrp_usrp-1783712214",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712214_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712417_current",
+      "evidence": "cockpit_usrp_usrp-1783712417",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712417_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712653_current",
+      "evidence": "cockpit_usrp_usrp-1783712653",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712653_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712834_current",
+      "evidence": "cockpit_usrp_usrp-1783712834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783713085_current",
+      "evidence": "cockpit_usrp_usrp-1783713085",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783713085_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783715031_current",
+      "evidence": "cockpit_usrp_usrp-1783715031",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783715031_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783715402_current",
+      "evidence": "cockpit_usrp_usrp-1783715402",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783715402_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783716203_current",
+      "evidence": "cockpit_usrp_usrp-1783716203",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783716203_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783716735_current",
+      "evidence": "cockpit_usrp_usrp-1783716735",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783716735_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783717186_current",
+      "evidence": "cockpit_usrp_usrp-1783717186",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783717186_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783717743_current",
+      "evidence": "cockpit_usrp_usrp-1783717743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783717743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718140_current",
+      "evidence": "cockpit_usrp_usrp-1783718140",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718140_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718207_current",
+      "evidence": "cockpit_usrp_usrp-1783718207",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718207_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718667_current",
+      "evidence": "cockpit_usrp_usrp-1783718667",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718667_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718743_current",
+      "evidence": "cockpit_usrp_usrp-1783718743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719128_current",
+      "evidence": "cockpit_usrp_usrp-1783719128",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719128_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719194_current",
+      "evidence": "cockpit_usrp_usrp-1783719194",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719194_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719607_current",
+      "evidence": "cockpit_usrp_usrp-1783719607",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719607_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719763_current",
+      "evidence": "cockpit_usrp_usrp-1783719763",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719763_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783720370_current",
+      "evidence": "cockpit_usrp_usrp-1783720370",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783720370_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783721542_current",
+      "evidence": "cockpit_usrp_usrp-1783721542",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783721542_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783722099_current",
+      "evidence": "cockpit_usrp_usrp-1783722099",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783722099_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783722161_current",
+      "evidence": "cockpit_usrp_usrp-1783722161",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783722161_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783724140_current",
+      "evidence": "cockpit_usrp_usrp-1783724140",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783724140_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783724189_current",
+      "evidence": "cockpit_usrp_usrp-1783724189",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783724189_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783725582_current",
+      "evidence": "cockpit_usrp_usrp-1783725582",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783725582_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783726109_current",
+      "evidence": "cockpit_usrp_usrp-1783726109",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783726109_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783726777_current",
+      "evidence": "cockpit_usrp_usrp-1783726777",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783726777_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783727897_current",
+      "evidence": "cockpit_usrp_usrp-1783727897",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783727897_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783730551_current",
+      "evidence": "cockpit_usrp_usrp-1783730551",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783730551_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783731754_current",
+      "evidence": "cockpit_usrp_usrp-1783731754",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783731754_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732029_current",
+      "evidence": "cockpit_usrp_usrp-1783732029",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732029_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732287_current",
+      "evidence": "cockpit_usrp_usrp-1783732287",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732287_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732885_current",
+      "evidence": "cockpit_usrp_usrp-1783732885",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732885_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783733858_current",
+      "evidence": "cockpit_usrp_usrp-1783733858",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783733858_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783734236_current",
+      "evidence": "cockpit_usrp_usrp-1783734236",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783734236_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735194_current",
+      "evidence": "cockpit_usrp_usrp-1783735194",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735194_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735816_current",
+      "evidence": "cockpit_usrp_usrp-1783735816",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735816_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735946_current",
+      "evidence": "cockpit_usrp_usrp-1783735946",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735946_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736671_current",
+      "evidence": "cockpit_usrp_usrp-1783736671",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736671_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736840_current",
+      "evidence": "cockpit_usrp_usrp-1783736840",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736840_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736949_current",
+      "evidence": "cockpit_usrp_usrp-1783736949",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736949_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783737367_current",
+      "evidence": "cockpit_usrp_usrp-1783737367",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783737367_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783737536_current",
+      "evidence": "cockpit_usrp_usrp-1783737536",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783737536_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783748751_current",
+      "evidence": "cockpit_usrp_usrp-1783748751",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783748751_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783748855_current",
+      "evidence": "cockpit_usrp_usrp-1783748855",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783748855_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783749340_current",
+      "evidence": "cockpit_usrp_usrp-1783749340",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783749340_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783749717_current",
+      "evidence": "cockpit_usrp_usrp-1783749717",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783749717_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783753807_current",
+      "evidence": "cockpit_usrp_usrp-1783753807",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783753807_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783754244_current",
+      "evidence": "cockpit_usrp_usrp-1783754244",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783754244_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783759903_current",
+      "evidence": "cockpit_usrp_usrp-1783759903",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783759903_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783760534_current",
+      "evidence": "cockpit_usrp_usrp-1783760534",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783760534_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783773640_current",
+      "evidence": "cockpit_usrp_usrp-1783773640",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783773640_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783778411_current",
+      "evidence": "cockpit_usrp_usrp-1783778411",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783778411_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783781334_current",
+      "evidence": "cockpit_usrp_usrp-1783781334",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783781334_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783782074_current",
+      "evidence": "cockpit_usrp_usrp-1783782074",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783782074_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783782559_current",
+      "evidence": "cockpit_usrp_usrp-1783782559",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783782559_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783786016_current",
+      "evidence": "cockpit_usrp_usrp-1783786016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783786016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783786211_current",
+      "evidence": "cockpit_usrp_usrp-1783786211",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783786211_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783787169_current",
+      "evidence": "cockpit_usrp_usrp-1783787169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783787169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783787474_current",
+      "evidence": "cockpit_usrp_usrp-1783787474",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783787474_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783788174_current",
+      "evidence": "cockpit_usrp_usrp-1783788174",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783788174_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783788263_current",
+      "evidence": "cockpit_usrp_usrp-1783788263",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783788263_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783789110_current",
+      "evidence": "cockpit_usrp_usrp-1783789110",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783789110_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783789634_current",
+      "evidence": "cockpit_usrp_usrp-1783789634",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783789634_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783812063_current",
+      "evidence": "cockpit_usrp_usrp-1783812063",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783812063_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783817646_current",
+      "evidence": "cockpit_usrp_usrp-1783817646",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783817646_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783820939_current",
+      "evidence": "cockpit_usrp_usrp-1783820939",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783820939_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783825668_current",
+      "evidence": "cockpit_usrp_usrp-1783825668",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783825668_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783832965_current",
+      "evidence": "cockpit_usrp_usrp-1783832965",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783832965_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783833249_current",
+      "evidence": "cockpit_usrp_usrp-1783833249",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783833249_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783835764_current",
+      "evidence": "cockpit_usrp_usrp-1783835764",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783835764_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839345_current",
+      "evidence": "cockpit_usrp_usrp-1783839345",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839345_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839447_current",
+      "evidence": "cockpit_usrp_usrp-1783839447",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839447_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839880_current",
+      "evidence": "cockpit_usrp_usrp-1783839880",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839880_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840236_current",
+      "evidence": "cockpit_usrp_usrp-1783840236",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840236_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840375_current",
+      "evidence": "cockpit_usrp_usrp-1783840375",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840375_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840831_current",
+      "evidence": "cockpit_usrp_usrp-1783840831",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840831_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783841300_current",
+      "evidence": "cockpit_usrp_usrp-1783841300",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783841300_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783858551_current",
+      "evidence": "cockpit_usrp_usrp-1783858551",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783858551_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783860564_current",
+      "evidence": "cockpit_usrp_usrp-1783860564",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783860564_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783861112_current",
+      "evidence": "cockpit_usrp_usrp-1783861112",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783861112_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783867742_current",
+      "evidence": "cockpit_usrp_usrp-1783867742",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783867742_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783869995_current",
+      "evidence": "cockpit_usrp_usrp-1783869995",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783869995_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875097_current",
+      "evidence": "cockpit_usrp_usrp-1783875097",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875097_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875150_current",
+      "evidence": "cockpit_usrp_usrp-1783875150",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875150_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875429_current",
+      "evidence": "cockpit_usrp_usrp-1783875429",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875429_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784021493_current",
+      "evidence": "cockpit_usrp_usrp-1784021493",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784021493_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784028882_current",
+      "evidence": "cockpit_usrp_usrp-1784028882",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784028882_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784029516_current",
+      "evidence": "cockpit_usrp_usrp-1784029516",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784029516_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784030398_current",
+      "evidence": "cockpit_usrp_usrp-1784030398",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784030398_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784033643_current",
+      "evidence": "cockpit_usrp_usrp-1784033643",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784033643_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784040376_current",
+      "evidence": "cockpit_usrp_usrp-1784040376",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784040376_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784043657_current",
+      "evidence": "cockpit_usrp_usrp-1784043657",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784043657_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784044178_current",
+      "evidence": "cockpit_usrp_usrp-1784044178",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784044178_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784108299_current",
+      "evidence": "cockpit_usrp_usrp-1784108299",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784108299_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784126064_current",
+      "evidence": "cockpit_usrp_usrp-1784126064",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784126064_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784129489_current",
+      "evidence": "cockpit_usrp_usrp-1784129489",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784129489_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784131645_current",
+      "evidence": "cockpit_usrp_usrp-1784131645",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784131645_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784135451_current",
+      "evidence": "cockpit_usrp_usrp-1784135451",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784135451_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784136416_current",
+      "evidence": "cockpit_usrp_usrp-1784136416",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784136416_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784137345_current",
+      "evidence": "cockpit_usrp_usrp-1784137345",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784137345_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784137715_current",
+      "evidence": "cockpit_usrp_usrp-1784137715",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784137715_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784139032_current",
+      "evidence": "cockpit_usrp_usrp-1784139032",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784139032_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784140407_current",
+      "evidence": "cockpit_usrp_usrp-1784140407",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784140407_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784183380_current",
+      "evidence": "cockpit_usrp_usrp-1784183380",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784183380_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784183669_current",
+      "evidence": "cockpit_usrp_usrp-1784183669",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784183669_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784184075_current",
+      "evidence": "cockpit_usrp_usrp-1784184075",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784184075_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784186679_current",
+      "evidence": "cockpit_usrp_usrp-1784186679",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784186679_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188092_current",
+      "evidence": "cockpit_usrp_usrp-1784188092",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188092_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188312_current",
+      "evidence": "cockpit_usrp_usrp-1784188312",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188312_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188663_current",
+      "evidence": "cockpit_usrp_usrp-1784188663",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188663_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784189642_current",
+      "evidence": "cockpit_usrp_usrp-1784189642",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784189642_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196169_current",
+      "evidence": "cockpit_usrp_usrp-1784196169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196560_current",
+      "evidence": "cockpit_usrp_usrp-1784196560",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196560_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196844_current",
+      "evidence": "cockpit_usrp_usrp-1784196844",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196844_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784197230_current",
+      "evidence": "cockpit_usrp_usrp-1784197230",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784197230_current"
+    },
+    {
+      "classification": "inherited-base-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784197230_recovery_current",
+      "evidence": "cockpit_usrp_usrp-1784197230",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784197230_recovery_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784199255_current",
+      "evidence": "cockpit_usrp_usrp-1784199255",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784199255_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784200162_current",
+      "evidence": "cockpit_usrp_usrp-1784200162",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784200162_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784202045_current",
+      "evidence": "cockpit_usrp_usrp-1784202045",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784202045_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784203435_current",
+      "evidence": "cockpit_usrp_usrp-1784203435",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784203435_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784219171_current",
+      "evidence": "cockpit_usrp_usrp-1784219171",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784219171_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784220739_current",
+      "evidence": "cockpit_usrp_usrp-1784220739",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784220739_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221058_current",
+      "evidence": "cockpit_usrp_usrp-1784221058",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221058_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221528_current",
+      "evidence": "cockpit_usrp_usrp-1784221528",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221528_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221844_current",
+      "evidence": "cockpit_usrp_usrp-1784221844",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221844_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784222195_current",
+      "evidence": "cockpit_usrp_usrp-1784222195",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784222195_current"
+    }
+  ],
+  "apply": false,
+  "classification_counts": {
+    "exact-summary": 243,
+    "inherited-base-summary": 1,
+    "unresolved": 1
+  },
+  "classified": [
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783594828_current",
+      "evidence": "cockpit_usrp_usrp-1783594828",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783594828_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783595262_current",
+      "evidence": "cockpit_usrp_usrp-1783595262",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783595262_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783596954_current",
+      "evidence": "cockpit_usrp_usrp-1783596954",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783596954_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783597414_current",
+      "evidence": "cockpit_usrp_usrp-1783597414",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783597414_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783597834_current",
+      "evidence": "cockpit_usrp_usrp-1783597834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783597834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1783608935_current",
+      "evidence": "cockpit_usrp_usrp-1783608935",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783608935_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783610422_current",
+      "evidence": "cockpit_usrp_usrp-1783610422",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783610422_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1783610673_current",
+      "evidence": "cockpit_usrp_usrp-1783610673",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783610673_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783622446_current",
+      "evidence": "cockpit_usrp_usrp-1783622446",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783622446_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783624256_current",
+      "evidence": "cockpit_usrp_usrp-1783624256",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783624256_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783624303_current",
+      "evidence": "cockpit_usrp_usrp-1783624303",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783624303_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783625245_current",
+      "evidence": "cockpit_usrp_usrp-1783625245",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783625245_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783625337_current",
+      "evidence": "cockpit_usrp_usrp-1783625337",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783625337_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783626818_current",
+      "evidence": "cockpit_usrp_usrp-1783626818",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783626818_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783626884_current",
+      "evidence": "cockpit_usrp_usrp-1783626884",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783626884_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783627996_current",
+      "evidence": "cockpit_usrp_usrp-1783627996",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783627996_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783628596_current",
+      "evidence": "cockpit_usrp_usrp-1783628596",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783628596_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783629764_current",
+      "evidence": "cockpit_usrp_usrp-1783629764",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783629764_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783631315_current",
+      "evidence": "cockpit_usrp_usrp-1783631315",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783631315_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783632169_current",
+      "evidence": "cockpit_usrp_usrp-1783632169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783632169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783632701_current",
+      "evidence": "cockpit_usrp_usrp-1783632701",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783632701_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783633562_current",
+      "evidence": "cockpit_usrp_usrp-1783633562",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783633562_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783633743_current",
+      "evidence": "cockpit_usrp_usrp-1783633743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783633743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783634669_current",
+      "evidence": "cockpit_usrp_usrp-1783634669",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783634669_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783635469_current",
+      "evidence": "cockpit_usrp_usrp-1783635469",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783635469_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783635568_current",
+      "evidence": "cockpit_usrp_usrp-1783635568",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783635568_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783636039_current",
+      "evidence": "cockpit_usrp_usrp-1783636039",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783636039_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783636541_current",
+      "evidence": "cockpit_usrp_usrp-1783636541",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783636541_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783637793_current",
+      "evidence": "cockpit_usrp_usrp-1783637793",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783637793_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783637904_current",
+      "evidence": "cockpit_usrp_usrp-1783637904",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783637904_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783638107_current",
+      "evidence": "cockpit_usrp_usrp-1783638107",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783638107_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783638234_current",
+      "evidence": "cockpit_usrp_usrp-1783638234",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783638234_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783639396_current",
+      "evidence": "cockpit_usrp_usrp-1783639396",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783639396_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783639944_current",
+      "evidence": "cockpit_usrp_usrp-1783639944",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783639944_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640049_current",
+      "evidence": "cockpit_usrp_usrp-1783640049",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640049_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640318_current",
+      "evidence": "cockpit_usrp_usrp-1783640318",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640318_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783640401_current",
+      "evidence": "cockpit_usrp_usrp-1783640401",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783640401_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783641924_current",
+      "evidence": "cockpit_usrp_usrp-1783641924",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783641924_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783642466_current",
+      "evidence": "cockpit_usrp_usrp-1783642466",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783642466_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783642640_current",
+      "evidence": "cockpit_usrp_usrp-1783642640",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783642640_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783643493_current",
+      "evidence": "cockpit_usrp_usrp-1783643493",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783643493_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783644743_current",
+      "evidence": "cockpit_usrp_usrp-1783644743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783644743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783650744_current",
+      "evidence": "cockpit_usrp_usrp-1783650744",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783650744_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783654447_current",
+      "evidence": "cockpit_usrp_usrp-1783654447",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783654447_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655547_current",
+      "evidence": "cockpit_usrp_usrp-1783655547",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655547_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655890_current",
+      "evidence": "cockpit_usrp_usrp-1783655890",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655890_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783655994_current",
+      "evidence": "cockpit_usrp_usrp-1783655994",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783655994_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783656535_current",
+      "evidence": "cockpit_usrp_usrp-1783656535",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783656535_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783656629_current",
+      "evidence": "cockpit_usrp_usrp-1783656629",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783656629_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783657728_current",
+      "evidence": "cockpit_usrp_usrp-1783657728",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783657728_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658102_current",
+      "evidence": "cockpit_usrp_usrp-1783658102",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658102_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658585_current",
+      "evidence": "cockpit_usrp_usrp-1783658585",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658585_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783658922_current",
+      "evidence": "cockpit_usrp_usrp-1783658922",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783658922_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659032_current",
+      "evidence": "cockpit_usrp_usrp-1783659032",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659032_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659322_current",
+      "evidence": "cockpit_usrp_usrp-1783659322",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659322_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783659430_current",
+      "evidence": "cockpit_usrp_usrp-1783659430",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783659430_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783661396_current",
+      "evidence": "cockpit_usrp_usrp-1783661396",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783661396_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783661701_current",
+      "evidence": "cockpit_usrp_usrp-1783661701",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783661701_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783662016_current",
+      "evidence": "cockpit_usrp_usrp-1783662016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783662016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783664275_current",
+      "evidence": "cockpit_usrp_usrp-1783664275",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783664275_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783665498_current",
+      "evidence": "cockpit_usrp_usrp-1783665498",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783665498_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666450_current",
+      "evidence": "cockpit_usrp_usrp-1783666450",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666450_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666694_current",
+      "evidence": "cockpit_usrp_usrp-1783666694",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666694_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666884_current",
+      "evidence": "cockpit_usrp_usrp-1783666884",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666884_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783666960_current",
+      "evidence": "cockpit_usrp_usrp-1783666960",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783666960_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783668000_current",
+      "evidence": "cockpit_usrp_usrp-1783668000",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783668000_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783671675_current",
+      "evidence": "cockpit_usrp_usrp-1783671675",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783671675_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783671744_current",
+      "evidence": "cockpit_usrp_usrp-1783671744",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783671744_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783672570_current",
+      "evidence": "cockpit_usrp_usrp-1783672570",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783672570_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783672642_current",
+      "evidence": "cockpit_usrp_usrp-1783672642",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783672642_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783674212_current",
+      "evidence": "cockpit_usrp_usrp-1783674212",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783674212_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783674397_current",
+      "evidence": "cockpit_usrp_usrp-1783674397",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783674397_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783676258_current",
+      "evidence": "cockpit_usrp_usrp-1783676258",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783676258_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783678227_current",
+      "evidence": "cockpit_usrp_usrp-1783678227",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783678227_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783678924_current",
+      "evidence": "cockpit_usrp_usrp-1783678924",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783678924_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783680558_current",
+      "evidence": "cockpit_usrp_usrp-1783680558",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783680558_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783681389_current",
+      "evidence": "cockpit_usrp_usrp-1783681389",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783681389_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783682083_current",
+      "evidence": "cockpit_usrp_usrp-1783682083",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783682083_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783682666_current",
+      "evidence": "cockpit_usrp_usrp-1783682666",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783682666_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783683491_current",
+      "evidence": "cockpit_usrp_usrp-1783683491",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783683491_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783683897_current",
+      "evidence": "cockpit_usrp_usrp-1783683897",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783683897_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783684070_current",
+      "evidence": "cockpit_usrp_usrp-1783684070",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783684070_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783686020_current",
+      "evidence": "cockpit_usrp_usrp-1783686020",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783686020_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783686930_current",
+      "evidence": "cockpit_usrp_usrp-1783686930",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783686930_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783688979_current",
+      "evidence": "cockpit_usrp_usrp-1783688979",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783688979_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690299_current",
+      "evidence": "cockpit_usrp_usrp-1783690299",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690299_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690852_current",
+      "evidence": "cockpit_usrp_usrp-1783690852",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690852_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783690925_current",
+      "evidence": "cockpit_usrp_usrp-1783690925",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783690925_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783691290_current",
+      "evidence": "cockpit_usrp_usrp-1783691290",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783691290_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783691806_current",
+      "evidence": "cockpit_usrp_usrp-1783691806",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783691806_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783693518_current",
+      "evidence": "cockpit_usrp_usrp-1783693518",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783693518_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783694251_current",
+      "evidence": "cockpit_usrp_usrp-1783694251",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783694251_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783695696_current",
+      "evidence": "cockpit_usrp_usrp-1783695696",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783695696_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783696115_current",
+      "evidence": "cockpit_usrp_usrp-1783696115",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783696115_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783696822_current",
+      "evidence": "cockpit_usrp_usrp-1783696822",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783696822_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783697847_current",
+      "evidence": "cockpit_usrp_usrp-1783697847",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783697847_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783697942_current",
+      "evidence": "cockpit_usrp_usrp-1783697942",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783697942_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783698593_current",
+      "evidence": "cockpit_usrp_usrp-1783698593",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783698593_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783700070_current",
+      "evidence": "cockpit_usrp_usrp-1783700070",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783700070_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783700726_current",
+      "evidence": "cockpit_usrp_usrp-1783700726",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783700726_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783701414_current",
+      "evidence": "cockpit_usrp_usrp-1783701414",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783701414_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783701712_current",
+      "evidence": "cockpit_usrp_usrp-1783701712",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783701712_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783703143_current",
+      "evidence": "cockpit_usrp_usrp-1783703143",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783703143_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783703433_current",
+      "evidence": "cockpit_usrp_usrp-1783703433",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783703433_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783704246_current",
+      "evidence": "cockpit_usrp_usrp-1783704246",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783704246_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783704792_current",
+      "evidence": "cockpit_usrp_usrp-1783704792",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783704792_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783706692_current",
+      "evidence": "cockpit_usrp_usrp-1783706692",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783706692_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707048_current",
+      "evidence": "cockpit_usrp_usrp-1783707048",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707048_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707439_current",
+      "evidence": "cockpit_usrp_usrp-1783707439",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707439_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783707616_current",
+      "evidence": "cockpit_usrp_usrp-1783707616",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783707616_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783709016_current",
+      "evidence": "cockpit_usrp_usrp-1783709016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783709016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783709766_current",
+      "evidence": "cockpit_usrp_usrp-1783709766",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783709766_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783710269_current",
+      "evidence": "cockpit_usrp_usrp-1783710269",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783710269_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783710850_current",
+      "evidence": "cockpit_usrp_usrp-1783710850",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783710850_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783711722_current",
+      "evidence": "cockpit_usrp_usrp-1783711722",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783711722_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783711834_current",
+      "evidence": "cockpit_usrp_usrp-1783711834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783711834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712214_current",
+      "evidence": "cockpit_usrp_usrp-1783712214",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712214_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712417_current",
+      "evidence": "cockpit_usrp_usrp-1783712417",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712417_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712653_current",
+      "evidence": "cockpit_usrp_usrp-1783712653",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712653_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783712834_current",
+      "evidence": "cockpit_usrp_usrp-1783712834",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783712834_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783713085_current",
+      "evidence": "cockpit_usrp_usrp-1783713085",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783713085_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783715031_current",
+      "evidence": "cockpit_usrp_usrp-1783715031",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783715031_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783715402_current",
+      "evidence": "cockpit_usrp_usrp-1783715402",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783715402_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783716203_current",
+      "evidence": "cockpit_usrp_usrp-1783716203",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783716203_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783716735_current",
+      "evidence": "cockpit_usrp_usrp-1783716735",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783716735_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783717186_current",
+      "evidence": "cockpit_usrp_usrp-1783717186",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783717186_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783717743_current",
+      "evidence": "cockpit_usrp_usrp-1783717743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783717743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718140_current",
+      "evidence": "cockpit_usrp_usrp-1783718140",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718140_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718207_current",
+      "evidence": "cockpit_usrp_usrp-1783718207",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718207_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718667_current",
+      "evidence": "cockpit_usrp_usrp-1783718667",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718667_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783718743_current",
+      "evidence": "cockpit_usrp_usrp-1783718743",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783718743_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719128_current",
+      "evidence": "cockpit_usrp_usrp-1783719128",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719128_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719194_current",
+      "evidence": "cockpit_usrp_usrp-1783719194",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719194_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719607_current",
+      "evidence": "cockpit_usrp_usrp-1783719607",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719607_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783719763_current",
+      "evidence": "cockpit_usrp_usrp-1783719763",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783719763_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783720370_current",
+      "evidence": "cockpit_usrp_usrp-1783720370",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783720370_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783721542_current",
+      "evidence": "cockpit_usrp_usrp-1783721542",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783721542_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783722099_current",
+      "evidence": "cockpit_usrp_usrp-1783722099",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783722099_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783722161_current",
+      "evidence": "cockpit_usrp_usrp-1783722161",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783722161_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783724140_current",
+      "evidence": "cockpit_usrp_usrp-1783724140",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783724140_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783724189_current",
+      "evidence": "cockpit_usrp_usrp-1783724189",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783724189_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783725582_current",
+      "evidence": "cockpit_usrp_usrp-1783725582",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783725582_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783726109_current",
+      "evidence": "cockpit_usrp_usrp-1783726109",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783726109_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783726777_current",
+      "evidence": "cockpit_usrp_usrp-1783726777",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783726777_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783727897_current",
+      "evidence": "cockpit_usrp_usrp-1783727897",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783727897_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783730551_current",
+      "evidence": "cockpit_usrp_usrp-1783730551",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783730551_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783731754_current",
+      "evidence": "cockpit_usrp_usrp-1783731754",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783731754_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732029_current",
+      "evidence": "cockpit_usrp_usrp-1783732029",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732029_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732287_current",
+      "evidence": "cockpit_usrp_usrp-1783732287",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732287_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783732885_current",
+      "evidence": "cockpit_usrp_usrp-1783732885",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783732885_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783733858_current",
+      "evidence": "cockpit_usrp_usrp-1783733858",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783733858_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783734236_current",
+      "evidence": "cockpit_usrp_usrp-1783734236",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783734236_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735194_current",
+      "evidence": "cockpit_usrp_usrp-1783735194",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735194_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735816_current",
+      "evidence": "cockpit_usrp_usrp-1783735816",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735816_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783735946_current",
+      "evidence": "cockpit_usrp_usrp-1783735946",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783735946_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736671_current",
+      "evidence": "cockpit_usrp_usrp-1783736671",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736671_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736840_current",
+      "evidence": "cockpit_usrp_usrp-1783736840",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736840_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783736949_current",
+      "evidence": "cockpit_usrp_usrp-1783736949",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783736949_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783737367_current",
+      "evidence": "cockpit_usrp_usrp-1783737367",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783737367_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783737536_current",
+      "evidence": "cockpit_usrp_usrp-1783737536",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783737536_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783748751_current",
+      "evidence": "cockpit_usrp_usrp-1783748751",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783748751_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783748855_current",
+      "evidence": "cockpit_usrp_usrp-1783748855",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783748855_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783749340_current",
+      "evidence": "cockpit_usrp_usrp-1783749340",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783749340_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783749717_current",
+      "evidence": "cockpit_usrp_usrp-1783749717",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783749717_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783753807_current",
+      "evidence": "cockpit_usrp_usrp-1783753807",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783753807_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783754244_current",
+      "evidence": "cockpit_usrp_usrp-1783754244",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783754244_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783759903_current",
+      "evidence": "cockpit_usrp_usrp-1783759903",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783759903_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783760534_current",
+      "evidence": "cockpit_usrp_usrp-1783760534",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783760534_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783773640_current",
+      "evidence": "cockpit_usrp_usrp-1783773640",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783773640_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783778411_current",
+      "evidence": "cockpit_usrp_usrp-1783778411",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783778411_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783781334_current",
+      "evidence": "cockpit_usrp_usrp-1783781334",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783781334_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783782074_current",
+      "evidence": "cockpit_usrp_usrp-1783782074",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783782074_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783782559_current",
+      "evidence": "cockpit_usrp_usrp-1783782559",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783782559_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783786016_current",
+      "evidence": "cockpit_usrp_usrp-1783786016",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783786016_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783786211_current",
+      "evidence": "cockpit_usrp_usrp-1783786211",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783786211_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783787169_current",
+      "evidence": "cockpit_usrp_usrp-1783787169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783787169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783787474_current",
+      "evidence": "cockpit_usrp_usrp-1783787474",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783787474_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783788174_current",
+      "evidence": "cockpit_usrp_usrp-1783788174",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783788174_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783788263_current",
+      "evidence": "cockpit_usrp_usrp-1783788263",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783788263_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783789110_current",
+      "evidence": "cockpit_usrp_usrp-1783789110",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783789110_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783789634_current",
+      "evidence": "cockpit_usrp_usrp-1783789634",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783789634_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783812063_current",
+      "evidence": "cockpit_usrp_usrp-1783812063",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783812063_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783817646_current",
+      "evidence": "cockpit_usrp_usrp-1783817646",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783817646_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783820939_current",
+      "evidence": "cockpit_usrp_usrp-1783820939",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783820939_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783825668_current",
+      "evidence": "cockpit_usrp_usrp-1783825668",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783825668_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783832965_current",
+      "evidence": "cockpit_usrp_usrp-1783832965",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783832965_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783833249_current",
+      "evidence": "cockpit_usrp_usrp-1783833249",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783833249_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783835764_current",
+      "evidence": "cockpit_usrp_usrp-1783835764",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783835764_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839345_current",
+      "evidence": "cockpit_usrp_usrp-1783839345",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839345_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839447_current",
+      "evidence": "cockpit_usrp_usrp-1783839447",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839447_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783839880_current",
+      "evidence": "cockpit_usrp_usrp-1783839880",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783839880_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840236_current",
+      "evidence": "cockpit_usrp_usrp-1783840236",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840236_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840375_current",
+      "evidence": "cockpit_usrp_usrp-1783840375",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840375_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783840831_current",
+      "evidence": "cockpit_usrp_usrp-1783840831",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783840831_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783841300_current",
+      "evidence": "cockpit_usrp_usrp-1783841300",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783841300_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783858551_current",
+      "evidence": "cockpit_usrp_usrp-1783858551",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783858551_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783860564_current",
+      "evidence": "cockpit_usrp_usrp-1783860564",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783860564_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783861112_current",
+      "evidence": "cockpit_usrp_usrp-1783861112",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783861112_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783867742_current",
+      "evidence": "cockpit_usrp_usrp-1783867742",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783867742_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783869995_current",
+      "evidence": "cockpit_usrp_usrp-1783869995",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783869995_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875097_current",
+      "evidence": "cockpit_usrp_usrp-1783875097",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875097_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875150_current",
+      "evidence": "cockpit_usrp_usrp-1783875150",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875150_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1783875429_current",
+      "evidence": "cockpit_usrp_usrp-1783875429",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783875429_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784021493_current",
+      "evidence": "cockpit_usrp_usrp-1784021493",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784021493_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784028882_current",
+      "evidence": "cockpit_usrp_usrp-1784028882",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784028882_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784029516_current",
+      "evidence": "cockpit_usrp_usrp-1784029516",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784029516_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784030398_current",
+      "evidence": "cockpit_usrp_usrp-1784030398",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784030398_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784033643_current",
+      "evidence": "cockpit_usrp_usrp-1784033643",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784033643_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784040376_current",
+      "evidence": "cockpit_usrp_usrp-1784040376",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784040376_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784043657_current",
+      "evidence": "cockpit_usrp_usrp-1784043657",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784043657_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784044178_current",
+      "evidence": "cockpit_usrp_usrp-1784044178",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784044178_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784108299_current",
+      "evidence": "cockpit_usrp_usrp-1784108299",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784108299_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784126064_current",
+      "evidence": "cockpit_usrp_usrp-1784126064",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784126064_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784129489_current",
+      "evidence": "cockpit_usrp_usrp-1784129489",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784129489_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784131645_current",
+      "evidence": "cockpit_usrp_usrp-1784131645",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784131645_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784135451_current",
+      "evidence": "cockpit_usrp_usrp-1784135451",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784135451_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784136416_current",
+      "evidence": "cockpit_usrp_usrp-1784136416",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784136416_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784137345_current",
+      "evidence": "cockpit_usrp_usrp-1784137345",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784137345_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784137715_current",
+      "evidence": "cockpit_usrp_usrp-1784137715",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784137715_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784139032_current",
+      "evidence": "cockpit_usrp_usrp-1784139032",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784139032_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784140407_current",
+      "evidence": "cockpit_usrp_usrp-1784140407",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784140407_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784183380_current",
+      "evidence": "cockpit_usrp_usrp-1784183380",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784183380_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784183669_current",
+      "evidence": "cockpit_usrp_usrp-1784183669",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784183669_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784184075_current",
+      "evidence": "cockpit_usrp_usrp-1784184075",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784184075_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784186679_current",
+      "evidence": "cockpit_usrp_usrp-1784186679",
+      "mode": "usrp-qpsk",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784186679_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188092_current",
+      "evidence": "cockpit_usrp_usrp-1784188092",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188092_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188312_current",
+      "evidence": "cockpit_usrp_usrp-1784188312",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188312_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784188663_current",
+      "evidence": "cockpit_usrp_usrp-1784188663",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784188663_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784189642_current",
+      "evidence": "cockpit_usrp_usrp-1784189642",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784189642_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196169_current",
+      "evidence": "cockpit_usrp_usrp-1784196169",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196169_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196560_current",
+      "evidence": "cockpit_usrp_usrp-1784196560",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196560_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784196844_current",
+      "evidence": "cockpit_usrp_usrp-1784196844",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784196844_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784197230_current",
+      "evidence": "cockpit_usrp_usrp-1784197230",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784197230_current"
+    },
+    {
+      "classification": "inherited-base-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784197230_recovery_current",
+      "evidence": "cockpit_usrp_usrp-1784197230",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784197230_recovery_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784199255_current",
+      "evidence": "cockpit_usrp_usrp-1784199255",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784199255_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784200162_current",
+      "evidence": "cockpit_usrp_usrp-1784200162",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784200162_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784202045_current",
+      "evidence": "cockpit_usrp_usrp-1784202045",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784202045_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784203435_current",
+      "evidence": "cockpit_usrp_usrp-1784203435",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784203435_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784219171_current",
+      "evidence": "cockpit_usrp_usrp-1784219171",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784219171_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784220739_current",
+      "evidence": "cockpit_usrp_usrp-1784220739",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784220739_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221058_current",
+      "evidence": "cockpit_usrp_usrp-1784221058",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221058_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221528_current",
+      "evidence": "cockpit_usrp_usrp-1784221528",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221528_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784221844_current",
+      "evidence": "cockpit_usrp_usrp-1784221844",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784221844_current"
+    },
+    {
+      "classification": "exact-summary",
+      "destination": "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_1784222195_current",
+      "evidence": "cockpit_usrp_usrp-1784222195",
+      "mode": "usrp-iq-direct",
+      "reason": "classified from batch_spool_summary.json",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1784222195_current"
+    }
+  ],
+  "collisions": [],
+  "counts": {
+    "already_moved": 244,
+    "classified": 244,
+    "collisions": 0,
+    "failed": 0,
+    "missing": 0,
+    "moved": 0,
+    "unresolved": 1
+  },
+  "current": null,
+  "error": null,
+  "failed": [],
+  "legacy_root": "/home/user/Downloads/jscc-test-usrp/tvm",
+  "missing": [],
+  "mode_counts": {
+    "usrp-iq-direct": 240,
+    "usrp-qpsk": 4
+  },
+  "moved": [],
+  "operation": "migration",
+  "output_root": "/home/user/Downloads/jscc-test-usrp",
+  "run_root": "E:\\Main\\Career\\集创赛\\FINAL_WORK_ICCompetition2026\\USRP292x\\qpsk_batch_spool_arq_runs",
+  "safe": true,
+  "schema_version": 2,
+  "status": "dry-run",
+  "unresolved": [
+    {
+      "classification": "unresolved",
+      "destination": null,
+      "evidence": null,
+      "mode": null,
+      "reason": "batch_spool_summary.json not found",
+      "source": "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_1783653522_current_retry_current"
+    }
+  ]
+}
