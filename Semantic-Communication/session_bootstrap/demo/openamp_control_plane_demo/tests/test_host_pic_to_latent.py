@@ -44,6 +44,26 @@ class HostPicToLatentTest(unittest.TestCase):
 
         self.assertEqual(resolved, str(expected))
 
+    def test_build_manifest_record_preserves_source_and_latent_hashes(self) -> None:
+        module = load_encode_latent_module()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "images" / "00000001.jpg"
+            latent = root / "latents" / "abc_latent.pt"
+            source.parent.mkdir()
+            latent.parent.mkdir()
+            source.write_bytes(b"source")
+            latent.write_bytes(b"latent")
+
+            record = module.build_manifest_record(source, source.parent, latent)
+
+        self.assertEqual(record["source_image_rel"], "00000001.jpg")
+        self.assertEqual(record["original_filename"], "00000001")
+        self.assertEqual(record["latent_rel"], "abc_latent.pt")
+        self.assertEqual(len(record["source_image_sha256"]), 64)
+        self.assertEqual(len(record["latent_sha256"]), 64)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,6 +50,31 @@ from src.network import encoder
 from default_config import ModelModes
 
 
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as infile:
+        for chunk in iter(lambda: infile.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_manifest_record(source_path, source_root, latent_path):
+    source = Path(source_path).resolve()
+    root = Path(source_root).resolve()
+    latent = Path(latent_path).resolve()
+    return {
+        'source_image': str(source),
+        'source_image_rel': str(source.relative_to(root)),
+        'source_image_sha256': file_sha256(source),
+        'source_image_size': source.stat().st_size,
+        'original_filename': source.stem,
+        'latent': str(latent),
+        'latent_rel': latent.name,
+        'latent_sha256': file_sha256(latent),
+        'latent_size': latent.stat().st_size,
+    }
+
+
 def resolve_checkpoint_path(ckpt_dir, config_str):
     ckpt_name = '1snr_lpips_{}_openimages_gan.pt'.format(config_str)
     script_dir = Path(SCRIPT_DIR)
@@ -175,6 +200,9 @@ def main():
                         help='计算设备 (cpu/cuda)')
     parser.add_argument('--progress_jsonl', action='store_true',
                         help='逐张输出 JSONL 进度，供主 demo 轮询阶段条使用')
+    parser.add_argument('--manifest-name', type=str,
+                        default='host_image_to_latent_manifest.json',
+                        help='写入 output_dir 的来源映射清单文件名')
     args = parser.parse_args()
 
     ckpt_dir = os.path.normpath(args.ckpt_dir)
@@ -206,6 +234,7 @@ def main():
     to_tensor = transforms.ToTensor()
     t_start = time.time()
     success_count = 0
+    manifest_records = []
 
     for img_path in tqdm(img_files, desc='Encoding'):
         try:
@@ -223,6 +252,7 @@ def main():
             safe_name = f"{hashlib.sha256(filename.encode()).hexdigest()}_latent.pt"
             save_path = os.path.join(output_dir, safe_name)
             torch.save(latent_dict, save_path)
+            manifest_records.append(build_manifest_record(img_path, image_dir, save_path))
 
             success_count += 1
             if args.progress_jsonl:
@@ -250,6 +280,26 @@ def main():
     print(f'\nDone. {success_count}/{len(img_files)} images encoded in {elapsed:.1f}s '
           f'({success_count/max(elapsed,0.001):.1f} img/s)')
     print(f'Output: {output_dir}')
+    manifest_path = Path(output_dir) / args.manifest_name
+    manifest = {
+        'schema': 'host_image_to_latent_manifest/v1',
+        'generated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+        'source_dir': str(Path(image_dir).resolve()),
+        'output_dir': str(Path(output_dir).resolve()),
+        'count': len(manifest_records),
+        'snr': args.snr,
+        'config_str': args.config_str,
+        'device': args.device,
+        'jscc_root': JSCC_ROOT,
+        'checkpoint_dir': str(Path(ckpt_dir).resolve()),
+        'records': manifest_records,
+        'command': sys.argv,
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + '\n',
+        encoding='utf-8',
+    )
+    print(f'Manifest: {manifest_path}')
 
 
 if __name__ == '__main__':
