@@ -267,17 +267,18 @@ def load_pt_latent(path: Path) -> tuple[torch.Tensor, dict[str, Any]]:
         raise ValueError(f"unsupported .pt payload type in {path}: {type(payload)!r}")
 
     if {"quant", "scale", "zero_point"}.issubset(payload):
-        quant = torch.as_tensor(payload["quant"], dtype=torch.float32, device="cpu")
-        scale = torch.as_tensor(payload["scale"], dtype=torch.float32, device="cpu")
-        zero_point = torch.as_tensor(payload["zero_point"], dtype=torch.float32, device="cpu")
+        raw_quant = torch.as_tensor(payload["quant"], device="cpu")
         checksum = payload.get("checksum")
         if checksum:
-            current_checksum = hashlib.md5(quant.numpy().tobytes()).hexdigest()
+            current_checksum = hashlib.md5(raw_quant.numpy().tobytes()).hexdigest()
             if current_checksum != checksum:
                 raise ValueError(
                     f"checksum mismatch in {path}: expected {checksum}, got {current_checksum}"
                 )
             metadata["quant_checksum"] = checksum
+        quant = raw_quant.to(dtype=torch.float32)
+        scale = torch.as_tensor(payload["scale"], dtype=torch.float32, device="cpu")
+        zero_point = torch.as_tensor(payload["zero_point"], dtype=torch.float32, device="cpu")
         metadata["original_filename"] = payload.get("original_filename")
         metadata["latent_snr"] = json_ready(payload.get("snr"))
         metadata["config_str"] = payload.get("config_str")

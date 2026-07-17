@@ -45,9 +45,7 @@ def resolve_jscc_root():
 JSCC_ROOT = resolve_jscc_root()
 sys.path.insert(0, JSCC_ROOT)
 
-from src import utils
 from src.network import encoder
-from default_config import ModelModes
 
 
 def file_sha256(path):

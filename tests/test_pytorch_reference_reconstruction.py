@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import sys
 from pathlib import Path
 
 import pytest
+import torch
 
 from scripts.rank_showcase_samples import assess_ranking_stability
 
@@ -64,6 +66,26 @@ def test_source_provenance_falls_back_to_embedded_name(tmp_path: Path) -> None:
     assert provenance["source_name"] == "00000001"
     assert provenance["source_path"] is None
     assert provenance["source_sha256"] is None
+
+
+def test_load_pt_latent_validates_checksum_before_float_conversion(tmp_path: Path) -> None:
+    module = _load_module()
+    quant = torch.tensor([[[1, 2], [3, 4]]], dtype=torch.uint8)
+    latent_path = tmp_path / "sample.pt"
+    torch.save(
+        {
+            "quant": quant,
+            "scale": torch.tensor(0.5),
+            "zero_point": torch.tensor(2.0),
+            "checksum": hashlib.md5(quant.numpy().tobytes()).hexdigest(),
+        },
+        latent_path,
+    )
+
+    latent, metadata = module.load_pt_latent(latent_path)
+
+    assert tuple(latent.shape) == (1, 1, 2, 2)
+    assert metadata["quant_checksum"] == hashlib.md5(quant.numpy().tobytes()).hexdigest()
 
 
 def test_same_seed_hash_mismatch_is_rejected() -> None:
