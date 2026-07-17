@@ -10199,6 +10199,84 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["fit_id"], "FIT-01")
         self.assertIn("回放", payload["source_label"])
 
+    def test_replay_only_fit_scenarios_never_call_board_injector(self) -> None:
+        expected = {
+            "control_crc_error": ("FIT-04", "CONTROL_FRAME_CRC_MISMATCH"),
+            "deadline_exceeded": ("FIT-05", "JOB_DEADLINE_EXCEEDED"),
+            "duplicate_job_id": ("FIT-06", "DUPLICATE_JOB_ID"),
+        }
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        with patch("server.run_fault_action") as run_fault_action:
+            for fault_type, (fit_id, fault_code) in expected.items():
+                status, _, payload = request_json(
+                    state,
+                    "POST",
+                    "/api/inject-fault",
+                    body=json.dumps({"fault_type": fault_type}).encode("utf-8"),
+                )
+
+                with self.subTest(fault_type=fault_type):
+                    self.assertEqual(status, 200)
+                    self.assertEqual(payload["fit_id"], fit_id)
+                    self.assertEqual(payload["execution_mode"], "replay")
+                    self.assertEqual(payload["status_category"], "success")
+                    self.assertTrue(payload["simulation"])
+                    self.assertFalse(payload["details"]["board_injection"])
+                    self.assertEqual(payload["last_fault_code"], fault_code)
+                    self.assertGreaterEqual(len(payload["log_entries"]), 5)
+                    self.assertGreaterEqual(len(payload["event_sequence"]), 4)
+
+        run_fault_action.assert_not_called()
+
+        event_status, _, event_payload = request_json(state, "GET", "/api/event-spine?limit=30")
+        self.assertEqual(event_status, 200)
+        event_types = [item["type"] for item in event_payload["recent_events"]]
+        self.assertIn("JOB_REJECTED", event_types)
+        self.assertIn("SAFE_STOP_TRIGGERED", event_types)
+        self.assertIn("SAFE_STOP_CLEARED", event_types)
+
+    def test_replay_only_fit_recovery_never_calls_board(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        request_json(
+            state,
+            "POST",
+            "/api/session/board-access",
+            body=json.dumps(
+                {
+                    "host": "demo-board",
+                    "user": "demo-user",
+                    "password": "placeholder-pass",
+                    "port": "22",
+                }
+            ).encode("utf-8"),
+        )
+
+        with patch("server.run_fault_action") as run_fault_action, patch(
+            "server.run_recover_action"
+        ) as run_recover_action:
+            request_json(
+                state,
+                "POST",
+                "/api/inject-fault",
+                body=json.dumps({"fault_type": "deadline_exceeded"}).encode("utf-8"),
+            )
+            status, _, payload = request_json(
+                state,
+                "POST",
+                "/api/recover",
+                body=json.dumps({}).encode("utf-8"),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "replay")
+        self.assertEqual(payload["source_label"], "FIT 仿真 SAFE_STOP 收口")
+        self.assertTrue(payload["simulation"])
+        self.assertFalse(payload["details"]["board_injection"])
+        self.assertEqual(payload["guard_state"], "READY")
+        run_fault_action.assert_not_called()
+        run_recover_action.assert_not_called()
+
     def test_inject_fault_endpoint_uses_updated_current_sha_after_env_switch(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         request_json(

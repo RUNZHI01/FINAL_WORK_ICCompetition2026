@@ -1699,10 +1699,123 @@ def build_fault_catalog() -> list[dict[str, Any]]:
             "fit_id": "FIT-03",
             "summary": fit_map["FIT-03"]["scenario"],
         },
+        {
+            "fault_type": "control_crc_error",
+            "title": "控制帧 CRC 仿真",
+            "fit_id": "FIT-04",
+            "summary": "控制帧 CRC 校验失败后拒绝解析并触发安全收口。",
+        },
+        {
+            "fault_type": "deadline_exceeded",
+            "title": "截止期超时仿真",
+            "fit_id": "FIT-05",
+            "summary": "作业超过 deadline 后停止执行并触发 SAFE_STOP。",
+        },
+        {
+            "fault_type": "duplicate_job_id",
+            "title": "重复作业号仿真",
+            "fit_id": "FIT-06",
+            "summary": "活动作业收到重复 job_id 时在准入阶段拒绝。",
+        },
     ]
 
 
 def build_fault_replay(fault_type: str) -> dict[str, Any]:
+    replay_only = {
+        "control_crc_error": {
+            "fit_id": "FIT-04",
+            "fault_code": "CONTROL_FRAME_CRC_MISMATCH",
+            "guard_state": "READY",
+            "decision": "DENY",
+            "message": "控制帧 CRC 错误仿真已完成；帧在解析前被拒绝，并执行安全收口。",
+            "log_entries": [
+                "[SIM +000ms] ▶ RX CONTROL_FRAME seq=1842 bytes=76",
+                "[SIM +180ms] ◀ CRC32 expected=0x91E4A2C7 actual=0x91E4A247",
+                "[SIM +360ms] ◀ FRAME_REJECT: CONTROL_FRAME_CRC_MISMATCH",
+                "[SIM +620ms] ▶ SAFE_STOP_TRIGGERED -> transport queue flushed",
+                "[SIM +880ms] ◀ SAFE_STOP_CLEARED，guard=READY",
+            ],
+            "event_sequence": [
+                ("JOB_SUBMITTED", "FIT-04 replay received a simulated control frame."),
+                ("JOB_REJECTED", "FIT-04 replay rejected the frame after CRC verification failed."),
+                ("SAFE_STOP_TRIGGERED", "FIT-04 replay flushed the control queue after CRC failure."),
+                ("SAFE_STOP_CLEARED", "FIT-04 replay returned the guard to READY."),
+            ],
+        },
+        "deadline_exceeded": {
+            "fit_id": "FIT-05",
+            "fault_code": "JOB_DEADLINE_EXCEEDED",
+            "guard_state": "READY",
+            "decision": "ABORT",
+            "message": "截止期超时仿真已完成；超期作业被中止，资源和 Guard 已安全收口。",
+            "log_entries": [
+                "[SIM +000ms] ▶ JOB_REQ job_id=2405 deadline_ms=1200",
+                "[SIM +160ms] ◀ JOB_ACK: ALLOW，guard=JOB_ACTIVE",
+                "[SIM +520ms] ▶ JOB_STARTED elapsed_ms=0",
+                "[SIM +760ms] ◀ DEADLINE_WATCHDOG elapsed_ms=1208 budget_ms=1200",
+                "[SIM +940ms] ▶ SAFE_STOP_CLEARED，guard=READY",
+            ],
+            "event_sequence": [
+                ("JOB_SUBMITTED", "FIT-05 replay submitted a deadline-bounded job."),
+                ("JOB_ADMITTED", "FIT-05 replay admitted the job before its deadline."),
+                ("JOB_STARTED", "FIT-05 replay started the simulated workload."),
+                ("SAFE_STOP_TRIGGERED", "FIT-05 replay aborted the job after deadline expiry."),
+                ("SAFE_STOP_CLEARED", "FIT-05 replay released resources and returned to READY."),
+            ],
+        },
+        "duplicate_job_id": {
+            "fit_id": "FIT-06",
+            "fault_code": "DUPLICATE_JOB_ID",
+            "guard_state": "JOB_ACTIVE",
+            "decision": "DENY",
+            "message": "重复作业号仿真已完成；活动 job_id 的第二次准入请求被拒绝。",
+            "log_entries": [
+                "[SIM +000ms] ▶ JOB_REQ job_id=2606 -> JOB_ACK(ALLOW)",
+                "[SIM +220ms] ▶ JOB_STARTED job_id=2606，guard=JOB_ACTIVE",
+                "[SIM +460ms] ▶ JOB_REQ job_id=2606 (duplicate)",
+                "[SIM +650ms] ◀ JOB_ACK: DENY，fault=DUPLICATE_JOB_ID",
+                "[SIM +860ms] ◀ 原作业保持活动，重复请求未进入执行队列",
+            ],
+            "event_sequence": [
+                ("JOB_SUBMITTED", "FIT-06 replay submitted the original job_id=2606."),
+                ("JOB_ADMITTED", "FIT-06 replay admitted the original job."),
+                ("JOB_STARTED", "FIT-06 replay marked the original job active."),
+                ("JOB_SUBMITTED", "FIT-06 replay submitted duplicate job_id=2606."),
+                ("JOB_REJECTED", "FIT-06 replay rejected the duplicate job identifier."),
+            ],
+        },
+    }
+    if fault_type in replay_only:
+        scenario = replay_only[fault_type]
+        return {
+            "status": "injected",
+            "status_category": "success",
+            "execution_mode": "replay",
+            "simulation": True,
+            "fault_type": fault_type,
+            "fit_id": scenario["fit_id"],
+            "source_label": f"{scenario['fit_id']} 仿真回放",
+            "message": scenario["message"],
+            "board_response": {
+                "decision": scenario["decision"],
+                "fault_code": scenario["fault_code"],
+                "guard_state": scenario["guard_state"],
+                "source": "host_replay",
+            },
+            "guard_state": scenario["guard_state"],
+            "last_fault_code": scenario["fault_code"],
+            "status_lamp": "amber",
+            "log_entries": scenario["log_entries"],
+            "event_sequence": [
+                {"type": event_type, "message": message}
+                for event_type, message in scenario["event_sequence"]
+            ],
+            "details": {
+                "simulation": True,
+                "board_injection": False,
+                "stage_delay_ms": 220,
+            },
+        }
     if fault_type == "wrong_sha":
         fit_summary = load_fit_summary(REPORTS_ROOT / "openamp_wrong_sha_fit_20260315_012403" / "fit_summary.json")
         return {
@@ -1753,6 +1866,8 @@ def build_fault_replay(fault_type: str) -> dict[str, Any]:
             ],
             "fit_summary": fit_summary,
         }
+    if fault_type != "heartbeat_timeout":
+        raise ValueError(f"unsupported fault replay: {fault_type}")
     fit_summary = load_fit_summary(REPORTS_ROOT / "openamp_heartbeat_timeout_fit_watchdogfix_20260315_023410" / "fit_summary.json")
     return {
         "status": "injected",

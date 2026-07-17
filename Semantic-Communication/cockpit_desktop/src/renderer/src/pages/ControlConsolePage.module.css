@@ -514,6 +514,16 @@
   background: var(--color-success);
 }
 
+.fitCardReplay {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.035);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.08);
+}
+
+.fitCardReplay::before {
+  background: #3B82F6;
+}
+
 @keyframes fitFlash {
   0% { background: rgba(239, 68, 68, 0.15); }
   100% { background: rgba(239, 68, 68, 0.03); }
@@ -538,6 +548,10 @@
   color: var(--color-success);
 }
 
+.fitCardReplay .fitIcon {
+  color: #3B82F6;
+}
+
 .fitLabel {
   font-size: 12px;
   font-weight: 600;
@@ -554,6 +568,7 @@
 /* FIT result display (replaces button after injection) */
 .fitResultBox {
   margin-top: auto;
+  min-width: 0;
   padding: 6px 8px;
   background: rgba(239, 68, 68, 0.06);
   border-radius: var(--radius-sm);
@@ -563,6 +578,7 @@
 
 .fitResultLine {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 4px;
   font-size: 11px;
@@ -572,9 +588,24 @@
   line-height: 1.6;
 }
 
+.fitResultLine > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .fitResultIcon {
   font-size: 13px;
   font-weight: 700;
+}
+
+.fitResultCode {
+  min-width: 0;
+  color: var(--color-error);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .fitResultGuard {
@@ -593,6 +624,27 @@
 
 .fitResultVerified .fitResultGuard {
   color: var(--color-text-secondary);
+}
+
+.fitResultVerified .fitResultCode {
+  color: var(--color-success);
+}
+
+.fitResultReplay {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.18);
+}
+
+.fitResultReplay .fitResultLine {
+  color: #2563EB;
+}
+
+.fitResultReplay .fitResultGuard {
+  color: var(--color-text-secondary);
+}
+
+.fitResultReplay .fitResultCode {
+  color: #2563EB;
 }
 
 .fitReserved {

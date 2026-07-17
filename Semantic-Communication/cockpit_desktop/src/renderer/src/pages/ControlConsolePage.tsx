@@ -50,21 +50,21 @@ const OPENAMP_FIT_SCENARIOS = [
     label: 'FIT-04：控制帧 CRC',
     desc: '控制消息校验错误 → 安全停机',
     icon: Icons.Radio,
-    endpoint: 'reserved',
+    endpoint: 'replay',
   },
   {
     id: 'deadline_exceeded',
     label: 'FIT-05：截止期超时',
     desc: '作业越过 deadline → 中止并收口',
     icon: Icons.Clock,
-    endpoint: 'reserved',
+    endpoint: 'replay',
   },
   {
     id: 'duplicate_job_id',
     label: 'FIT-06：重复作业号',
     desc: '重复 job_id → 准入阶段拒绝',
     icon: Icons.XCircle,
-    endpoint: 'reserved',
+    endpoint: 'replay',
   },
 ] as const
 
@@ -79,7 +79,7 @@ const SECURITY_FIT_SCENARIOS = [
 ] as const
 
 const FIT_GROUPS = [
-  { id: 'openamp', label: 'OpenAMP 控制面', note: 'FIT-01～03 真机注入；FIT-04～06 等待板端接口', scenarios: OPENAMP_FIT_SCENARIOS },
+  { id: 'openamp', label: 'OpenAMP 控制面', note: 'FIT-01～03 真机注入；FIT-04～06 仿真回放（未接板端）', scenarios: OPENAMP_FIT_SCENARIOS },
   { id: 'security', label: '安全信道', note: '在上位机隔离容器中执行现有负向测试', scenarios: SECURITY_FIT_SCENARIOS },
 ] as const
 
@@ -173,15 +173,21 @@ export function ControlConsolePage() {
   }, [queryClient])
 
   // ── Per-FIT injection — each button gets its own pending/result state ──
-  const handleFIT = useCallback((fitId: string, endpoint: 'openamp' | 'security') => {
+  const handleFIT = useCallback((fitId: string, endpoint: 'openamp' | 'security' | 'replay') => {
     setFitPending(prev => ({ ...prev, [fitId]: true }))
     const request = endpoint === 'security' ? postSecurityFit(fitId) : postInjectFault(fitId)
     request
-      .then((data) => {
+      .then(async (data) => {
         const gs = data?.guard_state ?? 'UNKNOWN'
         const fc = data?.last_fault_code ?? 'UNKNOWN'
         const status = data?.status_category ?? data?.status ?? 'unknown'
         const executionMode = data?.execution_mode ?? 'unknown'
+        if (executionMode === 'replay' && Array.isArray(data?.log_entries)) {
+          for (const entry of data.log_entries) {
+            setActionLog(prev => [...prev.slice(-5), `[REPLAY] ${String(entry)}`])
+            await new Promise(resolve => window.setTimeout(resolve, 220))
+          }
+        }
         setFitResults(prev => ({
           ...prev,
           [fitId]: { guard_state: gs, fault_code: fc, status, execution_mode: executionMode, ts: Date.now() },
@@ -396,34 +402,35 @@ export function ControlConsolePage() {
                         const isPending = fitPending[fit.id] ?? false
                         const result = fitResults[fit.id]
                         const hasResult = !!result
-                        const verified = result?.status === 'success'
+                        const replayed = result?.execution_mode === 'replay'
+                        const verified = result?.status === 'success' && !replayed
+                        const completed = verified || replayed
                         return (
-                          <div key={fit.id} className={`${s.fitCard} ${hasResult ? (verified ? s.fitCardVerified : s.fitCardTriggered) : ''}`}>
+                          <div key={fit.id} className={`${s.fitCard} ${hasResult ? (replayed ? s.fitCardReplay : (verified ? s.fitCardVerified : s.fitCardTriggered)) : ''}`}>
                             <div className={s.fitCardTop}>
                               <Icon size={16} className={s.fitIcon} />
                               <div className={s.fitLabel}>{fit.label}</div>
                             </div>
                             <div className={s.fitDesc}>{fit.desc}</div>
                             {hasResult ? (
-                              <div className={`${s.fitResultBox} ${verified ? s.fitResultVerified : ''}`}>
+                              <div className={`${s.fitResultBox} ${replayed ? s.fitResultReplay : (verified ? s.fitResultVerified : '')}`}>
                                 <div className={s.fitResultLine}>
-                                  <span className={s.fitResultIcon}>{verified ? '✓' : '✗'}</span>
-                                  <span>{verified ? '已验证' : '自检失败'} · {result.fault_code}</span>
+                                  <span className={s.fitResultIcon}>{completed ? '✓' : '✗'}</span>
+                                  <span>{replayed ? '仿真完成' : (verified ? '已验证' : '自检失败')}</span>
                                 </div>
+                                <div className={s.fitResultCode}>{result.fault_code}</div>
                                 <div className={s.fitResultLine}>
                                   <span className={s.fitResultGuard}>guard → {result.guard_state}</span>
                                 </div>
                               </div>
-                            ) : fit.endpoint === 'reserved' ? (
-                              <span className={s.fitReserved}>UI 预留 · 未接真机</span>
                             ) : (
                               <button
-                                className={fit.endpoint === 'security' ? s.btnVerify : s.btnDanger}
+                                className={fit.endpoint === 'openamp' ? s.btnDanger : s.btnVerify}
                                 onClick={() => handleFIT(fit.id, fit.endpoint)}
                                 disabled={isPending}
                               >
                                 {isPending ? <span className={s.spinner} /> : <Icon size={14} />}
-                                <span>{fit.endpoint === 'security' ? '验证' : '注入'}</span>
+                                <span>{fit.endpoint === 'security' ? '验证' : (fit.endpoint === 'replay' ? '仿真' : '注入')}</span>
                               </button>
                             )}
                           </div>
@@ -449,6 +456,8 @@ export function ControlConsolePage() {
                   {actionLog.map((line, i) => {
                     const tagCls = line.startsWith('[FIT]')
                       ? s.logTagDanger
+                      : line.startsWith('[REPLAY]')
+                        ? s.logTagInfo
                       : line.startsWith('[RECOVER]')
                         ? s.logTagSuccess
                         : line.startsWith('[PROBE]')

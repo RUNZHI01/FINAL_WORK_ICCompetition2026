@@ -168,6 +168,9 @@ MLKEM_AUTH_SIG_POLICY_KEYS = ("MLKEM_AUTH_SIG_POLICY",)
 DEFAULT_MLKEM_AUTH_SERVER_ID = "phytium-board"
 DEFAULT_MLKEM_AUTH_SIG_POLICY = "DUAL_REQUIRED"
 SUPPORTED_MLKEM_AUTH_SIG_POLICIES = ("DUAL_REQUIRED", "SM2_ONLY", "MLDSA_ONLY")
+LIVE_FIT_FAULT_TYPES = {"wrong_sha", "illegal_param", "heartbeat_timeout"}
+REPLAY_ONLY_FIT_FAULT_TYPES = {"control_crc_error", "deadline_exceeded", "duplicate_job_id"}
+SUPPORTED_FIT_FAULT_TYPES = LIVE_FIT_FAULT_TYPES | REPLAY_ONLY_FIT_FAULT_TYPES
 
 SECURITY_FIT_TARGETS = {
     "sfit_ciphertext_tamper": "scripts/test_fit.py::TestCiphertextTampering",
@@ -9820,6 +9823,43 @@ class DashboardState:
         }
 
     def run_fault_demo(self, fault_type: str) -> dict[str, Any]:
+        if fault_type in REPLAY_ONLY_FIT_FAULT_TYPES:
+            replay = build_fault_replay(fault_type)
+            with self._lock:
+                self._last_fault_result = {
+                    "fault_type": fault_type,
+                    "status": replay["status"],
+                    "status_category": replay["status_category"],
+                    "execution_mode": replay["execution_mode"],
+                    "message": replay["message"],
+                    "guard_state": replay["guard_state"],
+                    "last_fault_code": replay["last_fault_code"],
+                }
+                replay_control = dict(self._last_control_status or {})
+                replay_control["guard_state"] = replay["guard_state"]
+                replay_control["last_fault_code"] = replay["last_fault_code"]
+                replay_control["total_fault_count"] = self._safe_int(
+                    replay_control.get("total_fault_count"), default=0
+                ) + 1
+                self._last_control_status = replay_control
+                self._crypto_status_cache = None
+
+            for event in replay.get("event_sequence", []):
+                self._event_spine.publish(
+                    str(event["type"]),
+                    source="fault-replay",
+                    plane="control",
+                    mode_scope=CONTROL_MODE_SCOPE,
+                    message=str(event["message"]),
+                    data={
+                        "fault_type": fault_type,
+                        "fault_code": replay["last_fault_code"],
+                        "execution_mode": "replay",
+                        "simulation": True,
+                    },
+                )
+            return replay
+
         with self._lock:
             board_access = self._board_access
 
@@ -10016,6 +10056,47 @@ class DashboardState:
             retained_fault_code = str(last_fault.get("last_fault_code") or "")
         elif control_status and control_status.get("last_fault_code"):
             retained_fault_code = str(control_status.get("last_fault_code") or "")
+
+        replay_fault_type = str((last_fault or {}).get("fault_type") or "")
+        if replay_fault_type in REPLAY_ONLY_FIT_FAULT_TYPES:
+            replay = build_recover_replay(retained_fault_code)
+            replay.update(
+                {
+                    "status_category": "success",
+                    "execution_mode": "replay",
+                    "simulation": True,
+                    "source_label": "FIT 仿真 SAFE_STOP 收口",
+                    "message": "仿真故障已收口，控制面回到 READY；未向板端发送恢复指令。",
+                }
+            )
+            replay_details = dict(replay.get("details") or {})
+            replay_details.update({"simulation": True, "board_injection": False})
+            replay["details"] = replay_details
+            with self._lock:
+                self._last_fault_result = {
+                    "fault_type": "recover",
+                    "status": replay["status"],
+                    "status_category": replay["status_category"],
+                    "execution_mode": replay["execution_mode"],
+                    "simulation": True,
+                    "message": replay["message"],
+                    "guard_state": replay["guard_state"],
+                    "last_fault_code": replay["last_fault_code"],
+                }
+                replay_control = dict(self._last_control_status or {})
+                replay_control["guard_state"] = replay["guard_state"]
+                replay_control["last_fault_code"] = replay["last_fault_code"]
+                self._last_control_status = replay_control
+                self._crypto_status_cache = None
+            self._event_spine.publish(
+                "SAFE_STOP_CLEARED",
+                source="fault-replay",
+                plane="control",
+                mode_scope=CONTROL_MODE_SCOPE,
+                message="Simulated SAFE_STOP returned the control plane to READY.",
+                data={"reason": "simulation_recover", "last_fault_code": replay["last_fault_code"]},
+            )
+            return replay
 
         if board_access.probe_ready:
             live_result = run_recover_action(board_access, trusted_sha=self._current_trusted_sha(board_access))
@@ -10578,7 +10659,7 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == "/api/inject-fault":
                 fault_type = str(body.get("fault_type") or "").strip()
-                if fault_type not in {"wrong_sha", "illegal_param", "heartbeat_timeout"}:
+                if fault_type not in SUPPORTED_FIT_FAULT_TYPES:
                     self.respond_json(HTTPStatus.BAD_REQUEST, {"status": "error", "message": "unsupported fault_type"})
                     return
                 payload = self.server.app_state.run_fault_demo(fault_type)
