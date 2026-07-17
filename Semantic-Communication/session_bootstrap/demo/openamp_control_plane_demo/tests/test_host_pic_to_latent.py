@@ -19,6 +19,14 @@ def load_encode_latent_module():
 
 
 class HostPicToLatentTest(unittest.TestCase):
+    def test_resolve_jscc_root_prefers_environment_override(self) -> None:
+        module = load_encode_latent_module()
+
+        with patch.dict("os.environ", {"HOST_PIC_TO_LATENT_JSCC_ROOT": "/tmp/board-jscc"}):
+            resolved = module.resolve_jscc_root()
+
+        self.assertEqual(resolved, str(Path("/tmp/board-jscc").resolve()))
+
     def test_resolve_checkpoint_path_falls_back_to_workspace_jscc_origin(self) -> None:
         module = load_encode_latent_module()
 

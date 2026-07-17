@@ -33,7 +33,17 @@ from tqdm.auto import tqdm
 
 # ── 将 jscc 包目录加入 sys.path ──
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(SCRIPT_DIR, 'jscc'))
+
+
+def resolve_jscc_root():
+    return os.path.abspath(
+        os.environ.get('HOST_PIC_TO_LATENT_JSCC_ROOT')
+        or os.path.join(SCRIPT_DIR, 'jscc')
+    )
+
+
+JSCC_ROOT = resolve_jscc_root()
+sys.path.insert(0, JSCC_ROOT)
 
 from src import utils
 from src.network import encoder
