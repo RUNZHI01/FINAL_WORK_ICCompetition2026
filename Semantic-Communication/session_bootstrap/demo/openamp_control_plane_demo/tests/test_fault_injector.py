@@ -13,7 +13,13 @@ if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
 from board_access import BoardAccessConfig  # noqa: E402
-from fault_injector import query_live_status, run_fault_action, run_proxy_phase, run_recover_action  # noqa: E402
+from fault_injector import (  # noqa: E402
+    build_proxy_command,
+    query_live_status,
+    run_fault_action,
+    run_proxy_phase,
+    run_recover_action,
+)
 
 
 def make_access() -> BoardAccessConfig:
@@ -110,6 +116,26 @@ def safe_stop_response(*, last_fault: str, transport_status: str = "safe_stop_st
 
 
 class RunFaultActionTest(unittest.TestCase):
+    def test_proxy_uses_current_host_bundle_unless_remote_project_is_explicitly_enabled(self) -> None:
+        access = BoardAccessConfig(
+            host="demo-board",
+            user="demo-user",
+            password="demo-pass",
+            port="22",
+            env_file=None,
+            env_values={"REMOTE_PROJECT_ROOT": "/home/user/old-project"},
+            source_summary="unit test",
+        )
+
+        with patch.dict("fault_injector.os.environ", {"OPENAMP_FIT_USE_REMOTE_PROJECT": "0"}):
+            bundled_command = build_proxy_command(access, "/tmp/openamp-fit")
+        with patch.dict("fault_injector.os.environ", {"OPENAMP_FIT_USE_REMOTE_PROJECT": "1"}):
+            remote_command = build_proxy_command(access, "/tmp/openamp-fit")
+
+        self.assertNotIn("--remote-project-root", bundled_command)
+        self.assertIn("--remote-project-root", remote_command)
+        self.assertIn("/home/user/old-project", remote_command)
+
     def test_parse_json_stdout_skips_git_bash_terminal_suffix(self) -> None:
         from fault_injector import parse_json_stdout
 

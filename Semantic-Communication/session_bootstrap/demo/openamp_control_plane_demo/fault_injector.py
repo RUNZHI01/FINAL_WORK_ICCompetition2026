@@ -104,7 +104,13 @@ def build_proxy_command(access: BoardAccessConfig, remote_output_root: str) -> l
     ]
     remote_project_root = str(values.get("REMOTE_PROJECT_ROOT") or values.get("OPENAMP_REMOTE_PROJECT_ROOT") or "")
     remote_jscc_dir = str(values.get("REMOTE_JSCC_DIR") or "")
-    if remote_project_root:
+    use_remote_project = str(os.environ.get("OPENAMP_FIT_USE_REMOTE_PROJECT", "0")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if remote_project_root and use_remote_project:
         command.extend(["--remote-project-root", remote_project_root])
     if remote_jscc_dir:
         command.extend(["--remote-jscc-dir", remote_jscc_dir])
