@@ -1,6 +1,6 @@
 # Analog-Latent-IQ PHY for LGJSCC over NI-USRP-2922
 
-本文档说明 `jscc_tran` 分支新增的 analog latent-IQ 主链路。目标是把 LGJSCC Encoder 输出的连续 latent 直接映射成 USRP I/Q 波形，让真实无线信道作用在语义 latent 上，而不是把 latent 当作可靠文件做 QPSK/CRC/ARQ 传输。
+本文档说明当前 analog latent-IQ 主链路。目标是把 LGJSCC Encoder 输出的连续 latent 直接映射成 USRP I/Q 波形，让真实无线信道作用在语义 latent 上，而不是把 latent 当作可靠文件做 QPSK/CRC 传输。当前演示、指标和安全口径见 [`../USRP_LINK_BRIEFING.md`](../USRP_LINK_BRIEFING.md)。
 
 完整 0-16 Pro 方案见：
 
@@ -28,7 +28,7 @@ image
  -> Generator / TVM reconstruction
 ```
 
-保留旧 QPSK 文件链路作为可靠 baseline，但 analog latent-IQ 不再使用 CRC/ARQ 判定 payload 成功，也不会用原始 latent SHA 作为 analog payload 成功条件。
+保留旧 QPSK 文件链路作为可靠 baseline。analog latent-IQ 不使用 CRC 或原始 latent SHA 判定 bit-exact 成功，但当前批处理 runner 会依据同步、导频、EVM、SNR 等质量指标执行 ARQ，并用 30 张分段和失败子集补传控制长批次退化。
 
 ## 新增和修改的文件
 
@@ -114,8 +114,9 @@ python3 USRP292x/AnalogLatentLink.py make \
   --out-sc16 tx_analog.sc16 \
   --manifest manifest.json \
   --rate 5000000 \
-  --sps 4 \
-  --amp 3000
+  --sps 2 \
+  --amp 6000 \
+  --tx-normalization-reference-peak 6
 ```
 
 解码 RX waveform：
@@ -155,7 +156,7 @@ python3 USRP292x/AnalogLatentLink.py simulate-channel \
 .bin latent_transport wire blob
 ```
 
-默认 `rx_post_quantize=true`，可以用 `--no-rx-post-quantize` 对比纯 raw latent 输入 Generator 的效果。
+CLI 默认 `rx_post_quantize=true`，可以用 `--no-rx-post-quantize` 对比纯 raw latent 输入 Generator 的效果。当前 Cockpit 主 profile 显式设置 `ANALOG_RX_POST_QUANTIZE=0`，因此演示使用恢复后的连续 latent。
 
 ## 已实现的离线增强
 

@@ -1,7 +1,7 @@
 # HANDOFF
 
-更新时间：2026-07-16
-当前分支：`main`
+更新时间：2026-07-17
+当前工作分支：`perf/iq-demo-hotpath`；交付时合入 `main`
 交接前代码保存点：以当前分支最新提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
 
 ## 当前主线
@@ -28,7 +28,7 @@
 | 推理引擎 | TVM 主线，MNN/PyTorch 状态不稳定 | TVM 是主路径；MNN 预录和 USRP remote-dir 已恢复；PyTorch 在 USRP 下保留预录参考 |
 | Cockpit UI | 控件堆叠，左右栏职责不清，USRP 指标展示不完整 | 左栏管数据面和 IQ 诊断，右栏管地图、硬件、板卡密码、安全信道；USRP 有三阶段进度和独立 benchmark |
 | 结果对比 | USRP/批量结果有时不刷新或显示旧状态 | USRP 三种模式会更新推理结果对比框，切换模式会清理旧进度状态 |
-| IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 30 张分段、两轮失败子集补传、固定峰值导频和质量门限已完成 300 张回归；仍需注意现场 RF 环境和天线位置 |
+| IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 30 张分段、两轮失败子集补传、固定峰值导频和质量门限已完成 300 张回归；RX 停滞后会执行真实 `RESET`，不再只重连控制口 |
 | 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
 | 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
 | 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数；板端 USRP RX 网口可由 systemd 开机自恢复 |
@@ -45,7 +45,16 @@ $env:REMOTE_PASS = 'user'
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 
-比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COCKPIT_STARTUP_USRP_WARMUP_COUNT=10`。脚本会先在后端静默尝试 10 张 `USRP IQ + TVM`；默认至少 5 张进入有效完成即可放行 UI，然后清掉隐藏 batch-state，再启动/显示 Cockpit Desktop 前端。这 10 张只是冷启动预热，不是 streaming 微批。正式 IQ 串行长批次默认每 30 张重建 RX/TX streamer。启动前请临时设置 `REMOTE_PASS`，或在脚本提示时输入；若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
+比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COUNT=10`、`ATTEMPTS=2`。脚本必须累计完成 `10/10` 才显示 UI；首轮不足时只补跑剩余数量，不降低质量门限。每轮后都会清掉隐藏 batch-state。正式 IQ 串行长批次默认每 30 张重建 RX streamer，TX 保持常驻。若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
+
+IQ 源码同步与日常启动已经分开。修改 `USRP292x/`、encoder 或 TVM helper 后运行一次：
+
+```powershell
+pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify `
+  -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+```
+
+同步包和 SSH/SCP 都在 Docker 内处理，不用 WSL。当前 Tailscale 地址可以保留；现场变化时用 `-BoardHost` 覆盖。`-Verify` 只做哈希、`py_compile` 和 runner 入口检查，不会向 `tvm310_safe` 安装 pytest。需要重编译 OTA server 时额外加 `-BuildOta`，并先停掉正在运行的 RX/TX 任务。
 
 启动后：
 
@@ -130,11 +139,13 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `REMOTE_RX_RUN_ROOT` | `/dev/shm/usrp292x_remote_runs` | 板端 RX 临时运行目录 |
 | `OPENAMP_DEMO_REMOTE_DECODE_PYTHON` | `/home/user/venv/bin/python` | 板端 IQ decode 虚拟环境 |
 | `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT` | `0` | 保持 TX/RX 常驻，减少反复初始化 |
+| `OPENAMP_USRP_TX_DOCKER_NETWORK` | `host` | TX 的 USRP UDP 数据面绕过 Docker bridge；TCP 控制口由 `tcp_forward.py` 映射回 `127.0.0.1:29221` |
 | `OPENAMP_IQ_SEGMENT_SIZE` | `30` | IQ 串行长批次每段张数；段间重建 RX streamer，并重置常驻 TX 的发送状态 |
 | `OPENAMP_IQ_SEGMENT_REPAIR_PASSES` | `2` | 段内首轮失败项的子集补传次数；默认两轮用于覆盖偶发低同步率 |
 | `COCKPIT_STARTUP_USRP_WARMUP` | `1` | 显示 Cockpit 前先做 USRP IQ + TVM 启动预热 |
 | `COCKPIT_STARTUP_USRP_WARMUP_COUNT` | `10` | 启动预热张数；对齐 IQ streaming 的 10 张微批 |
-| `COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS` | 空，默认 `ceil(count/2)` | 启动预热最小有效完成数；低于该值才阻止 UI 显示 |
+| `COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS` | 与 `COUNT` 相同，默认 `10` | 启动预热最小有效完成数；正式入口要求全量通过 |
+| `COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS` | `2` | 首轮不足时补跑剩余数量；两轮仍不足则不显示 UI |
 | `COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC` | `360` | 预热完成等待上限 |
 | `ANALOG_SPS` | `2` | IQ 直传每符号采样数 |
 | `ANALOG_AMPLITUDE` | `6000` | 当前验证环境下的 TX 幅度 |
@@ -215,6 +226,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | USRP IQ 严格可靠性 profile | 300 | median `411.59 ms`, p95 `3423.45 ms`, `300/300` accepted | median `245.42 ms`, mean `254.71 ms`, p95 `301.73 ms` | 30 张分段；11 次 RESET 共 `448.69 ms`；10 次 worker 清理共 `522.72 ms` |
 | USRP IQ 历史速度 profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 历史 accepted 速度记录，不代表当前严格可靠性默认值 |
 | QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
+
+2026-07-17 最新主机侧全关后一键冷启动对应 `cockpit_usrp_usrp-1784286235`：IQ `10/10`、TVM `10/10`，约 `99.6 s` 后显示 UI。该轮由脚本自动拉起 host-network TX 和 TCP 控制代理，没有继承旧容器。上一轮可精确引用的 TVM 指标为 median `243.38 ms`、mean `248.14 ms`。
 
 100 张热启动验收对应 `batch-1784222195-100` / `cockpit_usrp_usrp-1784222195`。正式点击复用了隐藏预热建立的 ML-KEM daemon，因此没有再次执行板端 helper 同步和热修。隐藏预热不能关闭，否则首次正式任务会重新承担约 80 秒的安全服务冷启动。该轮保持 `sync metric >= 0.75`、`pilot gain ratio >= 0.85`：261 次 OTA 中 100 次通过，116 次被质量门限拒绝后重试，45 次未形成可用同步。
 
@@ -308,8 +321,14 @@ usrp_payload_encrypted=false
 硬件面板 CPU/MEM 卡住
 通常是遥测轮询暂停或板端状态服务不可达。跑 USRP 批量时本来会推迟部分 SSH 轮询，避免干扰热路径。
 
+板端 SSH 频繁断开或内存异常偏高
+2026-07-17 冷启动排查发现 KDE `baloo_file_extractor` 占用约 45% 内存并处于 D 状态，导致 SSH 和安全服务不稳。现场若复现，先执行 `balooctl disable`，再终止残留 `baloo_file_extractor`；当次处理后板端 used memory 从约 `1510 MB` 降到 `1090 MB`。
+
+TX 容器存在但 `127.0.0.1:29221` 不可达
+检查 `cockpit-usrp-tx-29221` 和 `cockpit-usrp-tx-proxy-29221` 两个容器。前者用 host network 连 USRP，后者只转发 TCP 控制命令。不要手工只拉起其中一个；停掉两者后重跑 `start-demo.ps1`。
+
 USRP 卡在 299/300 或显示未进入有效重建链路
-优先看 IQ sync/ARQ 日志和 summary 中的 `iq_segment_resets`。当前默认为单图 ARQ12、30 张分段、1 次失败子集补传；只有全部 accepted 后才启动 TVM。若 RESET 返回 `unknown command`，Cockpit 会退出旧服务、从同步源码重建并重启。
+优先看 IQ sync/ARQ 日志和 summary 中的 `iq_segment_resets`。当前默认为单图 ARQ12、30 张分段、2 次失败子集补传；只有全部 accepted 后才启动 TVM。若 RX server 端口仍在但连续收不到 UHD 样本，runner 会关闭旧会话并发送真实 `RESET`。若 RESET 返回 `unknown command`，Cockpit 会退出旧服务、从同步源码重建并重启。
 
 MNN/PyTorch 与 USRP
 TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式下仍作为预录参考，不启动 USRP 传输。
@@ -365,6 +384,7 @@ npm run typecheck
 ## 文档入口
 
 - `docs/README.md`：当前仓库总览、典型指标和板端备份边界。
+- `docs/USRP_LINK_BRIEFING.md`：今晚汇报、PPT 修改、USRP 分阶段链路和指标边界。
 - `docs/runbooks/STARTUP.md`：现场断电后最短启动流程。
 - `docs/HANDOFF.md`：交接、默认参数、实验开关和验证命令。
 - `docs/security/mlkem_auth_setup.md`：ML-KEM/SM4 与认证通道部署说明。

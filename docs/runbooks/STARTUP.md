@@ -1,5 +1,11 @@
 # Demo Startup
 
+日常启动只执行下面 1-7 步。仅首次部署或 IQ 源码更新后执行一次同步：
+
+```powershell
+pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+```
+
 1. 上电板卡，等 2 分钟。确认 Docker Desktop 已启动。
 2. 在仓库根目录打开 PowerShell：
 
@@ -33,7 +39,7 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 .\Semantic-Communication\cockpit_desktop\start-demo.ps1 -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
 ```
 
-默认会启用 USRP IQ 直传、ML-KEM+SM4、ML-DSA+SM2，并在显示界面前静默预热 10 张。隐藏预热默认至少 5 张有效完成即可放行界面；正式 IQ 串行任务默认每 30 张重建一次 RX/TX streamer，全部传输通过后才进入 TVM。
+默认会启用 USRP IQ 直传、ML-KEM+SM4、ML-DSA+SM2，并在显示界面前静默预热 10 张。必须累计 `10/10` 才显示界面；首轮不足时只补跑剩余数量，最多两轮。TX 数据面默认走 Docker host network，脚本会自动拉起 `127.0.0.1:29221` 控制代理，无需手工启动容器。
 
 5. 界面出现后检查：
 
@@ -55,7 +61,8 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 - 预录 latent 输入（板端）：`/home/user/Downloads/jscc-test/简化版latent`
 - USRP IQ 接收解包（板端）：`/home/user/cockpit_usrp_rx/cockpit_usrp_*_rx`
 - 预录 TVM 重建（板端）：`/home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_handwritten_mean4_v7_big_little_current/reconstructions`
-- USRP TVM 重建（板端）：`/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_*_current/reconstructions`
+- USRP IQ TVM 重建（板端）：`/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_*_current/reconstructions`
+- USRP QPSK TVM 重建（板端）：`/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_*_current/reconstructions`
 - 本地抽查结果（上位机）：`Semantic-Communication\session_bootstrap\reports\reconstruction_error_audit_tvm_current_300_20260714_153238`
 
 现场首选：在 Cockpit 的“板端输出目录”下点击“本次重建对比图”。浏览器会打开 `http://127.0.0.1:8786/`；选择倒序排列的 job，再点击“拉取”查看当前序号。需要筛查异常图时再打开质量辅助。该页面只在上位机运行，板端不部署 Web 服务。
@@ -69,7 +76,7 @@ Cockpit 不可用时，使用离线兜底脚本拉取最新板端 USRP TVM 图�
 默认输出到 `artifacts\board_images\<timestamp>_usrp-tvm_...\index.html`。若要拉指定板端目录：
 
 ```powershell
-.\scripts\pull_board_images.ps1 -RemotePath "/home/user/Downloads/jscc-test-usrp/tvm/openamp3_usrp_xxx_current/reconstructions"
+.\scripts\pull_board_images.ps1 -RemotePath "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm/openamp3_usrp_xxx_current/reconstructions"
 ```
 
 若需要临时本地 Web 访问，加 `-Serve`：
@@ -79,3 +86,5 @@ Cockpit 不可用时，使用离线兜底脚本拉取最新板端 USRP TVM 图�
 ```
 
 若出现 `board status endpoint unavailable`，先重新保存板卡密码或重启 Cockpit；不要切到 WSL。
+
+USRP 分阶段说明和汇报口径见 [`../USRP_LINK_BRIEFING.md`](../USRP_LINK_BRIEFING.md)。
