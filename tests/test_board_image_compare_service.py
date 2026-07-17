@@ -322,6 +322,43 @@ def test_historical_usrp_job_keeps_direct_image_manifest_support(tmp_path: Path)
     state.close()
 
 
+def test_prerecorded_job_never_uses_usrp_run_manifest(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    image_dir = manifest_root / "cockpit_usrp_usrp-123" / "image_0"
+    image_dir.mkdir(parents=True)
+    (image_dir / "manifest.json").write_text(
+        json.dumps({"source_info": {"source_meta": {"original_filename": "zeta.png"}}}),
+        encoding="utf-8",
+    )
+    state, _ = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (80, 20, 40))
+
+    state.list_jobs("prerecorded-mnn")
+
+    assert state.job_detail("new")["pairs"][0]["original_name"] == "frame_0000.png"
+    state.close()
+
+
+def test_unmatched_usrp_job_never_uses_another_runs_manifest(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    image_dir = manifest_root / "cockpit_usrp_usrp-123" / "image_0"
+    image_dir.mkdir(parents=True)
+    (image_dir / "manifest.json").write_text(
+        json.dumps({"source_info": {"source_meta": {"original_filename": "zeta.png"}}}),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (80, 20, 40))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("unmatched", "openamp3_usrp_999_current", f"{remote_root}/unmatched/reconstructions", 300.0)
+    ]
+
+    state.list_jobs("usrp-iq-direct")
+
+    assert state.job_detail("unmatched")["pairs"][0]["original_name"] == "frame_0000.png"
+    state.close()
+
+
 def test_missing_pytorch_reference_does_not_fall_back(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     state.list_jobs("usrp-iq-direct")

@@ -23,10 +23,11 @@ from .remote import (
     ResourcePaused,
     SUPPORTED_IMAGE_EXTENSIONS,
 )
-from .sources import ReconstructionSource
+from .sources import ReconstructionSource, extract_usrp_token
 
 
 WEB_ROOT = Path(__file__).resolve().parent / "web"
+_USRP_SOURCE_IDS = frozenset({"usrp-qpsk", "usrp-iq-direct"})
 
 
 @dataclass(frozen=True)
@@ -282,12 +283,19 @@ class ComparisonServiceState:
         root = config.manifest_root
         if root is None or not root.is_dir():
             return {}
-        numeric_tokens = [token for token in job.name.replace("-", "_").split("_") if token.isdigit()]
-        candidates = [path for path in root.iterdir() if path.is_dir()]
-        if numeric_tokens:
-            matching = [path for path in candidates if any(token in path.name for token in numeric_tokens)]
-            if matching:
-                candidates = matching
+        with self._lock:
+            source_id = self._selected_source
+        if source_id not in _USRP_SOURCE_IDS:
+            return {}
+        token = extract_usrp_token(job.name)
+        if token is None:
+            return {}
+        base_token = token.split("_", 1)[0]
+        candidate_names = {
+            f"cockpit_usrp_usrp-{token}",
+            f"cockpit_usrp_usrp-{base_token}",
+        }
+        candidates = [path for path in root.iterdir() if path.is_dir() and path.name in candidate_names]
         candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         for run_dir in candidates:
             names: dict[int, str] = {}
