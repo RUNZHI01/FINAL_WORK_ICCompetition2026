@@ -356,11 +356,31 @@ def test_http_page_exposes_reconstruction_source_selector(tmp_path: Path) -> Non
 def test_http_page_ignores_job_details_from_previous_source(tmp_path: Path) -> None:
     _, script = fetch_page_assets(configured_http_state(tmp_path))
 
-    assert script.count("if (sourceId !== state.sourceId) return") == 2
     detail_request = script.index("const detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)")
-    stale_guard = script.index("if (sourceId !== state.sourceId) return", detail_request)
+    stale_guard = script.index("if (!isCurrentJobRequest(sourceEpoch, sourceId, jobId)) return", detail_request)
     detail_assignment = script.index("state.detail = detail", detail_request)
     assert stale_guard < detail_assignment
+
+
+def test_http_page_invalidates_stale_source_job_and_pull_requests(tmp_path: Path) -> None:
+    _, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    assert "sourceEpoch: 0" in script
+    assert "state.sourceEpoch += 1" in script
+    assert "state.quality = {}" in script
+    assert "function isCurrentSourceRequest(sourceEpoch, sourceId)" in script
+    assert "function isCurrentJobRequest(sourceEpoch, sourceId, jobId)" in script
+    assert "function isCurrentPullRequest(request)" in script
+    assert "if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return" in script
+    assert "if (!isCurrentJobRequest(sourceEpoch, sourceId, jobId)) return" in script
+    assert "if (!isCurrentPullRequest(request)) return" in script
+    assert "sourceEpoch: state.sourceEpoch" in script
+    assert "sourceId: state.sourceId" in script
+    assert "jobId: currentJobId()" in script
+    assert "index: state.index" in script
+    assert "referenceMode: state.referenceMode" in script
+    assert "pair === currentPair()" in script
+    assert "state.quality[`${jobId}:${index}:${referenceMode}`] = payload.quality" in script
 
 
 def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None:

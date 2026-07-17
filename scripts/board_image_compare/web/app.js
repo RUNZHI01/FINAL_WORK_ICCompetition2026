@@ -32,6 +32,7 @@ const elements = {
 const state = {
   config: null,
   sourceId: '',
+  sourceEpoch: 0,
   jobs: [],
   detail: null,
   index: 0,
@@ -56,6 +57,21 @@ function currentJobId() {
 
 function currentPair() {
   return state.detail?.pairs?.[state.index] || null
+}
+
+function isCurrentSourceRequest(sourceEpoch, sourceId) {
+  return sourceEpoch === state.sourceEpoch && sourceId === state.sourceId
+}
+
+function isCurrentJobRequest(sourceEpoch, sourceId, jobId) {
+  return isCurrentSourceRequest(sourceEpoch, sourceId) && jobId === currentJobId()
+}
+
+function isCurrentPullRequest(request) {
+  return isCurrentJobRequest(request.sourceEpoch, request.sourceId, request.jobId)
+    && request.index === state.index
+    && request.referenceMode === state.referenceMode
+    && request.pair === currentPair()
 }
 
 function showImage(image, empty, url) {
@@ -186,9 +202,11 @@ function setIndex(index) {
 }
 
 function resetSelectedJob() {
+  state.sourceEpoch += 1
   state.jobs = []
   state.detail = null
   state.index = 0
+  state.quality = {}
   elements.jobSelect.replaceChildren()
   elements.reconstructionDirectory.textContent = '未选择 job'
   elements.originalCount.textContent = '0 张'
@@ -199,6 +217,7 @@ function resetSelectedJob() {
   elements.qualityPsnr.textContent = '--'
   elements.qualitySsim.textContent = '--'
   elements.thumbnailStrip.replaceChildren()
+  elements.pullImage.disabled = true
   elements.pullStatus.textContent = '等待选择 job'
   showImage(elements.originalPreview, elements.originalEmpty, '')
   showImage(elements.reconstructionPreview, elements.reconstructionEmpty, '')
@@ -207,9 +226,10 @@ function resetSelectedJob() {
 async function loadJob(jobId) {
   if (!jobId) return
   const sourceId = state.sourceId
+  const sourceEpoch = state.sourceEpoch
   elements.pullStatus.textContent = '正在读取 job 清单'
   const detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)
-  if (sourceId !== state.sourceId) return
+  if (!isCurrentJobRequest(sourceEpoch, sourceId, jobId)) return
   state.detail = detail
   elements.reconstructionDirectory.textContent = state.detail.job.path
   elements.originalCount.textContent = `${state.detail.pairs.filter(referenceAvailable).length} 张`
@@ -218,10 +238,11 @@ async function loadJob(jobId) {
 
 async function loadJobs() {
   const sourceId = state.sourceId
+  const sourceEpoch = state.sourceEpoch
   elements.refreshJobs.disabled = true
   try {
-    const payload = await requestJson(`/api/jobs?source=${encodeURIComponent(state.sourceId)}`)
-    if (sourceId !== state.sourceId) return
+    const payload = await requestJson(`/api/jobs?source=${encodeURIComponent(sourceId)}`)
+    if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
     state.jobs = payload.jobs
     elements.jobSelect.replaceChildren()
     for (const job of state.jobs) {
@@ -233,7 +254,9 @@ async function loadJobs() {
     if (state.jobs.length) await loadJob(state.jobs[0].id)
     else elements.pullStatus.textContent = '当前来源没有可用重建 job'
   } finally {
-    elements.refreshJobs.disabled = false
+    if (isCurrentSourceRequest(sourceEpoch, sourceId)) {
+      elements.refreshJobs.disabled = false
+    }
   }
 }
 
@@ -246,27 +269,40 @@ async function selectSource(sourceId) {
 async function pullCurrent() {
   const pair = currentPair()
   if (!pair) return
+  const request = {
+    sourceEpoch: state.sourceEpoch,
+    sourceId: state.sourceId,
+    jobId: currentJobId(),
+    index: state.index,
+    referenceMode: state.referenceMode,
+    pair,
+  }
   elements.pullImage.disabled = true
-  elements.pullStatus.textContent = `正在拉取第 ${state.index + 1} 张`
+  elements.pullStatus.textContent = `正在拉取第 ${request.index + 1} 张`
   try {
     const payload = await requestJson('/api/pull', {
       method: 'POST',
       body: JSON.stringify({
-        job_id: currentJobId(),
-        index: state.index,
-        reference_mode: state.referenceMode,
+        job_id: request.jobId,
+        index: request.index,
+        reference_mode: request.referenceMode,
       }),
     })
+    if (!isCurrentPullRequest(request)) return
     pair.cached = true
     if (payload.quality) {
-      state.quality[`${currentJobId()}:${state.index}:${state.referenceMode}`] = payload.quality
+      const { jobId, index, referenceMode } = request
+      state.quality[`${jobId}:${index}:${referenceMode}`] = payload.quality
     }
     elements.pullStatus.textContent = payload.cached ? '已从本地缓存加载' : '拉取完成'
     renderPreview()
   } catch (error) {
+    if (!isCurrentPullRequest(request)) return
     elements.pullStatus.textContent = `拉取失败：${error.message}`
   } finally {
-    elements.pullImage.disabled = false
+    if (isCurrentPullRequest(request)) {
+      elements.pullImage.disabled = false
+    }
   }
 }
 
@@ -307,7 +343,7 @@ async function initialize() {
     elements.sourceSelect.value = state.sourceId
     renderReferenceMode()
     elements.serviceStatus.textContent = `上位机服务已连接 · 板端 ${state.config.board_host}`
-    await loadJobs()
+    await selectSource(state.sourceId)
     setInterval(pollState, 3000)
   } catch (error) {
     elements.serviceStatus.textContent = `初始化失败：${error.message}`
