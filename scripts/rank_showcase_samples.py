@@ -57,6 +57,7 @@ class RankedSample:
 class StabilityReport:
     stable: bool
     full_run_count: int
+    rankings_identical: bool
     minimum_spearman: float
     minimum_top_overlap: float
 
@@ -102,13 +103,17 @@ def assess_ranking_stability(
 
     lowest_correlation = min(correlations)
     lowest_overlap = min(overlaps)
+    rankings_identical = all(list(candidate) == reference for candidate in cross_seed_rankings[1:])
     stable = (
+        rankings_identical
+        and
         lowest_correlation >= minimum_spearman
         and lowest_overlap >= minimum_top_overlap
     )
     return StabilityReport(
         stable=stable,
         full_run_count=1 if stable else 3,
+        rankings_identical=rankings_identical,
         minimum_spearman=lowest_correlation,
         minimum_top_overlap=lowest_overlap,
     )

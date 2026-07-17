@@ -122,3 +122,19 @@ def test_unstable_cross_seed_probe_requires_three_full_runs() -> None:
 
     assert report.full_run_count == 3
     assert report.stable is False
+
+
+def test_correlated_but_different_rankings_still_require_averaging() -> None:
+    baseline = [f"sample-{index:03d}" for index in range(100)]
+    changed = list(baseline)
+    changed[-1], changed[-2] = changed[-2], changed[-1]
+
+    report = assess_ranking_stability(
+        same_seed_hash_runs=[{"a": "hash-1"}, {"a": "hash-1"}],
+        cross_seed_rankings=[baseline, changed, baseline],
+    )
+
+    assert report.minimum_spearman >= 0.98
+    assert report.minimum_top_overlap == 1.0
+    assert report.full_run_count == 3
+    assert report.stable is False
