@@ -1,0 +1,37 @@
+{
+  "already_moved": [],
+  "apply": false,
+  "classification_counts": {
+    "exact-summary": 0,
+    "inherited-base-summary": 0,
+    "unresolved": 0
+  },
+  "classified": [],
+  "collisions": [],
+  "connection": {
+    "host": "100.121.87.73",
+    "port": 22,
+    "user": "user"
+  },
+  "counts": {
+    "already_moved": 0,
+    "classified": 0,
+    "collisions": 0,
+    "missing": 0,
+    "moved": 0,
+    "unresolved": 0
+  },
+  "legacy_root": "/home/user/Downloads/jscc-test/jscc/infer_outputs",
+  "missing": [],
+  "mode_counts": {
+    "usrp-iq-direct": 0,
+    "usrp-qpsk": 0
+  },
+  "moved": [],
+  "operation": "migration",
+  "output_root": "/home/user/Downloads/jscc-test-usrp",
+  "run_root": "E:\\Main\\Career\\集创赛\\FINAL_WORK_ICCompetition2026\\USRP292x\\qpsk_batch_spool_arq_runs",
+  "safe": false,
+  "schema_version": 1,
+  "unresolved": []
+}
