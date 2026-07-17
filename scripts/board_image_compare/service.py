@@ -128,6 +128,8 @@ class ComparisonServiceState:
         source_ids = {source.id for source in config.sources}
         if not source_ids:
             raise ValueError("at least one reconstruction source is required")
+        if any(not source.id for source in config.sources):
+            raise ValueError("reconstruction source IDs must not be blank")
         if len(source_ids) != len(config.sources):
             raise ValueError("reconstruction source IDs must be unique")
         if config.default_source not in source_ids:
@@ -246,12 +248,15 @@ class ComparisonServiceState:
                 self._pairs.clear()
                 self._quality.clear()
                 self._scan_generation += 1
+            generation = self._scan_generation
         try:
             jobs = self._require_remote().list_jobs(source.remote_root)
         except FileNotFoundError:
             jobs = []
         jobs = [job for job in jobs if source.accepts(job.name)]
         with self._lock:
+            if self._selected_source != source_id or self._scan_generation != generation:
+                return []
             self._jobs = {job.id: job for job in jobs}
             self._pairs = {job_id: pairs for job_id, pairs in self._pairs.items() if job_id in self._jobs}
         return [self._serialize_job(job) for job in jobs]

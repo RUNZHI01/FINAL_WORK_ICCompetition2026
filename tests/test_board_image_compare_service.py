@@ -158,6 +158,48 @@ def test_switching_sources_clears_stale_job_selection(tmp_path: Path) -> None:
     state.close()
 
 
+def test_stale_source_listing_cannot_restore_old_jobs(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+    state.configure(
+        ComparisonConfig(
+            board_host="board-a",
+            board_user="user",
+            board_password="user",
+            board_port=22,
+            original_dir=tmp_path / "originals",
+            sources=(
+                ReconstructionSource("source-a", "Source A", "/source-a"),
+                ReconstructionSource("source-b", "Source B", "/source-b"),
+            ),
+            default_source="source-a",
+        )
+    )
+    a_started = threading.Event()
+    release_a = threading.Event()
+
+    def list_jobs(remote_root: str):
+        if remote_root == "/source-a":
+            a_started.set()
+            assert release_a.wait(timeout=2)
+            return [RemoteJob("a", "job-a", "/source-a/job-a/reconstructions", 1.0)]
+        return [RemoteJob("b", "job-b", "/source-b/job-b/reconstructions", 2.0)]
+
+    remote.list_jobs = list_jobs
+    thread = threading.Thread(target=lambda: state.list_jobs("source-a"))
+    thread.start()
+    assert a_started.wait(timeout=2)
+
+    assert [job["id"] for job in state.list_jobs("source-b")] == ["b"]
+    release_a.set()
+    thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    with pytest.raises(KeyError, match="unknown job"):
+        state.job_detail("a")
+    assert state.job_detail("b")["job"]["id"] == "b"
+    state.close()
+
+
 def test_pull_downloads_requested_image_and_reuses_cache(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
     state.list_jobs("usrp-iq-direct")
@@ -360,6 +402,36 @@ def test_http_config_parses_sources_and_exposes_public_source_fields(tmp_path: P
         ]
         assert payload["default_source"] == "usrp-iq-direct"
         assert "password" not in json.dumps(payload).lower()
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
+def test_http_config_rejects_blank_source_id(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    request = Request(
+        f"http://127.0.0.1:{server.server_port}/api/config",
+        data=json.dumps(
+            {
+                "board_host": "board-a",
+                "board_user": "user",
+                "board_port": 22,
+                "original_dir": str(tmp_path / "originals"),
+                "sources": [{"id": "", "label": "Blank", "remote_root": "/blank"}],
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with pytest.raises(HTTPError) as error:
+            urlopen(request, timeout=2)
+        assert error.value.code == 400
     finally:
         server.shutdown()
         server.server_close()
