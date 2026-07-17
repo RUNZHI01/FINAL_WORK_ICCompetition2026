@@ -211,13 +211,13 @@ function buildIqTailDistributionItems(audit: IqTailAudit | null | undefined): Iq
   return items
 }
 
-type MainProgressTone = 'yellow' | 'green' | 'blue'
+type MainProgressTone = 'lightBlue' | 'mediumBlue' | 'deepBlue'
 type MainProgressState = 'done' | 'active' | 'pending'
 
 function mainProgressToneClass(tone: MainProgressTone): string {
-  if (tone === 'yellow') return s.mainStageYellow
-  if (tone === 'green') return s.mainStageGreen
-  return s.mainStageBlue
+  if (tone === 'lightBlue') return s.mainStageLightBlue
+  if (tone === 'mediumBlue') return s.mainStageMediumBlue
+  return s.mainStageDeepBlue
 }
 
 function mainProgressStateClass(state: MainProgressState): string {
@@ -687,9 +687,9 @@ export function DashboardPageMinimal() {
   const progressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
   const stageProgressSuffix = isRunning ? '处理中' : isDone ? '已完成' : '待启动'
   const mainProgressRows = [
-    { key: 'host', label: activeTransport === 'usrp' ? '上位机图片→latent' : '预录输入准备', tone: 'yellow' as const, stage: hostPreprocessStage },
-    { key: 'transport', label: activeTransport === 'usrp' ? 'USRP 传输/解包' : '预录数据装载', tone: 'green' as const, stage: transportStage },
-    { key: 'inference', label: `${batchEngineLabel} 板端推理`, tone: 'blue' as const, stage: inferenceStage },
+    { key: 'host', label: activeTransport === 'usrp' ? '上位机图片→latent' : '预录输入准备', tone: 'lightBlue' as const, stage: hostPreprocessStage },
+    { key: 'transport', label: activeTransport === 'usrp' ? 'USRP 传输/解包' : '预录数据装载', tone: 'mediumBlue' as const, stage: transportStage },
+    { key: 'inference', label: `${batchEngineLabel} 板端推理`, tone: 'deepBlue' as const, stage: inferenceStage },
   ]
   const stageDoneFlags = hasStageProgress
     ? mainProgressRows.map((row) => row.stage.completed >= row.stage.total || row.stage.status === 'completed' || row.stage.status === 'done')

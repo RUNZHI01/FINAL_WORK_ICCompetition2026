@@ -413,16 +413,16 @@
   transition: background 200ms var(--easing-emphasized), opacity 200ms var(--easing-emphasized);
 }
 
-.mainStageYellow {
-  --main-stage-rgb: 234, 179, 8;
+.mainStageLightBlue {
+  --main-stage-rgb: 144, 202, 249;
 }
 
-.mainStageGreen {
-  --main-stage-rgb: 34, 197, 94;
+.mainStageMediumBlue {
+  --main-stage-rgb: 66, 165, 245;
 }
 
-.mainStageBlue {
-  --main-stage-rgb: 43, 94, 212;
+.mainStageDeepBlue {
+  --main-stage-rgb: 30, 136, 229;
 }
 
 .mainStagePending {
@@ -474,18 +474,18 @@
 }
 
 .hostPreprocessFill {
-  background: linear-gradient(90deg, #d99b06 0%, #facc15 55%, #fde68a 100%);
-  box-shadow: 4px 0 12px rgba(250, 204, 21, 0.5);
+  background: #90caf9;
+  box-shadow: 4px 0 12px rgba(144, 202, 249, 0.5);
 }
 
 .transportFill {
-  background: linear-gradient(90deg, #168a45 0%, #22c55e 55%, #86efac 100%);
-  box-shadow: 4px 0 12px rgba(34, 197, 94, 0.5);
+  background: #42a5f5;
+  box-shadow: 4px 0 12px rgba(66, 165, 245, 0.5);
 }
 
 .inferenceFill {
-  background: linear-gradient(90deg, #2b5ed4 0%, #3a76f0 55%, #62a0ff 100%);
-  box-shadow: 4px 0 12px rgba(26, 86, 219, 0.6);
+  background: #1e88e5;
+  box-shadow: 4px 0 12px rgba(30, 136, 229, 0.55);
 }
 
 .stageProgressGrid {
