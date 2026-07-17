@@ -8,6 +8,8 @@ import pytest
 from scripts.migrate_usrp_output_layout import (
     apply_migration,
     build_remote_migration_plan,
+    collect_remote_job_names,
+    parse_args,
     rollback_migration,
     write_report_atomic,
 )
@@ -20,8 +22,9 @@ from scripts.board_image_compare.sources import (
 
 
 class FakeSFTP:
-    def __init__(self, existing_paths=()):
+    def __init__(self, existing_paths=(), directory_entries=None):
         self.paths = set(existing_paths)
+        self.directory_entries = dict(directory_entries or {})
         self.mkdir_calls = []
         self.rename_calls = []
 
@@ -38,6 +41,11 @@ class FakeSFTP:
         self.rename_calls.append((source, destination))
         self.paths.remove(source)
         self.paths.add(destination)
+
+    def listdir(self, path):
+        if path not in self.directory_entries:
+            raise FileNotFoundError(2, "not found", path)
+        return list(self.directory_entries[path])
 
 
 @pytest.fixture
@@ -202,6 +210,43 @@ def test_build_remote_plan_uses_local_evidence_and_reversible_remote_paths(tmp_p
     ]
 
 
+def test_discovery_unions_legacy_and_destination_roots_for_idempotence(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    legacy_root = "/home/user/Downloads/jscc-test-usrp/tvm"
+    output_root = "/home/user/Downloads/jscc-test-usrp"
+    legacy_job = "openamp3_usrp_100_current"
+    qpsk_job = "openamp3_usrp_200_current"
+    iq_job = "openamp3_usrp_300_current"
+    _write_summary(run_root, legacy_job, {"max_arq_rounds": 2})
+    _write_summary(run_root, qpsk_job, {"chunk_bytes": 4096})
+    _write_summary(run_root, iq_job, {"phy": "analog-latent-iq"})
+    qpsk_destination = f"{output_root}/qpsk/tvm/{qpsk_job}"
+    iq_destination = f"{output_root}/iq-direct/tvm/{iq_job}"
+    fake_sftp = FakeSFTP(
+        {
+            f"{legacy_root}/{legacy_job}",
+            qpsk_destination,
+            iq_destination,
+        },
+        {
+            legacy_root: [legacy_job, "prerecorded_job"],
+            f"{output_root}/qpsk/tvm": [qpsk_job],
+            f"{output_root}/iq-direct/tvm": [iq_job],
+        },
+    )
+
+    job_names = collect_remote_job_names(fake_sftp, legacy_root, output_root)
+    plan = build_remote_migration_plan(job_names, run_root, legacy_root, output_root)
+    result = apply_migration(fake_sftp, plan, apply=False)
+
+    assert job_names == [legacy_job, qpsk_job, iq_job]
+    assert len(result["classified"]) == 3
+    assert {entry["destination"] for entry in result["already_moved"]} == {
+        qpsk_destination,
+        iq_destination,
+    }
+
+
 def test_write_report_atomic_is_deterministic(tmp_path: Path):
     report_path = tmp_path / "reports" / "migration.json"
     payload = {"moved": [], "classified": [{"source": "/legacy/job"}]}
@@ -227,6 +272,14 @@ def test_migration_script_runs_as_a_direct_cli():
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+def test_migration_cli_defaults_to_historical_usrp_legacy_root():
+    args = parse_args(
+        ["--host", "board", "--user", "user", "--password", "user"]
+    )
+
+    assert args.legacy_root == "/home/user/Downloads/jscc-test-usrp/tvm"
 
 
 def test_plan_usrp_migration_uses_exact_then_base_run_and_never_guesses(tmp_path: Path):

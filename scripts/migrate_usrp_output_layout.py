@@ -18,7 +18,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from scripts.board_image_compare.sources import extract_usrp_token, plan_usrp_migration
 
 
-DEFAULT_LEGACY_ROOT = "/home/user/Downloads/jscc-test/jscc/infer_outputs"
+DEFAULT_LEGACY_ROOT = "/home/user/Downloads/jscc-test-usrp/tvm"
 DEFAULT_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
 DEFAULT_REPORT = (
     "Semantic-Communication/session_bootstrap/reports/"

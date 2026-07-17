@@ -10,7 +10,7 @@
 | `usrp-qpsk` | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` | Historical and new QPSK TVM jobs |
 | `usrp-iq-direct` | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` | Historical and new direct-IQ TVM jobs |
 
-The prerecorded source roots stay at the paths above, and prerecorded jobs are not renamed. Only strict historical `openamp3_usrp_*_current` children selected from the legacy TVM root are eligible. New Demo jobs route to the QPSK or direct-IQ root from the effective `JSCC_LINK_MODE`; MNN uses the corresponding `mnn` leaf.
+The prerecorded source roots stay at the paths above, and prerecorded jobs are not renamed. Only strict historical `openamp3_usrp_*_current` children from `/home/user/Downloads/jscc-test-usrp/tvm` are eligible. New Demo jobs route to the QPSK or direct-IQ root from the effective `JSCC_LINK_MODE`; MNN uses the corresponding `mnn` leaf.
 
 | Effective link mode | TVM output | MNN output |
 |---|---|---|
@@ -31,6 +31,7 @@ Dry-run is the default:
 python scripts/migrate_usrp_output_layout.py `
   --host 100.121.87.73 --user user --password user `
   --run-root USRP292x/qpsk_batch_spool_arq_runs `
+  --legacy-root /home/user/Downloads/jscc-test-usrp/tvm `
   --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json
 ```
 
@@ -38,7 +39,7 @@ Use `--apply` only after the dry-run has the expected 239 exact direct-IQ jobs, 
 
 ```powershell
 # Apply after review
-python scripts/migrate_usrp_output_layout.py --host 100.121.87.73 --user user --password user --run-root USRP292x/qpsk_batch_spool_arq_runs --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
+python scripts/migrate_usrp_output_layout.py --host 100.121.87.73 --user user --password user --run-root USRP292x/qpsk_batch_spool_arq_runs --legacy-root /home/user/Downloads/jscc-test-usrp/tvm --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
 
 # Roll back destinations present in the report
 python scripts/migrate_usrp_output_layout.py --host 100.121.87.73 --user user --password user --rollback-report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
@@ -48,4 +49,6 @@ The CLI uses Paramiko SFTP `stat`, `mkdir`, and `rename`; it does not issue remo
 
 ## 2026-07-17 evidence
 
-The board was reachable, but the configured legacy root contained 122 children and no `openamp3_usrp_*_current` children. Both new USRP roots were absent. The guarded dry-run therefore recorded zero classified jobs and `safe: false`; apply and post-apply idempotence checks were not run. The expected unresolved retry job could not be identified in this board state. Restore or identify the historical legacy output snapshot, then repeat dry-run review before applying.
+The corrected dry-run classified 244 jobs: 239 exact direct-IQ jobs, four exact QPSK jobs, and one inherited direct-IQ recovery job `openamp3_usrp_1784197230_recovery_current`. It left `openamp3_usrp_1783653522_current_retry_current` unresolved because no `batch_spool_summary.json` evidence was found. There were no collisions or missing classified sources.
+
+Apply moved all 244 classified jobs. The post-apply dry-run reported 244 `already_moved`, zero `moved`, the same unresolved retry, and `safe: true`. A read-only SFTP check confirmed 240 IQ jobs, four QPSK jobs, and only the unresolved retry in the legacy root. No prerecorded path was inspected or modified by the migration command.

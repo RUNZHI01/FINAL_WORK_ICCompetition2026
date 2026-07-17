@@ -251,7 +251,7 @@ Cockpit 的“板端输出目录”下有“本次重建对比图”按钮。它
 | USRP QPSK TVM | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` |
 | USRP IQ 直传 TVM | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` |
 
-完整的五类来源、MNN USRP 叶目录和历史迁移证据见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。2026-07-17 的迁移 dry-run 因板端未发现预期历史 USRP job 而保持 `safe: false`，未执行 apply。
+完整的五类来源、MNN USRP 叶目录和历史迁移证据见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。2026-07-17 已从 `/home/user/Downloads/jscc-test-usrp/tvm` 迁移 244 个历史 job；复跑 dry-run 得到 244 个 `already_moved`，一个无分类证据的 retry job 留在旧目录。
 
 实现边界：
 
