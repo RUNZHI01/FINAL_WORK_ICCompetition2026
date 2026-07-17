@@ -101,6 +101,7 @@ def configured_state(
             original_dir=originals,
             sources=(
                 ReconstructionSource("prerecorded-mnn", "Prerecorded MNN", "/prerecorded/mnn"),
+                ReconstructionSource("usrp-qpsk", "USRP QPSK", "/usrp/qpsk/tvm"),
                 ReconstructionSource("usrp-iq-direct", "USRP IQ direct", "/usrp/iq-direct/tvm"),
             ),
             default_source="usrp-iq-direct",
@@ -322,6 +323,41 @@ def test_historical_usrp_job_keeps_direct_image_manifest_support(tmp_path: Path)
     state.list_jobs("usrp-iq-direct")
 
     assert state.job_detail("historical")["pairs"][0]["original_name"] == "zeta.png"
+    state.close()
+
+
+def test_qpsk_job_uses_prepared_input_manifest_for_original_and_quality(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    run_dir = manifest_root / "cockpit_usrp_usrp-123" / "prepared_usrp_inputs"
+    run_dir.mkdir(parents=True)
+    (run_dir / "usrp_input_manifest.json").write_text(
+        json.dumps(
+            {
+                "files": [
+                    {
+                        "original_filename": "zeta",
+                        "source_image_rel": "zeta.png",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (12, 30, 60))
+    write_image(state._config.original_dir / "frame_0000.png", (80, 20, 40))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("qpsk", "openamp3_usrp_123_current", f"{remote_root}/openamp3_usrp_123_current", 300.0)
+    ]
+
+    state.list_jobs("usrp-qpsk")
+    detail = state.job_detail("qpsk")
+    result = state.pull("qpsk", 0, "original")
+
+    assert detail["pairs"][0]["original_name"] == "zeta.png"
+    assert detail["pairs"][0]["original_available"] is True
+    assert result["quality"]["psnr_db"] == "Infinity"
+    assert result["quality"]["ssim"] == 1.0
     state.close()
 
 

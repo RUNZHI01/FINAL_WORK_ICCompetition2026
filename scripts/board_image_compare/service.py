@@ -59,6 +59,10 @@ def _local_image_paths(root: Path) -> list[Path]:
 def _manifest_original_name(payload: object) -> str:
     if not isinstance(payload, dict):
         return ""
+    for key in ("source_image_rel", "original_filename", "source_image"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
     source_info = payload.get("source_info")
     source_meta = source_info.get("source_meta") if isinstance(source_info, dict) else None
     value = source_meta.get("original_filename") if isinstance(source_meta, dict) else ""
@@ -298,6 +302,20 @@ class ComparisonServiceState:
         candidates = [path for path in root.iterdir() if path.is_dir() and path.name in candidate_names]
         candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         for run_dir in candidates:
+            prepared_manifest = run_dir / "prepared_usrp_inputs" / "usrp_input_manifest.json"
+            try:
+                prepared_payload = json.loads(prepared_manifest.read_text(encoding="utf-8"))
+                prepared_files = prepared_payload.get("files", []) if isinstance(prepared_payload, dict) else []
+            except (OSError, ValueError, json.JSONDecodeError):
+                prepared_files = []
+            prepared_names = {
+                index: name
+                for index, record in enumerate(prepared_files)
+                if (name := _manifest_original_name(record))
+            }
+            if prepared_names:
+                return prepared_names
+
             names: dict[int, str] = {}
             for image_dir in sorted(run_dir.glob("**/image_*")):
                 if not image_dir.is_dir():
