@@ -472,15 +472,43 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
         image = _first_value(env_values, ("OPENAMP_USRP_TX_DOCKER_IMAGE", "USRP_TX_DOCKER_IMAGE"), "iccomp-usrp-tx:latest")
         mount_target = _first_value(env_values, TX_DOCKER_MOUNT_TARGET_KEYS, DEFAULT_TX_DOCKER_MOUNT_TARGET)
         script_in_container = f"{mount_target.rstrip('/')}/USRP292x/OtaTxPersistentServer.sh"
+        network_mode = _first_value(
+            env_values,
+            ("OPENAMP_USRP_TX_DOCKER_NETWORK", "USRP_TX_DOCKER_NETWORK"),
+            "host",
+        ).strip().lower()
+        external_port = int(tx_port)
+        internal_port = int(_first_value(
+            env_values,
+            ("OPENAMP_USRP_TX_DOCKER_INTERNAL_PORT", "USRP_TX_DOCKER_INTERNAL_PORT"),
+            str(external_port + 10000),
+        ))
+        tx_name = f"cockpit-usrp-tx-{external_port}"
+        proxy_name = f"cockpit-usrp-tx-proxy-{external_port}"
+        if network_mode == "host":
+            for container_name in (proxy_name, tx_name):
+                subprocess.run(
+                    ["docker", "rm", "-f", container_name],
+                    capture_output=True,
+                    text=True,
+                    cwd=REPO_ROOT,
+                    check=False,
+                )
         command = [
             "docker",
             "run",
             "-d",
             "--rm",
+        ]
+        if network_mode == "host":
+            command.extend(["--name", tx_name, "--network", "host"])
+        command.extend([
             "--mount",
             f"type=bind,source={REPO_ROOT},target={mount_target}",
-            "-p",
-            f"127.0.0.1:{tx_port}:{tx_port}",
+        ])
+        if network_mode != "host":
+            command.extend(["-p", f"127.0.0.1:{tx_port}:{tx_port}"])
+        command.extend([
             "-e",
             f"DEVICE_ARGS={_first_value(env_values, ('TX_ARGS',), DEFAULT_TX_ARGS)}",
             "-e",
@@ -494,11 +522,11 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
             "-e",
             "BIND_ADDR=0.0.0.0",
             "-e",
-            f"PORT={tx_port}",
+            f"PORT={internal_port if network_mode == 'host' else external_port}",
             image,
             "bash",
             script_in_container,
-        ]
+        ])
         result = subprocess.run(command, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
         if result.returncode != 0:
             return {
@@ -506,12 +534,58 @@ def _start_local_tx_server(env_values: dict[str, str], *, log_dir: Path, tx_port
                 "runner": "docker",
                 "message": (result.stderr or result.stdout or f"docker rc={result.returncode}").strip(),
             }
+        proxy_result: subprocess.CompletedProcess[str] | None = None
+        if network_mode == "host":
+            proxy_script = f"{mount_target.rstrip('/')}/scripts/tcp_forward.py"
+            proxy_command = [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "--name",
+                proxy_name,
+                "--mount",
+                f"type=bind,source={REPO_ROOT},target={mount_target}",
+                "-p",
+                f"127.0.0.1:{external_port}:{external_port}",
+                image,
+                "python3",
+                proxy_script,
+                "--listen-port",
+                str(external_port),
+                "--target-host",
+                "docker-gateway",
+                "--target-port",
+                str(internal_port),
+            ]
+            proxy_result = subprocess.run(
+                proxy_command,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+                check=False,
+            )
+            if proxy_result.returncode != 0:
+                subprocess.run(
+                    ["docker", "rm", "-f", tx_name],
+                    capture_output=True,
+                    text=True,
+                    cwd=REPO_ROOT,
+                    check=False,
+                )
+                return {
+                    "status": "error",
+                    "runner": "docker",
+                    "message": (proxy_result.stderr or proxy_result.stdout or f"docker rc={proxy_result.returncode}").strip(),
+                }
         return {
             "status": "started",
             "runner": "docker",
             "container_id": (result.stdout or "").strip(),
+            "proxy_container_id": (proxy_result.stdout or "").strip() if proxy_result is not None else "",
             "image": image,
             "port": str(tx_port),
+            "network": network_mode or "bridge",
         }
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"tx_persistent_cockpit_{int(time.time())}.log"
@@ -663,7 +737,7 @@ def _start_remote_rx_server(
         "set -e; "
         f"cd {shlex.quote(remote_project_root)}; "
         f"mkdir -p {shlex.quote(remote_log_dir)}; "
-        "nohup env "
+        "setsid -f env "
         f"DEVICE_ARGS={shlex.quote(_first_value(env_values, ('RX_ARGS',), DEFAULT_RX_ARGS))} "
         f"RATE={shlex.quote(_first_value(env_values, ('RATE',), DEFAULT_RATE))} "
         f"FREQ={shlex.quote(_first_value(env_values, ('FREQ',), DEFAULT_FREQ))} "
@@ -674,7 +748,7 @@ def _start_remote_rx_server(
         f"STOP_WAIT_MS={shlex.quote(_rx_stop_wait_ms(env_values))} "
         f"PORT={shlex.quote(str(rx_port))} "
         "./USRP292x/OtaRxPersistentServer.sh "
-        f"> {shlex.quote(remote_log)} 2>&1 < /dev/null & "
+        f"> {shlex.quote(remote_log)} 2>&1 < /dev/null; "
         "sleep 1"
     )
     proc = _run_remote_command(access, remote_cmd, timeout=60.0)
@@ -1441,83 +1515,13 @@ def _sync_and_decode_wire_blobs_on_remote(
     remote_dir = f"{remote_root_text}/{remote_subdir}".rstrip("/")
     remote_python_cmd = str(remote_python or "").strip() or "python3"
     payload = _tar_directory_bytes(local_stage_dir)
-    local_tar_path: Path | None = None
-    remote_tar_path = f"/tmp/cockpit_usrp_wire_{os.getpid()}_{int(time.time() * 1000)}.tar.gz"
-    scp_env = os.environ.copy()
-    scp_env.update(CHILD_PROCESS_ENV)
-    scp_env["SSHPASS"] = access.password
-    scp_command = [
-        "sshpass",
-        "-e",
-        "scp",
-        "-q",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "BatchMode=no",
-        "-o",
-        "LogLevel=ERROR",
-        "-o",
-        "PreferredAuthentications=password,keyboard-interactive",
-        "-P",
-        access.port,
-    ]
-    remote_command = (
-        f"set -euo pipefail && mkdir -p {shlex.quote(remote_dir)} "
-        f"&& tar xzf {shlex.quote(remote_tar_path)} -C {shlex.quote(remote_dir)} "
-        f"&& rm -f {shlex.quote(remote_tar_path)} "
-        f"&& cd {shlex.quote(remote_dir)} "
-        f"&& {remote_python_cmd} decode_usrp_wire.py --wire-dir _wire --output-dir ."
+    remote_command = "bash -lc " + shlex.quote(
+        f"set -euo pipefail; mkdir -p {shlex.quote(remote_dir)}; "
+        f"tar xzf - -C {shlex.quote(remote_dir)}; "
+        f"cd {shlex.quote(remote_dir)}; "
+        f"{remote_python_cmd} decode_usrp_wire.py --wire-dir _wire --output-dir ."
     )
-    command = [
-        resolve_bash_executable(),
-        str(SSH_HELPER),
-        "--host",
-        access.host,
-        "--user",
-        access.user,
-        "--pass",
-        access.password,
-        "--port",
-        access.port,
-        "--",
-        remote_command,
-    ]
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz") as tmp:
-            tmp.write(payload)
-            local_tar_path = Path(tmp.name)
-        scp_result = subprocess.run(
-            [
-                *scp_command,
-                str(local_tar_path),
-                f"{access.user}@{access.host}:{remote_tar_path}",
-            ],
-            capture_output=True,
-            cwd=REPO_ROOT,
-            env=scp_env,
-            check=False,
-        )
-        if scp_result.returncode != 0:
-            stderr = scp_result.stderr.decode("utf-8", errors="ignore").strip()
-            stdout = scp_result.stdout.decode("utf-8", errors="ignore").strip()
-            detail = stderr or stdout or f"scp rc={scp_result.returncode}"
-            raise RuntimeError(f"板端 USRP RX 目录上传失败: {detail}")
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            cwd=REPO_ROOT,
-            env=scp_env,
-            check=False,
-        )
-    finally:
-        if local_tar_path is not None:
-            try:
-                local_tar_path.unlink()
-            except OSError:
-                pass
+    result = _run_remote_command(access, remote_command, timeout=180.0, input_data=payload)
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="ignore").strip()
         stdout = result.stdout.decode("utf-8", errors="ignore").strip()

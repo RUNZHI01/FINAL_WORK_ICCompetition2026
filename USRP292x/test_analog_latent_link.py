@@ -5997,6 +5997,7 @@ def test_batch_runner_recycles_rx_session_after_opt_in_rx_stall(tmp_path, monkey
     opened: list[str] = []
     closed: list[str] = []
     seen_sessions: list[str] = []
+    reset_commands: list[tuple[str, int, str]] = []
 
     class FakeSession:
         def __init__(self, name: str):
@@ -6021,12 +6022,17 @@ def test_batch_runner_recycles_rx_session_after_opt_in_rx_stall(tmp_path, monkey
             image.records.append({"rx_wait_wall_sec": 0.04, "rx_capture_wall_sec": 0.09, "total_wall_sec": 0.2})
         return image
 
+    def fake_run_control(host, port, line, _log_path, _timeout):
+        reset_commands.append((str(host), int(port), str(line)))
+        return "OK reset=1 busy=0"
+
     monkeypatch.setattr(analog_batch, "parse_args", lambda: args)
     monkeypatch.setattr(analog_batch, "_validate_rx_capture_config", lambda _args: None)
     monkeypatch.setattr(analog_batch, "load_inputs", lambda _args: input_paths)
     monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
     monkeypatch.setattr(analog_batch, "open_control_session", fake_open_control_session)
     monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+    monkeypatch.setattr(analog_batch, "run_control", fake_run_control)
 
     assert analog_batch.main() == 0
 
@@ -6034,8 +6040,10 @@ def test_batch_runner_recycles_rx_session_after_opt_in_rx_stall(tmp_path, monkey
     assert opened == ["session-1", "session-2"]
     assert seen_sessions == ["session-1", "session-2"]
     assert "session-1" in closed
+    assert reset_commands == [("127.0.0.1", 29220, "RESET")]
     assert summary["rx_health_reset_count"] == 1
     assert summary["images"][0]["round_records"][0]["rx_health_reset_after_stall"] is True
+    assert summary["images"][0]["round_records"][0]["rx_health_reset_response"] == "OK reset=1 busy=0"
 
 
 def test_batch_runner_grants_one_extra_attempt_after_rx_health_stall(tmp_path, monkeypatch):
@@ -6132,6 +6140,7 @@ def test_batch_runner_grants_one_extra_attempt_after_rx_health_stall(tmp_path, m
     monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
     monkeypatch.setattr(analog_batch, "open_control_session", fake_open_control_session)
     monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+    monkeypatch.setattr(analog_batch, "run_control", lambda *_args, **_kwargs: "OK reset=1 busy=0")
 
     assert analog_batch.main() == 0
 
@@ -6242,6 +6251,7 @@ def test_batch_runner_grants_health_extra_attempt_even_when_stall_is_not_final_a
     monkeypatch.setattr(analog_batch, "warmup_local_codec", lambda _args, _inputs: 0.0)
     monkeypatch.setattr(analog_batch, "open_control_session", fake_open_control_session)
     monkeypatch.setattr(analog_batch, "process_image", fake_process_image)
+    monkeypatch.setattr(analog_batch, "run_control", lambda *_args, **_kwargs: "OK reset=1 busy=0")
 
     assert analog_batch.main() == 0
 

@@ -1,10 +1,33 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 
 DOCKER_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = DOCKER_DIR.parent
+
+
+def load_tcp_forward_module():
+    path = PROJECT_ROOT / "scripts" / "tcp_forward.py"
+    spec = importlib.util.spec_from_file_location("tcp_forward", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_tcp_forward_resolves_docker_bridge_gateway(tmp_path: Path) -> None:
+    route = tmp_path / "route"
+    route.write_text(
+        "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\n"
+        "eth0\t00000000\t010011AC\t0003\t0\t0\t0\t00000000\n",
+        encoding="ascii",
+    )
+
+    module = load_tcp_forward_module()
+
+    assert module.resolve_target_host("docker-gateway", route_path=route) == "172.17.0.1"
 
 
 def read_script(name: str) -> str:
@@ -51,7 +74,11 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
     assert 'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"' in script
     assert 'COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10' in script
     assert 'COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS' in script
+    assert "min_success = count" in script
+    assert "min_success = max(1, (count + 1) // 2)" not in script
     assert 'warm-up incomplete' not in script
+    assert 'PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"' in script
+    assert 'PYTHONUTF8="${PYTHONUTF8:-1}"' in script
     for expected in (
         'ANALOG_SYNC_PROFILE="${ANALOG_SYNC_PROFILE:-fast-first}"',
         'ANALOG_FAST_SYNC_CANDIDATES="${ANALOG_FAST_SYNC_CANDIDATES:-4}"',
@@ -83,6 +110,15 @@ def test_start_demo_defaults_to_full_iq_streaming_warmup_chunk() -> None:
 
     assert "[int]$WarmupCount = 10" in script
     assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)' in script
+    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)' in script
+    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS" "2"' in script
+    assert 'Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "host"' in script
+
+    shell_script = (
+        PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-dev.sh"
+    ).read_text(encoding="utf-8")
+    assert 'COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS="${COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS:-2}"' in shell_script
+    assert "remaining = count - accepted_total" in shell_script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
@@ -161,6 +197,7 @@ def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:
         "OPENAMP_USRP_TX_RUNNER",
         "OPENAMP_USRP_TX_DOCKER_IMAGE",
         "OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET",
+        "OPENAMP_USRP_TX_DOCKER_NETWORK",
         "OPENAMP_TVM_BATCH_RUNNER",
         "OPENAMP_DEMO_TVM_BATCH_RUNNER",
         "OPENAMP_TVM_BATCH_EXIT_GRACE_SEC",
@@ -185,6 +222,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         'OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"',
         'OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"',
         'OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET="${OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET:-/host_workspace}"',
+        'OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-host}"',
         'REMOTE_USRP_RX_DIR="${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}"',
         'REMOTE_RX_RUN_ROOT="${REMOTE_RX_RUN_ROOT:-/dev/shm/usrp292x_remote_runs}"',
         'REMOTE_USRP_PROJECT_ROOT="${REMOTE_USRP_PROJECT_ROOT:-/home/user}"',
@@ -259,6 +297,7 @@ def test_run_demo_tailscale_defaults_match_current_cockpit_usrp_tvm_profile() ->
         '$env:OPENAMP_USRP_TX_RUNNER = "docker"',
         '$env:OPENAMP_USRP_TX_DOCKER_IMAGE = "iccomp-usrp-tx:latest"',
         '$env:OPENAMP_USRP_TX_DOCKER_MOUNT_TARGET = "/host_workspace"',
+        '$env:OPENAMP_USRP_TX_DOCKER_NETWORK = "host"',
         '$env:REMOTE_USRP_RX_DIR = "/home/user/cockpit_usrp_rx"',
         '$env:REMOTE_RX_RUN_ROOT = "/dev/shm/usrp292x_remote_runs"',
         '$env:REMOTE_USRP_PROJECT_ROOT = "/home/user"',
@@ -372,10 +411,10 @@ def test_prepare_iq_board_sync_manifest_activates_board_tvm_env_for_validation()
     validation_section = script.split("## 同步后板端验证", 1)[1]
 
     assert "conda activate tvm310_safe" in validation_section
-    assert "python -m pytest test_analog_latent_link.py -v" in validation_section
+    assert "python -m py_compile RunAnalogLatentBatch.py AnalogLatentLink.py" in validation_section
     assert "python /home/user/USRP292x/RunAnalogLatentBatch.py --help | head -3" in validation_section
     assert "OTA_TARGETS='OtaRxPersistentServer OtaTxPersistentServer' bash BuildOtaTools.sh" in validation_section
-    assert "python3 -m pytest test_analog_latent_link.py -v" not in validation_section
+    assert "python -m pytest" not in validation_section
 
 
 def test_prepare_iq_board_sync_powershell_wrapper_runs_docker_packager() -> None:
@@ -387,6 +426,32 @@ def test_prepare_iq_board_sync_powershell_wrapper_runs_docker_packager() -> None
     assert "OUT_TAR=/workspace/artifacts/iq_board_sync.tar.gz" in script
     assert "OUT_MANIFEST=/workspace/artifacts/iq_board_sync_manifest.txt" in script
     assert "scripts/prepare_iq_board_sync.sh" in script
+
+
+def test_prepare_iq_board_sync_powershell_wrapper_can_deploy_with_docker() -> None:
+    script = read_script("prepare-iq-board-sync.ps1")
+
+    for expected in (
+        "[switch]$Deploy",
+        "[switch]$Verify",
+        '[string]$BoardHost = "100.121.87.73"',
+        '[string]$BoardUser = "user"',
+        "[int]$BoardPort = 22",
+        "sshpass -e scp",
+        "REMOTE_HOST=$BoardHost",
+        "REMOTE_USER=$BoardUser",
+        "REMOTE_SSH_PORT=$BoardPort",
+    ):
+        assert expected in script
+
+    assert "if (-not $Deploy)" in script
+    assert "conda activate tvm310_safe" in script
+    assert "python -m py_compile RunAnalogLatentBatch.py AnalogLatentLink.py" in script
+    assert "python -m pytest" not in script
+    assert "docker/start-tailscale.sh" not in script
+    assert "--cap-add=NET_ADMIN" not in script
+    assert "| cut -d ' ' -f1)" in script
+    assert "awk '{print \\\\$1}'" not in script
 
 
 def test_big_little_wrapper_intermediate_json_is_ascii_safe() -> None:

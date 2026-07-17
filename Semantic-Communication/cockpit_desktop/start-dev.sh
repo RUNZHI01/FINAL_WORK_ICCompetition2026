@@ -12,6 +12,8 @@ FRONTEND_LOG="${TMPDIR:-/tmp}/cockpit-vite.log"
 DEFAULT_AIRCRAFT_POSITION_ENV="$REPO_ROOT/session_bootstrap/tmp/aircraft_position_baidu_ip.local.env"
 AUTH_KEYS_DIR="$PACKAGE_ROOT/keys"
 AUTH_PUBLIC_KEYS_ARCHIVE="$PACKAGE_ROOT/board_deps/crypto/public_keys/board-auth-public-keys.tar.gz"
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+export PYTHONUTF8="${PYTHONUTF8:-1}"
 
 to_windows_path() {
   local path="$1"
@@ -96,6 +98,7 @@ configure_runtime_defaults() {
     export MLKEM_LOCAL_CLIENT_DOCKER_IMAGE="${MLKEM_LOCAL_CLIENT_DOCKER_IMAGE:-$OPENAMP_SSH_DOCKER_IMAGE}"
     export OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"
     export OPENAMP_USRP_TX_DOCKER_IMAGE="${OPENAMP_USRP_TX_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
+    export OPENAMP_USRP_TX_DOCKER_NETWORK="${OPENAMP_USRP_TX_DOCKER_NETWORK:-host}"
   fi
   if command -v cygpath >/dev/null 2>&1 || [[ -n "${MSYSTEM:-}" ]]; then
     local msys_env_exclusions
@@ -126,6 +129,7 @@ configure_runtime_defaults() {
   export COCKPIT_STARTUP_USRP_WARMUP="${COCKPIT_STARTUP_USRP_WARMUP:-1}"
   export COCKPIT_STARTUP_USRP_WARMUP_COUNT="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10}"
   export COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS="${COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS:-}"
+  export COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS="${COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS:-2}"
   export COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
   export MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"
   export MLKEM_AUTH_SERVER_ID="${MLKEM_AUTH_SERVER_ID:-phytium-board}"
@@ -383,40 +387,6 @@ usrp = request_json("POST", "/api/usrp-control/start", {}, timeout=90.0)
 if usrp.get("status") != "ready":
     raise SystemExit(f"USRP control did not become ready: {usrp}")
 
-try:
-    started = request_json(
-        "POST",
-        "/api/run-inference-batch",
-        {"count": count, "allow_preflight_degraded": True, "warmup": True},
-        timeout=90.0,
-    )
-except Exception as exc:
-    # The backend may keep the HTTP request open while the warm-up job is
-    # already queued. Do not abort the one-click startup until batch-state
-    # proves that no hidden warm-up exists.
-    print(f"启动预热提交未及时返回，转为轮询后端状态: {exc}", flush=True)
-    started = {}
-    start_deadline = time.monotonic() + min(timeout_sec, 120.0)
-    while time.monotonic() < start_deadline:
-        state = request_json("GET", "/api/batch-state", timeout=10.0)
-        state_status = str(state.get("status") or "")
-        state_total = int(state.get("total") or 0)
-        if state.get("warmup") and state_total == count and state_status in {
-            "running",
-            "done",
-            "completed",
-        }:
-            started = {
-                "status": "started" if state_status == "running" else "done",
-                "batch_job_id": state.get("batch_job_id") or "",
-            }
-            break
-        time.sleep(2.0)
-
-if started.get("status") not in {"started", "done"}:
-    raise SystemExit(f"warm-up batch did not start: {started}")
-job_id = str(started.get("batch_job_id") or "")
-
 def _warmup_stage_line(name: str, payload: object, fallback_total: int) -> str:
     if not isinstance(payload, dict):
         return f"{name}: 0/{fallback_total} 等待"
@@ -437,68 +407,113 @@ def _warmup_stage_line(name: str, payload: object, fallback_total: int) -> str:
         status_text = "等待"
     return f"{name}: {completed}/{total} {status_text}"
 
-deadline = time.monotonic() + timeout_sec
-last_state: dict = {}
-last_progress_line = ""
-next_progress_heartbeat = 0.0
-while time.monotonic() < deadline:
-    last_state = request_json("GET", "/api/batch-state", timeout=10.0)
-    status = str(last_state.get("status") or "")
-    completed = int(last_state.get("completed") or 0)
-    total = int(last_state.get("total") or count)
-    progress_line = "启动预热进度: " + "；".join(
-        [
-            _warmup_stage_line("latent", last_state.get("host_preprocess_progress"), total),
-            _warmup_stage_line("USRP", last_state.get("transport_progress"), total),
-            _warmup_stage_line("TVM", last_state.get("inference_progress"), total),
-        ]
-    )
-    now = time.monotonic()
-    if progress_line != last_progress_line or now >= next_progress_heartbeat:
-        print(progress_line, flush=True)
-        last_progress_line = progress_line
-        next_progress_heartbeat = now + 15.0
-    if status in {"done", "completed"}:
-        break
-    if status in {"failed", "error", "cancelled"}:
-        raise SystemExit(f"warm-up failed: {last_state}")
-    time.sleep(3.0)
-else:
-    raise SystemExit(f"warm-up timeout after {timeout_sec:.0f}s: {last_state}")
 
-completed = int(last_state.get("completed") or 0)
-success = int(last_state.get("success") or 0)
-inference_progress = last_state.get("inference_progress")
-if isinstance(inference_progress, dict):
-    completed = max(completed, int(inference_progress.get("completed") or 0))
 min_success_raw = os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS", "").strip()
 if min_success_raw:
     min_success = int(min_success_raw)
 else:
-    min_success = max(1, (count + 1) // 2)
+    min_success = count
 min_success = max(1, min(count, min_success))
-accepted_success = max(success, completed)
-if accepted_success < min_success:
+max_attempts = max(1, int(os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS", "2") or "2"))
+
+
+def run_warmup_attempt(attempt_count: int, attempt_number: int) -> int:
+    if attempt_number > 1:
+        print(
+            f"启动预热补跑 {attempt_number}/{max_attempts}：剩余 {attempt_count} 张...",
+            flush=True,
+        )
+    try:
+        started = request_json(
+            "POST",
+            "/api/run-inference-batch",
+            {"count": attempt_count, "allow_preflight_degraded": True, "warmup": True},
+            timeout=90.0,
+        )
+    except Exception as exc:
+        print(f"启动预热提交未及时返回，转为轮询后端状态: {exc}", flush=True)
+        started = {}
+        start_deadline = time.monotonic() + min(timeout_sec, 120.0)
+        while time.monotonic() < start_deadline:
+            state = request_json("GET", "/api/batch-state", timeout=10.0)
+            state_status = str(state.get("status") or "")
+            state_total = int(state.get("total") or 0)
+            if state.get("warmup") and state_total == attempt_count and state_status in {
+                "running",
+                "done",
+                "completed",
+            }:
+                started = {
+                    "status": "started" if state_status == "running" else "done",
+                    "batch_job_id": state.get("batch_job_id") or "",
+                }
+                break
+            time.sleep(2.0)
+
+    if started.get("status") not in {"started", "done"}:
+        raise SystemExit(f"warm-up batch did not start: {started}")
+    job_id = str(started.get("batch_job_id") or "")
+    deadline = time.monotonic() + timeout_sec
+    last_state: dict = {}
+    last_progress_line = ""
+    next_progress_heartbeat = 0.0
+    while time.monotonic() < deadline:
+        last_state = request_json("GET", "/api/batch-state", timeout=10.0)
+        status = str(last_state.get("status") or "")
+        total = int(last_state.get("total") or attempt_count)
+        progress_line = "启动预热进度: " + "；".join(
+            [
+                _warmup_stage_line("latent", last_state.get("host_preprocess_progress"), total),
+                _warmup_stage_line("USRP", last_state.get("transport_progress"), total),
+                _warmup_stage_line("TVM", last_state.get("inference_progress"), total),
+            ]
+        )
+        now = time.monotonic()
+        if progress_line != last_progress_line or now >= next_progress_heartbeat:
+            print(progress_line, flush=True)
+            last_progress_line = progress_line
+            next_progress_heartbeat = now + 15.0
+        if status in {"done", "completed"}:
+            break
+        if status in {"failed", "error", "cancelled"}:
+            raise SystemExit(f"warm-up failed: {last_state}")
+        time.sleep(3.0)
+    else:
+        raise SystemExit(f"warm-up timeout after {timeout_sec:.0f}s: {last_state}")
+
+    completed = int(last_state.get("completed") or 0)
+    success = int(last_state.get("success") or 0)
+    inference_progress = last_state.get("inference_progress")
+    if isinstance(inference_progress, dict):
+        completed = max(completed, int(inference_progress.get("completed") or 0))
+    accepted = min(attempt_count, max(success, completed))
+    cleared = request_json(
+        "POST",
+        "/api/batch-state/clear",
+        {"warmup_only": True, "batch_job_id": job_id},
+        timeout=10.0,
+    )
+    if cleared.get("status") != "ok" or not cleared.get("cleared"):
+        raise SystemExit(f"warm-up batch-state clear failed: {cleared}")
+    return accepted
+
+
+accepted_total = 0
+for attempt_number in range(1, max_attempts + 1):
+    remaining = count - accepted_total
+    if remaining <= 0:
+        break
+    accepted_total += run_warmup_attempt(remaining, attempt_number)
+    if accepted_total >= min_success:
+        break
+
+if accepted_total < min_success:
     raise SystemExit(
-        f"warm-up insufficient: completed={completed}, success={success}, minimum={min_success}, expected={count}"
+        f"warm-up insufficient after {max_attempts} attempts: accepted={accepted_total}, "
+        f"minimum={min_success}, expected={count}"
     )
 
-cleared = request_json(
-    "POST",
-    "/api/batch-state/clear",
-    {"warmup_only": True, "batch_job_id": job_id},
-    timeout=10.0,
-)
-if cleared.get("status") != "ok" or not cleared.get("cleared"):
-    raise SystemExit(f"warm-up batch-state clear failed: {cleared}")
-
-if accepted_success >= count:
-    print(f"启动预热完成：{accepted_success}/{count}，Cockpit Desktop 即将显示。", flush=True)
-else:
-    print(
-        f"启动预热部分完成：{accepted_success}/{count}，已达到最小阈值 {min_success}，Cockpit Desktop 即将显示。",
-        flush=True,
-    )
+print(f"启动预热完成：{accepted_total}/{count}，Cockpit Desktop 即将显示。", flush=True)
 PY
 }
 

@@ -407,6 +407,8 @@ def test_start_remote_rx_server_passes_arm_wait_ms(monkeypatch) -> None:
     assert result["status"] == "started"
     assert "ARM_WAIT_MS=50" in commands[0]
     assert "STOP_WAIT_MS=8000" in commands[0]
+    assert "setsid -f env" in commands[0]
+    assert "nohup env" not in commands[0]
 
 
 def live_probe_payload(requested_at: str, summary: str) -> dict[str, object]:
@@ -5614,16 +5616,48 @@ class ServerMainTest(unittest.TestCase):
 
         self.assertEqual(payload["status"], "started")
         self.assertEqual(payload["runner"], "docker")
-        command = run.call_args.args[0]
-        self.assertEqual(command[:4], ["docker", "run", "-d", "--rm"])
-        self.assertIn("--mount", command)
-        mount_value = command[command.index("--mount") + 1]
+        start_commands = [
+            call.args[0]
+            for call in run.call_args_list
+            if call.args[0][:4] == ["docker", "run", "-d", "--rm"]
+        ]
+        self.assertEqual(len(start_commands), 2)
+        tx_command = next(command for command in start_commands if "OtaTxPersistentServer.sh" in command[-1])
+        proxy_command = next(
+            command for command in start_commands if any(str(part).endswith("tcp_forward.py") for part in command)
+        )
+        self.assertIn("--network", tx_command)
+        self.assertEqual(tx_command[tx_command.index("--network") + 1], "host")
+        self.assertIn("PORT=39221", tx_command)
+        self.assertIn("--mount", tx_command)
+        mount_value = tx_command[tx_command.index("--mount") + 1]
         self.assertIn(f"source={usrp_runtime.REPO_ROOT}", mount_value)
         self.assertIn("target=/host_workspace", mount_value)
+        self.assertNotIn("-p", tx_command)
+        self.assertIn("127.0.0.1:29221:29221", proxy_command)
+        self.assertIn("--target-host", proxy_command)
+        self.assertEqual(proxy_command[proxy_command.index("--target-host") + 1], "docker-gateway")
+        self.assertEqual(proxy_command[proxy_command.index("--target-port") + 1], "39221")
+        self.assertEqual(tx_command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
+
+    def test_usrp_local_tx_server_can_opt_back_into_bridge_network(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            result = Mock(returncode=0, stdout="container-123\n", stderr="")
+            env_values = {
+                "OPENAMP_USRP_TX_RUNNER": "docker",
+                "OPENAMP_USRP_TX_DOCKER_NETWORK": "bridge",
+            }
+            with patch("usrp_runtime.subprocess.run", return_value=result) as run:
+                usrp_runtime._start_local_tx_server(
+                    env_values,
+                    log_dir=Path(temp_dir_name),
+                    tx_port="29221",
+                )
+
+        command = run.call_args.args[0]
+        self.assertNotIn("--network", command)
         self.assertIn("-p", command)
         self.assertIn("127.0.0.1:29221:29221", command)
-        self.assertIn("iccomp-usrp-tx:latest", command)
-        self.assertEqual(command[-2:], ["bash", "/host_workspace/USRP292x/OtaTxPersistentServer.sh"])
 
     def test_usrp_tx_server_defaults_to_docker_on_windows_when_available(self) -> None:
         with (
@@ -5730,7 +5764,7 @@ class ServerMainTest(unittest.TestCase):
         self.assertNotIn("--amp", command)
         sync_decode_assets.assert_not_called()
 
-    def test_usrp_wire_sync_uses_scp_instead_of_ssh_stdin(self) -> None:
+    def test_usrp_wire_sync_streams_archive_through_configured_ssh_runner(self) -> None:
         access = usrp_runtime.BoardAccessConfig(
             host="100.121.87.73",
             user="user",
@@ -5745,18 +5779,28 @@ class ServerMainTest(unittest.TestCase):
             wire_dir = stage_dir / "_wire"
             wire_dir.mkdir(parents=True)
             (wire_dir / "00000001.bin").write_bytes(b"wire")
-            calls: list[tuple[list[str], dict[str, object]]] = []
+            calls: list[tuple[str, dict[str, object]]] = []
 
-            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+            def fake_remote_run(
+                _access: usrp_runtime.BoardAccessConfig,
+                command: str,
+                **kwargs: object,
+            ) -> subprocess.CompletedProcess[bytes]:
                 calls.append((command, kwargs))
                 return subprocess.CompletedProcess(
-                    command,
+                    ["ssh"],
                     0,
                     stdout=b'{"decoded_count": 1}\n',
                     stderr=b"",
                 )
 
-            with patch("usrp_runtime.subprocess.run", side_effect=fake_run):
+            with (
+                patch("usrp_runtime._run_remote_command", side_effect=fake_remote_run),
+                patch(
+                    "usrp_runtime.subprocess.run",
+                    side_effect=AssertionError("native scp must not be used for USRP wire sync"),
+                ),
+            ):
                 payload = usrp_runtime._sync_and_decode_wire_blobs_on_remote(
                     local_stage_dir=stage_dir,
                     remote_root="/home/user/cockpit_usrp_rx",
@@ -5765,11 +5809,10 @@ class ServerMainTest(unittest.TestCase):
                     access=access,
                 )
 
-        self.assertEqual(len(calls), 2)
-        self.assertIn("scp", calls[0][0])
-        self.assertNotIn("input", calls[0][1])
-        self.assertNotIn("input", calls[1][1])
-        self.assertEqual(calls[0][1]["env"]["SSHPASS"], "demo-pass")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("tar xzf -", calls[0][0])
+        self.assertIn("decode_usrp_wire.py", calls[0][0])
+        self.assertGreater(len(calls[0][1]["input_data"]), 0)
         self.assertEqual(payload["decode_manifest"]["decoded_count"], 1)
 
     def test_usrp_iq_direct_runner_command_defaults_to_remote_decode(self) -> None:

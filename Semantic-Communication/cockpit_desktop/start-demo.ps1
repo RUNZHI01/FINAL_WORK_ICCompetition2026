@@ -100,6 +100,7 @@ Set-DefaultEnv "MLKEM_LOCAL_CLIENT_RUNNER" "docker"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
 Set-DefaultEnv "OPENAMP_USRP_TX_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
+Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "host"
 
 Set-DefaultEnv "MLKEM_TRANSPORT_MODE" "usrp"
 Set-DefaultEnv "OPENAMP_DEMO_INPUT_SOURCE_MODE" "usrp"
@@ -109,6 +110,8 @@ Set-DefaultEnv "MLKEM_AUTH_ENABLED" "1"
 Set-DefaultEnv "MLKEM_AUTH_SIG_POLICY" "DUAL_REQUIRED"
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP" ($(if ($NoWarmup) { "0" } else { "1" }))
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)
+Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)
+Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS" "2"
 Set-DefaultEnv "MSYS2_ARG_CONV_EXCL" "*"
 
 [Environment]::SetEnvironmentVariable("COCKPIT_SCRIPT_DIR_WIN", $ScriptDir, "Process")

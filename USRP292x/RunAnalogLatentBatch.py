@@ -5272,8 +5272,24 @@ def main() -> int:
                 if shared_rx_control_session is current_session:
                     shared_rx_control_session = None
                 rx_batch_session_images_since_open = 0
+            reset_log = run_dir / f"rx_health_reset_{rx_health_reset_count + 1:04d}.log"
+            reset_timeout = max(0.5, min(float(getattr(args, "rx_timeout_sec", 30.0) or 30.0), 5.0))
+            try:
+                reset_response = run_control(
+                    str(getattr(args, "rx_control_host", "")),
+                    int(getattr(args, "rx_control_port", 0)),
+                    "RESET",
+                    reset_log,
+                    reset_timeout,
+                )
+            except Exception as exc:
+                record["rx_health_reset_error"] = f"{type(exc).__name__}: {exc}"
+                reset_succeeded = False
+            else:
+                record["rx_health_reset_response"] = reset_response
+                reset_succeeded = reset_response.startswith("OK")
             rx_health_reset_count += 1
-            return True
+            return reset_succeeded
 
         if pipeline_enabled:
             completed, pipeline_stats = _process_images_remote_decode_pipeline(
