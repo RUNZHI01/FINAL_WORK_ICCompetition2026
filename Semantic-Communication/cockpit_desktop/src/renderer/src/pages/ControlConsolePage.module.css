@@ -420,6 +420,37 @@
    FIT cards
    ──────────────────────────────────────────────── */
 
+.fitGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fitGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fitGroupHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fitGroupLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.fitGroupNote {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  text-align: right;
+}
+
 .fitGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -473,6 +504,16 @@
   background: var(--color-error);
 }
 
+.fitCardVerified {
+  border-color: rgba(5, 150, 105, 0.4);
+  background: rgba(5, 150, 105, 0.03);
+  box-shadow: 0 0 12px rgba(5, 150, 105, 0.08);
+}
+
+.fitCardVerified::before {
+  background: var(--color-success);
+}
+
 @keyframes fitFlash {
   0% { background: rgba(239, 68, 68, 0.15); }
   100% { background: rgba(239, 68, 68, 0.03); }
@@ -491,6 +532,10 @@
 
 .fitCardTriggered .fitIcon {
   color: var(--color-error);
+}
+
+.fitCardVerified .fitIcon {
+  color: var(--color-success);
 }
 
 .fitLabel {
@@ -535,6 +580,33 @@
 .fitResultGuard {
   color: var(--color-text-secondary);
   font-weight: 500;
+}
+
+.fitResultVerified {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.18);
+}
+
+.fitResultVerified .fitResultLine {
+  color: var(--color-success);
+}
+
+.fitResultVerified .fitResultGuard {
+  color: var(--color-text-secondary);
+}
+
+.fitReserved {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px dashed var(--color-border-base);
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  background: rgba(0, 0, 0, 0.015);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* ────────────────────────────────────────────────
@@ -823,6 +895,33 @@
 }
 
 .btnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnVerify {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(30, 136, 229, 0.3);
+  background: rgba(30, 136, 229, 0.06);
+  color: #1e88e5;
+  cursor: pointer;
+  transition: background 200ms, border-color 200ms;
+  white-space: nowrap;
+}
+
+.btnVerify:hover:not(:disabled) {
+  background: rgba(30, 136, 229, 0.12);
+  border-color: rgba(30, 136, 229, 0.5);
+}
+
+.btnVerify:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

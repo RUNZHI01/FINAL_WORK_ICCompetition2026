@@ -158,6 +158,10 @@ export async function postInjectFault(faultType: string): Promise<FaultInjectRes
   return postJson<FaultInjectResponse>('/api/inject-fault', { fault_type: faultType })
 }
 
+export async function postSecurityFit(faultType: string): Promise<FaultInjectResponse> {
+  return postJson<FaultInjectResponse>('/api/security-fit', { fault_type: faultType })
+}
+
 export async function postRecover(): Promise<RecoverResponse> {
   return postJson<RecoverResponse>('/api/recover')
 }

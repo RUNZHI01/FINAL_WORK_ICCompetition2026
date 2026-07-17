@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCryptoStatus } from '../hooks/useCryptoStatus'
 import { useEventSpine } from '../hooks/useEventSpine'
 import { useRecover, useProbeBoard, useSwitchLinkProfile } from '../hooks/useActions'
-import { postInjectFault } from '../api/client'
+import { postInjectFault, postSecurityFit } from '../api/client'
 import type { EventSpineEvent } from '../api/types'
 import { PageTransition, StaggeredList, AnimatedListItem } from '../components/animations'
 import { Icons } from '../components/icons'
@@ -23,31 +23,64 @@ const PROTOCOL_CHECKLIST = [
 
 /* ── FIT scenario definitions ── */
 
-const FIT_SCENARIOS = [
+const OPENAMP_FIT_SCENARIOS = [
   {
     id: 'wrong_sha',
-    label: 'FIT-01：SHA 篡改',
+    label: 'FIT-01：制品 SHA 异常',
     desc: '注入错误 SHA256 → Guard 校验拒绝',
-    expectGuard: 'READY',
-    expectFault: 'ARTIFACT_SHA_MISMATCH',
     icon: Icons.AlertTriangle,
-  },
-  {
-    id: 'heartbeat_timeout',
-    label: 'FIT-02：心跳超时',
-    desc: '中断心跳 → watchdog 触发 SAFE_STOP',
-    expectGuard: 'SAFE_STOP',
-    expectFault: 'HEARTBEAT_TIMEOUT',
-    icon: Icons.Clock,
+    endpoint: 'openamp',
   },
   {
     id: 'illegal_param',
-    label: 'FIT-03：非法参数',
+    label: 'FIT-02：非法参数',
     desc: '越界参数 → Guard 校验拒绝',
-    expectGuard: 'READY',
-    expectFault: 'ILLEGAL_PARAM_RANGE',
     icon: Icons.XCircle,
+    endpoint: 'openamp',
   },
+  {
+    id: 'heartbeat_timeout',
+    label: 'FIT-03：心跳超时',
+    desc: '中断心跳 → watchdog 触发 SAFE_STOP',
+    icon: Icons.Clock,
+    endpoint: 'openamp',
+  },
+  {
+    id: 'control_crc_error',
+    label: 'FIT-04：控制帧 CRC',
+    desc: '控制消息校验错误 → 安全停机',
+    icon: Icons.Radio,
+    endpoint: 'reserved',
+  },
+  {
+    id: 'deadline_exceeded',
+    label: 'FIT-05：截止期超时',
+    desc: '作业越过 deadline → 中止并收口',
+    icon: Icons.Clock,
+    endpoint: 'reserved',
+  },
+  {
+    id: 'duplicate_job_id',
+    label: 'FIT-06：重复作业号',
+    desc: '重复 job_id → 准入阶段拒绝',
+    icon: Icons.XCircle,
+    endpoint: 'reserved',
+  },
+] as const
+
+const SECURITY_FIT_SCENARIOS = [
+  { id: 'sfit_ciphertext_tamper', label: 'S-FIT-01：密文篡改', desc: '改写密文或 GCM 标签 → AEAD 拒绝解密', icon: Icons.Lock, endpoint: 'security' },
+  { id: 'sfit_aad_tamper', label: 'S-FIT-02：元数据篡改', desc: '改写 AAD 合同 → 认证标签校验失败', icon: Icons.Shield, endpoint: 'security' },
+  { id: 'sfit_artifact_guard', label: 'S-FIT-03：未知制品', desc: '模型 SHA 不受信 → ArtifactGuard 拦截', icon: Icons.AlertTriangle, endpoint: 'security' },
+  { id: 'sfit_kem_unavailable', label: 'S-FIT-04：KEM 不可用', desc: '可信后端缺失 → 拒绝不安全降级', icon: Icons.XCircle, endpoint: 'security' },
+  { id: 'sfit_session_invalidated', label: 'S-FIT-05：会话失联', desc: '控制端断开或超时 → 失效并重建会话', icon: Icons.WifiOff, endpoint: 'security' },
+  { id: 'sfit_output_audit', label: 'S-FIT-06：输出异常', desc: '输出形状异常 → 阻断并留下审计证据', icon: Icons.AlertTriangle, endpoint: 'security' },
+  { id: 'sfit_replay_guard', label: 'S-FIT-07：重放请求', desc: '重复 (job_id, seq) → LRU 窗口拒绝', icon: Icons.RefreshCw, endpoint: 'security' },
+] as const
+
+const FIT_GROUPS = [
+  { id: 'openamp', label: 'OpenAMP 控制面', note: 'FIT-01～03 真机注入；FIT-04～06 等待板端接口', scenarios: OPENAMP_FIT_SCENARIOS },
+  { id: 'security', label: '安全信道', note: '在上位机隔离容器中执行现有负向测试', scenarios: SECURITY_FIT_SCENARIOS },
 ] as const
 
 /* ── Mode definitions ── */
@@ -97,6 +130,8 @@ function eventBadgeCls(eventType: string): string {
 type FitResult = {
   guard_state: string
   fault_code: string
+  status: string
+  execution_mode: string
   ts: number          // timestamp for auto-expire highlight
 }
 
@@ -138,13 +173,19 @@ export function ControlConsolePage() {
   }, [queryClient])
 
   // ── Per-FIT injection — each button gets its own pending/result state ──
-  const handleFIT = useCallback((fitId: string) => {
+  const handleFIT = useCallback((fitId: string, endpoint: 'openamp' | 'security') => {
     setFitPending(prev => ({ ...prev, [fitId]: true }))
-    postInjectFault(fitId)
+    const request = endpoint === 'security' ? postSecurityFit(fitId) : postInjectFault(fitId)
+    request
       .then((data) => {
         const gs = data?.guard_state ?? 'UNKNOWN'
         const fc = data?.last_fault_code ?? 'UNKNOWN'
-        setFitResults(prev => ({ ...prev, [fitId]: { guard_state: gs, fault_code: fc, ts: Date.now() } }))
+        const status = data?.status_category ?? data?.status ?? 'unknown'
+        const executionMode = data?.execution_mode ?? 'unknown'
+        setFitResults(prev => ({
+          ...prev,
+          [fitId]: { guard_state: gs, fault_code: fc, status, execution_mode: executionMode, ts: Date.now() },
+        }))
         setActionLog(prev => [...prev.slice(-4), `[FIT] ${fitId} → guard=${gs} fault=${fc} (${data?.execution_mode ?? 'unknown'})`])
         refreshConsoleData()
       })
@@ -342,42 +383,55 @@ export function ControlConsolePage() {
                 </span>
               </div>
 
-              <div className={s.fitGrid}>
-                {FIT_SCENARIOS.map((fit) => {
-                  const Icon = fit.icon
-                  const isPending = fitPending[fit.id] ?? false
-                  const result = fitResults[fit.id]
-                  const hasResult = !!result
-                  return (
-                    <div key={fit.id} className={`${s.fitCard} ${hasResult ? s.fitCardTriggered : ''}`}>
-                      <div className={s.fitCardTop}>
-                        <Icon size={16} className={s.fitIcon} />
-                        <div className={s.fitLabel}>{fit.label}</div>
-                      </div>
-                      <div className={s.fitDesc}>{fit.desc}</div>
-                      {hasResult ? (
-                        <div className={s.fitResultBox}>
-                          <div className={s.fitResultLine}>
-                            <span className={s.fitResultIcon}>✗</span>
-                            <span>DENY — {result.fault_code}</span>
-                          </div>
-                          <div className={s.fitResultLine}>
-                            <span className={s.fitResultGuard}>guard → {result.guard_state}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          className={s.btnDanger}
-                          onClick={() => handleFIT(fit.id)}
-                          disabled={isPending}
-                        >
-                          {isPending ? <span className={s.spinner} /> : <Icon size={14} />}
-                          <span>注入</span>
-                        </button>
-                      )}
+              <div className={s.fitGroups}>
+                {FIT_GROUPS.map((group) => (
+                  <div key={group.id} className={s.fitGroup}>
+                    <div className={s.fitGroupHeader}>
+                      <span className={s.fitGroupLabel}>{group.label}</span>
+                      <span className={s.fitGroupNote}>{group.note}</span>
                     </div>
-                  )
-                })}
+                    <div className={s.fitGrid}>
+                      {group.scenarios.map((fit) => {
+                        const Icon = fit.icon
+                        const isPending = fitPending[fit.id] ?? false
+                        const result = fitResults[fit.id]
+                        const hasResult = !!result
+                        const verified = result?.status === 'success'
+                        return (
+                          <div key={fit.id} className={`${s.fitCard} ${hasResult ? (verified ? s.fitCardVerified : s.fitCardTriggered) : ''}`}>
+                            <div className={s.fitCardTop}>
+                              <Icon size={16} className={s.fitIcon} />
+                              <div className={s.fitLabel}>{fit.label}</div>
+                            </div>
+                            <div className={s.fitDesc}>{fit.desc}</div>
+                            {hasResult ? (
+                              <div className={`${s.fitResultBox} ${verified ? s.fitResultVerified : ''}`}>
+                                <div className={s.fitResultLine}>
+                                  <span className={s.fitResultIcon}>{verified ? '✓' : '✗'}</span>
+                                  <span>{verified ? '已验证' : '自检失败'} · {result.fault_code}</span>
+                                </div>
+                                <div className={s.fitResultLine}>
+                                  <span className={s.fitResultGuard}>guard → {result.guard_state}</span>
+                                </div>
+                              </div>
+                            ) : fit.endpoint === 'reserved' ? (
+                              <span className={s.fitReserved}>UI 预留 · 未接真机</span>
+                            ) : (
+                              <button
+                                className={fit.endpoint === 'security' ? s.btnVerify : s.btnDanger}
+                                onClick={() => handleFIT(fit.id, fit.endpoint)}
+                                disabled={isPending}
+                              >
+                                {isPending ? <span className={s.spinner} /> : <Icon size={14} />}
+                                <span>{fit.endpoint === 'security' ? '验证' : '注入'}</span>
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <button

@@ -168,6 +168,29 @@ MLKEM_AUTH_SIG_POLICY_KEYS = ("MLKEM_AUTH_SIG_POLICY",)
 DEFAULT_MLKEM_AUTH_SERVER_ID = "phytium-board"
 DEFAULT_MLKEM_AUTH_SIG_POLICY = "DUAL_REQUIRED"
 SUPPORTED_MLKEM_AUTH_SIG_POLICIES = ("DUAL_REQUIRED", "SM2_ONLY", "MLDSA_ONLY")
+
+SECURITY_FIT_TARGETS = {
+    "sfit_ciphertext_tamper": "scripts/test_fit.py::TestCiphertextTampering",
+    "sfit_aad_tamper": "scripts/test_fit.py::TestAADTampering",
+    "sfit_artifact_guard": "tests/test_security_fit_runtime.py::test_sfit03_artifact_guard_rejects_tampered_artifact",
+    "sfit_kem_unavailable": "tests/test_security_fit_runtime.py::test_sfit04_missing_trusted_kem_backend_rejects_session",
+    "sfit_session_invalidated": (
+        "Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/tests/"
+        "test_crypto_runtime.py::CryptoRuntimeTest::test_mlkem_session_manager_restarts_and_retries_on_eof"
+    ),
+    "sfit_output_audit": "tests/test_security_fit_runtime.py::test_sfit06_abnormal_output_is_detected_and_auditable",
+    "sfit_replay_guard": "tests/test_security_fit_runtime.py::test_sfit07_replay_guard_rejects_duplicate_job_sequence",
+}
+
+SECURITY_FIT_RESULTS = {
+    "sfit_ciphertext_tamper": ("DENY", "AEAD_AUTH_FAILED"),
+    "sfit_aad_tamper": ("DENY", "AAD_CONTRACT_MISMATCH"),
+    "sfit_artifact_guard": ("DENY", "ARTIFACT_GUARD_REJECTED"),
+    "sfit_kem_unavailable": ("DENY", "TRUSTED_KEM_UNAVAILABLE"),
+    "sfit_session_invalidated": ("INVALIDATED", "SECURE_SESSION_INVALIDATED"),
+    "sfit_output_audit": ("AUDITED", "OUTPUT_ANOMALY_DETECTED"),
+    "sfit_replay_guard": ("DENY", "REPLAY_DENIED"),
+}
 DEFAULT_MLKEM_AUTH_REMOTE_KEY_DIR = "/home/user/keys"
 DEFAULT_MLKEM_AUTH_LOCAL_KEY_DIR = PACKAGE_ROOT / "keys"
 DEFAULT_MLKEM_REMOTE_TONGSUO_SIG_BRIDGE = "/home/user/libtongsuo_sig_bridge.so"
@@ -9718,6 +9741,84 @@ class DashboardState:
         self._emit_inference_record_events(record, payload)
         return payload
 
+    def run_security_fault_demo(self, fault_type: str) -> dict[str, Any]:
+        target = SECURITY_FIT_TARGETS.get(fault_type)
+        if target is None:
+            raise ValueError(f"unsupported security fault_type: {fault_type}")
+
+        image = os.environ.get("COCKPIT_SECURITY_FIT_IMAGE", "iccomp-dev:latest").strip()
+        guard_state, fault_code = SECURITY_FIT_RESULTS[fault_type]
+        command = [
+            "docker", "run", "--rm", "--network", "none",
+            "--cpus", "2", "--memory", "1g",
+            "-v", f"{PACKAGE_ROOT}:/workspace",
+            "-w", "/workspace", image,
+            "python", "-m", "pytest", target, "-q",
+        ]
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {
+                "status": "error",
+                "status_category": "unavailable",
+                "execution_mode": "host_docker_self_test",
+                "fault_type": fault_type,
+                "source_label": "上位机安全自检",
+                "message": f"安全场景自检未完成: {exc}",
+                "guard_state": "UNKNOWN",
+                "last_fault_code": "SELF_TEST_UNAVAILABLE",
+                "details": {"elapsed_ms": round((time.monotonic() - started) * 1000, 1)},
+            }
+
+        elapsed_ms = round((time.monotonic() - started) * 1000, 1)
+        output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part.strip())
+        if completed.returncode != 0:
+            return {
+                "status": "error",
+                "status_category": "failed",
+                "execution_mode": "host_docker_self_test",
+                "fault_type": fault_type,
+                "source_label": "上位机安全自检",
+                "message": "安全场景自检失败，未将该能力标记为通过。",
+                "guard_state": "UNKNOWN",
+                "last_fault_code": "SELF_TEST_FAILED",
+                "details": {
+                    "elapsed_ms": elapsed_ms,
+                    "return_code": completed.returncode,
+                    "output_tail": output[-1200:],
+                },
+            }
+
+        self._event_spine.publish(
+            "SECURITY_FIT_VERIFIED",
+            source="security-fit",
+            plane="control",
+            mode_scope=CONTROL_MODE_SCOPE,
+            message=f"{fault_type} completed in the isolated host test container.",
+            data={"fault_type": fault_type, "fault_code": fault_code, "elapsed_ms": elapsed_ms},
+        )
+        return {
+            "status": "verified",
+            "status_category": "success",
+            "execution_mode": "host_docker_self_test",
+            "fault_type": fault_type,
+            "source_label": "上位机安全自检",
+            "message": "已在隔离容器中执行现有安全链路负向测试。",
+            "guard_state": guard_state,
+            "last_fault_code": fault_code,
+            "status_lamp": "green",
+            "details": {"elapsed_ms": elapsed_ms, "test_target": target},
+        }
+
     def run_fault_demo(self, fault_type: str) -> dict[str, Any]:
         with self._lock:
             board_access = self._board_access
@@ -10481,6 +10582,14 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
                     self.respond_json(HTTPStatus.BAD_REQUEST, {"status": "error", "message": "unsupported fault_type"})
                     return
                 payload = self.server.app_state.run_fault_demo(fault_type)
+                self.respond_json(HTTPStatus.OK, payload)
+                return
+            if parsed.path == "/api/security-fit":
+                fault_type = str(body.get("fault_type") or "").strip()
+                if fault_type not in SECURITY_FIT_TARGETS:
+                    self.respond_json(HTTPStatus.BAD_REQUEST, {"status": "error", "message": "unsupported fault_type"})
+                    return
+                payload = self.server.app_state.run_security_fault_demo(fault_type)
                 self.respond_json(HTTPStatus.OK, payload)
                 return
             if parsed.path == "/api/recover":
