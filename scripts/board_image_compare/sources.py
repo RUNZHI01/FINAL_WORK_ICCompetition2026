@@ -45,7 +45,7 @@ def default_reconstruction_sources(usrp_root: str) -> dict[str, ReconstructionSo
         "prerecorded-mnn": ReconstructionSource(
             "prerecorded-mnn",
             "预录 MNN",
-            f"{prerecorded_root}/mnn_benchmark_outputs",
+            "/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
         ),
         "usrp-qpsk": ReconstructionSource(
             "usrp-qpsk",

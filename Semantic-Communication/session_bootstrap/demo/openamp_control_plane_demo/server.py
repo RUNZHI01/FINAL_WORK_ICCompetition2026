@@ -41,6 +41,7 @@ from board_access import (
     build_board_access_config,
     build_demo_default_board_access,
     current_input_source_mode,
+    current_jscc_link_mode,
     load_env_file,
     normalize_jscc_link_mode,
     normalize_transport_mode,
@@ -7494,10 +7495,7 @@ class DashboardState:
             keys=USRP_REMOTE_OUTPUT_ROOT_KEYS,
             default=DEFAULT_USRP_REMOTE_OUTPUT_ROOT,
         )
-        usrp_link_mode = normalize_jscc_link_mode(
-            first_config_value(base_env, keys=("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE"), default=""),
-            default="qpsk",
-        )
+        usrp_link_mode = current_jscc_link_mode(base_env)
         output_engine = "mnn" if str(engine).lower() == INFERENCE_ENGINE_MNN else "tvm"
         usrp_output_base = f"{output_root.rstrip('/')}/{usrp_link_mode}/{output_engine}"
         return base_access.with_env_overrides(
@@ -7523,10 +7521,7 @@ class DashboardState:
         def _callback(remote_stage_manifest: dict[str, Any], progress: Any) -> dict[str, Any]:
             access = self._usrp_stage_access(base_access, remote_stage_manifest, engine=INFERENCE_ENGINE_TVM)
             env_values = access.build_env()
-            usrp_link_mode = normalize_jscc_link_mode(
-                first_config_value(env_values, keys=("JSCC_LINK_MODE", "OPENAMP_DEMO_LINK_MODE"), default=""),
-                default="qpsk",
-            )
+            usrp_link_mode = current_jscc_link_mode(env_values)
             env_overrides: dict[str, str] = {}
             if not str(env_values.get("BIG_LITTLE_INPUT_WAIT_TIMEOUT_SEC") or "").strip():
                 env_overrides.update(

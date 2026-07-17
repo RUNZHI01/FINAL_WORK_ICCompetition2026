@@ -16,8 +16,11 @@ def test_prerecorded_filters_keep_existing_layout():
 
     assert sources["prerecorded-pytorch"].accepts("pytorch_reference_reconstruction_20260715")
     assert not sources["prerecorded-tvm"].accepts("pytorch_reference_reconstruction_20260715")
-    assert sources["prerecorded-tvm"].remote_root.endswith("/jscc/infer_outputs")
-    assert sources["prerecorded-mnn"].remote_root.endswith("/mnn_benchmark_outputs")
+    assert sources["prerecorded-pytorch"].remote_root == "/home/user/Downloads/jscc-test/jscc/infer_outputs"
+    assert sources["prerecorded-tvm"].remote_root == "/home/user/Downloads/jscc-test/jscc/infer_outputs"
+    assert sources["prerecorded-mnn"].remote_root == "/home/user/Downloads/jscc-test/mnn_benchmark_outputs"
+    assert sources["usrp-qpsk"].remote_root == "/home/user/Downloads/jscc-test-usrp/qpsk/tvm"
+    assert sources["usrp-iq-direct"].remote_root == "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm"
     assert set(sources) == {
         "prerecorded-pytorch",
         "prerecorded-tvm",

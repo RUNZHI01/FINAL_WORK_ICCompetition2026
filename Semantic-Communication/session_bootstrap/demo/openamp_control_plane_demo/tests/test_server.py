@@ -2413,6 +2413,47 @@ class DashboardStateTest(unittest.TestCase):
             "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm",
         )
 
+    def test_usrp_stage_access_missing_link_mode_falls_back_to_qpsk(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        access = state._usrp_stage_access(
+            state._board_access,
+            {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx"},
+        )
+
+        self.assertEqual(
+            access.build_env()["REMOTE_OUTPUT_BASE"],
+            "/home/user/Downloads/jscc-test-usrp/qpsk/tvm",
+        )
+
+    def test_usrp_stage_access_unknown_link_mode_falls_back_to_qpsk(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides({"JSCC_LINK_MODE": "unknown-mode"})
+
+        access = state._usrp_stage_access(
+            base_access,
+            {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx"},
+        )
+
+        self.assertEqual(
+            access.build_env()["REMOTE_OUTPUT_BASE"],
+            "/home/user/Downloads/jscc-test-usrp/qpsk/tvm",
+        )
+
+    def test_usrp_stage_access_uses_openamp_link_mode_alias(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides({"OPENAMP_DEMO_LINK_MODE": "iq-direct"})
+
+        access = state._usrp_stage_access(
+            base_access,
+            {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-123_rx"},
+        )
+
+        self.assertEqual(
+            access.build_env()["REMOTE_OUTPUT_BASE"],
+            "/home/user/Downloads/jscc-test-usrp/iq-direct/tvm",
+        )
+
     def test_usrp_tvm_stage_sets_big_little_input_wait_window(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         base_access = state._board_access.with_env_overrides(
@@ -2443,6 +2484,23 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(captured["BIG_LITTLE_INPUT_POLL_SEC"], "0.05")
         self.assertEqual(captured["BIG_LITTLE_INPUT_CHUNK_SIZE"], "10")
 
+    def test_usrp_tvm_stage_unknown_link_mode_falls_back_after_transport(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        base_access = state._board_access.with_env_overrides({"JSCC_LINK_MODE": "unknown-mode"})
+
+        with patch.object(
+            state,
+            "_run_tvm_batch_with_access",
+            return_value={"status": "ok", "processed_count": 1, "selected_input_count": 1},
+        ):
+            callback = state._run_tvm_after_usrp_stage(base_access, count=1)
+            result = callback(
+                {"remote_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-789_rx"},
+                lambda *_args: None,
+            )
+
+        self.assertEqual(result["status"], "ok")
+
     def test_usrp_tvm_stage_clamps_iq_chunk_size_to_short_warmup_count(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         base_access = state._board_access.with_env_overrides(
@@ -2472,11 +2530,11 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(captured["BIG_LITTLE_INPUT_CHUNK_SIZE"], "5")
 
-    def test_usrp_stage_access_uses_separate_mnn_output_base(self) -> None:
+    def test_usrp_stage_access_uses_iq_direct_mnn_output_root(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         base_access = state._board_access.with_env_overrides(
             {
-                "JSCC_LINK_MODE": "qpsk",
+                "JSCC_LINK_MODE": "iq-direct",
                 "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
                 "REMOTE_OUTPUT_BASE": "/home/user/Downloads/jscc-test/mnn_benchmark_outputs",
             }
@@ -2490,7 +2548,7 @@ class DashboardStateTest(unittest.TestCase):
         env = access.build_env()
 
         self.assertEqual(env["REMOTE_USRP_RX_DIR"], "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-456_rx")
-        self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/qpsk/mnn")
+        self.assertEqual(env["REMOTE_OUTPUT_BASE"], "/home/user/Downloads/jscc-test-usrp/iq-direct/mnn")
         self.assertEqual(env["INFERENCE_REAL_OUTPUT_PREFIX"], "openamp3_usrp_456")
 
     def test_post_run_mnn_batch_uses_dashboard_state_entrypoint(self) -> None:
