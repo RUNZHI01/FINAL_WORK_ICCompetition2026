@@ -1,3 +1,4 @@
+import errno
 import json
 import subprocess
 import sys
@@ -12,6 +13,8 @@ from scripts.migrate_usrp_output_layout import (
     parse_args,
     rollback_migration,
     write_report_atomic,
+    _remote_exists,
+    _with_report_metadata,
 )
 from scripts.board_image_compare.sources import (
     classify_usrp_summary,
@@ -22,9 +25,10 @@ from scripts.board_image_compare.sources import (
 
 
 class FakeSFTP:
-    def __init__(self, existing_paths=(), directory_entries=None):
+    def __init__(self, existing_paths=(), directory_entries=None, rename_fail_at=None):
         self.paths = set(existing_paths)
         self.directory_entries = dict(directory_entries or {})
+        self.rename_fail_at = rename_fail_at
         self.mkdir_calls = []
         self.rename_calls = []
 
@@ -39,6 +43,8 @@ class FakeSFTP:
 
     def rename(self, source, destination):
         self.rename_calls.append((source, destination))
+        if self.rename_fail_at == len(self.rename_calls):
+            raise OSError("injected rename failure")
         self.paths.remove(source)
         self.paths.add(destination)
 
@@ -92,6 +98,54 @@ def test_apply_creates_parent_directories_and_renames_once(fake_sftp, migration_
     assert result["moved"] == migration_plan
 
 
+def _second_migration_entry(entry):
+    return {
+        **entry,
+        "source": "/legacy/openamp3_usrp_456_current",
+        "destination": "/outputs/qpsk/tvm/openamp3_usrp_456_current",
+    }
+
+
+def test_apply_journals_partial_failure_and_can_resume(tmp_path: Path, migration_plan):
+    first = migration_plan[0]
+    second = _second_migration_entry(first)
+    fake_sftp = FakeSFTP(
+        {first["source"], second["source"]},
+        rename_fail_at=2,
+    )
+    journal_path = tmp_path / "apply-journal.json"
+    snapshots = []
+
+    def persist(snapshot):
+        snapshots.append(json.loads(json.dumps(snapshot)))
+        write_report_atomic(journal_path, snapshot)
+
+    result = apply_migration(
+        fake_sftp,
+        [first, second],
+        apply=True,
+        journal=persist,
+    )
+
+    persisted = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert result["status"] == "failed"
+    assert result["safe"] is False
+    assert result["moved"] == [first]
+    assert result["failed"][0]["source"] == second["source"]
+    assert result["error"] == "OSError: remote operation failed"
+    assert "injected rename failure" not in json.dumps(result)
+    assert persisted == result
+    assert any(snapshot["current"] == first for snapshot in snapshots)
+    assert any(snapshot["current"] is None and snapshot["moved"] == [first] for snapshot in snapshots)
+
+    fake_sftp.rename_fail_at = None
+    resumed = apply_migration(fake_sftp, result["classified"], apply=True)
+
+    assert resumed["status"] == "complete"
+    assert resumed["already_moved"] == [first]
+    assert resumed["moved"] == [second]
+
+
 def test_existing_destination_collision_is_reported_without_overwrite(migration_plan):
     entry = migration_plan[0]
     fake_sftp = FakeSFTP({entry["source"], entry["destination"]})
@@ -137,6 +191,118 @@ def test_rollback_swaps_only_entries_whose_destination_exists(migration_plan):
             "destination": present["source"],
         }
     ]
+
+
+def test_rollback_journals_partial_failure_and_can_resume(tmp_path: Path, migration_plan):
+    first = migration_plan[0]
+    second = _second_migration_entry(first)
+    fake_sftp = FakeSFTP(
+        {first["destination"], second["destination"]},
+        rename_fail_at=2,
+    )
+    journal_path = tmp_path / "rollback-journal.json"
+
+    result = rollback_migration(
+        fake_sftp,
+        {"operation": "migration", "classified": [first, second]},
+        apply=True,
+        journal=lambda snapshot: write_report_atomic(journal_path, snapshot),
+    )
+
+    persisted = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert result["status"] == "failed"
+    assert result["moved"][0]["destination"] == first["source"]
+    assert result["failed"][0]["destination"] == second["source"]
+    assert persisted == result
+
+    fake_sftp.rename_fail_at = None
+    resumed = rollback_migration(
+        fake_sftp,
+        {"operation": "rollback", "classified": result["classified"]},
+        apply=True,
+    )
+
+    assert resumed["status"] == "complete"
+    assert len(resumed["already_moved"]) == 1
+    assert len(resumed["moved"]) == 1
+
+
+class StatErrorSFTP:
+    def __init__(self, error):
+        self.error = error
+
+    def stat(self, path):
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError(),
+        OSError("transport failed"),
+        OSError(errno.EACCES, "permission denied"),
+    ],
+)
+def test_remote_exists_propagates_nonmissing_oserror(error):
+    with pytest.raises(OSError) as raised:
+        _remote_exists(StatErrorSFTP(error), "/remote/path")
+
+    assert raised.value is error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        FileNotFoundError(errno.ENOENT, "not found"),
+        OSError(errno.ENOENT, "not found"),
+        OSError("No such file"),
+    ],
+)
+def test_remote_exists_accepts_only_explicit_missing_errors(error):
+    assert _remote_exists(StatErrorSFTP(error), "/remote/path") is False
+
+
+def test_report_metadata_does_not_persist_connection_identity(migration_plan):
+    result = apply_migration(FakeSFTP({migration_plan[0]["source"]}), migration_plan)
+
+    payload = _with_report_metadata(
+        result,
+        operation="migration",
+        apply=False,
+        run_root="runs",
+        legacy_root="/legacy",
+        output_root="/outputs",
+    )
+
+    assert "connection" not in payload
+    assert "host" not in json.dumps(payload).casefold()
+    assert "password" not in json.dumps(payload).casefold()
+
+
+def test_task5_docs_and_runtime_report_omit_board_connection_values():
+    repository_root = Path(__file__).resolve().parents[1]
+    forbidden_values = (
+        "100.121.87.73",
+        "--password user",
+        "user/user",
+        "user / user",
+    )
+
+    layout_doc = repository_root / "docs/USRP_OUTPUT_LAYOUT.md"
+    layout_content = layout_doc.read_text(encoding="utf-8").casefold()
+    for forbidden in forbidden_values:
+        assert forbidden not in layout_content, f"{forbidden!r} persisted in {layout_doc}"
+
+    report_path = (
+        repository_root
+        / "Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json"
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    serialized_report = json.dumps(report).casefold()
+    assert "connection" not in report
+    for forbidden in forbidden_values:
+        assert forbidden not in serialized_report, f"{forbidden!r} persisted in {report_path}"
+    assert "password" not in serialized_report
 
 
 def test_prerecorded_filters_keep_existing_layout():

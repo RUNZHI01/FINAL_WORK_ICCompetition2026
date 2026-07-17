@@ -8,8 +8,9 @@ import errno
 import json
 import sys
 import tempfile
+from copy import deepcopy
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
@@ -34,7 +35,9 @@ def _remote_path(value: str | PurePosixPath) -> str:
 
 
 def _is_missing_error(exc: OSError) -> bool:
-    return getattr(exc, "errno", None) in (None, errno.ENOENT)
+    if isinstance(exc, FileNotFoundError) or getattr(exc, "errno", None) == errno.ENOENT:
+        return True
+    return len(exc.args) == 1 and str(exc.args[0]).strip().casefold() == "no such file"
 
 
 def _remote_exists(sftp: Any, path: str) -> bool:
@@ -63,11 +66,26 @@ def _copy_entry(entry: dict[str, Any], **updates: Any) -> dict[str, Any]:
     return copied
 
 
+def _failure_error(exc: Exception) -> str:
+    error_number = getattr(exc, "errno", None)
+    suffix = f" errno={error_number}" if error_number is not None else ""
+    return f"{type(exc).__name__}:{suffix} remote operation failed"
+
+
+def _persist_journal(
+    journal: Callable[[dict[str, Any]], None] | None,
+    result: dict[str, Any],
+) -> None:
+    if journal is not None:
+        journal(deepcopy(result))
+
+
 def apply_migration(
     sftp: Any,
     migration_plan: Iterable[dict[str, Any]],
     *,
     apply: bool = False,
+    journal: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Preflight a plan and optionally rename every safe classified source."""
     plan = [dict(entry) for entry in migration_plan]
@@ -98,24 +116,46 @@ def apply_migration(
             unresolved.append(missing_entry)
 
     safe = bool(plan) and not collisions and not missing
-    moved: list[dict[str, Any]] = []
-    if apply and safe:
-        for entry in pending:
-            source = _remote_path(str(entry["source"]))
-            destination = _remote_path(str(entry["destination"]))
-            _mkdir_parents(sftp, destination)
-            sftp.rename(source, destination)
-            moved.append(entry)
-
-    return {
+    result = {
         "safe": safe,
+        "status": "blocked" if not safe else ("in-progress" if apply else "dry-run"),
+        "error": None,
+        "current": None,
         "classified": classified,
-        "moved": moved,
+        "moved": [],
         "already_moved": already_moved,
         "unresolved": unresolved,
         "collisions": collisions,
         "missing": missing,
+        "failed": [],
     }
+    _persist_journal(journal, result)
+    if not apply or not safe:
+        return result
+
+    for entry in pending:
+        source = _remote_path(str(entry["source"]))
+        destination = _remote_path(str(entry["destination"]))
+        result["current"] = entry
+        _persist_journal(journal, result)
+        try:
+            _mkdir_parents(sftp, destination)
+            sftp.rename(source, destination)
+        except Exception as exc:
+            error = _failure_error(exc)
+            result["safe"] = False
+            result["status"] = "failed"
+            result["error"] = error
+            result["failed"].append(_copy_entry(entry, error=error))
+            _persist_journal(journal, result)
+            return result
+        result["moved"].append(entry)
+        result["current"] = None
+        _persist_journal(journal, result)
+
+    result["status"] = "complete"
+    _persist_journal(journal, result)
+    return result
 
 
 def rollback_migration(
@@ -123,8 +163,17 @@ def rollback_migration(
     report: dict[str, Any],
     *,
     apply: bool = False,
+    journal: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Reverse classified report entries whose migrated destination exists."""
+    if report.get("operation") == "rollback":
+        return apply_migration(
+            sftp,
+            report.get("classified", []),
+            apply=apply,
+            journal=journal,
+        )
+
     reverse_plan: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     for entry in report.get("classified", []):
@@ -141,7 +190,7 @@ def rollback_migration(
             _copy_entry(entry, source=destination, destination=source)
         )
 
-    result = apply_migration(sftp, reverse_plan, apply=apply)
+    result = apply_migration(sftp, reverse_plan, apply=apply, journal=journal)
     result["unresolved"].extend(skipped)
     return result
 
@@ -292,18 +341,14 @@ def _with_report_metadata(
     *,
     operation: str,
     apply: bool,
-    host: str,
-    port: int,
-    user: str,
     run_root: str | None,
     legacy_root: str | None,
     output_root: str | None,
 ) -> dict[str, Any]:
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "operation": operation,
         "apply": apply,
-        "connection": {"host": host, "port": port, "user": user},
         "run_root": run_root,
         "legacy_root": legacy_root,
         "output_root": output_root,
@@ -318,6 +363,7 @@ def _with_report_metadata(
             "unresolved",
             "collisions",
             "missing",
+            "failed",
         )
     }
     payload["mode_counts"] = _mode_counts(payload["classified"])
@@ -365,14 +411,29 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.rollback_report:
             prior_report = json.loads(Path(args.rollback_report).read_text(encoding="utf-8"))
-            result = rollback_migration(sftp, prior_report, apply=args.apply)
+            def persist_rollback(snapshot: dict[str, Any]) -> None:
+                write_report_atomic(
+                    args.report,
+                    _with_report_metadata(
+                        snapshot,
+                        operation="rollback",
+                        apply=args.apply,
+                        run_root=prior_report.get("run_root"),
+                        legacy_root=prior_report.get("legacy_root"),
+                        output_root=prior_report.get("output_root"),
+                    ),
+                )
+
+            result = rollback_migration(
+                sftp,
+                prior_report,
+                apply=args.apply,
+                journal=persist_rollback,
+            )
             payload = _with_report_metadata(
                 result,
                 operation="rollback",
                 apply=args.apply,
-                host=args.host,
-                port=args.port,
-                user=args.user,
                 run_root=prior_report.get("run_root"),
                 legacy_root=prior_report.get("legacy_root"),
                 output_root=prior_report.get("output_root"),
@@ -388,14 +449,29 @@ def main(argv: list[str] | None = None) -> int:
                 args.legacy_root,
                 args.output_root,
             )
-            result = apply_migration(sftp, plan, apply=args.apply)
+            def persist_migration(snapshot: dict[str, Any]) -> None:
+                write_report_atomic(
+                    args.report,
+                    _with_report_metadata(
+                        snapshot,
+                        operation="migration",
+                        apply=args.apply,
+                        run_root=str(run_root),
+                        legacy_root=_remote_path(args.legacy_root),
+                        output_root=_remote_path(args.output_root),
+                    ),
+                )
+
+            result = apply_migration(
+                sftp,
+                plan,
+                apply=args.apply,
+                journal=persist_migration,
+            )
             payload = _with_report_metadata(
                 result,
                 operation="migration",
                 apply=args.apply,
-                host=args.host,
-                port=args.port,
-                user=args.user,
                 run_root=str(run_root),
                 legacy_root=_remote_path(args.legacy_root),
                 output_root=_remote_path(args.output_root),
