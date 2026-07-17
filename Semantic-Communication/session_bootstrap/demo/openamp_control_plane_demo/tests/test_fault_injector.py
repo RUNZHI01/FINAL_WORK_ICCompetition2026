@@ -110,6 +110,16 @@ def safe_stop_response(*, last_fault: str, transport_status: str = "safe_stop_st
 
 
 class RunFaultActionTest(unittest.TestCase):
+    def test_parse_json_stdout_skips_git_bash_terminal_suffix(self) -> None:
+        from fault_injector import parse_json_stdout
+
+        payload = {"phase": "STATUS_REQ", "protocol_semantics": "implemented"}
+
+        self.assertEqual(
+            parse_json_stdout(json.dumps(payload) + "\n\x1b[?9001l\x1b[?1004l\n"),
+            payload,
+        )
+
     def test_proxy_phase_decodes_remote_diagnostics_as_utf8_on_windows_hosts(self) -> None:
         access = make_access()
         completed = subprocess.CompletedProcess(
@@ -277,6 +287,67 @@ class RunFaultActionTest(unittest.TestCase):
         self.assertEqual(payload["guard_state"], "READY")
         self.assertEqual(payload["last_fault_code"], "ARTIFACT_SHA_MISMATCH")
         self.assertEqual(payload["total_fault_count"], 1)
+
+    def test_wrong_sha_batch_runs_all_phases_through_one_proxy_process(self) -> None:
+        access = make_access()
+        envelope = {
+            "proxy_sequence": True,
+            "results": [
+                {
+                    "phase": "STATUS_REQ",
+                    "response": json.loads(status_response(guard="READY", last_fault="NONE")),
+                    "stdout": status_response(guard="READY", last_fault="NONE"),
+                    "returncode": 0,
+                },
+                {
+                    "phase": "JOB_REQ",
+                    "response": json.loads(job_ack_response(decision="DENY", fault_name="ARTIFACT_SHA_MISMATCH")),
+                    "stdout": job_ack_response(decision="DENY", fault_name="ARTIFACT_SHA_MISMATCH"),
+                    "returncode": 2,
+                },
+                {
+                    "phase": "STATUS_REQ",
+                    "response": json.loads(
+                        status_response(
+                            guard="READY",
+                            last_fault="ARTIFACT_SHA_MISMATCH",
+                            total_fault_count=1,
+                        )
+                    ),
+                    "stdout": status_response(
+                        guard="READY",
+                        last_fault="ARTIFACT_SHA_MISMATCH",
+                        total_fault_count=1,
+                    ),
+                    "returncode": 0,
+                },
+            ],
+        }
+        completed = subprocess.CompletedProcess(
+            ["python3", "openamp_remote_hook_proxy.py"],
+            0,
+            stdout=json.dumps(envelope, ensure_ascii=False) + "\n",
+            stderr="",
+        )
+
+        with (
+            patch.dict("fault_injector.os.environ", {"OPENAMP_FIT_BATCH_PHASES": "1"}),
+            patch("fault_injector.subprocess.run", return_value=completed) as run,
+        ):
+            payload = run_fault_action(
+                access,
+                fault_type="wrong_sha",
+                trusted_sha="6f236b07f9b0bf981b6762ddb72449e23332d2d92c76b38acdcadc1d9b536dc1",
+                timeout_sec=8.0,
+            )
+
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(run.call_count, 1)
+        submitted = json.loads(run.call_args.kwargs["input"])
+        self.assertEqual(
+            [event["phase"] for event in submitted["events"]],
+            ["STATUS_REQ", "JOB_REQ", "STATUS_REQ"],
+        )
 
     def test_heartbeat_timeout_requires_watchdog_status_and_cleanup_confirmation(self) -> None:
         access = make_access()

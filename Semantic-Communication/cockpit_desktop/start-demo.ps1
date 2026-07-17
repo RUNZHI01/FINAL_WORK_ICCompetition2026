@@ -101,6 +101,7 @@ Set-DefaultEnv "PHYTIUM_PI_PORT" ([string]$BoardPort)
 Set-DefaultEnv "OPENAMP_SSH_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_SSH_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
 Set-DefaultEnv "OPENAMP_FIT_SSH_RUNNER" "system"
+Set-DefaultEnv "OPENAMP_FIT_BATCH_PHASES" "1"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_RUNNER" "docker"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
 Set-DefaultEnv "OPENAMP_USRP_TX_RUNNER" "docker"

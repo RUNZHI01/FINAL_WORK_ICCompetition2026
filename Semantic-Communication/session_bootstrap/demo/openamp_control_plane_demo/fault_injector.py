@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+from collections import deque
 from typing import Any
 
 from board_access import BoardAccessConfig
@@ -29,7 +30,10 @@ def parse_json_stdout(raw: str) -> dict[str, Any]:
         line = line.strip()
         if not line:
             continue
-        payload = json.loads(line)
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
         if isinstance(payload, dict):
             return payload
     raise ValueError("remote fault action produced no JSON payload")
@@ -107,6 +111,25 @@ def build_proxy_command(access: BoardAccessConfig, remote_output_root: str) -> l
     return command
 
 
+def proxy_subprocess_env() -> dict[str, str]:
+    phase_env = os.environ.copy()
+    fit_ssh_runner = str(phase_env.get("OPENAMP_FIT_SSH_RUNNER") or "").strip()
+    if fit_ssh_runner:
+        phase_env["OPENAMP_SSH_RUNNER"] = fit_ssh_runner
+        if os.name == "nt" and fit_ssh_runner.lower() not in {"docker", "paramiko", "python"}:
+            phase_env.setdefault("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", "1")
+    return phase_env
+
+
+def fit_sequence_enabled() -> bool:
+    return str(os.environ.get("OPENAMP_FIT_BATCH_PHASES", "0")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def run_proxy_phase(
     access: BoardAccessConfig,
     *,
@@ -117,12 +140,6 @@ def run_proxy_phase(
 ) -> dict[str, Any]:
     event = {"phase": phase, "payload": payload}
     command = build_proxy_command(access, remote_output_root)
-    phase_env = os.environ.copy()
-    fit_ssh_runner = str(phase_env.get("OPENAMP_FIT_SSH_RUNNER") or "").strip()
-    if fit_ssh_runner:
-        phase_env["OPENAMP_SSH_RUNNER"] = fit_ssh_runner
-        if os.name == "nt" and fit_ssh_runner.lower() not in {"docker", "paramiko", "python"}:
-            phase_env.setdefault("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", "1")
     try:
         result = subprocess.run(
             command,
@@ -133,7 +150,7 @@ def run_proxy_phase(
             errors="replace",
             input=json.dumps(event, ensure_ascii=False),
             capture_output=True,
-            env=phase_env,
+            env=proxy_subprocess_env(),
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired:
@@ -185,6 +202,83 @@ def run_proxy_phase(
         "returncode": result.returncode,
         "error_text": response_error_text(response),
     }
+
+
+def run_proxy_sequence(
+    access: BoardAccessConfig,
+    *,
+    events: list[dict[str, Any]],
+    timeout_sec: float,
+    remote_output_root: str,
+) -> list[dict[str, Any]]:
+    command = build_proxy_command(access, remote_output_root)
+
+    def failed_results(status: str, *, stderr: str = "", error_text: str = "") -> list[dict[str, Any]]:
+        return [
+            {
+                "status": status,
+                "phase": str(event.get("phase") or "STATUS_REQ"),
+                "payload": event.get("payload") if isinstance(event.get("payload"), dict) else {},
+                "response": {},
+                "stdout": "",
+                "stderr": stderr,
+                "returncode": None,
+                "error_text": error_text,
+            }
+            for event in events
+        ]
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input=json.dumps({"events": events}, ensure_ascii=False),
+            capture_output=True,
+            env=proxy_subprocess_env(),
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired:
+        return failed_results("timeout")
+    except OSError as exc:
+        return failed_results("launch_error", error_text=str(exc))
+
+    stdout = result.stdout.strip()
+    stderr = result.stderr.strip()
+    try:
+        envelope = parse_json_stdout(result.stdout)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return failed_results("parse_error", stderr=stderr, error_text=str(exc))
+
+    raw_results = envelope.get("results") if envelope.get("proxy_sequence") is True else None
+    if not isinstance(raw_results, list):
+        return failed_results(
+            "parse_error",
+            stderr=stderr,
+            error_text="remote fault sequence did not return a results list",
+        )
+
+    parsed_results: list[dict[str, Any]] = []
+    for index, event in enumerate(events):
+        item = raw_results[index] if index < len(raw_results) and isinstance(raw_results[index], dict) else {}
+        response = item.get("response") if isinstance(item.get("response"), dict) else {}
+        segment_stdout = str(item.get("stdout") or "").strip()
+        parsed_results.append(
+            {
+                "status": "success" if response else "parse_error",
+                "phase": str(event.get("phase") or "STATUS_REQ"),
+                "payload": event.get("payload") if isinstance(event.get("payload"), dict) else {},
+                "response": response,
+                "stdout": segment_stdout or stdout,
+                "stderr": stderr,
+                "returncode": item.get("returncode", result.returncode),
+                "error_text": response_error_text(response) if response else "sequence phase produced no JSON payload",
+            }
+        )
+    return parsed_results
 
 
 def collect_phase_diagnostics(phase_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -397,6 +491,63 @@ def default_driver_config(action: str, trusted_sha: str) -> dict[str, Any]:
     }
 
 
+def build_fault_sequence_events(
+    action: str,
+    config: dict[str, Any],
+    trusted_sha: str,
+) -> list[dict[str, Any]]:
+    status_event = {
+        "phase": "STATUS_REQ",
+        "payload": make_status_payload(config["job_id"], trusted_sha, config["job_flags"]),
+    }
+    if action in {"wrong_sha", "illegal_param"}:
+        expected_sha = config["wrong_sha"] if action == "wrong_sha" else trusted_sha
+        expected_outputs = 1 if action == "wrong_sha" else 2
+        return [
+            status_event,
+            {
+                "phase": "JOB_REQ",
+                "payload": make_job_payload(
+                    job_id=config["job_id"],
+                    expected_sha256=expected_sha,
+                    expected_outputs=expected_outputs,
+                    deadline_ms=config["deadline_ms"],
+                    job_flags=config["job_flags"],
+                ),
+            },
+            status_event,
+        ]
+    if action == "heartbeat_timeout":
+        return [
+            status_event,
+            {
+                "phase": "JOB_REQ",
+                "payload": make_job_payload(
+                    job_id=config["job_id"],
+                    expected_sha256=trusted_sha,
+                    expected_outputs=1,
+                    deadline_ms=config["deadline_ms"],
+                    job_flags=config["job_flags"],
+                ),
+            },
+            {
+                "phase": "HEARTBEAT",
+                "payload": make_heartbeat_payload(config["job_id"], elapsed_ms=1234),
+            },
+            {
+                "phase": "STATUS_REQ",
+                "payload": status_event["payload"],
+                "delay_before_sec": float(config["wait_without_heartbeat_sec"]),
+            },
+            {
+                "phase": "SAFE_STOP",
+                "payload": make_safe_stop_payload(config["job_id"], "heartbeat_timeout_cleanup"),
+            },
+            status_event,
+        ]
+    return []
+
+
 def query_live_status(access: BoardAccessConfig, *, trusted_sha: str, timeout_sec: float = 12.0) -> dict[str, Any]:
     config = default_driver_config("status", trusted_sha)
     deadline = time.monotonic() + timeout_sec
@@ -445,19 +596,60 @@ def run_fault_action(
 ) -> dict[str, Any]:
     action = FAULT_TYPE_TO_ACTION.get(fault_type, fault_type)
     config = default_driver_config(action, trusted_sha)
+    if fit_sequence_enabled() and action == "heartbeat_timeout":
+        try:
+            config["wait_without_heartbeat_sec"] = max(
+                5.0,
+                min(float(os.environ.get("OPENAMP_FIT_HEARTBEAT_WAIT_SEC", "5.0")), 15.0),
+            )
+        except (TypeError, ValueError):
+            config["wait_without_heartbeat_sec"] = 5.0
     deadline = time.monotonic() + timeout_sec
     logs: list[str] = []
     phase_results: list[dict[str, Any]] = []
     remote_output_root = f"{DEFAULT_REMOTE_OUTPUT_ROOT}/{action}"
+    batched_results: deque[dict[str, Any]] | None = None
+    if fit_sequence_enabled():
+        sequence = build_fault_sequence_events(action, config, trusted_sha)
+        if sequence:
+            batched_results = deque(
+                run_proxy_sequence(
+                    access,
+                    events=sequence,
+                    timeout_sec=remaining_timeout(deadline),
+                    remote_output_root=remote_output_root,
+                )
+            )
 
     def run_phase(phase: str, payload: dict[str, Any]) -> dict[str, Any]:
-        result = run_proxy_phase(
-            access,
-            phase=phase,
-            payload=payload,
-            timeout_sec=remaining_timeout(deadline),
-            remote_output_root=remote_output_root,
-        )
+        if batched_results is not None:
+            if batched_results:
+                result = batched_results.popleft()
+            else:
+                result = {
+                    "status": "parse_error",
+                    "phase": phase,
+                    "payload": payload,
+                    "response": {},
+                    "stdout": "",
+                    "stderr": "",
+                    "returncode": None,
+                    "error_text": "fault sequence ended before all phases were returned",
+                }
+            if result.get("phase") != phase:
+                result = {
+                    **result,
+                    "status": "parse_error",
+                    "error_text": f"fault sequence phase mismatch: expected {phase}, got {result.get('phase')}",
+                }
+        else:
+            result = run_proxy_phase(
+                access,
+                phase=phase,
+                payload=payload,
+                timeout_sec=remaining_timeout(deadline),
+                remote_output_root=remote_output_root,
+            )
         phase_results.append(result)
         return result
 
@@ -593,7 +785,8 @@ def run_fault_action(
             return payload
 
         log(logs, f"⏳ 停发 heartbeat {config['wait_without_heartbeat_sec']:.1f} 秒，等待 FIT-03 watchdog 结果")
-        wait_with_deadline(deadline, float(config["wait_without_heartbeat_sec"]))
+        if batched_results is None:
+            wait_with_deadline(deadline, float(config["wait_without_heartbeat_sec"]))
 
         timeout_status = run_phase("STATUS_REQ", make_status_payload(config["job_id"], trusted_sha, config["job_flags"]))
         if not status_phase_is_live(timeout_status):

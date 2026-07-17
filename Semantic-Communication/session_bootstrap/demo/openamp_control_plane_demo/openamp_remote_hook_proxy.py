@@ -289,6 +289,147 @@ fi
 """.strip()
 
 
+SEQUENCE_START_PREFIX = "__OPENAMP_SEQUENCE_START__"
+SEQUENCE_END_PREFIX = "__OPENAMP_SEQUENCE_END__"
+
+
+def sequence_events(event: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_events = event.get("events")
+    if not isinstance(raw_events, list):
+        return []
+    events: list[dict[str, Any]] = []
+    for item in raw_events:
+        if not isinstance(item, dict):
+            continue
+        raw_event = item.get("event") if isinstance(item.get("event"), dict) else item
+        phase = detect_phase(raw_event)
+        payload = raw_event.get("payload") if isinstance(raw_event.get("payload"), dict) else {}
+        try:
+            delay_before_sec = max(0.0, min(float(item.get("delay_before_sec", 0.0) or 0.0), 30.0))
+        except (TypeError, ValueError):
+            delay_before_sec = 0.0
+        events.append(
+            {
+                "phase": phase,
+                "payload": payload,
+                "delay_before_sec": delay_before_sec,
+            }
+        )
+    return events
+
+
+def build_remote_sequence_command(args: argparse.Namespace, events: list[dict[str, Any]]) -> str:
+    steps: list[str] = []
+    for index, event in enumerate(events):
+        phase = detect_phase(event)
+        job_id = detect_job_id(event)
+        raw_event = json.dumps(
+            {"phase": phase, "payload": event.get("payload", {})},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
+        delay_before_sec = float(event.get("delay_before_sec", 0.0) or 0.0)
+        phase_command = build_remote_command(
+            args,
+            phase=phase,
+            job_id=job_id,
+            hook_event_b64=hook_event_b64,
+        )
+        steps.append(
+            f"""
+printf '%s:%d:%s\\n' {shlex.quote(SEQUENCE_START_PREFIX)} {index} {shlex.quote(phase)}
+sleep {delay_before_sec:.3f}
+if (
+{phase_command}
+); then
+  sequence_rc=0
+else
+  sequence_rc=$?
+fi
+printf '%s:%d:%s:%d\\n' {shlex.quote(SEQUENCE_END_PREFIX)} {index} {shlex.quote(phase)} "$sequence_rc"
+""".strip()
+        )
+
+    sequence_body = "\n\n".join(steps)
+    return f"""
+set -uo pipefail
+SEQUENCE_STAGE_ROOT="$(mktemp -d /tmp/openamp_demo_sequence.XXXXXX)"
+SEQUENCE_SCRIPT="$SEQUENCE_STAGE_ROOT/run_sequence.sh"
+cleanup_sequence() {{
+  if command -v sudo >/dev/null 2>&1; then
+    printf '%s\\n' "${{SUDO_PASSWORD:-}}" | sudo -S -p '' rm -rf "$SEQUENCE_STAGE_ROOT" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$SEQUENCE_STAGE_ROOT" >/dev/null 2>&1 || true
+}}
+trap cleanup_sequence EXIT
+cat >"$SEQUENCE_SCRIPT" <<'OPENAMP_SEQUENCE_SCRIPT'
+#!/usr/bin/env bash
+set -uo pipefail
+{sequence_body}
+OPENAMP_SEQUENCE_SCRIPT
+chmod 700 "$SEQUENCE_SCRIPT"
+if [[ "$(id -u)" -eq 0 ]] || {{ [[ -r {shlex.quote(args.rpmsg_dev)} ]] && [[ -w {shlex.quote(args.rpmsg_dev)} ]]; }}; then
+  SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
+elif command -v sudo >/dev/null 2>&1; then
+  printf '%s\\n' "${{SUDO_PASSWORD:-}}" | sudo -S -p '' env SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
+else
+  SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
+fi
+""".strip()
+
+
+def parse_sequence_output(raw: str, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    segments: dict[int, dict[str, Any]] = {}
+    current_index: int | None = None
+    for raw_line in raw.splitlines():
+        line = raw_line.strip()
+        if line.startswith(f"{SEQUENCE_START_PREFIX}:"):
+            parts = line.split(":", 2)
+            try:
+                current_index = int(parts[1])
+            except (IndexError, ValueError):
+                current_index = None
+                continue
+            segments[current_index] = {"lines": [], "returncode": None}
+            continue
+        if line.startswith(f"{SEQUENCE_END_PREFIX}:"):
+            parts = line.split(":", 3)
+            try:
+                index = int(parts[1])
+                returncode = int(parts[3])
+            except (IndexError, ValueError):
+                current_index = None
+                continue
+            segments.setdefault(index, {"lines": [], "returncode": None})["returncode"] = returncode
+            current_index = None
+            continue
+        if current_index is not None:
+            segments[current_index]["lines"].append(raw_line)
+
+    results: list[dict[str, Any]] = []
+    for index, event in enumerate(events):
+        segment = segments.get(index, {"lines": [], "returncode": None})
+        segment_stdout = "\n".join(segment["lines"]).strip()
+        parsed = parse_json_dict_lines(segment_stdout)
+        response: dict[str, Any] = {}
+        for _line_index, candidate in reversed(parsed):
+            if not is_synthetic_sudo_failure(candidate):
+                response = candidate
+                break
+        if not response and parsed:
+            response = parsed[-1][1]
+        results.append(
+            {
+                "phase": detect_phase(event),
+                "response": response,
+                "stdout": segment_stdout,
+                "returncode": segment.get("returncode"),
+            }
+        )
+    return results
+
+
 def build_remote_stdin_wrapper_command() -> str:
     return """
 set -euo pipefail
@@ -316,10 +457,15 @@ def main() -> int:
     args = normalize_args(parse_args())
     raw_event = sys.stdin.read()
     event = read_event(raw_event)
-    phase = detect_phase(event)
-    job_id = detect_job_id(event)
-    hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
-    remote_command = build_remote_command(args, phase=phase, job_id=job_id, hook_event_b64=hook_event_b64)
+    events = sequence_events(event)
+    if events:
+        phase = detect_phase(events[0])
+        remote_command = build_remote_sequence_command(args, events)
+    else:
+        phase = detect_phase(event)
+        job_id = detect_job_id(event)
+        hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
+        remote_command = build_remote_command(args, phase=phase, job_id=job_id, hook_event_b64=hook_event_b64)
     remote_input = f"{args.password}\n{remote_command}\n".encode("utf-8")
     command = [
         resolve_bash_executable(),
@@ -346,6 +492,20 @@ def main() -> int:
     )
     result_stdout = decode_completed_output(result.stdout)
     result_stderr = decode_completed_output(result.stderr)
+    if events:
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "proxy_sequence": True,
+                    "results": parse_sequence_output(result_stdout, events),
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+        if result_stderr:
+            sys.stderr.write(result_stderr)
+        return result.returncode
     stdout, suppressed_tail = suppress_synthetic_sudo_failure_tail(result_stdout)
     if stdout:
         sys.stdout.write(stdout)

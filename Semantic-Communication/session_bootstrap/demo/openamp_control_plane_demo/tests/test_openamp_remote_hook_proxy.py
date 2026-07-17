@@ -21,9 +21,12 @@ from openamp_remote_hook_proxy import (  # noqa: E402
     SSH_HELPER,
     build_bridge_bundle_base64,
     build_remote_command,
+    build_remote_sequence_command,
     main,
     normalize_args,
+    parse_sequence_output,
     resolve_bash_executable,
+    sequence_events,
 )
 
 
@@ -120,6 +123,63 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertIn('REMOTE_BRIDGE_PYTHONPATH="$REMOTE_PROJECT_ROOT"', command)
         self.assertIn('BRIDGE_SCRIPT="${REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}"', command)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1", command)
+
+    def test_sequence_command_reuses_one_ssh_and_one_outer_sudo(self) -> None:
+        args = SimpleNamespace(
+            remote_project_root="/tmp/openamp_fit/project",
+            remote_jscc_dir="",
+            remote_output_root="/tmp/openamp_demo_hook",
+            rpmsg_ctrl="/dev/rpmsg_ctrl0",
+            rpmsg_dev="/dev/rpmsg0",
+        )
+        events = sequence_events(
+            {
+                "events": [
+                    {"phase": "STATUS_REQ", "payload": {"job_id": 7}},
+                    {"phase": "JOB_REQ", "payload": {"job_id": 7}},
+                    {"phase": "STATUS_REQ", "payload": {"job_id": 7}, "delay_before_sec": 5},
+                ]
+            }
+        )
+
+        command = build_remote_sequence_command(args, events)
+
+        self.assertEqual(command.count("sudo -S -p '' env SUDO_PASSWORD="), 1)
+        self.assertIn("__OPENAMP_SEQUENCE_START__", command)
+        self.assertIn("__OPENAMP_SEQUENCE_END__", command)
+        self.assertIn("sleep 5.000", command)
+        self.assertEqual(command.count("openamp_rpmsg_bridge.py"), 9)
+
+    def test_sequence_output_prefers_bridge_summary_over_permission_tail(self) -> None:
+        events = [
+            {"phase": "JOB_REQ", "payload": {"job_id": 7}},
+            {"phase": "STATUS_REQ", "payload": {"job_id": 7}},
+        ]
+        job_summary = {"phase": "JOB_REQ", "decision": "DENY", "source": "firmware_job_ack"}
+        sudo_tail = {
+            "phase": "JOB_REQ",
+            "source": "openamp_demo_remote_hook_proxy",
+            "transport_status": "permission_gate",
+            "note": "JOB_REQ could not launch the board-side bridge under sudo: expected denial",
+        }
+        status_summary = {"phase": "STATUS_REQ", "protocol_semantics": "implemented"}
+        raw = "\n".join(
+            [
+                "__OPENAMP_SEQUENCE_START__:0:JOB_REQ",
+                json.dumps(job_summary),
+                json.dumps(sudo_tail),
+                "__OPENAMP_SEQUENCE_END__:0:JOB_REQ:2",
+                "__OPENAMP_SEQUENCE_START__:1:STATUS_REQ",
+                json.dumps(status_summary),
+                "__OPENAMP_SEQUENCE_END__:1:STATUS_REQ:0",
+            ]
+        )
+
+        results = parse_sequence_output(raw, events)
+
+        self.assertEqual(results[0]["response"], job_summary)
+        self.assertEqual(results[0]["returncode"], 2)
+        self.assertEqual(results[1]["response"], status_summary)
 
     def test_main_passes_password_and_remote_script_on_stdin_to_avoid_long_windows_argv(self) -> None:
         args = SimpleNamespace(
