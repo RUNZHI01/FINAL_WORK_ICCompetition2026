@@ -390,13 +390,36 @@ def test_http_page_ignores_stale_poll_state_responses(tmp_path: Path) -> None:
     state_request = script.index("const payload = await requestJson('/api/state')", poll_start)
     source_epoch = script.index("const sourceEpoch = state.sourceEpoch", poll_start)
     source_id = script.index("const sourceId = state.sourceId", poll_start)
-    success_guard = script.index("if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return", state_request)
+    success_guard = script.index("if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return", state_request)
     quality_update = script.index("state.quality = payload.quality || {}", state_request)
-    error_guard = script.index("if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return", success_guard + 1)
+    error_guard = script.index("if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return", success_guard + 1)
     status_update = script.index("elements.serviceStatus.textContent", error_guard)
 
     assert source_epoch < state_request
     assert source_id < state_request
+    assert success_guard < quality_update
+    assert error_guard < status_update
+
+
+def test_http_page_requires_source_ready_before_applying_poll_state(tmp_path: Path) -> None:
+    _, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    reset_start = script.index("function resetSelectedJob()")
+    poll_start = script.index("async function pollState()")
+    jobs_start = script.index("async function loadJobs()")
+    source_guard = script.index("if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return", jobs_start)
+    jobs_apply = script.index("state.jobs = payload.jobs", jobs_start)
+    state_request = script.index("const payload = await requestJson('/api/state')", poll_start)
+    ready_capture = script.index("const sourceReady = state.sourceReady", poll_start)
+    success_guard = script.index("if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return", state_request)
+    quality_update = script.index("state.quality = payload.quality || {}", state_request)
+    error_guard = script.index("if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return", success_guard + 1)
+    status_update = script.index("elements.serviceStatus.textContent", error_guard)
+
+    assert "sourceReady: false" in script
+    assert "state.sourceReady = false" in script[reset_start:poll_start]
+    assert source_guard < script.index("state.sourceReady = true", jobs_start) < jobs_apply
+    assert ready_capture < state_request
     assert success_guard < quality_update
     assert error_guard < status_update
 

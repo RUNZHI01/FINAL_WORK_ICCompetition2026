@@ -33,6 +33,7 @@ const state = {
   config: null,
   sourceId: '',
   sourceEpoch: 0,
+  sourceReady: false,
   jobs: [],
   detail: null,
   index: 0,
@@ -203,6 +204,7 @@ function setIndex(index) {
 
 function resetSelectedJob() {
   state.sourceEpoch += 1
+  state.sourceReady = false
   state.jobs = []
   state.detail = null
   state.index = 0
@@ -243,6 +245,7 @@ async function loadJobs() {
   try {
     const payload = await requestJson(`/api/jobs?source=${encodeURIComponent(sourceId)}`)
     if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
+    state.sourceReady = true
     state.jobs = payload.jobs
     elements.jobSelect.replaceChildren()
     for (const job of state.jobs) {
@@ -318,9 +321,10 @@ async function setQualityAssistance(enabled) {
 async function pollState() {
   const sourceEpoch = state.sourceEpoch
   const sourceId = state.sourceId
+  const sourceReady = state.sourceReady
   try {
     const payload = await requestJson('/api/state')
-    if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
+    if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return
     state.quality = payload.quality || {}
     const resources = payload.resources
     elements.boardResource.textContent = resources
@@ -328,7 +332,7 @@ async function pollState() {
       : '板端资源待采样'
     renderPreview()
   } catch (error) {
-    if (!isCurrentSourceRequest(sourceEpoch, sourceId)) return
+    if (!sourceReady || !isCurrentSourceRequest(sourceEpoch, sourceId)) return
     elements.serviceStatus.textContent = `服务状态不可用：${error.message}`
   }
 }
