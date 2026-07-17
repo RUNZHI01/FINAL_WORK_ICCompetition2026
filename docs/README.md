@@ -14,6 +14,7 @@
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
 | 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP IQ 直传、认证加密默认开启、10 张隐藏预热 |
 | 要准备汇报或修改 PPT | [`USRP_LINK_BRIEFING.md`](./USRP_LINK_BRIEFING.md) | USRP 分阶段链路、指标边界、安全口径和材料修改清单 |
+| 要了解当前 USRP IQ 实际链路 | [`USRP_IQ_RUNTIME_20260717.md`](./USRP_IQ_RUNTIME_20260717.md) | 数据面执行顺序、控制/安全边界和 300 张实测卡点 |
 | 要跑旧交付容器入口 | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |
 | 要日常快速复测性能 | `docker/run-board-cli-benchmark-fast.*` | 复用板端依赖缓存，只同步代码层 |

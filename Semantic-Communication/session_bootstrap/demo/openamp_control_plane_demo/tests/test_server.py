@@ -1851,46 +1851,24 @@ class DashboardStateTest(unittest.TestCase):
         self.assertEqual(batch_state["status_category"], "config_error")
         run_demo_inference.assert_called_once()
 
-    def test_start_batch_inference_alert_mode_keeps_batch_state_accessible_and_completes(self) -> None:
+    def test_alert_mode_rejects_all_inference_engines_without_creating_batch_state(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         state.set_link_director_profile({"profile_id": "flaky"})
 
-        payload = state.start_batch_inference(count=3)
-        self.assertEqual(payload["status"], "started")
-        self.assertEqual(payload["service_mode"], "ALERT_ONLY")
-        self.assertEqual(payload["total"], 3)
+        tvm = state.start_batch_inference(count=3)
+        mnn = state.start_mnn_batch_inference(count=3)
+        pytorch = state.run_demo_inference(variant="baseline", image_index=0, max_inputs=3)
 
-        # Batch mode should stay stable for the lifetime of this batch even if
-        # the operator changes the staged profile afterwards.
-        state.set_link_director_profile({"profile_id": "normal"})
+        for engine, payload in (("TVM", tvm), ("MNN", mnn), ("PyTorch", pytorch)):
+            self.assertEqual(payload["status"], "blocked")
+            self.assertEqual(payload["request_state"], "rejected")
+            self.assertEqual(payload["status_category"], "service_mode_blocked")
+            self.assertEqual(payload["service_mode"], "ALERT_ONLY")
+            self.assertEqual(payload["engine"], engine)
+            self.assertIn("仅下发北斗定位和告警信息", payload["message"])
+            self.assertNotIn("batch_job_id", payload)
 
-        time.sleep(0.05)
-        holder: dict[str, object] = {}
-
-        def _read_batch_state() -> None:
-            holder["state"] = state.get_batch_state()
-
-        reader = threading.Thread(target=_read_batch_state, daemon=True)
-        reader.start()
-        reader.join(timeout=0.2)
-        self.assertFalse(reader.is_alive(), "get_batch_state() blocked during ALERT_ONLY batch")
-
-        deadline = time.monotonic() + 1.0
-        while time.monotonic() < deadline:
-            current = state.get_batch_state()
-            if current.get("status") == "done":
-                break
-            time.sleep(0.02)
-        else:
-            self.fail(f"alert-mode batch did not finish: {state.get_batch_state()}")
-
-        final_state = state.get_batch_state()
-        self.assertEqual(final_state["service_mode"], "ALERT_ONLY")
-        self.assertEqual(final_state["completed"], 3)
-        self.assertEqual(final_state["total"], 3)
-        self.assertEqual(final_state["success"], 0)
-        self.assertEqual(final_state["fallback"], 0)
-        self.assertIsNone(final_state["benchmark"])
+        self.assertEqual(state.get_batch_state(), {"status": "idle"})
 
     def test_start_batch_inference_roi_mode_reduces_effective_count_and_completes(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
@@ -5216,6 +5194,44 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(manifest["selected_count"], 1)
         self.assertEqual(Path(manifest["files"][0]["source"]).name, "001.pt")
         self.assertEqual(prepared_bytes, b"second")
+
+    def test_usrp_explicit_latent_dir_ignores_stale_image_cache_when_encoding_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            latent_dir = temp_dir / "candidate_latents"
+            image_dir = temp_dir / "old_images"
+            stale_output_dir = temp_dir / "old_image_latents"
+            latent_dir.mkdir()
+            image_dir.mkdir()
+            stale_output_dir.mkdir()
+            candidate = latent_dir / "candidate.pt"
+            candidate.write_bytes(b"candidate")
+            stale = stale_output_dir / "stale.pt"
+            stale.write_bytes(b"stale")
+
+            job = object.__new__(usrp_runtime.UsrpBatchSpoolJob)
+            job._expected_outputs = 1
+            job._set_host_preprocess_progress = Mock()
+            job._host_latent_files = []
+            job._host_preprocess_manifest = None
+            env_values = {
+                "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED": "0",
+                "OPENAMP_DEMO_LOCAL_IMAGE_DIR": str(image_dir),
+                "OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR": str(stale_output_dir),
+                "OPENAMP_DEMO_LOCAL_LATENT_PATTERN": "*.pt",
+            }
+
+            with patch.object(
+                usrp_runtime,
+                "_host_image_latent_cache_valid",
+                return_value=({"status": "cache_hit"}, [stale]),
+            ) as image_cache:
+                selected_dir = job._ensure_host_latents(env_values, latent_dir)
+
+        image_cache.assert_not_called()
+        self.assertEqual(selected_dir, latent_dir)
+        self.assertEqual(job._host_latent_files, [candidate])
+        self.assertEqual(job._host_preprocess_manifest["source"], "latent_cache")
 
     def test_usrp_wire_manifest_records_source_image_hash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -9109,7 +9125,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["message"], "unsupported transport_mode; expected tcp or usrp")
 
-    def test_board_access_usrp_defaults_discover_workspace_original_images(self) -> None:
+    def test_board_access_usrp_defaults_discover_ranked_top300_images(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
         status, _, payload = request_json(
@@ -9121,9 +9137,10 @@ class DemoHTTPServerTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         image_dir = Path(payload["board_access"]["local_usrp_image_dir"])
-        self.assertEqual(image_dir.name, "原始图像")
-        self.assertTrue((image_dir / "00000001.jpg").is_file())
-        self.assertTrue((image_dir / "00000050.jpg").is_file())
+        self.assertEqual(image_dir.name, "原始图像_Top300")
+        self.assertEqual(len(list(image_dir.glob("*.jpg"))), 300)
+        self.assertTrue((image_dir / "00004417.jpg").is_file())
+        self.assertTrue((image_dir / "00000601.jpg").is_file())
         self.assertEqual(state._board_access.build_env()["OPENAMP_DEMO_LOCAL_IMAGE_DIR"], str(image_dir))
 
     def test_board_access_usrp_defaults_prepare_latents_from_original_images(self) -> None:
@@ -9138,7 +9155,7 @@ class DemoHTTPServerTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         latent_dir = Path(payload["board_access"]["local_usrp_input_dir"])
-        self.assertEqual(latent_dir.name, "encoder_outputs_airfield300")
+        self.assertEqual(latent_dir.name, "encoder_outputs_top300")
         env = state._board_access.build_env()
         self.assertEqual(env["OPENAMP_DEMO_LOCAL_LATENT_DIR"], str(latent_dir))
         self.assertEqual(env["OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR"], str(latent_dir))

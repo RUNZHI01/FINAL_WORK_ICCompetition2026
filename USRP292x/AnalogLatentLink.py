@@ -406,7 +406,7 @@ def build_frame_symbols(data_symbols: np.ndarray, manifest: dict[str, Any]) -> n
         parts.append(data_symbols[pos:pos + take])
         block_lengths.append(int(take))
         pos += take
-        if pos < len(data_symbols) and len(mid) > 0:
+        if len(mid) > 0 and (pos < len(data_symbols) or bool(manifest.get("trailing_mid_pilot"))):
             parts.append(mid)
     manifest["data_block_lengths"] = block_lengths
     manifest["frame_symbols"] = int(sum(len(part) for part in parts))
@@ -540,7 +540,10 @@ def expected_symbols_after_sync(manifest: dict[str, Any]) -> int:
         n_complex = int(manifest.get("n_complex", 0))
         block = max(int(manifest.get("data_block_symbols", 1)), 1)
         block_lengths = [min(block, n_complex - pos) for pos in range(0, n_complex, block)]
-    return int(sync_len + sum(block_lengths) + max(0, len(block_lengths) - 1) * mid_len)
+    pilot_count = max(0, len(block_lengths) - 1)
+    if block_lengths and bool(manifest.get("trailing_mid_pilot")):
+        pilot_count += 1
+    return int(sync_len + sum(block_lengths) + pilot_count * mid_len)
 
 
 def sync_candidate_has_complete_frame(candidate: dict[str, Any], manifest: dict[str, Any]) -> bool:
@@ -873,7 +876,9 @@ def recover_payload_symbols(sym_stream: np.ndarray, sync_start: int, manifest: d
         if block_rx.size < block_len:
             raise RuntimeError(f"payload block {block_idx} extends beyond symbol stream")
 
-        has_next_mid = block_idx != len(block_lengths) - 1 and mid_len > 0
+        has_next_mid = mid_len > 0 and (
+            block_idx != len(block_lengths) - 1 or bool(manifest.get("trailing_mid_pilot"))
+        )
         next_gain = current_gain
         if has_next_mid:
             mid_cursor = cursor + block_len
@@ -1151,6 +1156,7 @@ def make_waveform(args: argparse.Namespace) -> dict[str, Any]:
         "sync_pilot_symbols": int(args.sync_pilot_symbols),
         "data_block_symbols": int(args.data_block_symbols),
         "mid_pilot_symbols": int(args.mid_pilot_symbols),
+        "trailing_mid_pilot": True,
         "cfo_seed": int(args.cfo_seed),
         "sync_seed": int(args.sync_seed),
         "mid_pilot_seed": int(args.mid_pilot_seed),

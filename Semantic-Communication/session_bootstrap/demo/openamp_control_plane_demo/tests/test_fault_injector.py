@@ -119,7 +119,11 @@ class RunFaultActionTest(unittest.TestCase):
             stderr="远端 bridge 启动失败\n",
         )
 
-        with patch("fault_injector.subprocess.run", return_value=completed) as run:
+        with (
+            patch.dict("fault_injector.os.environ", {"OPENAMP_FIT_SSH_RUNNER": "system"}),
+            patch("fault_injector.os.name", "nt"),
+            patch("fault_injector.subprocess.run", return_value=completed) as run,
+        ):
             payload = run_proxy_phase(
                 access,
                 phase="STATUS_REQ",
@@ -131,6 +135,8 @@ class RunFaultActionTest(unittest.TestCase):
         self.assertEqual(payload["status"], "success")
         self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
         self.assertEqual(run.call_args.kwargs["errors"], "replace")
+        self.assertEqual(run.call_args.kwargs["env"]["OPENAMP_SSH_RUNNER"], "system")
+        self.assertEqual(run.call_args.kwargs["env"]["SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER"], "1")
 
     def test_auth_failure_maps_to_operator_message_with_diagnostics(self) -> None:
         access = make_access()

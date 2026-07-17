@@ -2982,7 +2982,7 @@ class UsrpBatchSpoolJob:
         config_str = _first_value(env_values, LOCAL_IMAGE_TO_LATENT_CONFIG_KEYS, "6_6_6_6_6_6_6")
         snr = _first_value(env_values, LOCAL_IMAGE_TO_LATENT_SNR_KEYS, "10")
 
-        if image_dir is not None and image_dir.is_dir():
+        if enabled and image_dir is not None and image_dir.is_dir():
             cache = _host_image_latent_cache_valid(
                 image_dir=image_dir,
                 output_dir=output_dir,

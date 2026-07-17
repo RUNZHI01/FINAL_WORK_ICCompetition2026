@@ -5641,6 +5641,29 @@ def test_iq_quality_gate_uses_stricter_default_pilot_threshold(monkeypatch):
     assert "below 0.850000" in error
 
 
+def test_iq_quality_gate_rejects_nonuniform_pilots_when_initial_pilot_is_weakest(monkeypatch):
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
+    monkeypatch.setenv("ANALOG_IQ_QUALITY_MIN_SYNC_METRIC", "0.75")
+    monkeypatch.setenv("ANALOG_IQ_MIN_PILOT_GAIN_RATIO", "0.85")
+    args = Namespace(min_sync_metric=0.05)
+
+    error = analog_batch.iq_decode_quality_failure(
+        {
+            "status": "ok",
+            "frame_complete": True,
+            "sync_success": True,
+            "sync_metric": 0.84,
+            "pilot_gain_min_over_initial": 1.0,
+            "pilot_gain_min_abs": 0.118,
+            "pilot_gain_max_abs": 0.455,
+        },
+        args,
+    )
+
+    assert "pilot gain uniformity" in error
+    assert "below 0.850000" in error
+
+
 def test_remote_decode_soft_complete_disabled_by_default_with_iq_quality_gate(monkeypatch):
     monkeypatch.setenv("ANALOG_IQ_QUALITY_GATE", "1")
 
@@ -7725,7 +7748,10 @@ def test_robust_sync_rejects_false_peak_then_recovers_3khz_cfo_at_5db(tmp_path):
 
     summary = json.loads((tmp_path / "decode_summary.json").read_text(encoding="utf-8"))
     assert summary["sync_search_mode"] == "robust-cfo-grid"
-    assert "sync metric" in summary["normal_sync_error"].lower()
+    assert any(
+        reason in summary["normal_sync_error"].lower()
+        for reason in ("sync metric", "complete frame")
+    )
     assert summary["sync_metric"] > 0.90
     assert abs(summary["estimated_cfo_hz"] - 3000.0) < 250.0
     assert summary["evm_rms"] < 0.30
@@ -7840,3 +7866,40 @@ def test_mid_pilot_linear_phase_tracking_recovers_symbol_block():
     assert metrics["phase_corrections"][0]["end_phase_deg"] > metrics["phase_corrections"][0]["start_phase_deg"]
     np.testing.assert_allclose(recovered[:block_len], data, rtol=2.0e-5, atol=2.0e-5)
     np.testing.assert_allclose(recovered[block_len:], data, rtol=2.0e-5, atol=2.0e-5)
+
+
+def test_trailing_mid_pilot_tracks_gain_drift_across_last_block():
+    cfo_len = 8
+    sync_len = 8
+    mid_len = 4
+    block_len = 12
+    data = (
+        np.linspace(-0.8, 0.9, num=block_len * 2, dtype=np.float32)[0::2]
+        + 1j * np.linspace(0.7, -0.6, num=block_len * 2, dtype=np.float32)[1::2]
+    ).astype(np.complex64)
+    manifest = {
+        "cfo_pilot_symbols": cfo_len,
+        "sync_pilot_symbols": sync_len,
+        "mid_pilot_symbols": mid_len,
+        "data_block_symbols": block_len,
+        "data_block_lengths": [block_len],
+        "trailing_mid_pilot": True,
+        "cfo_seed": 1001,
+        "sync_seed": 1002,
+        "mid_pilot_seed": 1003,
+    }
+    cfo = analog.make_pilot_symbols(cfo_len, 1001)
+    sync = analog.make_pilot_symbols(sync_len, 1002)
+    mid = analog.make_pilot_symbols(mid_len, 1003)
+    gain0 = 0.72 * np.exp(1j * np.deg2rad(18.0))
+    gain1 = 0.92 * np.exp(1j * np.deg2rad(78.0))
+    gain_track = analog.interpolate_complex_gain(gain0, gain1, block_len)
+    sym_stream = np.concatenate(
+        [cfo * gain0, cfo * gain0, sync * gain0, data * gain_track, mid * gain1]
+    ).astype(np.complex64)
+
+    recovered, metrics = analog.recover_payload_symbols(sym_stream, 2 * cfo_len, manifest)
+
+    assert metrics["phase_corrections"][0]["mode"] == "linear-mid-pilot"
+    assert metrics["pilot_gain_max_abs"] > metrics["pilot_gain_min_abs"]
+    np.testing.assert_allclose(recovered, data, rtol=2.0e-5, atol=2.0e-5)

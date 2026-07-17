@@ -26,6 +26,7 @@ import { comparisonResultFromInferencePayload } from '../hooks/comparisonResult'
 import {
   isDashboardBatchRunning,
   isDashboardWorkRunning,
+  isInferenceLaunchBlocked,
   shouldDisplayDashboardBatch,
 } from '../hooks/dashboardBatchDisplayState'
 import {
@@ -386,6 +387,12 @@ export function DashboardPageMinimal() {
     setTimeout(() => removeToast(id), 3000)
   }, [removeToast])
 
+  const rejectAlertModeInference = useCallback((engine: 'TVM' | 'MNN' | 'PyTorch') => {
+    if (!isInferenceLaunchBlocked(currentMode)) return false
+    showToast(`告警模式仅下发北斗定位信息，已拒绝 ${engine} 推理`, 'error')
+    return true
+  }, [currentMode, showToast])
+
   useEffect(() => {
     clearComparisonResults()
     setLastCompletedInference(null)
@@ -409,6 +416,7 @@ export function DashboardPageMinimal() {
 
   const handleRunInference = useCallback(
     (count: number = batchCount) => {
+      if (rejectAlertModeInference('TVM')) return
       batchMut.mutate({ count }, {
         onSuccess: (data) => {
           if (data.status === 'already_running') {
@@ -424,11 +432,12 @@ export function DashboardPageMinimal() {
         },
       })
     },
-    [batchCount, batchMut, showToast],
+    [batchCount, batchMut, rejectAlertModeInference, showToast],
   )
 
   const handleRunMnnInference = useCallback(
     (count: number = batchCount) => {
+      if (rejectAlertModeInference('MNN')) return
       mnnBatchMut.mutate({ count }, {
         onSuccess: (data) => {
           if (data.status === 'already_running') {
@@ -444,7 +453,27 @@ export function DashboardPageMinimal() {
         },
       })
     },
-    [batchCount, mnnBatchMut, showToast],
+    [batchCount, mnnBatchMut, rejectAlertModeInference, showToast],
+  )
+
+  const handleRunBaseline = useCallback(
+    (count: number = batchCount) => {
+      if (rejectAlertModeInference('PyTorch')) return
+      baselineMut.mutate(
+        { imageIndex: 0, count },
+        {
+          onSuccess: (data) => {
+            if (data.status === 'blocked') {
+              showToast(data.message || '当前服务模式拒绝 PyTorch 推理', 'error')
+            }
+          },
+          onError: (error) => {
+            showToast(`启动失败: ${error.message}`, 'error')
+          },
+        },
+      )
+    },
+    [baselineMut, batchCount, rejectAlertModeInference, showToast],
   )
 
   const handleSavePassword = useMemo(
@@ -572,7 +601,6 @@ export function DashboardPageMinimal() {
   const resultQualityPairs = rawQualityPairs ?? fallbackQualityPairs
   const qualityPairRows = [
     resultQualityPairs?.original_tvm,
-    resultQualityPairs?.pytorch_tvm,
   ].filter((item): item is InferenceQualityPair => Boolean(item && (item.psnr_db != null || item.ssim != null)))
   const hasPositiveSpeedup = comparisonRows.some((row) => (
     row.engine !== 'pytorch'
@@ -1046,7 +1074,7 @@ export function DashboardPageMinimal() {
 
                   <button
                     className={s.btnTonal}
-                    onClick={() => baselineMut.mutate({ imageIndex: 0, count: batchCount })}
+                    onClick={() => handleRunBaseline(batchCount)}
                     disabled={baselineMut.isPending || isRunning}
                   >
                     {baselineMut.isPending ? <span className={s.spinner} /> : <Icons.Activity size={16} />}

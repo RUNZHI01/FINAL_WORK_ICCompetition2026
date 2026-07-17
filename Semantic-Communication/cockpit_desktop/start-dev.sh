@@ -89,11 +89,16 @@ ensure_auth_public_keys() {
 
 configure_runtime_defaults() {
   ensure_auth_public_keys
-  local auth_keys_dir_win
+  local auth_keys_dir_win default_image_dir
   auth_keys_dir_win="$(to_windows_path "$AUTH_KEYS_DIR")"
+  default_image_dir="$PACKAGE_ROOT/../原始图像_Top300"
+  if [[ -z "${OPENAMP_DEMO_LOCAL_IMAGE_DIR:-}" && -d "$default_image_dir" ]]; then
+    export OPENAMP_DEMO_LOCAL_IMAGE_DIR="$(to_windows_path "$default_image_dir")"
+  fi
   if command -v powershell.exe >/dev/null 2>&1; then
     export OPENAMP_SSH_RUNNER="${OPENAMP_SSH_RUNNER:-docker}"
     export OPENAMP_SSH_DOCKER_IMAGE="${OPENAMP_SSH_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
+    export OPENAMP_FIT_SSH_RUNNER="${OPENAMP_FIT_SSH_RUNNER:-system}"
     export MLKEM_LOCAL_CLIENT_RUNNER="${MLKEM_LOCAL_CLIENT_RUNNER:-docker}"
     export MLKEM_LOCAL_CLIENT_DOCKER_IMAGE="${MLKEM_LOCAL_CLIENT_DOCKER_IMAGE:-$OPENAMP_SSH_DOCKER_IMAGE}"
     export OPENAMP_USRP_TX_RUNNER="${OPENAMP_USRP_TX_RUNNER:-docker}"

@@ -145,7 +145,7 @@ REMOTE_TVM_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" /
 BIG_LITTLE_PIPELINE_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
 DEFAULT_USRP_REMOTE_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
 USRP_REMOTE_OUTPUT_ROOT_KEYS = ("OPENAMP_DEMO_USRP_OUTPUT_ROOT", "USRP_REMOTE_OUTPUT_ROOT")
-DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR = PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_airfield300"
+DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR = PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_top300"
 DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
     PACKAGE_ROOT / "usrp_latent_input",
     WORKSPACE_ROOT / "jscc-test" / "encoder_outputs",
@@ -157,6 +157,7 @@ DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
 DEFAULT_LOCAL_USRP_IMAGE_DIR_CANDIDATES = (
     PACKAGE_ROOT / "host_pic_to_latent" / "airfield300",
     PACKAGE_ROOT / "host_pic_to_latent" / "airfield",
+    WORKSPACE_ROOT / "原始图像_Top300",
     WORKSPACE_ROOT / "原始图像",
 )
 MLKEM_MODERN_INPUT_BYTES = 1 * 32 * 32 * 32 * 4
@@ -3802,6 +3803,29 @@ class DashboardState:
             "last_transition": "Link Director Event",
             "note": "上位机守护进程已通过 0x60/0x62 服务协议接管动态调度。",
         }
+
+    @staticmethod
+    def _alert_only_inference_rejection(
+        *,
+        engine: str,
+        variant: str | None = None,
+        image_index: int | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": "blocked",
+            "request_state": "rejected",
+            "status_category": "service_mode_blocked",
+            "execution_mode": "blocked",
+            "service_mode": "ALERT_ONLY",
+            "engine": engine,
+            "source_label": "告警模式：仅定位传输",
+            "message": f"告警模式仅下发北斗定位和告警信息，已拒绝 {engine} 推理请求。",
+        }
+        if variant is not None:
+            payload["variant"] = variant
+        if image_index is not None:
+            payload["image_index"] = image_index
+        return payload
 
     @staticmethod
     def _auth_enabled_for_env(env_values: dict[str, str]) -> bool:
@@ -7588,6 +7612,9 @@ class DashboardState:
         import threading
 
         batch_count = max(1, count)
+        if self._service_mode_snapshot().get("current_mode") == "ALERT_ONLY":
+            return self._alert_only_inference_rejection(engine="MNN")
+
         with self._lock:
             existing = self._batch_state
             if existing and existing.get("status") == "running":
@@ -7978,7 +8005,7 @@ class DashboardState:
         服务模式联动：
         - FULL_FRAME：全量推理（默认）
         - ROI_ONLY：跳帧降采样，有效推理数量 = count // 3
-        - ALERT_ONLY：不做推理，改为模拟北斗坐标持续下发
+        - ALERT_ONLY：拒绝推理请求，仅保留告警与北斗坐标下发
         """
         import threading
 
@@ -7986,6 +8013,8 @@ class DashboardState:
         # ── 读取当前服务模式 ──
         service_snapshot = self._service_mode_snapshot()
         current_mode = service_snapshot.get("current_mode", "FULL_FRAME")
+        if current_mode == "ALERT_ONLY":
+            return self._alert_only_inference_rejection(engine="TVM")
         if warmup and current_mode != "FULL_FRAME":
             return {
                 "status": "error",
@@ -8001,83 +8030,6 @@ class DashboardState:
                 return {"status": "already_running", "batch_job_id": existing.get("batch_job_id")}
             board_access_for_mode = self._board_access
             is_usrp_batch = local_crypto_transport_mode(board_access_for_mode.build_env()) == "usrp"
-
-            # ── ALERT_ONLY：不做推理，模拟坐标下发 ──
-            if current_mode == "ALERT_ONLY":
-                batch_job_id = f"alert-{int(time.time())}-coord"
-                self._batch_state = {
-                    "status": "running",
-                    "batch_job_id": batch_job_id,
-                    "engine": "tvm",
-                    "total": count,
-                    "completed": 0,
-                    "success": 0,
-                    "fallback": 0,
-                    "sha_match": 0,
-                    "started_at": time.time(),
-                    "finished_at": None,
-                    "service_mode": "ALERT_ONLY",
-                    "_samples": {"handshake_ms": [], "encrypt_ms": [], "decrypt_ms": [], "inference_ms": [], "total_ms": []},
-                    "benchmark": None,
-                }
-
-                def _coord_worker() -> None:
-                    """模拟 ALERT_ONLY 下持续转发北斗坐标，不做推理。
-
-                    批量任务启动后冻结本批次的 service_mode，避免 worker 在线程里
-                    再次读取 link director 状态时与 get_batch_state()/UI 轮询发生锁重入，
-                    也避免导演台临时切换 staged profile 让本批次被提前截断。
-                    """
-                    worker_error = ""
-                    try:
-                        for i in range(count):
-                            with self._lock:
-                                state = self._batch_state
-                                if state is None or state.get("status") != "running":
-                                    return
-                                if state.get("batch_job_id") != batch_job_id:
-                                    return
-                                if str(state.get("service_mode") or current_mode) != "ALERT_ONLY":
-                                    state["completed"] = i
-                                    break
-                                state["completed"] = i + 1
-                            self._event_spine.publish(
-                                "COORD_FORWARDED",
-                                source="alert_mode",
-                                plane="data",
-                                mode_scope=CONTROL_MODE_SCOPE,
-                                message=f"北斗坐标帧 #{i + 1} 已下发至下位机。",
-                                data={"frame_index": i, "mode": "ALERT_ONLY"},
-                            )
-                            time.sleep(0.08)  # 模拟坐标帧间隔
-                    except Exception as exc:
-                        worker_error = f"{type(exc).__name__}: {exc}"
-                    with self._lock:
-                        state = self._batch_state
-                        if state is not None and state.get("batch_job_id") == batch_job_id:
-                            state["status"] = "done"
-                            state["finished_at"] = time.time()
-                            state["benchmark"] = None
-                            if worker_error:
-                                state["error"] = worker_error
-
-                thread = threading.Thread(target=_coord_worker, daemon=True)
-                thread.start()
-                self._event_spine.publish(
-                    "MODE_ALERT_ACTIVE",
-                    source="batch",
-                    plane="control",
-                    mode_scope=CONTROL_MODE_SCOPE,
-                    message="ALERT_ONLY 模式激活：推理任务已挂起，切换为北斗坐标持续下发。",
-                    data={"service_mode": "ALERT_ONLY", "coord_frames": count},
-                )
-                return {
-                    "status": "started",
-                    "batch_job_id": batch_job_id,
-                    "total": count,
-                    "service_mode": "ALERT_ONLY",
-                    "message": "ALERT_ONLY 模式：推理已挂起，正在持续下发北斗定位坐标。",
-                }
 
             # ── ROI_ONLY：跳帧降采样 ──
             effective_count = count
@@ -9355,6 +9307,14 @@ class DashboardState:
         allow_preflight_degraded: bool = False,
         max_inputs: int = DEFAULT_MAX_INPUTS,
     ) -> dict[str, Any]:
+        if self._service_mode_snapshot().get("current_mode") == "ALERT_ONLY":
+            engine = "PyTorch" if str(variant).strip().lower() == "baseline" else "TVM"
+            return self._alert_only_inference_rejection(
+                engine=engine,
+                variant=variant,
+                image_index=image_index,
+            )
+
         payload = self._build_prerecorded_payload_safe(image_index=image_index, variant=variant)
         event_record: dict[str, Any] | None = None
         security_context: dict[str, Any] | None = None

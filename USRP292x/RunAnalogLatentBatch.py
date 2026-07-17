@@ -118,6 +118,16 @@ def iq_decode_quality_failure(summary: dict[str, Any], args: argparse.Namespace)
     if pilot_ratio is not None and min_pilot_ratio > 0.0 and pilot_ratio < min_pilot_ratio:
         return f"IQ quality gate failed: pilot gain ratio {pilot_ratio:.6f} below {min_pilot_ratio:.6f}"
 
+    pilot_min_abs = _optional_summary_float(summary, "pilot_gain_min_abs")
+    pilot_max_abs = _optional_summary_float(summary, "pilot_gain_max_abs")
+    if pilot_min_abs is not None and pilot_max_abs is not None and pilot_max_abs > 0.0:
+        pilot_uniformity = pilot_min_abs / pilot_max_abs
+        if min_pilot_ratio > 0.0 and pilot_uniformity < min_pilot_ratio:
+            return (
+                "IQ quality gate failed: pilot gain uniformity "
+                f"{pilot_uniformity:.6f} below {min_pilot_ratio:.6f}"
+            )
+
     evm_rms = _optional_summary_float(summary, "evm_rms")
     max_evm_rms = env_float("ANALOG_IQ_MAX_EVM_RMS", 0.75)
     if evm_rms is not None and max_evm_rms > 0.0 and evm_rms > max_evm_rms:

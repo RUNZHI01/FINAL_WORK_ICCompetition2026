@@ -28,6 +28,10 @@ export function batchMatchesCurrentServiceMode(
   return normalizeBatchServiceMode(batchServiceMode) === normalizedCurrent
 }
 
+export function isInferenceLaunchBlocked(currentMode: unknown): boolean {
+  return normalizeCurrentServiceMode(currentMode) === 'ALERT_ONLY'
+}
+
 export function shouldDisplayDashboardBatch(
   batch: BatchStateResponse | undefined,
   pendingBatchJobId: string | null,

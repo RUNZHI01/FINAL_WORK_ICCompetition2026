@@ -82,6 +82,10 @@ function Resolve-BoardPassword {
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
+$WorkspaceRoot = Split-Path -Parent $RepoRoot
+$FinalImageDir = Join-Path $WorkspaceRoot "原始图像_Top300_最终"
+$FinalLatentDir = Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"
 $Bash = Find-GitBash -ExplicitPath $GitBashPath
 $Password = Resolve-BoardPassword -ExplicitPassword $BoardPassword
 
@@ -96,6 +100,7 @@ Set-DefaultEnv "PHYTIUM_PI_PORT" ([string]$BoardPort)
 
 Set-DefaultEnv "OPENAMP_SSH_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_SSH_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
+Set-DefaultEnv "OPENAMP_FIT_SSH_RUNNER" "system"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_RUNNER" "docker"
 Set-DefaultEnv "MLKEM_LOCAL_CLIENT_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
 Set-DefaultEnv "OPENAMP_USRP_TX_RUNNER" "docker"
@@ -108,6 +113,13 @@ Set-DefaultEnv "JSCC_LINK_MODE" "iq-direct"
 Set-DefaultEnv "OPENAMP_DEMO_LINK_MODE" "iq-direct"
 Set-DefaultEnv "MLKEM_AUTH_ENABLED" "1"
 Set-DefaultEnv "MLKEM_AUTH_SIG_POLICY" "DUAL_REQUIRED"
+if ((Test-Path -LiteralPath $FinalImageDir -PathType Container) -and
+    (Test-Path -LiteralPath $FinalLatentDir -PathType Container)) {
+    Set-DefaultEnv "OPENAMP_DEMO_LOCAL_IMAGE_DIR" $FinalImageDir
+    Set-DefaultEnv "OPENAMP_DEMO_LOCAL_LATENT_DIR" $FinalLatentDir
+    Set-DefaultEnv "OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR" $FinalLatentDir
+    Set-DefaultEnv "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED" "0"
+}
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP" ($(if ($NoWarmup) { "0" } else { "1" }))
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)
@@ -119,6 +131,9 @@ Set-DefaultEnv "MSYS2_ARG_CONV_EXCL" "*"
 Write-Host "[demo] Git Bash: $Bash"
 Write-Host "[demo] Board: $BoardUser@$BoardHost`:$BoardPort"
 Write-Host "[demo] Defaults: USRP IQ direct, ML-KEM+SM4, ML-DSA+SM2, warmup=$(-not $NoWarmup), count=$WarmupCount"
+if ($env:OPENAMP_DEMO_LOCAL_LATENT_DIR -eq $FinalLatentDir) {
+    Write-Host "[demo] Showcase inputs: $FinalImageDir (300 pre-encoded latents)"
+}
 
 & $Bash -lc 'cd "$(cygpath -u "$COCKPIT_SCRIPT_DIR_WIN")" && ./start-dev.sh'
 if ($LASTEXITCODE -ne 0) {

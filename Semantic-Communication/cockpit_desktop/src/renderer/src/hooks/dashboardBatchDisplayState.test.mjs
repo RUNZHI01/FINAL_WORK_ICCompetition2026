@@ -5,8 +5,16 @@ import {
   batchMatchesCurrentServiceMode,
   isDashboardBatchRunning,
   isDashboardWorkRunning,
+  isInferenceLaunchBlocked,
   shouldDisplayDashboardBatch,
 } from './dashboardBatchDisplayState.ts'
+
+test('blocks every inference launch while alert-only mode is active', () => {
+  assert.equal(isInferenceLaunchBlocked('ALERT_ONLY'), true)
+  assert.equal(isInferenceLaunchBlocked('alert_only'), true)
+  assert.equal(isInferenceLaunchBlocked('ROI_ONLY'), false)
+  assert.equal(isInferenceLaunchBlocked('FULL_FRAME'), false)
+})
 
 test('does not display stale ROI batch after switching back to full frame mode', () => {
   assert.equal(

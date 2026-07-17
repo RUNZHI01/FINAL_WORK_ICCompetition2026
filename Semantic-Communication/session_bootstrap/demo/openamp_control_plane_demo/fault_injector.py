@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -116,6 +117,12 @@ def run_proxy_phase(
 ) -> dict[str, Any]:
     event = {"phase": phase, "payload": payload}
     command = build_proxy_command(access, remote_output_root)
+    phase_env = os.environ.copy()
+    fit_ssh_runner = str(phase_env.get("OPENAMP_FIT_SSH_RUNNER") or "").strip()
+    if fit_ssh_runner:
+        phase_env["OPENAMP_SSH_RUNNER"] = fit_ssh_runner
+        if os.name == "nt" and fit_ssh_runner.lower() not in {"docker", "paramiko", "python"}:
+            phase_env.setdefault("SSH_WITH_PASSWORD_DISABLE_CONTROLMASTER", "1")
     try:
         result = subprocess.run(
             command,
@@ -126,6 +133,7 @@ def run_proxy_phase(
             errors="replace",
             input=json.dumps(event, ensure_ascii=False),
             capture_output=True,
+            env=phase_env,
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired:
