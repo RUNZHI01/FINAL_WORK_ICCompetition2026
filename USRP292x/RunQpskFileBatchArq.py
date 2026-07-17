@@ -18,6 +18,11 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    from .input_order import ordered_directory_inputs
+except ImportError:
+    from input_order import ordered_directory_inputs
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / 'USRP292x' / 'payloads' / 'source_latent_wire_blob.bin'
@@ -64,7 +69,7 @@ def load_inputs(args: argparse.Namespace) -> list[Path]:
             if line.strip() and not line.lstrip().startswith('#')
         ]
     elif args.input_dir is not None:
-        paths = sorted(path for path in args.input_dir.rglob(args.pattern) if path.is_file())
+        paths = ordered_directory_inputs(args.input_dir, args.pattern)
     else:
         paths = [DEFAULT_INPUT]
 

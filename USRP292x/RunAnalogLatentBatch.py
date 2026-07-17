@@ -34,6 +34,11 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
+try:
+    from .input_order import ordered_directory_inputs
+except ImportError:
+    from input_order import ordered_directory_inputs
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ANALOG_LINK = PROJECT_ROOT / "USRP292x" / "AnalogLatentLink.py"
@@ -1106,7 +1111,7 @@ def load_inputs(args: argparse.Namespace) -> list[Path]:
             if line.strip() and not line.lstrip().startswith("#")
         ]
     elif args.input_dir is not None:
-        paths = sorted(path for path in args.input_dir.rglob(args.pattern) if path.is_file())
+        paths = ordered_directory_inputs(args.input_dir, args.pattern)
     else:
         paths = [DEFAULT_INPUT]
 

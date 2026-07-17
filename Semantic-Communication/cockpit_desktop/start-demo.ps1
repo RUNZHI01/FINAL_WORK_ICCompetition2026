@@ -86,6 +86,7 @@ $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
 $WorkspaceRoot = Split-Path -Parent $RepoRoot
 $FinalImageDir = Join-Path $WorkspaceRoot "原始图像_Top300_最终"
 $FinalLatentDir = Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"
+$FinalInputOrder = Join-Path $RepoRoot "host_pic_to_latent\showcase_final_300_order.tsv"
 $Bash = Find-GitBash -ExplicitPath $GitBashPath
 $Password = Resolve-BoardPassword -ExplicitPassword $BoardPassword
 
@@ -121,6 +122,7 @@ if ((Test-Path -LiteralPath $FinalImageDir -PathType Container) -and
     Set-DefaultEnv "OPENAMP_DEMO_LOCAL_LATENT_DIR" $FinalLatentDir
     Set-DefaultEnv "OPENAMP_DEMO_IMAGE_TO_LATENT_OUTPUT_DIR" $FinalLatentDir
     Set-DefaultEnv "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED" "0"
+    Set-DefaultEnv "USRP_INPUT_ORDER_FILE" $FinalInputOrder
 }
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP" ($(if ($NoWarmup) { "0" } else { "1" }))
 Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)
