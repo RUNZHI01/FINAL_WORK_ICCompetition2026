@@ -1,0 +1,124 @@
+{
+  "generated_at": "2026-07-18T00:22:42.9678662+08:00",
+  "fit": [
+    {
+      "fault": "wrong_sha",
+      "ok": true,
+      "elapsed_ms": 6997.5,
+      "status": "injected",
+      "category": "success",
+      "guard": "READY",
+      "code": "ARTIFACT_SHA_MISMATCH",
+      "message": "已使用当前会话凭据执行 RPMsg 故障注入。",
+      "error": ""
+    },
+    {
+      "fault": "illegal_param",
+      "ok": true,
+      "elapsed_ms": 6065.0,
+      "status": "injected",
+      "category": "success",
+      "guard": "READY",
+      "code": "ILLEGAL_PARAM_RANGE",
+      "message": "已使用当前会话凭据执行 RPMsg 故障注入。",
+      "error": ""
+    },
+    {
+      "fault": "heartbeat_timeout",
+      "ok": true,
+      "elapsed_ms": 12610.5,
+      "status": "injected",
+      "category": "timeout",
+      "guard": "READY",
+      "code": "HEARTBEAT_TIMEOUT",
+      "message": "远端故障注入超时，请确认板卡在线后重试。 已切换到 FIT-03 回放模式。",
+      "error": ""
+    }
+  ],
+  "sfit": [
+    {
+      "fault": "sfit_ciphertext_tamper",
+      "ok": true,
+      "elapsed_ms": 1946.6,
+      "status": "verified",
+      "category": "success",
+      "guard": "DENY",
+      "code": "AEAD_AUTH_FAILED",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_aad_tamper",
+      "ok": true,
+      "elapsed_ms": 1385.3,
+      "status": "verified",
+      "category": "success",
+      "guard": "DENY",
+      "code": "AAD_CONTRACT_MISMATCH",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_artifact_guard",
+      "ok": true,
+      "elapsed_ms": 1278.6,
+      "status": "verified",
+      "category": "success",
+      "guard": "DENY",
+      "code": "ARTIFACT_GUARD_REJECTED",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_kem_unavailable",
+      "ok": true,
+      "elapsed_ms": 1225.9,
+      "status": "verified",
+      "category": "success",
+      "guard": "DENY",
+      "code": "TRUSTED_KEM_UNAVAILABLE",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_session_invalidated",
+      "ok": true,
+      "elapsed_ms": 1828.4,
+      "status": "verified",
+      "category": "success",
+      "guard": "INVALIDATED",
+      "code": "SECURE_SESSION_INVALIDATED",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_output_audit",
+      "ok": true,
+      "elapsed_ms": 1168.2,
+      "status": "verified",
+      "category": "success",
+      "guard": "AUDITED",
+      "code": "OUTPUT_ANOMALY_DETECTED",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    },
+    {
+      "fault": "sfit_replay_guard",
+      "ok": true,
+      "elapsed_ms": 1207.1,
+      "status": "verified",
+      "category": "success",
+      "guard": "DENY",
+      "code": "REPLAY_DENIED",
+      "mode": "host_docker_self_test",
+      "message": "已在隔离容器中执行现有安全链路负向测试。",
+      "error": ""
+    }
+  ]
+}

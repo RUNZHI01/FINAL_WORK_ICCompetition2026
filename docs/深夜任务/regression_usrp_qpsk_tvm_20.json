@@ -1,0 +1,639 @@
+{
+  "status": "done",
+  "batch_job_id": "batch-1784304489-20",
+  "engine": "tvm",
+  "warmup": false,
+  "hidden": false,
+  "purpose": "batch",
+  "total": 20,
+  "completed": 20,
+  "success": 20,
+  "fallback": 0,
+  "sha_match": 0,
+  "started_at": 1784304489.7422032,
+  "finished_at": 1784304679.603241,
+  "service_mode": "FULL_FRAME",
+  "_samples": {
+    "handshake_ms": [
+      35.727
+    ],
+    "encrypt_ms": [],
+    "decrypt_ms": [],
+    "inference_ms": [
+      240.717
+    ],
+    "total_ms": [
+      240.717
+    ]
+  },
+  "benchmark": {
+    "handshake_ms": null,
+    "encrypt_ms": null,
+    "decrypt_ms": null,
+    "inference_ms": {
+      "n": 20,
+      "min_ms": 238.91,
+      "max_ms": 350.28,
+      "mean_ms": 254.88,
+      "median_ms": 240.72,
+      "p95_ms": 350.28
+    },
+    "total_ms": {
+      "n": 20,
+      "min_ms": 238.91,
+      "max_ms": 350.28,
+      "mean_ms": 254.88,
+      "median_ms": 240.72,
+      "p95_ms": 350.28
+    }
+  },
+  "transport_progress": {
+    "completed": 20,
+    "total": 20,
+    "status": "completed"
+  },
+  "host_preprocess_progress": {
+    "completed": 20,
+    "total": 20,
+    "status": "completed"
+  },
+  "inference_progress": {
+    "completed": 20,
+    "total": 20,
+    "status": "completed"
+  },
+  "remote_usrp_rx_payload_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-1784304494_rx",
+  "inference_benchmark": {
+    "handshake_ms": null,
+    "encrypt_ms": null,
+    "decrypt_ms": null,
+    "inference_ms": {
+      "n": 20,
+      "min_ms": 238.91,
+      "max_ms": 350.28,
+      "mean_ms": 254.88,
+      "median_ms": 240.72,
+      "p95_ms": 350.28
+    },
+    "total_ms": {
+      "n": 20,
+      "min_ms": 238.91,
+      "max_ms": 350.28,
+      "mean_ms": 254.88,
+      "median_ms": 240.72,
+      "p95_ms": 350.28
+    }
+  },
+  "transport_benchmark": {
+    "radio_airtime_ms": {
+      "n": 20,
+      "min_ms": 51.05,
+      "max_ms": 51.05,
+      "mean_ms": 51.05,
+      "median_ms": 51.05,
+      "p95_ms": null
+    },
+    "decode_ms": null,
+    "merge_ms": {
+      "n": 20,
+      "min_ms": 44.97,
+      "max_ms": 44.97,
+      "mean_ms": 44.97,
+      "median_ms": 44.97,
+      "p95_ms": null
+    },
+    "rx_pull_ms": null,
+    "remote_cleanup_ms": null,
+    "other_wall_ms": {
+      "n": 20,
+      "min_ms": 4879.53,
+      "max_ms": 4879.53,
+      "mean_ms": 4879.53,
+      "median_ms": 4879.53,
+      "p95_ms": null
+    },
+    "total_ms": {
+      "n": 20,
+      "min_ms": 4975.55,
+      "max_ms": 4975.55,
+      "mean_ms": 4975.55,
+      "median_ms": 4975.55,
+      "p95_ms": null
+    }
+  },
+  "iq_stage_benchmark": null,
+  "iq_tail_audit": null,
+  "runner_summary": {
+    "status": "ok",
+    "run_id": "openamp3_usrp_1784304494_current_20260718_001050",
+    "runner": "run_big_little_pipeline.sh",
+    "env_file": null,
+    "variant": "current",
+    "remote_mode": "ssh",
+    "log_file": "E:\\Main\\Career\\集创赛\\FINAL_WORK_ICCompetition2026\\Semantic-Communication\\session_bootstrap\\logs\\openamp3_usrp_1784304494_current_20260718_001050.log",
+    "pipeline": {
+      "status": "ok",
+      "mode": "big_little_pipeline",
+      "execution_mode": "pipeline",
+      "backend": "processes",
+      "variant": "current",
+      "dry_run": false,
+      "mock_infer_ms": null,
+      "artifact_path": "/home/user/Downloads/jscc-test/jscc_opus_final_mean4_v7_20260406/tvm_tune_logs/optimized_model.so",
+      "artifact_sha256": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+      "artifact_sha256_expected": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+      "artifact_sha256_match": true,
+      "input_dir": "/home/user/cockpit_usrp_rx/cockpit_usrp_usrp-1784304494_rx",
+      "output_dir": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784304494_current",
+      "output_count": 20,
+      "processed_count": 20,
+      "input_count": 20,
+      "available_input_count": 20,
+      "load_ms": 3.963,
+      "vm_init_ms": 0.509,
+      "run_samples_ms": [
+        296.13,
+        306.519,
+        241.956,
+        240.108,
+        241.574,
+        239.468,
+        239.272,
+        238.906,
+        248.725,
+        287.556,
+        350.277,
+        242.995,
+        239.219,
+        240.611,
+        239.4,
+        244.394,
+        240.824,
+        240.042,
+        239.067,
+        240.464
+      ],
+      "run_count": 20,
+      "run_median_ms": 240.717,
+      "run_mean_ms": 254.875,
+      "run_min_ms": 238.906,
+      "run_max_ms": 350.277,
+      "run_variance_ms2": 884.417054,
+      "output_shape": [
+        1,
+        3,
+        256,
+        256
+      ],
+      "output_dtype": "float32",
+      "preload_load_samples_ms": [
+        26.325,
+        7.751,
+        6.109,
+        6.825,
+        6.48,
+        6.212,
+        9.917,
+        7.897,
+        7.335,
+        8.291,
+        6.543,
+        7.259,
+        7.171,
+        8.534,
+        19.864,
+        8.27,
+        6.697,
+        7.088,
+        7.171,
+        7.208
+      ],
+      "preload_awgn_samples_ms": [
+        3.491,
+        2.932,
+        3.278,
+        2.946,
+        2.957,
+        3.103,
+        8.987,
+        3.215,
+        3.301,
+        5.708,
+        3.697,
+        3.281,
+        3.155,
+        3.148,
+        3.184,
+        19.292,
+        3.37,
+        2.88,
+        3.059,
+        2.938
+      ],
+      "save_samples_ms": [
+        494.451,
+        152.514,
+        154.24,
+        163.925,
+        153.055,
+        150.34,
+        144.642,
+        137.237,
+        271.931,
+        185.683,
+        141.834,
+        144.259,
+        140.294,
+        159.907,
+        150.499,
+        169.106,
+        161.357,
+        133.021,
+        140.974,
+        145.289
+      ],
+      "preload_load_summary": {
+        "count": 20,
+        "median_ms": 7.233,
+        "mean_ms": 8.947,
+        "min_ms": 6.109,
+        "max_ms": 26.325,
+        "variance_ms2": 24.045449
+      },
+      "preload_awgn_summary": {
+        "count": 20,
+        "median_ms": 3.2,
+        "mean_ms": 4.396,
+        "min_ms": 2.88,
+        "max_ms": 19.292,
+        "variance_ms2": 13.544975
+      },
+      "save_summary": {
+        "count": 20,
+        "median_ms": 151.506,
+        "mean_ms": 174.728,
+        "min_ms": 133.021,
+        "max_ms": 494.451,
+        "variance_ms2": 6207.768593
+      },
+      "total_wall_ms": 8283.65,
+      "images_per_sec": 2.414,
+      "ms_per_image": 414.183,
+      "snr": 10.0,
+      "batch_size": 1,
+      "max_inputs": 20,
+      "seed": 0,
+      "big_cores": [
+        2
+      ],
+      "little_cores": [
+        0,
+        1
+      ],
+      "input_queue_size": 4,
+      "output_queue_size": 4,
+      "input_chunk_size": 10,
+      "save_format": "png",
+      "tvm_version": "0.24.dev0",
+      "affinity": {
+        "preloader": {
+          "role": "preloader",
+          "requested": [
+            0,
+            1
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            0,
+            1
+          ],
+          "status": "applied",
+          "error": null
+        },
+        "inferencer": {
+          "role": "inferencer",
+          "requested": [
+            2
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            2
+          ],
+          "status": "applied",
+          "error": null
+        },
+        "postprocessor": {
+          "role": "postprocessor",
+          "requested": [
+            0,
+            1
+          ],
+          "before": [
+            0,
+            1,
+            2
+          ],
+          "after": [
+            0,
+            1
+          ],
+          "status": "applied",
+          "error": null
+        }
+      },
+      "stages": {
+        "preloader": {
+          "role": "preloader",
+          "status": "ok",
+          "affinity": {
+            "role": "preloader",
+            "requested": [
+              0,
+              1
+            ],
+            "before": [
+              0,
+              1,
+              2
+            ],
+            "after": [
+              0,
+              1
+            ],
+            "status": "applied",
+            "error": null
+          },
+          "queued_count": 20,
+          "available_input_count": 20,
+          "input_wait_timeout_sec": 60.0,
+          "input_poll_sec": 0.05,
+          "input_chunk_size": 10,
+          "load_samples_ms": [
+            26.325,
+            7.751,
+            6.109,
+            6.825,
+            6.48,
+            6.212,
+            9.917,
+            7.897,
+            7.335,
+            8.291,
+            6.543,
+            7.259,
+            7.171,
+            8.534,
+            19.864,
+            8.27,
+            6.697,
+            7.088,
+            7.171,
+            7.208
+          ],
+          "awgn_samples_ms": [
+            3.491,
+            2.932,
+            3.278,
+            2.946,
+            2.957,
+            3.103,
+            8.987,
+            3.215,
+            3.301,
+            5.708,
+            3.697,
+            3.281,
+            3.155,
+            3.148,
+            3.184,
+            19.292,
+            3.37,
+            2.88,
+            3.059,
+            2.938
+          ],
+          "load_summary": {
+            "count": 20,
+            "median_ms": 7.233,
+            "mean_ms": 8.947,
+            "min_ms": 6.109,
+            "max_ms": 26.325,
+            "variance_ms2": 24.045449
+          },
+          "awgn_summary": {
+            "count": 20,
+            "median_ms": 3.2,
+            "mean_ms": 4.396,
+            "min_ms": 2.88,
+            "max_ms": 19.292,
+            "variance_ms2": 13.544975
+          }
+        },
+        "inferencer": {
+          "role": "inferencer",
+          "status": "ok",
+          "affinity": {
+            "role": "inferencer",
+            "requested": [
+              2
+            ],
+            "before": [
+              0,
+              1,
+              2
+            ],
+            "after": [
+              2
+            ],
+            "status": "applied",
+            "error": null
+          },
+          "artifact_path": "/home/user/Downloads/jscc-test/jscc_opus_final_mean4_v7_20260406/tvm_tune_logs/optimized_model.so",
+          "artifact_sha256": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+          "artifact_sha256_expected": "bf255cd4bb29408b30b50bce2ad8713a260c5e45efc2d0e831bd293eec9edecb",
+          "artifact_sha256_match": true,
+          "dry_run": false,
+          "mock_infer_ms": null,
+          "tvm_version": "0.24.dev0",
+          "runtime_preload_py": null,
+          "load_ms": 3.963,
+          "vm_init_ms": 0.509,
+          "processed_count": 20,
+          "run_samples_ms": [
+            296.13,
+            306.519,
+            241.956,
+            240.108,
+            241.574,
+            239.468,
+            239.272,
+            238.906,
+            248.725,
+            287.556,
+            350.277,
+            242.995,
+            239.219,
+            240.611,
+            239.4,
+            244.394,
+            240.824,
+            240.042,
+            239.067,
+            240.464
+          ],
+          "run_summary": {
+            "count": 20,
+            "median_ms": 240.717,
+            "mean_ms": 254.875,
+            "min_ms": 238.906,
+            "max_ms": 350.277,
+            "variance_ms2": 884.417054
+          },
+          "output_shape": [
+            1,
+            3,
+            256,
+            256
+          ],
+          "output_dtype": "float32"
+        },
+        "postprocessor": {
+          "role": "postprocessor",
+          "status": "ok",
+          "affinity": {
+            "role": "postprocessor",
+            "requested": [
+              0,
+              1
+            ],
+            "before": [
+              0,
+              1,
+              2
+            ],
+            "after": [
+              0,
+              1
+            ],
+            "status": "applied",
+            "error": null
+          },
+          "output_count": 20,
+          "save_samples_ms": [
+            494.451,
+            152.514,
+            154.24,
+            163.925,
+            153.055,
+            150.34,
+            144.642,
+            137.237,
+            271.931,
+            185.683,
+            141.834,
+            144.259,
+            140.294,
+            159.907,
+            150.499,
+            169.106,
+            161.357,
+            133.021,
+            140.974,
+            145.289
+          ],
+          "save_summary": {
+            "count": 20,
+            "median_ms": 151.506,
+            "mean_ms": 174.728,
+            "min_ms": 133.021,
+            "max_ms": 494.451,
+            "variance_ms2": 6207.768593
+          },
+          "last_output_path": "/home/user/Downloads/jscc-test-usrp/qpsk/tvm/openamp3_usrp_1784304494_current/reconstructions/f3e7abbeb6ac146724ce867c5b83e093f2059910f3293d8daca0ddc2e0ec7493_recon.png"
+        }
+      },
+      "errors": []
+    },
+    "processed_count": 20,
+    "input_count": 20,
+    "available_input_count": 20,
+    "load_ms": 3.963,
+    "vm_init_ms": 0.509,
+    "run_count": 20,
+    "run_samples_ms": [
+      296.13,
+      306.519,
+      241.956,
+      240.108,
+      241.574,
+      239.468,
+      239.272,
+      238.906,
+      248.725,
+      287.556,
+      350.277,
+      242.995,
+      239.219,
+      240.611,
+      239.4,
+      244.394,
+      240.824,
+      240.042,
+      239.067,
+      240.464
+    ],
+    "run_median_ms": 240.717,
+    "run_mean_ms": 254.875,
+    "run_min_ms": 238.906,
+    "run_max_ms": 350.277,
+    "run_variance_ms2": 884.417054,
+    "output_shape": [
+      1,
+      3,
+      256,
+      256
+    ],
+    "output_dtype": "float32",
+    "snr": 10.0,
+    "batch_size": 1,
+    "save_format": "png",
+    "seed": 0,
+    "max_inputs": 20,
+    "big_cores": [
+      2
+    ],
+    "little_cores": [
+      0,
+      1
+    ],
+    "execution_mode": "pipeline",
+    "backend": "processes",
+    "selected_input_count": 20,
+    "wrapper_timeout_recovered": true,
+    "stale_wrapper_after_complete": true
+  },
+  "quality_pairs": {
+    "pytorch_tvm": {
+      "label": "PyTorch-TVM",
+      "psnr_db": 35.694187540665254,
+      "ssim": 0.9728362713251338,
+      "scope": "archived_pytorch_reference_mean",
+      "report_path": "session_bootstrap/reports/quality_metrics_20260312_pytorch_vs_tvm_current.json"
+    },
+    "original_tvm": {
+      "label": "原图-TVM",
+      "psnr_db": 22.19905655476432,
+      "ssim": 0.9421285121334056,
+      "scope": "latest_original_reconstruction_audit",
+      "report_path": "session_bootstrap/reports/reconstruction_error_audit_usrp_iq_tvm_30_20260716_023833/report.json"
+    }
+  }
+}
