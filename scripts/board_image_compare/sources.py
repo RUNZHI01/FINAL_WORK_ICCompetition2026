@@ -110,24 +110,42 @@ def _base_usrp_job(job_name: str) -> str:
 
 
 def _summary_candidates(job_name: str, run_root: Path, legacy_root: Path) -> list[Path]:
-    base_name = _base_usrp_job(job_name)
     token = extract_usrp_token(job_name)
-    local_names = [job_name, base_name]
+    exact_names = [job_name]
+    base_names = [_base_usrp_job(job_name)]
     if token is not None:
         base_token = re.sub(r"_(?:recovery|retry)$", "", token, flags=re.IGNORECASE)
-        local_names.extend(
-            [
-                f"cockpit_usrp_usrp-{token}",
-                f"cockpit_usrp_usrp-{base_token}",
-            ]
-        )
+        exact_names.append(f"cockpit_usrp_usrp-{token}")
+        base_names.append(f"cockpit_usrp_usrp-{base_token}")
     candidates: list[Path] = []
-    for root in (run_root, legacy_root):
-        for name in local_names:
-            candidate = root / name
-            if candidate not in candidates:
-                candidates.append(candidate)
+    for names in (exact_names, base_names):
+        for root in (run_root, legacy_root):
+            for name in names:
+                candidate = root / name
+                if candidate not in candidates:
+                    candidates.append(candidate)
     return candidates
+
+
+def _path_key(value: str | Path) -> str:
+    return str(value).replace("\\", "/").rstrip("/").casefold()
+
+
+def _planned_destination(output_root: Path, layout_name: str, job_name: str) -> str:
+    return str(output_root / layout_name / "tvm" / job_name)
+
+
+def _destination_keys(destination: str) -> set[str]:
+    keys = {_path_key(destination)}
+    keys.add(_path_key(PurePosixPath(destination)))
+    return keys
+
+
+def _existing_destination_keys(existing_destinations: Iterable[str | Path]) -> set[str]:
+    keys: set[str] = set()
+    for destination in existing_destinations:
+        keys.update(_destination_keys(str(destination)))
+    return keys
 
 
 def _read_summary(candidates: Iterable[Path]) -> tuple[Path | None, dict[str, Any] | None]:
@@ -149,11 +167,14 @@ def plan_usrp_migration(
     run_root: str | Path,
     legacy_root: str | Path,
     output_root: str | Path,
+    *,
+    existing_destinations: Iterable[str | Path] = (),
 ) -> list[dict[str, str | None]]:
     """Return auditable migration decisions without copying or overwriting data."""
     run_path = Path(run_root)
     legacy_path = Path(legacy_root)
     output_path = Path(output_root)
+    existing_keys = _existing_destination_keys(existing_destinations)
     decisions: list[dict[str, str | None]] = []
 
     for job_name in job_names:
@@ -164,8 +185,12 @@ def plan_usrp_migration(
         destination = None
         if mode is not None:
             layout_name = "iq-direct" if mode == "usrp-iq-direct" else "qpsk"
-            destination = str(output_path / layout_name / "tvm" / name)
-            reason = "classified from batch_spool_summary.json"
+            planned_destination = _planned_destination(output_path, layout_name, name)
+            if _destination_keys(planned_destination) & existing_keys:
+                reason = "destination already exists"
+            else:
+                destination = planned_destination
+                reason = "classified from batch_spool_summary.json"
         elif payload is None:
             reason = "batch_spool_summary.json not found"
         else:

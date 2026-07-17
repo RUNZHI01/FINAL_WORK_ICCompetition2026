@@ -114,3 +114,39 @@ def test_plan_usrp_migration_does_not_read_other_files(tmp_path: Path):
 
     assert decisions[0]["destination"] is None
     assert decisions[0]["reason"] == "batch_spool_summary.json not found"
+
+
+def test_plan_usrp_migration_checks_exact_recovery_across_all_roots_before_base(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    legacy_root = tmp_path / "legacy"
+    output_root = tmp_path / "outputs"
+    _write_summary(run_root, "openamp3_usrp_123_current", {"max_arq_rounds": 2, "chunk_bytes": 4096})
+    _write_summary(legacy_root, "openamp3_usrp_123_recovery_current", {"phy": "analog-latent-iq"})
+
+    decisions = plan_usrp_migration(
+        ["openamp3_usrp_123_recovery_current"], run_root, legacy_root, output_root
+    )
+
+    assert decisions[0]["source"] == str(legacy_root / "openamp3_usrp_123_recovery_current")
+    assert decisions[0]["mode"] == "usrp-iq-direct"
+
+
+def test_plan_usrp_migration_reports_existing_destination_collision(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    legacy_root = tmp_path / "legacy"
+    output_root = tmp_path / "outputs"
+    job_name = "openamp3_usrp_123_current"
+    _write_summary(run_root, job_name, {"max_arq_rounds": 2, "chunk_bytes": 4096})
+    destination = output_root / "qpsk" / "tvm" / job_name
+
+    decisions = plan_usrp_migration(
+        [job_name],
+        run_root,
+        legacy_root,
+        output_root,
+        existing_destinations=[str(destination)],
+    )
+
+    assert decisions[0]["mode"] == "usrp-qpsk"
+    assert decisions[0]["destination"] is None
+    assert decisions[0]["reason"] == "destination already exists"
