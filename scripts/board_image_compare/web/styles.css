@@ -40,6 +40,10 @@ main { padding: 16px 24px 20px; }
 .reconstruction-directory { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .directory-copy { min-width: 0; display: grid; gap: 4px; }
 .directory-band strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.reference-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reference-mode { display: inline-flex; align-items: center; padding: 2px; border: 1px solid #aeb8c2; border-radius: 5px; background: #f4f6f8; }
+.reference-mode button { min-width: 58px; height: 25px; padding: 0 8px; border: 0; border-radius: 3px; background: transparent; color: #586575; cursor: pointer; font-size: 11px; }
+.reference-mode button.active { background: #185fa5; color: #fff; }
 .label { color: #445160; font-size: 12px; }
 .meta { color: #647181; font-size: 11px; }
 .job-controls { display: flex; align-items: center; gap: 7px; }

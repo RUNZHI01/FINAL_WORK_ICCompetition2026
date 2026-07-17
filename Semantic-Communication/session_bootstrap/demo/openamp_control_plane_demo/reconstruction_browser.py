@@ -21,6 +21,7 @@ class ReconstructionBrowserConfig:
     original_dir: Path
     remote_root: str
     manifest_root: Path | None = None
+    pytorch_manifest: Path | None = None
 
 
 class ProcessLike(Protocol):
@@ -134,6 +135,7 @@ class ReconstructionBrowserManager:
                 "original_dir": str(config.original_dir),
                 "remote_root": config.remote_root,
                 "manifest_root": str(config.manifest_root) if config.manifest_root else "",
+                "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
             }
             self._http_json("POST", f"{self.base_url}api/config", payload=payload, timeout=5.0)
             return self.base_url
@@ -153,4 +155,3 @@ class ReconstructionBrowserManager:
     def close(self) -> None:
         with self._lock:
             self._stop_owned_process()
-

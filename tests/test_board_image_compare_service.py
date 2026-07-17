@@ -51,13 +51,35 @@ def write_image(path: Path, color: tuple[int, int, int]) -> None:
     Image.new("RGB", (8, 8), color).save(path)
 
 
-def configured_state(tmp_path: Path) -> tuple[ComparisonServiceState, FakeRemote]:
+def configured_state(
+    tmp_path: Path,
+    *,
+    with_pytorch: bool = False,
+) -> tuple[ComparisonServiceState, FakeRemote]:
     originals = tmp_path / "originals"
     originals.mkdir()
     write_image(originals / "frame_0000.png", (12, 30, 60))
     reconstruction = tmp_path / "reconstruction.png"
     write_image(reconstruction, (12, 30, 60))
     remote = FakeRemote(reconstruction)
+    pytorch_manifest = None
+    if with_pytorch:
+        pytorch_output = tmp_path / "pytorch_0000.png"
+        write_image(pytorch_output, (22, 40, 70))
+        pytorch_manifest = tmp_path / "pytorch_reference_manifest.json"
+        pytorch_manifest.write_text(
+            json.dumps(
+                {
+                    "records": [
+                        {
+                            "source_name": "frame_0000.png",
+                            "output_path": str(pytorch_output),
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
     state = ComparisonServiceState(
         cache_root=tmp_path / "cache",
         remote_factory=lambda _config: remote,
@@ -70,6 +92,7 @@ def configured_state(tmp_path: Path) -> tuple[ComparisonServiceState, FakeRemote
             board_port=22,
             original_dir=originals,
             remote_root="/outputs",
+            pytorch_manifest=pytorch_manifest,
         )
     )
     return state, remote
@@ -128,6 +151,46 @@ def test_quality_assistance_defaults_to_disabled(tmp_path: Path) -> None:
     state.close()
 
 
+def test_pytorch_reference_mode_uses_manifest_mapping(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path, with_pytorch=True)
+    state.list_jobs()
+    state.job_detail("new")
+
+    path = state.reference_path("new", 0, "pytorch")
+
+    assert path.name == "pytorch_0000.png"
+    state.close()
+
+
+def test_missing_pytorch_reference_does_not_fall_back(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+    state.list_jobs()
+    state.job_detail("new")
+
+    try:
+        state.reference_path("new", 0, "pytorch")
+        raise AssertionError("missing PyTorch reference unexpectedly fell back")
+    except FileNotFoundError as error:
+        assert "PyTorch" in str(error)
+    finally:
+        state.close()
+
+
+def test_quality_cache_is_isolated_by_reference_mode(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path, with_pytorch=True)
+    state.list_jobs()
+    state.job_detail("new")
+
+    original = state.pull("new", 0, reference_mode="original")
+    pytorch = state.pull("new", 0, reference_mode="pytorch")
+
+    assert original["quality"]["psnr_db"] == "Infinity"
+    assert pytorch["quality"]["psnr_db"] != "Infinity"
+    assert "new:0:original" in state.public_state()["quality"]
+    assert "new:0:pytorch" in state.public_state()["quality"]
+    state.close()
+
+
 def test_http_uncached_reconstruction_returns_404_without_download(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
     state.list_jobs()
@@ -161,6 +224,8 @@ def test_http_page_exposes_two_previews_and_quality_switch(tmp_path: Path) -> No
         assert 'id="original-preview"' in body
         assert 'id="reconstruction-preview"' in body
         assert 'id="quality-assistance"' in body
+        assert 'data-reference-mode="original"' in body
+        assert 'data-reference-mode="pytorch"' in body
     finally:
         server.shutdown()
         server.server_close()

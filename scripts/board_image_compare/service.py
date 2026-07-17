@@ -37,6 +37,7 @@ class ComparisonConfig:
     original_dir: Path
     remote_root: str
     manifest_root: Path | None = None
+    pytorch_manifest: Path | None = None
 
 
 def _local_image_paths(root: Path) -> list[Path]:
@@ -82,7 +83,8 @@ class ComparisonServiceState:
         self._remote: BoardSftpClient | None = None
         self._jobs: dict[str, RemoteJob] = {}
         self._pairs: dict[str, list[ImagePair]] = {}
-        self._quality: dict[tuple[str, int], tuple[QualityMetrics, dict[str, Any]]] = {}
+        self._pytorch_references: dict[str, Path] = {}
+        self._quality: dict[tuple[str, int, str], tuple[QualityMetrics, dict[str, Any]]] = {}
         self._lock = threading.RLock()
         self._transfer_lock = threading.Lock()
         self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="board-image-prefetch")
@@ -113,12 +115,43 @@ class ComparisonServiceState:
             )
             self._jobs.clear()
             self._pairs.clear()
+            self._pytorch_references = self._load_pytorch_references(config.pytorch_manifest)
             self._quality.clear()
             self._scan_generation += 1
             self._quality_assistance = False
             self._last_resource = None
             self._resource_gate = ResourceGate()
         return self.public_config()
+
+    @staticmethod
+    def _load_pytorch_references(manifest_path: Path | None) -> dict[str, Path]:
+        if manifest_path is None or not manifest_path.is_file():
+            return {}
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"invalid PyTorch reference manifest: {error}") from error
+        records = payload.get("records") if isinstance(payload, dict) else None
+        if not isinstance(records, list):
+            raise ValueError("PyTorch reference manifest has no records list")
+        references: dict[str, Path] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            source_name = str(
+                record.get("source_name")
+                or (record.get("latent_metadata") or {}).get("original_filename")
+                or ""
+            ).strip()
+            output_value = str(record.get("output_path") or "").strip()
+            if not source_name or not output_value:
+                continue
+            output_path = Path(output_value)
+            if not output_path.is_absolute():
+                output_path = (manifest_path.parent / output_path).resolve()
+            references[source_name.casefold()] = output_path
+            references.setdefault(Path(source_name).stem.casefold(), output_path)
+        return references
 
     def _require_config(self) -> ComparisonConfig:
         if self._config is None:
@@ -139,13 +172,14 @@ class ComparisonServiceState:
             "original_dir": str(config.original_dir),
             "remote_root": config.remote_root,
             "manifest_root": str(config.manifest_root) if config.manifest_root else "",
+            "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
         }
 
     def public_state(self) -> dict[str, Any]:
         with self._lock:
             quality = {
-                f"{job_id}:{index}": {**_quality_metrics_payload(metrics), **verdict}
-                for (job_id, index), (metrics, verdict) in self._quality.items()
+                f"{job_id}:{index}:{reference_mode}": {**_quality_metrics_payload(metrics), **verdict}
+                for (job_id, index, reference_mode), (metrics, verdict) in self._quality.items()
             }
             return {
                 "configured": self._config is not None,
@@ -237,7 +271,24 @@ class ComparisonServiceState:
             "original_available": pair.original is not None and pair.original.is_file(),
             "reconstruction_available": pair.reconstruction is not None,
             "cached": cached,
+            "pytorch_available": self._pytorch_reference_for_pair(pair) is not None,
         }
+
+    def _pytorch_reference_for_pair(self, pair: ImagePair) -> Path | None:
+        names = [
+            pair.original.name if pair.original is not None else "",
+            pair.original_name,
+        ]
+        for name in names:
+            normalized = str(name or "").strip().casefold()
+            if not normalized:
+                continue
+            path = self._pytorch_references.get(normalized)
+            if path is None:
+                path = self._pytorch_references.get(Path(normalized).stem)
+            if path is not None and path.is_file():
+                return path
+        return None
 
     def _pair(self, job_id: str, index: int) -> tuple[RemoteJob, ImagePair]:
         if job_id not in self._pairs:
@@ -263,12 +314,12 @@ class ComparisonServiceState:
         config = self._require_config()
         target = self.cache.path_for(config.board_host, job.path, str(pair.reconstruction))
         if target.is_file():
-            self._measure_pair(job_id, pair, target)
+            self._measure_pair(job_id, pair, target, "original")
             return target, True
 
         with self._transfer_lock:
             if target.is_file():
-                self._measure_pair(job_id, pair, target)
+                self._measure_pair(job_id, pair, target, "original")
                 return target, True
             remote = self._require_remote()
             snapshot, _ = remote.ensure_resources_available(self._resource_gate)
@@ -292,32 +343,49 @@ class ComparisonServiceState:
                 target,
                 callback=monitor,
             )
-        self._measure_pair(job_id, pair, target)
+        self._measure_pair(job_id, pair, target, "original")
         return target, False
 
-    def _measure_pair(self, job_id: str, pair: ImagePair, reconstruction: Path) -> None:
-        if pair.original is None or not pair.original.is_file():
-            return
-        key = (job_id, pair.index)
+    def _measure_pair(
+        self,
+        job_id: str,
+        pair: ImagePair,
+        reconstruction: Path,
+        reference_mode: str,
+    ) -> None:
+        reference = self.reference_path(job_id, pair.index, reference_mode)
+        key = (job_id, pair.index, reference_mode)
         with self._lock:
             if key in self._quality:
                 return
-            history = [metrics for (current_job, _), (metrics, _) in self._quality.items() if current_job == job_id]
-        metrics = measure_quality(pair.original, reconstruction)
+            history = [
+                metrics
+                for (current_job, _, current_mode), (metrics, _) in self._quality.items()
+                if current_job == job_id and current_mode == reference_mode
+            ]
+        metrics = measure_quality(reference, reconstruction)
         verdict = is_color_noise(metrics, history)
         with self._lock:
             self._quality[key] = (metrics, asdict(verdict))
 
-    def pull(self, job_id: str, index: int) -> dict[str, Any]:
+    def pull(self, job_id: str, index: int, reference_mode: str = "original") -> dict[str, Any]:
+        reference_mode = self._normalize_reference_mode(reference_mode)
         _, cached = self._download_pair(job_id, index)
+        _, pair = self._pair(job_id, index)
+        reconstruction = self.reconstruction_path(job_id, index)
+        self._measure_pair(job_id, pair, reconstruction, reference_mode)
         return {
             "status": "ok",
             "job_id": job_id,
             "index": index,
             "cached": cached,
             "original_url": f"/api/image/original?job_id={job_id}&index={index}",
+            "reference_url": (
+                f"/api/image/reference?job_id={job_id}&index={index}&mode={reference_mode}"
+            ),
             "reconstruction_url": f"/api/image/reconstruction?job_id={job_id}&index={index}",
-            "quality": self._quality_payload(job_id, index),
+            "reference_mode": reference_mode,
+            "quality": self._quality_payload(job_id, index, reference_mode),
         }
 
     def set_quality_assistance(self, enabled: bool, job_id: str = "") -> dict[str, Any]:
@@ -345,9 +413,14 @@ class ComparisonServiceState:
             except (ResourceAborted, RuntimeError, FileNotFoundError):
                 return
 
-    def _quality_payload(self, job_id: str, index: int) -> dict[str, Any] | None:
+    def _quality_payload(
+        self,
+        job_id: str,
+        index: int,
+        reference_mode: str = "original",
+    ) -> dict[str, Any] | None:
         with self._lock:
-            record = self._quality.get((job_id, index))
+            record = self._quality.get((job_id, index, reference_mode))
         if record is None:
             return None
         metrics, verdict = record
@@ -358,6 +431,23 @@ class ComparisonServiceState:
         if pair.original is None or not pair.original.is_file():
             raise FileNotFoundError("original image is unavailable")
         return pair.original
+
+    @staticmethod
+    def _normalize_reference_mode(reference_mode: str) -> str:
+        mode = str(reference_mode or "original").strip().casefold()
+        if mode not in {"original", "pytorch"}:
+            raise ValueError(f"unsupported reference mode: {reference_mode}")
+        return mode
+
+    def reference_path(self, job_id: str, index: int, reference_mode: str) -> Path:
+        mode = self._normalize_reference_mode(reference_mode)
+        if mode == "original":
+            return self.original_path(job_id, index)
+        _, pair = self._pair(job_id, index)
+        path = self._pytorch_reference_for_pair(pair)
+        if path is None:
+            raise FileNotFoundError("PyTorch reference image is unavailable")
+        return path
 
     def reconstruction_path(self, job_id: str, index: int) -> Path:
         job, pair = self._pair(job_id, index)
@@ -447,6 +537,15 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
                     )
                 )
                 return
+            if parsed.path == "/api/image/reference":
+                self._send_image(
+                    self.server.state.reference_path(
+                        params.get("job_id", [""])[0],
+                        int(params.get("index", ["-1"])[0]),
+                        params.get("mode", ["original"])[0],
+                    )
+                )
+                return
             if parsed.path == "/api/image/reconstruction":
                 self._send_image(
                     self.server.state.reconstruction_path(
@@ -482,11 +581,20 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
                         if payload.get("manifest_root")
                         else None
                     ),
+                    pytorch_manifest=(
+                        Path(str(payload["pytorch_manifest"])).resolve()
+                        if payload.get("pytorch_manifest")
+                        else None
+                    ),
                 )
                 self._json(HTTPStatus.OK, self.server.state.configure(config))
                 return
             if parsed.path == "/api/pull":
-                result = self.server.state.pull(str(payload.get("job_id", "")), int(payload.get("index", -1)))
+                result = self.server.state.pull(
+                    str(payload.get("job_id", "")),
+                    int(payload.get("index", -1)),
+                    str(payload.get("reference_mode", "original")),
+                )
                 self._json(HTTPStatus.OK, result)
                 return
             if parsed.path == "/api/quality-scan":

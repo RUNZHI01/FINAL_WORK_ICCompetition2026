@@ -1,6 +1,9 @@
 const elements = {
   serviceStatus: document.querySelector('#service-status'),
   originalDirectory: document.querySelector('#original-directory'),
+  referenceDirectoryLabel: document.querySelector('#reference-directory-label'),
+  referencePreviewLabel: document.querySelector('#reference-preview-label'),
+  referenceModes: document.querySelectorAll('[data-reference-mode]'),
   originalCount: document.querySelector('#original-count'),
   reconstructionDirectory: document.querySelector('#reconstruction-directory'),
   boardResource: document.querySelector('#board-resource'),
@@ -32,6 +35,7 @@ const state = {
   index: 0,
   quality: {},
   qualityEnabled: false,
+  referenceMode: 'original',
 }
 
 async function requestJson(url, options = {}) {
@@ -71,7 +75,25 @@ function showImage(image, empty, url) {
 }
 
 function qualityFor(index) {
-  return state.quality[`${currentJobId()}:${index}`] || null
+  return state.quality[`${currentJobId()}:${index}:${state.referenceMode}`] || null
+}
+
+function referenceAvailable(pair) {
+  return state.referenceMode === 'pytorch' ? pair?.pytorch_available : pair?.original_available
+}
+
+function renderReferenceMode() {
+  const isPytorch = state.referenceMode === 'pytorch'
+  elements.referenceDirectoryLabel.textContent = isPytorch ? 'PyTorch 参考目录' : '原图目录'
+  elements.referencePreviewLabel.textContent = isPytorch ? 'PyTorch' : '原图'
+  elements.originalDirectory.textContent = isPytorch
+    ? (state.config?.pytorch_manifest || '未生成 PyTorch 参考图')
+    : (state.config?.original_dir || '未配置')
+  for (const button of elements.referenceModes) {
+    const active = button.dataset.referenceMode === state.referenceMode
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-pressed', String(active))
+  }
 }
 
 function renderPreview() {
@@ -95,12 +117,16 @@ function renderPreview() {
     return
   }
 
-  elements.originalName.textContent = pair.original_name || '原图缺失'
+  elements.originalName.textContent = referenceAvailable(pair)
+    ? (pair.original_name || `第 ${state.index + 1} 张`)
+    : (state.referenceMode === 'pytorch' ? 'PyTorch 参考图缺失' : '原图缺失')
   elements.reconstructionName.textContent = pair.reconstruction_name || '重建图缺失'
   showImage(
     elements.originalPreview,
     elements.originalEmpty,
-    pair.original_available ? `/api/image/original?job_id=${encodeURIComponent(currentJobId())}&index=${state.index}` : '',
+    referenceAvailable(pair)
+      ? `/api/image/reference?job_id=${encodeURIComponent(currentJobId())}&index=${state.index}&mode=${state.referenceMode}`
+      : '',
   )
   showImage(
     elements.reconstructionPreview,
@@ -129,11 +155,11 @@ function renderThumbnails() {
     button.type = 'button'
     button.className = `thumbnail${index === state.index ? ' active' : ''}`
     button.title = `第 ${index + 1} 张`
-    if (pair.original_available) {
+    if (referenceAvailable(pair)) {
       const image = document.createElement('img')
       image.loading = 'lazy'
       image.alt = ''
-      image.src = `/api/image/original?job_id=${encodeURIComponent(currentJobId())}&index=${index}`
+      image.src = `/api/image/reference?job_id=${encodeURIComponent(currentJobId())}&index=${index}&mode=${state.referenceMode}`
       button.append(image)
     }
     const label = document.createElement('span')
@@ -162,7 +188,7 @@ async function loadJob(jobId) {
   elements.pullStatus.textContent = '正在读取 job 清单'
   state.detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)
   elements.reconstructionDirectory.textContent = state.detail.job.path
-  elements.originalCount.textContent = `${state.detail.pairs.filter((pair) => pair.original_available).length} 张`
+  elements.originalCount.textContent = `${state.detail.pairs.filter(referenceAvailable).length} 张`
   setIndex(Math.min(state.index, Math.max(0, state.detail.pair_count - 1)))
 }
 
@@ -193,10 +219,16 @@ async function pullCurrent() {
   try {
     const payload = await requestJson('/api/pull', {
       method: 'POST',
-      body: JSON.stringify({ job_id: currentJobId(), index: state.index }),
+      body: JSON.stringify({
+        job_id: currentJobId(),
+        index: state.index,
+        reference_mode: state.referenceMode,
+      }),
     })
     pair.cached = true
-    if (payload.quality) state.quality[`${currentJobId()}:${state.index}`] = payload.quality
+    if (payload.quality) {
+      state.quality[`${currentJobId()}:${state.index}:${state.referenceMode}`] = payload.quality
+    }
     elements.pullStatus.textContent = payload.cached ? '已从本地缓存加载' : '拉取完成'
     renderPreview()
   } catch (error) {
@@ -232,7 +264,7 @@ async function pollState() {
 async function initialize() {
   try {
     state.config = await requestJson('/api/config')
-    elements.originalDirectory.textContent = state.config.original_dir
+    renderReferenceMode()
     elements.serviceStatus.textContent = `上位机服务已连接 · 板端 ${state.config.board_host}`
     await loadJobs()
     setInterval(pollState, 3000)
@@ -248,5 +280,15 @@ elements.previousImage.addEventListener('click', () => setIndex(state.index - 1)
 elements.nextImage.addEventListener('click', () => setIndex(state.index + 1))
 elements.imageIndex.addEventListener('change', () => setIndex(Number(elements.imageIndex.value) - 1))
 elements.qualityAssistance.addEventListener('change', () => setQualityAssistance(elements.qualityAssistance.checked))
+for (const button of elements.referenceModes) {
+  button.addEventListener('click', () => {
+    state.referenceMode = button.dataset.referenceMode || 'original'
+    renderReferenceMode()
+    if (state.detail) {
+      elements.originalCount.textContent = `${state.detail.pairs.filter(referenceAvailable).length} 张`
+    }
+    renderPreview()
+  })
+}
 
 initialize()

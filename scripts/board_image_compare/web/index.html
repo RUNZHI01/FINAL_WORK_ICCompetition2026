@@ -21,7 +21,13 @@
   <main>
     <section class="directory-grid" aria-label="对比目录">
       <div class="directory-band">
-        <span class="label">原图目录</span>
+        <div class="reference-heading">
+          <span id="reference-directory-label" class="label">原图目录</span>
+          <div class="reference-mode" role="group" aria-label="参考图来源">
+            <button type="button" data-reference-mode="original" class="active" aria-pressed="true">原图</button>
+            <button type="button" data-reference-mode="pytorch" aria-pressed="false">PyTorch</button>
+          </div>
+        </div>
         <strong id="original-directory">未配置</strong>
         <span id="original-count" class="meta">0 张</span>
       </div>
@@ -42,7 +48,7 @@
     <section class="preview-grid" aria-label="图片对比预览">
       <figure class="preview-pane">
         <figcaption>
-          <span>原图</span>
+          <span id="reference-preview-label">原图</span>
           <span id="original-name" class="filename">未选择</span>
         </figcaption>
         <div class="image-stage">

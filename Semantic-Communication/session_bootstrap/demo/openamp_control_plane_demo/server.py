@@ -77,6 +77,7 @@ from crypto_runtime import (
 )
 from demo_data import (
     PROJECT_ROOT,
+    PYTORCH_REFERENCE_MANIFEST,
     build_aircraft_position_snapshot,
     build_fault_replay,
     build_job_manifest_contract_snapshot,
@@ -2784,6 +2785,14 @@ class DashboardState:
         remote_root = f"{usrp_output_root.rstrip('/')}/tvm"
         if not original_dir:
             raise RuntimeError("上位机原图目录未配置")
+        pytorch_manifest_value = str(
+            os.environ.get("OPENAMP_DEMO_PYTORCH_REFERENCE_MANIFEST", "")
+        ).strip()
+        pytorch_manifest = (
+            Path(pytorch_manifest_value).resolve()
+            if pytorch_manifest_value
+            else PYTORCH_REFERENCE_MANIFEST
+        )
         url = self._reconstruction_browser_manager.open(
             ReconstructionBrowserConfig(
                 board_host=board_access.host,
@@ -2793,6 +2802,7 @@ class DashboardState:
                 original_dir=Path(original_dir).resolve(),
                 remote_root=remote_root,
                 manifest_root=DEFAULT_RUN_ROOT,
+                pytorch_manifest=pytorch_manifest if pytorch_manifest.is_file() else None,
             )
         )
         return {"status": "ok", "url": url}
