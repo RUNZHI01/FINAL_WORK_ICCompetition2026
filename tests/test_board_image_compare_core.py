@@ -52,6 +52,18 @@ def test_reconstruction_batch_does_not_include_trailing_source_images(tmp_path: 
     assert [pair.original for pair in pairs] == originals[:2]
 
 
+def test_hash_named_reconstruction_pairs_with_matching_original(tmp_path: Path) -> None:
+    source_hash = "b8a2ee65a3f1e97a3447a3c13900f19a121c2c87a537a8cf3fb77fd45a8f49f2"
+    original = tmp_path / f"{source_hash}.jpg"
+    reconstruction = PurePosixPath(f"/remote/{source_hash}_recon.png")
+
+    pairs = pair_images([original], [reconstruction])
+
+    assert len(pairs) == 1
+    assert pairs[0].original == original
+    assert pairs[0].reconstruction == reconstruction
+
+
 def test_color_noise_requires_low_similarity_and_chroma_error() -> None:
     noisy = QualityMetrics(
         psnr_db=9.0,

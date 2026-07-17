@@ -106,7 +106,8 @@ class ReconstructionBrowserManager:
             self._stop_owned_process()
         command = [
             sys.executable,
-            str(self.script_path),
+            "-m",
+            "scripts.board_image_compare_server",
             "--host",
             self.host,
             "--port",
