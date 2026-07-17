@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import argparse
+import csv
+import json
 import math
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from statistics import fmean, pstdev
 from typing import Iterable, Mapping, Sequence
+
+try:
+    from scripts.image_quality_metrics import measure_rgb_quality
+except ModuleNotFoundError:
+    from image_quality_metrics import measure_rgb_quality
 
 
 @dataclass(frozen=True)
@@ -105,14 +114,13 @@ def assess_ranking_stability(
     lowest_overlap = min(overlaps)
     rankings_identical = all(list(candidate) == reference for candidate in cross_seed_rankings[1:])
     stable = (
-        rankings_identical
-        and
         lowest_correlation >= minimum_spearman
         and lowest_overlap >= minimum_top_overlap
     )
+    full_run_count = 1 if rankings_identical else (2 if stable else 3)
     return StabilityReport(
         stable=stable,
-        full_run_count=1 if stable else 3,
+        full_run_count=full_run_count,
         rankings_identical=rankings_identical,
         minimum_spearman=lowest_correlation,
         minimum_top_overlap=lowest_overlap,
@@ -199,3 +207,163 @@ def rank_showcase_samples(
             )
         )
     return ranked
+
+
+def _manifest_path(value: object, manifest_path: Path) -> Path:
+    path = Path(str(value or ""))
+    return path if path.is_absolute() else (manifest_path.parent / path).resolve()
+
+
+def load_quality_rows(
+    original_dir: Path,
+    manifest_paths: Sequence[Path],
+) -> list[QualityRow]:
+    original_root = Path(original_dir).resolve()
+    originals_by_name = {
+        path.name.casefold(): path
+        for path in original_root.iterdir()
+        if path.is_file()
+    }
+    originals_by_stem = {path.stem.casefold(): path for path in originals_by_name.values()}
+    rows: list[QualityRow] = []
+    for manifest_value in manifest_paths:
+        manifest_path = Path(manifest_value).resolve()
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        records = payload.get("records") if isinstance(payload, dict) else None
+        if not isinstance(records, list):
+            raise ValueError(f"manifest has no records list: {manifest_path}")
+        default_seed = int(payload.get("seed", 0))
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            source_name = str(
+                record.get("source_name")
+                or (record.get("latent_metadata") or {}).get("original_filename")
+                or ""
+            ).strip()
+            source_path_value = str(record.get("source_path") or "").strip()
+            source_path = Path(source_path_value) if source_path_value else None
+            if source_path is None or not source_path.is_file():
+                source_path = originals_by_name.get(source_name.casefold())
+                if source_path is None:
+                    source_path = originals_by_stem.get(Path(source_name).stem.casefold())
+            if source_path is None or not source_path.is_file():
+                raise FileNotFoundError(f"original image unavailable for {source_name}")
+            output_path = _manifest_path(record.get("output_path"), manifest_path)
+            if not output_path.is_file():
+                raise FileNotFoundError(f"PyTorch output unavailable: {output_path}")
+            metrics = measure_rgb_quality(source_path, output_path)
+            if (
+                not metrics.shape_match
+                or metrics.psnr_db is None
+                or metrics.ssim is None
+                or metrics.chroma_mae is None
+            ):
+                raise ValueError(f"shape mismatch for {source_name}: {output_path}")
+            rows.append(
+                QualityRow(
+                    source_name=source_path.name,
+                    run_seed=int(record.get("run_seed", default_seed)),
+                    psnr_db=metrics.psnr_db,
+                    ssim=metrics.ssim,
+                    chroma_mae=metrics.chroma_mae,
+                )
+            )
+    return rows
+
+
+def write_ranking_outputs(
+    *,
+    quality_rows: Sequence[QualityRow],
+    usrp_rows: Sequence[UsrpEvidence],
+    output_dir: Path,
+    candidate_limit: int,
+    final_limit: int,
+) -> dict[str, Path | None]:
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    ranked = rank_showcase_samples(
+        quality_rows,
+        usrp_rows,
+        limit=len({row.source_name for row in quality_rows}),
+    )
+    ranking_json = output_root / "pytorch_quality_ranking.json"
+    ranking_csv = output_root / "pytorch_quality_ranking.csv"
+    candidates_json = output_root / "showcase_candidates.json"
+    ranking_payload = {
+        "sample_count": len(ranked),
+        "quality_run_count": max((row.run_count for row in ranked), default=0),
+        "samples": [row.to_dict() for row in ranked],
+    }
+    ranking_json.write_text(
+        json.dumps(ranking_payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    fieldnames = list(RankedSample.__dataclass_fields__)
+    with ranking_csv.open("w", encoding="utf-8-sig", newline="") as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(row.to_dict() for row in ranked)
+    candidates = ranked[:candidate_limit]
+    candidates_json.write_text(
+        json.dumps(
+            {
+                "candidate_limit": candidate_limit,
+                "samples": [row.to_dict() for row in candidates],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    qualified = [row for row in ranked if row.has_usrp_evidence]
+    selected_manifest: Path | None = None
+    if len(qualified) >= final_limit:
+        selected_manifest = output_root / "selected_300_manifest.json"
+        selected_manifest.write_text(
+            json.dumps(
+                {
+                    "final_limit": final_limit,
+                    "samples": [row.to_dict() for row in qualified[:final_limit]],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    return {
+        "ranking_json": ranking_json,
+        "ranking_csv": ranking_csv,
+        "candidates_json": candidates_json,
+        "selected_manifest": selected_manifest,
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Rank PyTorch and USRP showcase samples.")
+    parser.add_argument("--original-dir", required=True, type=Path)
+    parser.add_argument("--pytorch-manifest", required=True, type=Path, action="append")
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--candidate-limit", type=int, default=600)
+    parser.add_argument("--final-limit", type=int, default=300)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    quality_rows = load_quality_rows(args.original_dir, args.pytorch_manifest)
+    paths = write_ranking_outputs(
+        quality_rows=quality_rows,
+        usrp_rows=[],
+        output_dir=args.output_dir,
+        candidate_limit=args.candidate_limit,
+        final_limit=args.final_limit,
+    )
+    print(json.dumps({key: str(value) if value else None for key, value in paths.items()}))
+
+
+if __name__ == "__main__":
+    main()

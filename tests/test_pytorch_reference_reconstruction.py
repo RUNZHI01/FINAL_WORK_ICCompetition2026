@@ -124,7 +124,7 @@ def test_unstable_cross_seed_probe_requires_three_full_runs() -> None:
     assert report.stable is False
 
 
-def test_correlated_but_different_rankings_still_require_averaging() -> None:
+def test_correlated_but_different_rankings_stop_after_two_run_average() -> None:
     baseline = [f"sample-{index:03d}" for index in range(100)]
     changed = list(baseline)
     changed[-1], changed[-2] = changed[-2], changed[-1]
@@ -136,5 +136,5 @@ def test_correlated_but_different_rankings_still_require_averaging() -> None:
 
     assert report.minimum_spearman >= 0.98
     assert report.minimum_top_overlap == 1.0
-    assert report.full_run_count == 3
-    assert report.stable is False
+    assert report.full_run_count == 2
+    assert report.stable is True

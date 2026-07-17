@@ -10,7 +10,9 @@ from scripts.rank_showcase_samples import (
     QualityRow,
     UsrpEvidence,
     aggregate_quality_runs,
+    load_quality_rows,
     rank_showcase_samples,
+    write_ranking_outputs,
 )
 
 
@@ -99,6 +101,64 @@ def test_quality_breakers_are_deterministic() -> None:
     ranked = rank_showcase_samples(quality_rows, usrp_rows, limit=3)
 
     assert [row.source_name for row in ranked] == [
+        "00000001.jpg",
+        "00000002.jpg",
+        "00000003.jpg",
+    ]
+
+
+def test_load_quality_rows_reads_multiple_pytorch_manifests(tmp_path: Path) -> None:
+    original_dir = tmp_path / "originals"
+    original_dir.mkdir()
+    original = original_dir / "00000001.jpg"
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(original)
+    manifests = []
+    for seed, color in ((0, (10, 20, 30)), (1, (12, 22, 32))):
+        output = tmp_path / f"seed-{seed}.png"
+        Image.new("RGB", (8, 8), color).save(output)
+        manifest = tmp_path / f"seed-{seed}.json"
+        manifest.write_text(
+            __import__("json").dumps(
+                {
+                    "seed": seed,
+                    "records": [
+                        {
+                            "source_name": original.name,
+                            "source_path": str(original),
+                            "output_path": str(output),
+                            "run_seed": seed,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        manifests.append(manifest)
+
+    rows = load_quality_rows(original_dir, manifests)
+
+    assert len(rows) == 2
+    assert {row.run_seed for row in rows} == {0, 1}
+    assert {row.source_name for row in rows} == {"00000001.jpg"}
+
+
+def test_write_ranking_outputs_keeps_final_manifest_for_usrp_evidence(tmp_path: Path) -> None:
+    rows = [_quality(f"{index:08d}.jpg", 0, 40.0 - index) for index in range(1, 5)]
+
+    paths = write_ranking_outputs(
+        quality_rows=rows,
+        usrp_rows=[],
+        output_dir=tmp_path,
+        candidate_limit=3,
+        final_limit=2,
+    )
+
+    assert paths["ranking_json"].is_file()
+    assert paths["ranking_csv"].is_file()
+    assert paths["candidates_json"].is_file()
+    assert paths["selected_manifest"] is None
+    candidates = __import__("json").loads(paths["candidates_json"].read_text())
+    assert [row["source_name"] for row in candidates["samples"]] == [
         "00000001.jpg",
         "00000002.jpg",
         "00000003.jpg",

@@ -15,7 +15,7 @@
 - Final reference data is generated on the host only after helper/source/model hashes have been checked against the board-side PyTorch runtime.
 - Runtime images, latents, manifests, and reports remain untracked; only code, tests, and concise documentation are committed.
 - Canonical metrics are exact-shape RGB PSNR, global SSIM, and chroma MAE; no silent resizing or fallback reference substitution.
-- A same-seed mismatch forces investigation; cross-seed ranking instability triggers three full fixed-seed runs and mean/std aggregation.
+- A same-seed mismatch forces investigation. Identical rankings need one full run; highly similar rankings use two-run mean/std aggregation; only low correlation or low top-set overlap triggers a third run.
 - Final showcase ranking only treats retry counts as authoritative when backed by an actual USRP IQ run record.
 
 ---
@@ -122,7 +122,7 @@ Expected: FAIL on missing provenance fields and stability function.
 
 - [ ] **Step 3: Implement the conditional repeat policy**
 
-Run two identical seed-0 probes and require identical output hashes. Run seeds 0, 1, and 2 on the probe set; use one full run only when Spearman correlation is at least `0.98` and top-20% overlap is at least `0.90`, otherwise require three full runs. Aggregated ranking uses metric means and emits standard deviations for audit.
+Run two identical seed-0 probes and require identical output hashes. Compare fixed seeds on the probe set. Use one full run for identical rankings, two full runs when Spearman correlation is at least `0.98` and top-20% overlap is at least `0.90`, and three runs otherwise. Aggregated ranking uses metric means and emits standard deviations for audit.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -221,7 +221,7 @@ Verify exactly 5000 manifest records, unique source names, and unique latent pat
 
 - [ ] **Step 2: Run the 100-image reproducibility probe**
 
-After validating the host copy against the board, run seed 0 twice and seeds 1 and 2 once on the host with `pytorch_reference_reconstruction.py --max-images 100`. Feed all probe manifests to `rank_showcase_samples.py probe` and abort on same-seed hash mismatch. Record whether the full run count is one or three.
+After validating the host copy against the board, run seed 0 twice and seeds 1 and 2 once on the host with `pytorch_reference_reconstruction.py --max-images 100`. Feed all probe manifests to `rank_showcase_samples.py probe` and abort on same-seed hash mismatch. Record whether the full run count is one, two, or three.
 
 - [ ] **Step 3: Run the required 5000-image PyTorch passes**
 
