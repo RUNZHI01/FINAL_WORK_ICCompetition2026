@@ -19,7 +19,8 @@ class ReconstructionBrowserConfig:
     board_password: str
     board_port: int
     original_dir: Path
-    remote_root: str
+    sources: tuple[dict[str, Any], ...]
+    default_source: str
     manifest_root: Path | None = None
     pytorch_manifest: Path | None = None
 
@@ -133,7 +134,8 @@ class ReconstructionBrowserManager:
                 "board_password": config.board_password,
                 "board_port": config.board_port,
                 "original_dir": str(config.original_dir),
-                "remote_root": config.remote_root,
+                "sources": list(config.sources),
+                "default_source": config.default_source,
                 "manifest_root": str(config.manifest_root) if config.manifest_root else "",
                 "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
             }
