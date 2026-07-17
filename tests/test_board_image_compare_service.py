@@ -4,13 +4,16 @@ import json
 import threading
 import time
 from pathlib import Path, PurePosixPath
+from unittest.mock import Mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from PIL import Image
+import pytest
 
 from scripts.board_image_compare.core import GateDecision, ResourceSnapshot
 from scripts.board_image_compare.remote import RemoteJob
+from scripts.board_image_compare.sources import ReconstructionSource
 from scripts.board_image_compare.service import (
     ComparisonConfig,
     ComparisonServiceState,
@@ -22,9 +25,11 @@ class FakeRemote:
     def __init__(self, reconstruction: Path) -> None:
         self.reconstruction = reconstruction
         self.download_calls: list[str] = []
+        self.listed_roots: list[str] = []
         self.closed = False
 
     def list_jobs(self, remote_root: str):
+        self.listed_roots.append(remote_root)
         return [
             RemoteJob("new", "job-new", f"{remote_root}/job-new/reconstructions", 300.0),
             RemoteJob("old", "job-old", f"{remote_root}/job-old/reconstructions", 100.0),
@@ -91,7 +96,11 @@ def configured_state(
             board_password="user",
             board_port=22,
             original_dir=originals,
-            remote_root="/outputs",
+            sources=(
+                ReconstructionSource("prerecorded-mnn", "Prerecorded MNN", "/prerecorded/mnn"),
+                ReconstructionSource("usrp-iq-direct", "USRP IQ direct", "/usrp/iq-direct/tvm"),
+            ),
+            default_source="usrp-iq-direct",
             pytorch_manifest=pytorch_manifest,
         )
     )
@@ -101,7 +110,7 @@ def configured_state(
 def test_listing_and_selecting_job_do_not_download(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
 
-    jobs = state.list_jobs()
+    jobs = state.list_jobs("usrp-iq-direct")
     detail = state.job_detail("new")
 
     assert [job["name"] for job in jobs] == ["job-new", "job-old"]
@@ -110,9 +119,48 @@ def test_listing_and_selecting_job_do_not_download(tmp_path: Path) -> None:
     state.close()
 
 
+def test_jobs_are_scoped_to_requested_source(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+
+    jobs = state.list_jobs("usrp-iq-direct")
+
+    assert remote.listed_roots == ["/usrp/iq-direct/tvm"]
+    assert [job["name"] for job in jobs] == ["job-new", "job-old"]
+    state.close()
+
+
+def test_unknown_source_is_rejected(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+
+    with pytest.raises(ValueError, match="unknown reconstruction source"):
+        state.list_jobs("not-a-source")
+    state.close()
+
+
+def test_missing_source_root_returns_empty_list(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+    remote.list_jobs = Mock(side_effect=FileNotFoundError("missing"))
+
+    assert state.list_jobs("prerecorded-mnn") == []
+    state.close()
+
+
+def test_switching_sources_clears_stale_job_selection(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+    state.list_jobs("usrp-iq-direct")
+    state.job_detail("new")
+    remote.list_jobs = Mock(side_effect=FileNotFoundError("missing"))
+
+    state.list_jobs("prerecorded-mnn")
+
+    with pytest.raises(KeyError, match="unknown job"):
+        state.job_detail("new")
+    state.close()
+
+
 def test_pull_downloads_requested_image_and_reuses_cache(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
 
     first = state.pull("new", 0)
@@ -131,7 +179,7 @@ def test_pull_does_not_prefetch_adjacent_images(tmp_path: Path) -> None:
         PurePosixPath(f"{job_path}/00000000_recon.png"),
         PurePosixPath(f"{job_path}/00000001_recon.png"),
     ]
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
 
     state.pull("new", 0)
@@ -141,7 +189,9 @@ def test_pull_does_not_prefetch_adjacent_images(tmp_path: Path) -> None:
         time.sleep(0.05)
     state.close()
 
-    assert remote.download_calls == ["/outputs/job-new/reconstructions/00000000_recon.png"]
+    assert remote.download_calls == [
+        "/usrp/iq-direct/tvm/job-new/reconstructions/00000000_recon.png"
+    ]
 
 
 def test_quality_assistance_defaults_to_disabled(tmp_path: Path) -> None:
@@ -153,7 +203,7 @@ def test_quality_assistance_defaults_to_disabled(tmp_path: Path) -> None:
 
 def test_pytorch_reference_mode_uses_manifest_mapping(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path, with_pytorch=True)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
 
     path = state.reference_path("new", 0, "pytorch")
@@ -164,7 +214,7 @@ def test_pytorch_reference_mode_uses_manifest_mapping(tmp_path: Path) -> None:
 
 def test_missing_pytorch_reference_does_not_fall_back(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
 
     try:
@@ -178,7 +228,7 @@ def test_missing_pytorch_reference_does_not_fall_back(tmp_path: Path) -> None:
 
 def test_quality_cache_is_isolated_by_reference_mode(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path, with_pytorch=True)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
 
     original = state.pull("new", 0, reference_mode="original")
@@ -193,7 +243,7 @@ def test_quality_cache_is_isolated_by_reference_mode(tmp_path: Path) -> None:
 
 def test_http_uncached_reconstruction_returns_404_without_download(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
     server = create_http_server("127.0.0.1", 0, state)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -273,9 +323,73 @@ def test_config_endpoint_does_not_return_password(tmp_path: Path) -> None:
         state.close()
 
 
+def test_http_config_parses_sources_and_exposes_public_source_fields(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    request = Request(
+        f"http://127.0.0.1:{server.server_port}/api/config",
+        data=json.dumps(
+            {
+                "board_host": "board-a",
+                "board_user": "user",
+                "board_password": "secret",
+                "board_port": 22,
+                "original_dir": str(tmp_path / "originals"),
+                "sources": [
+                    {
+                        "id": "usrp-iq-direct",
+                        "label": "USRP IQ direct",
+                        "remote_root": "/usrp/iq-direct/tvm",
+                        "include_prefixes": [],
+                        "exclude_prefixes": [],
+                    }
+                ],
+                "default_source": "usrp-iq-direct",
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        payload = json.loads(urlopen(request, timeout=2).read())
+        assert payload["sources"] == [
+            {"id": "usrp-iq-direct", "label": "USRP IQ direct", "remote_root": "/usrp/iq-direct/tvm"}
+        ]
+        assert payload["default_source"] == "usrp-iq-direct"
+        assert "password" not in json.dumps(payload).lower()
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
+def test_http_jobs_reject_unknown_source_and_return_empty_for_missing_root(tmp_path: Path) -> None:
+    state, remote = configured_state(tmp_path)
+    remote.list_jobs = Mock(side_effect=FileNotFoundError("missing"))
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        with pytest.raises(HTTPError) as error:
+            urlopen(f"http://127.0.0.1:{server.server_port}/api/jobs?source=unknown", timeout=2)
+        assert error.value.code == 400
+        payload = json.loads(
+            urlopen(f"http://127.0.0.1:{server.server_port}/api/jobs?source=prerecorded-mnn", timeout=2).read()
+        )
+        assert payload == {"jobs": []}
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
 def test_http_pull_serializes_infinite_psnr_as_valid_json(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
-    state.list_jobs()
+    state.list_jobs("usrp-iq-direct")
     state.job_detail("new")
     server = create_http_server("127.0.0.1", 0, state)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
