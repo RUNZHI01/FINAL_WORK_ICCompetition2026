@@ -4,7 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import errno
+import getpass
+import hashlib
+import hmac
 import json
 import os
 import sys
@@ -26,6 +30,7 @@ DEFAULT_REPORT = (
     "Semantic-Communication/session_bootstrap/reports/"
     "usrp_output_migration_20260717.json"
 )
+BOARD_PASSWORD_ENV_VAR = "BOARD_PASSWORD"
 
 
 def _remote_path(value: str | PurePosixPath) -> str:
@@ -359,6 +364,45 @@ def _classification_counts(plan: Iterable[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def _parse_host_key_fingerprint(value: str) -> str:
+    fingerprint = str(value).strip()
+    prefix = "SHA256:"
+    encoded = fingerprint.removeprefix(prefix).rstrip("=")
+    if not fingerprint.startswith(prefix) or not encoded:
+        raise argparse.ArgumentTypeError("host key fingerprint must use SHA256:<base64>")
+    try:
+        base64.b64decode(encoded + "=" * (-len(encoded) % 4), validate=True)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("host key fingerprint must use SHA256:<base64>") from error
+    return f"{prefix}{encoded}"
+
+
+def _sha256_host_key_fingerprint(key: Any) -> str:
+    encoded = base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode("ascii").rstrip("=")
+    return f"SHA256:{encoded}"
+
+
+def _fingerprint_host_key_policy(paramiko: Any, expected_fingerprint: str) -> Any:
+    class FingerprintHostKeyPolicy:
+        def missing_host_key(self, client: Any, hostname: str, key: Any) -> None:
+            actual_fingerprint = _sha256_host_key_fingerprint(key)
+            if not hmac.compare_digest(expected_fingerprint, actual_fingerprint):
+                raise paramiko.SSHException("SSH host key fingerprint mismatch")
+            client.get_host_keys().add(hostname, key.get_name(), key)
+
+    return FingerprintHostKeyPolicy()
+
+
+def _read_board_password(prompt: Callable[[str], str] = getpass.getpass) -> str:
+    password = os.environ.get(BOARD_PASSWORD_ENV_VAR, "")
+    if password:
+        return password
+    password = prompt("Board password: ")
+    if not password:
+        raise ValueError(f"{BOARD_PASSWORD_ENV_VAR} is unset and no password was provided")
+    return password
+
+
 def _with_report_metadata(
     result: dict[str, Any],
     *,
@@ -401,7 +445,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, default=22)
     parser.add_argument("--user", required=True)
-    parser.add_argument("--password", required=True)
+    parser.add_argument(
+        "--host-key-fingerprint",
+        type=_parse_host_key_fingerprint,
+        help="explicit SHA256 host-key fingerprint for controlled recovery of an unknown host",
+    )
     parser.add_argument("--run-root", default="USRP292x/qpsk_batch_spool_arq_runs")
     parser.add_argument("--legacy-root", default=DEFAULT_LEGACY_ROOT)
     parser.add_argument("--output-root", default=DEFAULT_OUTPUT_ROOT)
@@ -411,16 +459,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _connect_sftp(args: argparse.Namespace) -> tuple[Any, Any]:
+def _connect_sftp(args: argparse.Namespace, *, password: str) -> tuple[Any, Any]:
     import paramiko
 
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.load_system_host_keys()
+    fingerprint = getattr(args, "host_key_fingerprint", None)
+    policy = (
+        _fingerprint_host_key_policy(paramiko, fingerprint)
+        if fingerprint
+        else paramiko.RejectPolicy()
+    )
+    client.set_missing_host_key_policy(policy)
     client.connect(
         hostname=args.host,
         port=args.port,
         username=args.user,
-        password=args.password,
+        password=password,
         look_for_keys=False,
         allow_agent=False,
         timeout=10.0,
@@ -430,7 +485,7 @@ def _connect_sftp(args: argparse.Namespace) -> tuple[Any, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    client, sftp = _connect_sftp(args)
+    client, sftp = _connect_sftp(args, password=_read_board_password())
     try:
         if args.rollback_report:
             prior_report = json.loads(Path(args.rollback_report).read_text(encoding="utf-8"))

@@ -64,13 +64,21 @@ def _has_nonempty_value(value: Any) -> bool:
     return value is not None and (not isinstance(value, str) or bool(value.strip()))
 
 
-def _contains_key_with_value(value: Any, keys: set[str]) -> bool:
-    if isinstance(value, dict):
-        if any(key in keys and _has_nonempty_value(candidate) for key, candidate in value.items()):
-            return True
-        return any(_contains_key_with_value(candidate, keys) for candidate in value.values())
+def _has_nonempty_path_entry(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
     if isinstance(value, list):
-        return any(_contains_key_with_value(candidate, keys) for candidate in value)
+        return any(_has_nonempty_path_entry(item) for item in value)
+    return False
+
+
+def _contains_key_with_path_entry(value: Any, keys: set[str]) -> bool:
+    if isinstance(value, dict):
+        if any(key in keys and _has_nonempty_path_entry(candidate) for key, candidate in value.items()):
+            return True
+        return any(_contains_key_with_path_entry(candidate, keys) for candidate in value.values())
+    if isinstance(value, list):
+        return any(_contains_key_with_path_entry(candidate, keys) for candidate in value)
     return False
 
 
@@ -82,7 +90,7 @@ def classify_usrp_summary(payload: dict[str, Any]) -> str | None:
     phy = str(payload.get("phy") or "").strip().casefold()
     if phy == "analog-latent-iq":
         return "usrp-iq-direct"
-    if _contains_key_with_value(payload, {"remote_received_latent_npz", "remote_received_latent_npz_files"}):
+    if _contains_key_with_path_entry(payload, {"remote_received_latent_npz", "remote_received_latent_npz_files"}):
         return "usrp-iq-direct"
 
     if any(

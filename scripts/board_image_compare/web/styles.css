@@ -92,6 +92,7 @@ main { padding: 16px 24px 20px; }
   .reconstruction-directory { grid-template-columns: 1fr; }
   .job-controls { flex-wrap: wrap; }
   .job-controls select { width: 100%; }
+  .job-controls #reconstruction-source { width: 100%; }
   .image-stage { min-height: 220px; }
 }
 

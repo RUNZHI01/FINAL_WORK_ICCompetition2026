@@ -291,7 +291,9 @@ class ComparisonServiceState:
         candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         for run_dir in candidates:
             names: dict[int, str] = {}
-            for image_dir in sorted(run_dir.glob("image_*")):
+            for image_dir in sorted(run_dir.glob("**/image_*")):
+                if not image_dir.is_dir():
+                    continue
                 try:
                     index = int(image_dir.name.split("_", 1)[1])
                     payload = json.loads((image_dir / "manifest.json").read_text(encoding="utf-8"))

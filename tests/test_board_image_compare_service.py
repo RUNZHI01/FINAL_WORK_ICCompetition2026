@@ -60,6 +60,7 @@ def configured_state(
     tmp_path: Path,
     *,
     with_pytorch: bool = False,
+    manifest_root: Path | None = None,
 ) -> tuple[ComparisonServiceState, FakeRemote]:
     originals = tmp_path / "originals"
     originals.mkdir()
@@ -101,6 +102,7 @@ def configured_state(
                 ReconstructionSource("usrp-iq-direct", "USRP IQ direct", "/usrp/iq-direct/tvm"),
             ),
             default_source="usrp-iq-direct",
+            manifest_root=manifest_root,
             pytorch_manifest=pytorch_manifest,
         )
     )
@@ -275,6 +277,51 @@ def test_pytorch_reference_mode_uses_manifest_mapping(tmp_path: Path) -> None:
     state.close()
 
 
+def test_historical_usrp_job_uses_nested_round_manifest_for_original_and_quality(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    image_dir = manifest_root / "cockpit_usrp_usrp-123" / "round_0001" / "image_0"
+    image_dir.mkdir(parents=True)
+    (image_dir / "manifest.json").write_text(
+        json.dumps({"source_info": {"source_meta": {"original_filename": "zeta.png"}}}),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (12, 30, 60))
+    write_image(state._config.original_dir / "frame_0000.png", (80, 20, 40))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("historical", "openamp3_usrp_123_current", f"{remote_root}/historic/reconstructions", 300.0)
+    ]
+
+    state.list_jobs("usrp-iq-direct")
+    detail = state.job_detail("historical")
+    result = state.pull("historical", 0)
+
+    assert detail["pairs"][0]["original_name"] == "zeta.png"
+    assert detail["pairs"][0]["original_available"] is True
+    assert result["quality"]["psnr_db"] == "Infinity"
+    state.close()
+
+
+def test_historical_usrp_job_keeps_direct_image_manifest_support(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    image_dir = manifest_root / "cockpit_usrp_usrp-123" / "image_0"
+    image_dir.mkdir(parents=True)
+    (image_dir / "manifest.json").write_text(
+        json.dumps({"source_info": {"source_meta": {"original_filename": "zeta.png"}}}),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (12, 30, 60))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("historical", "openamp3_usrp_123_current", f"{remote_root}/historic/reconstructions", 300.0)
+    ]
+
+    state.list_jobs("usrp-iq-direct")
+
+    assert state.job_detail("historical")["pairs"][0]["original_name"] == "zeta.png"
+    state.close()
+
+
 def test_missing_pytorch_reference_does_not_fall_back(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     state.list_jobs("usrp-iq-direct")
@@ -442,6 +489,8 @@ def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None
         assert "ssim.toFixed(4)" in script
         assert ".image-stage { position: relative; overflow: hidden;" in styles
         assert ".image-stage img { position: absolute; inset: 0;" in styles
+        mobile_styles = styles[styles.index("@media (max-width: 900px)"):]
+        assert ".job-controls #reconstruction-source { width: 100%; }" in mobile_styles
     finally:
         server.shutdown()
         server.server_close()

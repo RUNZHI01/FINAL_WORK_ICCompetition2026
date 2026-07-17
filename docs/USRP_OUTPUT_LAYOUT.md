@@ -32,7 +32,7 @@ $env:BOARD_HOST = '<board-host>'
 $env:BOARD_USER = '<board-user>'
 $env:BOARD_PASSWORD = '<board-password>'
 python scripts/migrate_usrp_output_layout.py `
-  --host $env:BOARD_HOST --user $env:BOARD_USER --password $env:BOARD_PASSWORD `
+  --host $env:BOARD_HOST --user $env:BOARD_USER `
   --run-root USRP292x/qpsk_batch_spool_arq_runs `
   --legacy-root /home/user/Downloads/jscc-test-usrp/tvm `
   --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json
@@ -42,11 +42,13 @@ Use `--apply` only after the dry-run has the expected 239 exact direct-IQ jobs, 
 
 ```powershell
 # Apply after review
-python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --password $env:BOARD_PASSWORD --run-root USRP292x/qpsk_batch_spool_arq_runs --legacy-root /home/user/Downloads/jscc-test-usrp/tvm --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
+python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --run-root USRP292x/qpsk_batch_spool_arq_runs --legacy-root /home/user/Downloads/jscc-test-usrp/tvm --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
 
 # Roll back destinations present in the report
-python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --password $env:BOARD_PASSWORD --rollback-report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
+python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --rollback-report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
 ```
+
+The CLI reads `BOARD_PASSWORD` from the environment; when it is unset, it prompts through `getpass` and never accepts a plaintext password argument. It loads the system `known_hosts` file and rejects unknown host keys by default. For controlled recovery of a board with an intentionally verified but unknown key, provide `--host-key-fingerprint SHA256:<base64-fingerprint>`; that key is accepted only for this process and is not written to `known_hosts`.
 
 The CLI uses Paramiko SFTP `stat`, `mkdir`, and `rename`; it does not issue remote shell move commands or overwrite a destination. Reports omit connection identity and credentials. Apply and rollback atomically update the report before each rename, after each success, and on failure; rerunning the same operation resumes from the recorded state.
 

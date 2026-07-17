@@ -4,7 +4,11 @@ import os
 import re
 import subprocess
 import sys
+from argparse import Namespace
+from base64 import b64encode
+from hashlib import sha256
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -345,6 +349,13 @@ def test_classify_usrp_summary_requires_evidence(payload, expected):
     assert classify_usrp_summary(payload) == expected
 
 
+@pytest.mark.parametrize("evidence", [None, "", "   ", False, [], [""], [None], {}])
+def test_classify_usrp_summary_rejects_empty_direct_iq_evidence(evidence):
+    payload = {"images": [{"round_records": [{"remote_received_latent_npz": evidence}]}]}
+
+    assert classify_usrp_summary(payload) is None
+
+
 def test_extract_usrp_token_accepts_only_current_usrp_jobs():
     assert extract_usrp_token("openamp3_usrp_1784203435_current") == "1784203435"
     assert extract_usrp_token("openamp3_usrp_1784203435_recovery_current") == "1784203435_recovery"
@@ -515,19 +526,101 @@ def test_migration_script_runs_as_a_direct_cli():
     assert completed.returncode == 0, completed.stderr
 
 
-def test_migration_cli_defaults_to_historical_usrp_legacy_root():
+def test_migration_cli_defaults_to_historical_usrp_legacy_root_without_password_argument():
     args = parse_args(
         [
             "--host",
             "board.example.invalid",
             "--user",
             "synthetic-board-user",
-            "--password",
-            "injected-secret-value",
         ]
     )
 
     assert args.legacy_root == "/home/user/Downloads/jscc-test-usrp/tvm"
+    assert not hasattr(args, "password")
+
+
+def test_migration_cli_rejects_plaintext_password_argument():
+    with pytest.raises(SystemExit):
+        parse_args(["--host", "board.example.invalid", "--user", "synthetic-board-user", "--password", "secret"])
+
+
+def test_migration_cli_reads_password_from_environment_or_interactive_prompt(monkeypatch):
+    monkeypatch.setenv("BOARD_PASSWORD", "environment-secret")
+    assert migration._read_board_password(lambda _prompt: pytest.fail("unexpected password prompt")) == "environment-secret"
+
+    monkeypatch.delenv("BOARD_PASSWORD")
+    assert migration._read_board_password(lambda prompt: "prompt-secret") == "prompt-secret"
+
+
+def test_migration_cli_uses_known_hosts_and_rejects_unknown_keys_by_default(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def load_system_host_keys(self):
+            calls.append("load_system_host_keys")
+
+        def set_missing_host_key_policy(self, policy):
+            calls.append(policy)
+
+        def connect(self, **kwargs):
+            calls.append(kwargs)
+
+        def open_sftp(self):
+            return "sftp"
+
+    fake_paramiko = SimpleNamespace(
+        SSHClient=lambda: FakeClient(),
+        RejectPolicy=lambda: "reject-policy",
+    )
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    _, sftp = migration._connect_sftp(
+        Namespace(host="board.example.invalid", port=22, user="board-user", host_key_fingerprint=None),
+        password="environment-secret",
+    )
+
+    assert sftp == "sftp"
+    assert calls[0:2] == ["load_system_host_keys", "reject-policy"]
+    assert calls[2]["password"] == "environment-secret"
+
+
+def test_migration_cli_accepts_only_the_explicit_sha256_host_key_fingerprint():
+    class FakeKey:
+        def asbytes(self):
+            return b"board-host-key"
+
+        def get_name(self):
+            return "ssh-ed25519"
+
+    class FakeHostKeys:
+        def __init__(self):
+            self.added = []
+
+        def add(self, hostname, key_type, key):
+            self.added.append((hostname, key_type, key))
+
+    class FakeClient:
+        def __init__(self):
+            self.host_keys = FakeHostKeys()
+
+        def get_host_keys(self):
+            return self.host_keys
+
+    class FakeSshException(Exception):
+        pass
+
+    fingerprint = "SHA256:" + b64encode(sha256(FakeKey().asbytes()).digest()).decode().rstrip("=")
+    client = FakeClient()
+    policy = migration._fingerprint_host_key_policy(SimpleNamespace(SSHException=FakeSshException), fingerprint)
+
+    policy.missing_host_key(client, "board.example.invalid", FakeKey())
+
+    assert [(hostname, key_type) for hostname, key_type, _key in client.host_keys.added] == [
+        ("board.example.invalid", "ssh-ed25519")
+    ]
+    with pytest.raises(FakeSshException):
+        policy.missing_host_key(FakeClient(), "board.example.invalid", type("OtherKey", (), {"asbytes": lambda self: b"other"})())
 
 
 def test_plan_usrp_migration_uses_exact_then_base_run_and_never_guesses(tmp_path: Path):
