@@ -98,7 +98,7 @@ configure_runtime_defaults() {
   if command -v powershell.exe >/dev/null 2>&1; then
     export OPENAMP_SSH_RUNNER="${OPENAMP_SSH_RUNNER:-docker}"
     export OPENAMP_SSH_DOCKER_IMAGE="${OPENAMP_SSH_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
-    export OPENAMP_FIT_SSH_RUNNER="${OPENAMP_FIT_SSH_RUNNER:-system}"
+    export OPENAMP_FIT_SSH_RUNNER="${OPENAMP_FIT_SSH_RUNNER:-docker}"
     export OPENAMP_FIT_BATCH_PHASES="${OPENAMP_FIT_BATCH_PHASES:-1}"
     export OPENAMP_FIT_USE_REMOTE_PROJECT="${OPENAMP_FIT_USE_REMOTE_PROJECT:-0}"
     export MLKEM_LOCAL_CLIENT_RUNNER="${MLKEM_LOCAL_CLIENT_RUNNER:-docker}"
