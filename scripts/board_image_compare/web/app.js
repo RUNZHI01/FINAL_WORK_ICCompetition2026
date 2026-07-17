@@ -7,6 +7,7 @@ const elements = {
   originalCount: document.querySelector('#original-count'),
   reconstructionDirectory: document.querySelector('#reconstruction-directory'),
   boardResource: document.querySelector('#board-resource'),
+  sourceSelect: document.querySelector('#reconstruction-source'),
   jobSelect: document.querySelector('#job-select'),
   refreshJobs: document.querySelector('#refresh-jobs'),
   pullImage: document.querySelector('#pull-image'),
@@ -30,6 +31,7 @@ const elements = {
 
 const state = {
   config: null,
+  sourceId: '',
   jobs: [],
   detail: null,
   index: 0,
@@ -183,19 +185,43 @@ function setIndex(index) {
   renderPreview()
 }
 
+function resetSelectedJob() {
+  state.jobs = []
+  state.detail = null
+  state.index = 0
+  elements.jobSelect.replaceChildren()
+  elements.reconstructionDirectory.textContent = '未选择 job'
+  elements.originalCount.textContent = '0 张'
+  elements.originalName.textContent = '未选择'
+  elements.reconstructionName.textContent = '未拉取'
+  elements.qualityMarker.hidden = true
+  elements.qualityMarker.title = ''
+  elements.qualityPsnr.textContent = '--'
+  elements.qualitySsim.textContent = '--'
+  elements.thumbnailStrip.replaceChildren()
+  elements.pullStatus.textContent = '等待选择 job'
+  showImage(elements.originalPreview, elements.originalEmpty, '')
+  showImage(elements.reconstructionPreview, elements.reconstructionEmpty, '')
+}
+
 async function loadJob(jobId) {
   if (!jobId) return
+  const sourceId = state.sourceId
   elements.pullStatus.textContent = '正在读取 job 清单'
-  state.detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)
+  const detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)
+  if (sourceId !== state.sourceId) return
+  state.detail = detail
   elements.reconstructionDirectory.textContent = state.detail.job.path
   elements.originalCount.textContent = `${state.detail.pairs.filter(referenceAvailable).length} 张`
   setIndex(Math.min(state.index, Math.max(0, state.detail.pair_count - 1)))
 }
 
 async function loadJobs() {
+  const sourceId = state.sourceId
   elements.refreshJobs.disabled = true
   try {
-    const payload = await requestJson('/api/jobs')
+    const payload = await requestJson(`/api/jobs?source=${encodeURIComponent(state.sourceId)}`)
+    if (sourceId !== state.sourceId) return
     state.jobs = payload.jobs
     elements.jobSelect.replaceChildren()
     for (const job of state.jobs) {
@@ -205,10 +231,16 @@ async function loadJobs() {
       elements.jobSelect.append(option)
     }
     if (state.jobs.length) await loadJob(state.jobs[0].id)
-    else elements.pullStatus.textContent = '板端没有可用重建 job'
+    else elements.pullStatus.textContent = '当前来源没有可用重建 job'
   } finally {
     elements.refreshJobs.disabled = false
   }
+}
+
+async function selectSource(sourceId) {
+  state.sourceId = sourceId
+  resetSelectedJob()
+  await loadJobs()
 }
 
 async function pullCurrent() {
@@ -264,6 +296,15 @@ async function pollState() {
 async function initialize() {
   try {
     state.config = await requestJson('/api/config')
+    state.sourceId = state.config.default_source
+    elements.sourceSelect.replaceChildren()
+    for (const source of state.config.sources || []) {
+      const option = document.createElement('option')
+      option.value = source.id
+      option.textContent = source.label
+      elements.sourceSelect.append(option)
+    }
+    elements.sourceSelect.value = state.sourceId
     renderReferenceMode()
     elements.serviceStatus.textContent = `上位机服务已连接 · 板端 ${state.config.board_host}`
     await loadJobs()
@@ -274,6 +315,8 @@ async function initialize() {
 }
 
 elements.refreshJobs.addEventListener('click', loadJobs)
+const sourceSelect = elements.sourceSelect
+sourceSelect.addEventListener('change', () => selectSource(sourceSelect.value))
 elements.jobSelect.addEventListener('change', () => loadJob(currentJobId()))
 elements.pullImage.addEventListener('click', pullCurrent)
 elements.previousImage.addEventListener('click', () => setIndex(state.index - 1))

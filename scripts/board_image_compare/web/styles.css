@@ -48,6 +48,7 @@ main { padding: 16px 24px 20px; }
 .meta { color: #647181; font-size: 11px; }
 .job-controls { display: flex; align-items: center; gap: 7px; }
 .job-controls select { width: min(260px, 24vw); height: 34px; border: 1px solid #aeb8c2; border-radius: 5px; padding: 0 9px; background: #fff; }
+.job-controls #reconstruction-source { width: min(180px, 16vw); }
 
 .button, .icon-button {
   min-height: 34px;

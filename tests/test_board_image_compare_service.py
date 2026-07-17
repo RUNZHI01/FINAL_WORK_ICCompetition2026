@@ -107,6 +107,27 @@ def configured_state(
     return state, remote
 
 
+def configured_http_state(tmp_path: Path):
+    state, _ = configured_state(tmp_path)
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return state, server
+
+
+def fetch_page_assets(configured_http):
+    state, server = configured_http
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        body = urlopen(f"{base_url}/", timeout=2).read().decode()
+        script = urlopen(f"{base_url}/app.js", timeout=2).read().decode()
+        return body, script
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
 def test_listing_and_selecting_job_do_not_download(tmp_path: Path) -> None:
     state, remote = configured_state(tmp_path)
 
@@ -322,6 +343,24 @@ def test_http_page_exposes_two_previews_and_quality_switch(tmp_path: Path) -> No
         server.shutdown()
         server.server_close()
         state.close()
+
+
+def test_http_page_exposes_reconstruction_source_selector(tmp_path: Path) -> None:
+    body, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    assert 'id="reconstruction-source"' in body
+    assert "sourceSelect.addEventListener('change'" in script
+    assert "/api/jobs?source=" in script
+
+
+def test_http_page_ignores_job_details_from_previous_source(tmp_path: Path) -> None:
+    _, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    assert script.count("if (sourceId !== state.sourceId) return") == 2
+    detail_request = script.index("const detail = await requestJson(`/api/job?id=${encodeURIComponent(jobId)}`)")
+    stale_guard = script.index("if (sourceId !== state.sourceId) return", detail_request)
+    detail_assignment = script.index("state.detail = detail", detail_request)
+    assert stale_guard < detail_assignment
 
 
 def test_http_page_renders_current_image_quality_metrics(tmp_path: Path) -> None:
