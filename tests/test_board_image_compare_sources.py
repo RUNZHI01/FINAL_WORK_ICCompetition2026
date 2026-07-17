@@ -1,11 +1,14 @@
 import errno
 import json
+import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+import scripts.migrate_usrp_output_layout as migration
 from scripts.migrate_usrp_output_layout import (
     apply_migration,
     build_remote_migration_plan,
@@ -279,29 +282,34 @@ def test_report_metadata_does_not_persist_connection_identity(migration_plan):
     assert "password" not in json.dumps(payload).casefold()
 
 
-def test_task5_docs_and_runtime_report_omit_board_connection_values():
+def test_task5_artifacts_omit_board_connection_values():
     repository_root = Path(__file__).resolve().parents[1]
-    forbidden_values = (
-        "100.121.87.73",
-        "--password user",
-        "user/user",
-        "user / user",
-    )
-
     layout_doc = repository_root / "docs/USRP_OUTPUT_LAYOUT.md"
-    layout_content = layout_doc.read_text(encoding="utf-8").casefold()
-    for forbidden in forbidden_values:
-        assert forbidden not in layout_content, f"{forbidden!r} persisted in {layout_doc}"
-
     report_path = (
         repository_root
         / "Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json"
     )
+    task_artifacts = (
+        repository_root / "scripts/migrate_usrp_output_layout.py",
+        repository_root / "tests/test_board_image_compare_sources.py",
+        layout_doc,
+        report_path,
+    )
+    ipv4_literal = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+    literal_password_arg = re.compile(
+        r"--password\s+(?!\$env:board_password\b|['\"]?<board-password>['\"]?)(\S+)",
+        re.IGNORECASE,
+    )
+
+    for path in task_artifacts:
+        content = path.read_text(encoding="utf-8").casefold()
+        assert ipv4_literal.search(content) is None, f"IPv4 literal persisted in {path}"
+        assert literal_password_arg.search(content) is None, f"literal password persisted in {path}"
+
     report = json.loads(report_path.read_text(encoding="utf-8"))
     serialized_report = json.dumps(report).casefold()
     assert "connection" not in report
-    for forbidden in forbidden_values:
-        assert forbidden not in serialized_report, f"{forbidden!r} persisted in {report_path}"
+    assert ipv4_literal.search(serialized_report) is None
     assert "password" not in serialized_report
 
 
@@ -426,6 +434,73 @@ def test_write_report_atomic_is_deterministic(tmp_path: Path):
     assert list(report_path.parent.iterdir()) == [report_path]
 
 
+def test_write_report_atomic_syncs_file_before_replace_then_directory(tmp_path: Path, monkeypatch):
+    report_path = tmp_path / "reports" / "migration.json"
+    events = []
+    real_fsync = os.fsync
+    real_replace = os.replace
+
+    def recording_fsync(file_descriptor):
+        assert os.fstat(file_descriptor).st_size > 0
+        events.append("file-fsync")
+        real_fsync(file_descriptor)
+
+    def recording_replace(source, destination):
+        events.append("replace")
+        real_replace(source, destination)
+
+    def recording_directory_fsync(directory):
+        assert directory == report_path.parent
+        events.append("directory-fsync")
+
+    monkeypatch.setattr(migration.os, "fsync", recording_fsync)
+    monkeypatch.setattr(migration.os, "replace", recording_replace)
+    monkeypatch.setattr(migration, "_fsync_directory", recording_directory_fsync, raising=False)
+
+    migration.write_report_atomic(report_path, {"status": "complete"})
+
+    assert events == ["file-fsync", "replace", "directory-fsync"]
+
+
+def test_directory_fsync_opens_syncs_and_closes_directory(tmp_path: Path, monkeypatch):
+    events = []
+
+    monkeypatch.setattr(migration.sys, "platform", "linux")
+    monkeypatch.setattr(
+        migration.os,
+        "open",
+        lambda path, flags: events.append(("open", Path(path), flags)) or 17,
+    )
+    monkeypatch.setattr(migration.os, "fsync", lambda fd: events.append(("fsync", fd)))
+    monkeypatch.setattr(migration.os, "close", lambda fd: events.append(("close", fd)))
+
+    migration._fsync_directory(tmp_path)
+
+    assert [event[0] for event in events] == ["open", "fsync", "close"]
+    assert events[0][1] == tmp_path
+
+
+def test_directory_fsync_only_ignores_unsupported_windows_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(migration.sys, "platform", "win32")
+    monkeypatch.setattr(
+        migration.os,
+        "open",
+        lambda *_args: (_ for _ in ()).throw(OSError(errno.EACCES, "unsupported")),
+    )
+
+    migration._fsync_directory(tmp_path)
+
+    monkeypatch.setattr(
+        migration.os,
+        "open",
+        lambda *_args: (_ for _ in ()).throw(OSError(errno.EIO, "device failure")),
+    )
+    with pytest.raises(OSError) as raised:
+        migration._fsync_directory(tmp_path)
+
+    assert raised.value.errno == errno.EIO
+
+
 def test_migration_script_runs_as_a_direct_cli():
     repository_root = Path(__file__).resolve().parents[1]
 
@@ -442,7 +517,14 @@ def test_migration_script_runs_as_a_direct_cli():
 
 def test_migration_cli_defaults_to_historical_usrp_legacy_root():
     args = parse_args(
-        ["--host", "board", "--user", "user", "--password", "user"]
+        [
+            "--host",
+            "board.example.invalid",
+            "--user",
+            "synthetic-board-user",
+            "--password",
+            "injected-secret-value",
+        ]
     )
 
     assert args.legacy_root == "/home/user/Downloads/jscc-test-usrp/tvm"

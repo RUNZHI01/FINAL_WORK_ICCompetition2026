@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import errno
 import json
+import os
 import sys
 import tempfile
 from copy import deepcopy
@@ -291,8 +292,27 @@ def collect_remote_job_names(sftp: Any, legacy_root: str, output_root: str) -> l
     return sorted(names)
 
 
+def _fsync_directory(directory: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_fd: int | None = None
+    try:
+        directory_fd = os.open(directory, flags)
+        os.fsync(directory_fd)
+    except OSError as exc:
+        unsupported_windows_errors = {
+            errno.EACCES,
+            errno.EINVAL,
+            getattr(errno, "ENOTSUP", errno.EINVAL),
+        }
+        if sys.platform != "win32" or exc.errno not in unsupported_windows_errors:
+            raise
+    finally:
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
 def write_report_atomic(report_path: str | Path, payload: dict[str, Any]) -> None:
-    """Write stable JSON through a temporary sibling and Path.replace()."""
+    """Durably replace a stable JSON report through a temporary sibling."""
     path = Path(report_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
@@ -308,8 +328,11 @@ def write_report_atomic(report_path: str | Path, payload: dict[str, Any]) -> Non
         ) as handle:
             json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
             handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
             temporary_path = Path(handle.name)
-        temporary_path.replace(path)
+        os.replace(temporary_path, path)
+        _fsync_directory(path.parent)
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()
