@@ -26,6 +26,7 @@ class FakeRemote:
         self.reconstruction = reconstruction
         self.download_calls: list[str] = []
         self.listed_roots: list[str] = []
+        self.resource_checks = 0
         self.closed = False
 
     def list_jobs(self, remote_root: str):
@@ -39,6 +40,7 @@ class FakeRemote:
         return [PurePosixPath(f"{job_path}/00000000_recon.png")]
 
     def ensure_resources_available(self, gate):
+        self.resource_checks += 1
         snapshot = ResourceSnapshot(cpu_percent=10.0, memory_percent=20.0)
         return snapshot, GateDecision("allow", "test")
 
@@ -234,6 +236,7 @@ def test_pull_downloads_requested_image_and_reuses_cache(tmp_path: Path) -> None
     assert first["cached"] is False
     assert second["cached"] is True
     assert len(remote.download_calls) == 1
+    assert remote.resource_checks == 2
     state.close()
 
 

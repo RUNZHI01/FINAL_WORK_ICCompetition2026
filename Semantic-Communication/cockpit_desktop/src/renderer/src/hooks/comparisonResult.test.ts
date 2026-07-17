@@ -24,7 +24,7 @@ test('baseline reference result can hydrate comparison from runner summary fallb
   })
 })
 
-test('current live result falls back to nested pipeline summary when timings are absent', () => {
+test('current live TVM result falls back to nested core inference time when timings are absent', () => {
   const result = comparisonResultFromInferencePayload({
     status: 'success',
     execution_mode: 'live',
@@ -41,7 +41,7 @@ test('current live result falls back to nested pipeline summary when timings are
   assert.deepEqual(result, {
     engine: 'tvm',
     label: 'TVM重建',
-    reconstructionMs: 251.4,
+    reconstructionMs: 239.8,
     runMs: 239.8,
     sampleCount: 300,
     quality: undefined,
@@ -66,7 +66,7 @@ test('current live result preserves quality metrics for display', () => {
   assert.deepEqual(result, {
     engine: 'tvm',
     label: 'TVM重建',
-    reconstructionMs: 251.4,
+    reconstructionMs: 239.8,
     runMs: 239.8,
     sampleCount: undefined,
     quality: {
@@ -127,6 +127,29 @@ test('current live ML-KEM TVM result uses board inference time for reconstructio
 
   assert.equal(result?.reconstructionMs, 259)
   assert.equal(result?.runMs, 259)
+})
+
+test('current live TVM result uses core inference time when hydrated transport metadata is absent', () => {
+  const result = comparisonResultFromInferencePayload({
+    status: 'success',
+    execution_mode: 'live',
+    variant: 'current',
+    timings: {
+      total_ms: 385.516,
+    },
+    runner_summary: {
+      pipeline: {
+        processed_count: 300,
+        total_wall_ms: 115654.712,
+        ms_per_image: 385.516,
+        run_median_ms: 243.712,
+        run_mean_ms: 250.414,
+      },
+    },
+  })
+
+  assert.equal(result?.reconstructionMs, 243.712)
+  assert.equal(result?.runMs, 243.712)
 })
 
 test('current live mnn result is recorded as mnn comparison', () => {

@@ -388,17 +388,13 @@ class ComparisonServiceState:
             raise FileNotFoundError(f"reconstruction missing at index {index}")
         config = self._require_config()
         target = self.cache.path_for(config.board_host, job.path, str(pair.reconstruction))
-        if target.is_file():
-            self._measure_pair(job_id, pair, target, "original")
-            return target, True
-
         with self._transfer_lock:
-            if target.is_file():
-                self._measure_pair(job_id, pair, target, "original")
-                return target, True
             remote = self._require_remote()
             snapshot, _ = remote.ensure_resources_available(self._resource_gate)
             self._record_resources(snapshot)
+            if target.is_file():
+                self._measure_pair(job_id, pair, target, "original")
+                return target, True
             last_check = time.monotonic()
 
             def monitor(_received: int, _total: int) -> None:

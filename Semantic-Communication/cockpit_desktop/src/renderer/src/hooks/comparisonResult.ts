@@ -94,8 +94,7 @@ function sampleStat(summary: Record<string, unknown> | undefined, key: string): 
 function pickReconstructionMs(payload: RunInferenceResponse, engine: ComparisonEngine): number | undefined {
   const wrapperSummary = objectValue(payload.wrapper_summary)
   const candidates = summaryCandidates(payload)
-  const controlTransport = String(payload.control_transport || '').trim().toLowerCase()
-  if (engine === 'tvm' && normalizedExecutionMode(payload) === 'live' && controlTransport === 'mlkem') {
+  if (engine === 'tvm' && normalizedExecutionMode(payload) === 'live') {
     return firstNumeric(
       pickRunMs(payload),
       payload.timings?.payload_ms,
