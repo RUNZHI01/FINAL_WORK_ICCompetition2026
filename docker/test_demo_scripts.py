@@ -72,11 +72,9 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
 
     assert 'MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"' in script
     assert 'MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"' in script
-    assert 'COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10' in script
-    assert 'COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS' in script
-    assert "min_success = count" in script
-    assert "min_success = max(1, (count + 1) // 2)" not in script
-    assert 'warm-up incomplete' not in script
+    assert "run_startup_usrp_readiness" in script
+    assert '"/api/usrp-control/start"' in script
+    assert '"/api/crypto-status"' in script
     assert 'PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"' in script
     assert 'PYTHONUTF8="${PYTHONUTF8:-1}"' in script
     for expected in (
@@ -103,22 +101,34 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
         assert name in script.split('msys_env_exclusions="', 1)[1].split('"', 1)[0]
 
 
-def test_start_demo_defaults_to_full_iq_streaming_warmup_chunk() -> None:
+def test_start_demo_initializes_services_without_image_warmup() -> None:
     script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-demo.ps1").read_text(
         encoding="utf-8-sig"
     )
 
-    assert "[int]$WarmupCount = 10" in script
-    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)' in script
-    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)' in script
-    assert 'Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS" "2"' in script
+    assert "[int]$WarmupCount" not in script
+    assert "[switch]$NoWarmup" not in script
+    assert "COCKPIT_STARTUP_USRP_WARMUP" not in script
+    assert "no image warmup" in script
     assert 'Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "bridge"' in script
 
     shell_script = (
         PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-dev.sh"
     ).read_text(encoding="utf-8")
-    assert 'COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS="${COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS:-2}"' in shell_script
-    assert "remaining = count - accepted_total" in shell_script
+    assert "run_startup_usrp_readiness" in shell_script
+    assert "run_startup_usrp_readiness\nrun_startup_control_probe" in shell_script
+
+
+def test_start_demo_recovers_board_usrp_network_before_cockpit_startup() -> None:
+    script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-demo.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "ConfigureUsrp2922DemoNetwork.ps1" in script
+    assert "-Target Board" in script
+    assert "-BoardInterface eth0" in script
+    assert "-Fast" in script
+    assert "Board RX USRP network recovery" in script
 
 
 def test_run_demo_wrappers_forward_board_and_profile_environment() -> None:

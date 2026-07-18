@@ -2,8 +2,6 @@ param(
     [string]$BoardHost = "100.121.87.73",
     [string]$BoardUser = "user",
     [int]$BoardPort = 22,
-    [int]$WarmupCount = 10,
-    [switch]$NoWarmup,
     [string]$GitBashPath = "",
     [string]$BoardPassword = "user"
 )
@@ -101,6 +99,8 @@ Set-DefaultEnv "PHYTIUM_PI_PORT" ([string]$BoardPort)
 
 Set-DefaultEnv "OPENAMP_SSH_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_SSH_DOCKER_IMAGE" "iccomp-usrp-tx:latest"
+$TxControlPort = if ($env:TX_CONTROL_PORT) { $env:TX_CONTROL_PORT } elseif ($env:USRP_TX_CONTROL_PORT) { $env:USRP_TX_CONTROL_PORT } else { "29221" }
+Set-DefaultEnv "OPENAMP_SSH_DOCKER_CONTAINER" "cockpit-usrp-tx-$TxControlPort"
 Set-DefaultEnv "OPENAMP_FIT_SSH_RUNNER" "docker"
 Set-DefaultEnv "OPENAMP_FIT_BATCH_PHASES" "1"
 Set-DefaultEnv "OPENAMP_FIT_USE_REMOTE_PROJECT" "0"
@@ -124,20 +124,31 @@ if ((Test-Path -LiteralPath $FinalImageDir -PathType Container) -and
     Set-DefaultEnv "OPENAMP_DEMO_IMAGE_TO_LATENT_ENABLED" "0"
     Set-DefaultEnv "USRP_INPUT_ORDER_FILE" $FinalInputOrder
 }
-Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP" ($(if ($NoWarmup) { "0" } else { "1" }))
-Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_COUNT" ([string]$WarmupCount)
-Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS" ([string]$WarmupCount)
-Set-DefaultEnv "COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS" "2"
 Set-DefaultEnv "MSYS2_ARG_CONV_EXCL" "*"
 
 [Environment]::SetEnvironmentVariable("COCKPIT_SCRIPT_DIR_WIN", $ScriptDir, "Process")
 
+$BoardNetworkScript = Join-Path $RepoRoot "USRP292x\ConfigureUsrp2922DemoNetwork.ps1"
+if (-not (Test-Path -LiteralPath $BoardNetworkScript -PathType Leaf)) {
+    throw "Board RX network recovery script not found: $BoardNetworkScript"
+}
+
 Write-Host "[demo] Git Bash: $Bash"
 Write-Host "[demo] Board: $BoardUser@$BoardHost`:$BoardPort"
-Write-Host "[demo] Defaults: USRP IQ direct, ML-KEM+SM4, ML-DSA+SM2, warmup=$(-not $NoWarmup), count=$WarmupCount"
+Write-Host "[demo] Defaults: USRP IQ direct, ML-KEM+SM4, ML-DSA+SM2, no image warmup"
 if ($env:OPENAMP_DEMO_LOCAL_LATENT_DIR -eq $FinalLatentDir) {
     Write-Host "[demo] Showcase inputs: $FinalImageDir (300 pre-encoded latents)"
 }
+Write-Host "[demo] Board RX USRP network recovery (eth0)..."
+& $BoardNetworkScript `
+    -Target Board `
+    -BoardHost $BoardHost `
+    -BoardUser $BoardUser `
+    -BoardPassword $Password `
+    -BoardPort $BoardPort `
+    -BoardInterface eth0 `
+    -Fast
+Write-Host "[demo] Board RX USRP network ready."
 
 & $Bash -lc 'cd "$(cygpath -u "$COCKPIT_SCRIPT_DIR_WIN")" && ./start-dev.sh'
 if ($LASTEXITCODE -ne 0) {

@@ -98,6 +98,7 @@ configure_runtime_defaults() {
   if command -v powershell.exe >/dev/null 2>&1; then
     export OPENAMP_SSH_RUNNER="${OPENAMP_SSH_RUNNER:-docker}"
     export OPENAMP_SSH_DOCKER_IMAGE="${OPENAMP_SSH_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
+    export OPENAMP_SSH_DOCKER_CONTAINER="${OPENAMP_SSH_DOCKER_CONTAINER:-cockpit-usrp-tx-${TX_CONTROL_PORT:-${USRP_TX_CONTROL_PORT:-29221}}}"
     export OPENAMP_FIT_SSH_RUNNER="${OPENAMP_FIT_SSH_RUNNER:-docker}"
     export OPENAMP_FIT_BATCH_PHASES="${OPENAMP_FIT_BATCH_PHASES:-1}"
     export OPENAMP_FIT_USE_REMOTE_PROJECT="${OPENAMP_FIT_USE_REMOTE_PROJECT:-0}"
@@ -133,11 +134,6 @@ configure_runtime_defaults() {
     export BIG_LITTLE_INPUT_CHUNK_SIZE="${BIG_LITTLE_INPUT_CHUNK_SIZE:-10}"
   fi
   export OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="${OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT:-0}"
-  export COCKPIT_STARTUP_USRP_WARMUP="${COCKPIT_STARTUP_USRP_WARMUP:-1}"
-  export COCKPIT_STARTUP_USRP_WARMUP_COUNT="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10}"
-  export COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS="${COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS:-}"
-  export COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS="${COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS:-2}"
-  export COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
   export MLKEM_AUTH_ENABLED="${MLKEM_AUTH_ENABLED:-1}"
   export MLKEM_AUTH_SERVER_ID="${MLKEM_AUTH_SERVER_ID:-phytium-board}"
   export MLKEM_AUTH_SIG_POLICY="${MLKEM_AUTH_SIG_POLICY:-DUAL_REQUIRED}"
@@ -297,12 +293,8 @@ resolve_board_password() {
   return 1
 }
 
-run_startup_usrp_warmup() {
-  if ! truthy_env "${COCKPIT_STARTUP_USRP_WARMUP:-0}"; then
-    return 0
-  fi
-  if [[ "${MLKEM_TRANSPORT_MODE:-}" != "usrp" || "${OPENAMP_DEMO_INPUT_SOURCE_MODE:-}" != "usrp" || "${JSCC_LINK_MODE:-}" != "iq-direct" ]]; then
-    echo "启动预热跳过：当前不是 USRP IQ 直传路径"
+run_startup_usrp_readiness() {
+  if [[ "${MLKEM_TRANSPORT_MODE:-}" != "usrp" || "${OPENAMP_DEMO_INPUT_SOURCE_MODE:-}" != "usrp" ]]; then
     return 0
   fi
 
@@ -310,33 +302,29 @@ run_startup_usrp_warmup() {
   local user="${REMOTE_USER:-${PHYTIUM_PI_USER:-user}}"
   local port="${REMOTE_SSH_PORT:-${PHYTIUM_PI_PORT:-22}}"
   local password=""
-  local count="${COCKPIT_STARTUP_USRP_WARMUP_COUNT:-10}"
-  local timeout_sec="${COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC:-360}"
 
   if [[ -z "$host" ]]; then
-    echo "ERROR: 启动预热需要 REMOTE_HOST；如需跳过，设置 COCKPIT_STARTUP_USRP_WARMUP=0。" >&2
+    echo "ERROR: 启动常驻 USRP 服务需要 REMOTE_HOST。" >&2
     return 1
   fi
 
   password="$(resolve_board_password || true)"
   if [[ -z "$password" && -t 0 ]]; then
-    read -r -s -p "板卡 SSH 密码（启动预热需要，输入不会显示）: " password
+    read -r -s -p "板卡 SSH 密码（服务初始化需要，输入不会显示）: " password
     echo
   fi
   if [[ -z "$password" ]]; then
-    echo "ERROR: 启动预热需要板卡密码。请临时设置 REMOTE_PASS，或设置 COCKPIT_STARTUP_USRP_WARMUP=0 跳过。" >&2
+    echo "ERROR: 启动常驻 USRP 服务需要板卡密码。" >&2
     return 1
   fi
 
-  echo "启动前静默预热 USRP IQ + TVM：${count} 张..."
-  COCKPIT_STARTUP_USRP_WARMUP_PASS="$password" \
+  echo "初始化板卡安全信道与常驻 USRP TX/RX..."
+  COCKPIT_STARTUP_SERVICE_PASS="$password" \
     "$PYTHON_CMD" - \
       "http://$BACKEND_HOST:$BACKEND_PORT" \
       "$host" \
       "$user" \
       "$port" \
-      "$count" \
-      "$timeout_sec" \
       "${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}" \
       "${JSCC_LINK_MODE:-iq-direct}" <<'PY'
 from __future__ import annotations
@@ -352,22 +340,20 @@ base_url = sys.argv[1].rstrip("/")
 host = sys.argv[2]
 user = sys.argv[3]
 port = int(sys.argv[4])
-count = max(1, int(sys.argv[5]))
-timeout_sec = max(30.0, float(sys.argv[6]))
-remote_usrp_rx_dir = sys.argv[7]
-jscc_link_mode = sys.argv[8]
-password = os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_PASS", "")
+remote_usrp_rx_dir = sys.argv[5]
+jscc_link_mode = sys.argv[6]
+password = os.environ.get("COCKPIT_STARTUP_SERVICE_PASS", "")
 
 
 def request_json(method: str, path: str, payload: dict | None = None, timeout: float = 20.0) -> dict:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         base_url + path,
         data=data,
         headers={"Content-Type": "application/json"},
         method=method,
     )
-    with urllib.request.urlopen(req, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         body = response.read().decode("utf-8", errors="replace")
     return json.loads(body) if body.strip() else {}
 
@@ -390,137 +376,65 @@ session = request_json(
 if session.get("status") != "ok":
     raise SystemExit(f"board session setup failed: {session}")
 
-usrp = request_json("POST", "/api/usrp-control/start", {}, timeout=90.0)
-if usrp.get("status") != "ready":
-    raise SystemExit(f"USRP control did not become ready: {usrp}")
-
-def _warmup_stage_line(name: str, payload: object, fallback_total: int) -> str:
-    if not isinstance(payload, dict):
-        return f"{name}: 0/{fallback_total} 等待"
-    completed = int(payload.get("completed") or 0)
-    total = int(payload.get("total") or fallback_total)
-    raw_status = str(payload.get("status") or "").lower()
-    if raw_status in {"done", "completed"} or (total > 0 and completed >= total):
-        status_text = "完成"
-    elif raw_status in {"failed", "error", "cancelled"}:
-        status_text = "失败"
-    elif raw_status in {"fallback", "partial"}:
-        status_text = "部分完成"
-    elif raw_status in {"running", "active"} or completed > 0:
-        status_text = "进行中"
-    elif raw_status in {"queued", "launching"}:
-        status_text = "启动中"
-    else:
-        status_text = "等待"
-    return f"{name}: {completed}/{total} {status_text}"
-
-
-min_success_raw = os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS", "").strip()
-if min_success_raw:
-    min_success = int(min_success_raw)
-else:
-    min_success = count
-min_success = max(1, min(count, min_success))
-max_attempts = max(1, int(os.environ.get("COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS", "2") or "2"))
-
-
-def run_warmup_attempt(attempt_count: int, attempt_number: int) -> int:
-    if attempt_number > 1:
-        print(
-            f"启动预热补跑 {attempt_number}/{max_attempts}：剩余 {attempt_count} 张...",
-            flush=True,
-        )
+usrp_deadline = time.monotonic() + 180.0
+last_usrp: dict = {}
+while time.monotonic() < usrp_deadline:
     try:
-        started = request_json(
-            "POST",
-            "/api/run-inference-batch",
-            {"count": attempt_count, "allow_preflight_degraded": True, "warmup": True},
-            timeout=90.0,
-        )
+        last_usrp = request_json("POST", "/api/usrp-control/start", {}, timeout=100.0)
     except Exception as exc:
-        print(f"启动预热提交未及时返回，转为轮询后端状态: {exc}", flush=True)
-        started = {}
-        start_deadline = time.monotonic() + min(timeout_sec, 120.0)
-        while time.monotonic() < start_deadline:
-            state = request_json("GET", "/api/batch-state", timeout=10.0)
-            state_status = str(state.get("status") or "")
-            state_total = int(state.get("total") or 0)
-            if state.get("warmup") and state_total == attempt_count and state_status in {
-                "running",
-                "done",
-                "completed",
-            }:
-                started = {
-                    "status": "started" if state_status == "running" else "done",
-                    "batch_job_id": state.get("batch_job_id") or "",
-                }
-                break
-            time.sleep(2.0)
-
-    if started.get("status") not in {"started", "done"}:
-        raise SystemExit(f"warm-up batch did not start: {started}")
-    job_id = str(started.get("batch_job_id") or "")
-    deadline = time.monotonic() + timeout_sec
-    last_state: dict = {}
-    last_progress_line = ""
-    next_progress_heartbeat = 0.0
-    while time.monotonic() < deadline:
-        last_state = request_json("GET", "/api/batch-state", timeout=10.0)
-        status = str(last_state.get("status") or "")
-        total = int(last_state.get("total") or attempt_count)
-        progress_line = "启动预热进度: " + "；".join(
-            [
-                _warmup_stage_line("latent", last_state.get("host_preprocess_progress"), total),
-                _warmup_stage_line("USRP", last_state.get("transport_progress"), total),
-                _warmup_stage_line("TVM", last_state.get("inference_progress"), total),
-            ]
-        )
-        now = time.monotonic()
-        if progress_line != last_progress_line or now >= next_progress_heartbeat:
-            print(progress_line, flush=True)
-            last_progress_line = progress_line
-            next_progress_heartbeat = now + 15.0
-        if status in {"done", "completed"}:
-            break
-        if status in {"failed", "error", "cancelled"}:
-            raise SystemExit(f"warm-up failed: {last_state}")
-        time.sleep(3.0)
-    else:
-        raise SystemExit(f"warm-up timeout after {timeout_sec:.0f}s: {last_state}")
-
-    completed = int(last_state.get("completed") or 0)
-    success = int(last_state.get("success") or 0)
-    inference_progress = last_state.get("inference_progress")
-    if isinstance(inference_progress, dict):
-        completed = max(completed, int(inference_progress.get("completed") or 0))
-    accepted = min(attempt_count, max(success, completed))
-    cleared = request_json(
-        "POST",
-        "/api/batch-state/clear",
-        {"warmup_only": True, "batch_job_id": job_id},
-        timeout=10.0,
-    )
-    if cleared.get("status") != "ok" or not cleared.get("cleared"):
-        raise SystemExit(f"warm-up batch-state clear failed: {cleared}")
-    return accepted
-
-
-accepted_total = 0
-for attempt_number in range(1, max_attempts + 1):
-    remaining = count - accepted_total
-    if remaining <= 0:
+        last_usrp = {"status": "error", "message": str(exc)}
+    if last_usrp.get("status") == "ready":
         break
-    accepted_total += run_warmup_attempt(remaining, attempt_number)
-    if accepted_total >= min_success:
+    time.sleep(5.0)
+else:
+    raise SystemExit(f"USRP control did not become ready: {last_usrp}")
+
+crypto_deadline = time.monotonic() + 90.0
+last_crypto: dict = {}
+while time.monotonic() < crypto_deadline:
+    last_crypto = request_json("GET", "/api/crypto-status", timeout=8.0)
+    if not last_crypto.get("error") and last_crypto.get("kem_backend") not in {None, "", "unknown"}:
         break
+    time.sleep(2.0)
+else:
+    raise SystemExit(f"board security service did not become ready: {last_crypto}")
 
-if accepted_total < min_success:
-    raise SystemExit(
-        f"warm-up insufficient after {max_attempts} attempts: accepted={accepted_total}, "
-        f"minimum={min_success}, expected={count}"
-    )
+print(
+    "服务初始化完成：USRP TX/RX 常驻，"
+    f"KEM={last_crypto.get('kem_backend')}，认证={'启用' if last_crypto.get('auth_enabled') else '关闭'}。",
+    flush=True,
+)
+PY
+}
 
-print(f"启动预热完成：{accepted_total}/{count}，Cockpit Desktop 即将显示。", flush=True)
+run_startup_control_probe() {
+  "$PYTHON_CMD" - "http://$BACKEND_HOST:$BACKEND_PORT" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+import urllib.request
+
+base_url = sys.argv[1].rstrip("/")
+request = urllib.request.Request(
+    base_url + "/api/probe-board",
+    data=b"{}",
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+with urllib.request.urlopen(request, timeout=90.0) as response:
+    probe = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+
+control = probe.get("control_status") if isinstance(probe.get("control_status"), dict) else {}
+guard_state = str(control.get("guard_state") or "UNKNOWN")
+if probe.get("status") != "success" or not probe.get("reachable") or guard_state != "READY":
+    raise SystemExit(f"startup control probe failed: {probe}")
+
+print(
+    "控制面探活完成："
+    f"guard={guard_state}，last_fault={control.get('last_fault_code') or 'UNKNOWN'}。",
+    flush=True,
+)
 PY
 }
 
@@ -591,7 +505,8 @@ for i in $(seq 1 15); do
   sleep 1
 done
 
-run_startup_usrp_warmup
+run_startup_usrp_readiness
+run_startup_control_probe
 
 echo "启动 Electron/Vite 开发环境..."
 (
