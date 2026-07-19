@@ -4,20 +4,20 @@
 
 ## 首次初始化
 
-评委拿到代码后，在仓库根目录运行：
+首次使用时，打开包含 `demo.ps1` 的交付目录并运行：
 
 ```powershell
 .\demo.ps1 init
 ```
 
-上位机需要预先安装 PowerShell 7、Git for Windows、Docker Desktop、Python 3 和 Node.js 20。初始化会准备 Python、前端依赖、演示输入和 Docker 镜像，不连接板卡。
+上位机需要预先安装 PowerShell 7、Git for Windows（提供 Git Bash）、Docker Desktop、Python 3 和 Node.js 20。交付目录已经包含初始化所需的项目文件；初始化只准备 Python、前端依赖、演示输入和 Docker 镜像，不连接板卡。
 
 ## 上电启动
 
 1. 启动 Docker Desktop。
 2. 给飞腾派和两台 USRP 上电。
 3. 等待飞腾派启动，通常约 2 分钟。
-4. 在仓库根目录运行：
+4. 在包含 `demo.ps1` 的交付目录运行：
 
 ```powershell
 .\demo.ps1
