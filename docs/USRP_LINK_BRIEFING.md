@@ -2,7 +2,7 @@
 
 更新时间：2026-07-18
 
-本文记录 USRP IQ-direct 可选链路、实测指标和安全边界。PPT 与技术文档的差量修改分别见 [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) 和 [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。推荐 `start-demo.ps1` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，链路为：
+本文记录 USRP IQ-direct 可选链路、实测指标和安全边界。推荐入口 `start-demo.ps1` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，链路为：
 
 ```text
 Cockpit Desktop
@@ -70,10 +70,11 @@ ML-KEM、SM4、ML-DSA 和 SM2 当前用于会话准入与控制信道。USRP IQ 
 
 安全状态中的耗时字段也要按边界解释：`handshake_ms` 是建立会话的墙钟时间，受冷启动和服务复用影响；历史 `decrypt_ms` 还包含等待板端执行、网络接收和结果读取，不是纯 SM4-GCM 解密时间。USRP 模式只使用安全会话做准入，不能用这两个字段推导 IQ 数据面密码开销。
 
-## 材料修改入口
+## 相关文档
 
-- PPT 只建议修改 3 页：[`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md)。
-- 技术文档只整理加密认证和 USRP 的差量内容：[`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。
+- 现场操作见 [`runbooks/STARTUP.md`](./runbooks/STARTUP.md)。
+- 安全信道部署见 [`security/mlkem_auth_setup.md`](./security/mlkem_auth_setup.md)。
+- 输出目录见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。
 
 ## 当前可汇报进度
 

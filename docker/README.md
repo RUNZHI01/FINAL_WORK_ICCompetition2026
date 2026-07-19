@@ -47,7 +47,7 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 .\docker\run-demo-tailscale.ps1
 ```
 
-兼容入口的关键默认值如下；完整 IQ 参数以 [`../docs/HANDOFF.md`](../docs/HANDOFF.md#推荐运行参数) 为准。
+兼容入口的关键默认值如下；IQ 运行顺序和限制见 [`../docs/USRP_IQ_RUNTIME.md`](../docs/USRP_IQ_RUNTIME.md)。
 
 | 参数 | 默认值 |
 |---|---|
