@@ -10,14 +10,23 @@
 .\demo.ps1 init
 ```
 
-上位机需要预先安装 PowerShell 7、Git for Windows（提供 Git Bash）、Docker Desktop、Python 3 和 Node.js 20。交付目录已经包含初始化所需的项目文件；初始化只准备 Python、前端依赖、演示输入和 Docker 镜像，不连接板卡。
+上位机需要预先安装 PowerShell 7、Git for Windows（提供 Git Bash）、Docker Desktop、Tailscale、Python 3 和 Node.js 20。Tailscale 需要提前登录并加入板卡所在网络。交付目录已经包含初始化所需的项目文件；初始化只准备 Python、前端依赖、演示输入和 Docker 镜像，不连接板卡。
 
 ## 上电启动
 
-1. 启动 Docker Desktop。
+1. 启动 Docker Desktop 和 Tailscale。
 2. 给飞腾派和两台 USRP 上电。
 3. 等待飞腾派启动，通常约 2 分钟。
-4. 在包含 `demo.ps1` 的交付目录运行：
+4. 在 PowerShell 中检查上位机和板卡连接：
+
+```powershell
+docker info
+tailscale status
+tailscale ping 100.121.87.73
+.\demo.ps1 check
+```
+
+5. 检查通过后，在包含 `demo.ps1` 的交付目录运行：
 
 ```powershell
 .\demo.ps1
@@ -63,6 +72,7 @@ Remove-Item Env:REMOTE_USER -ErrorAction SilentlyContinue
 
 - 提示未初始化：运行 `.\demo.ps1 init`。
 - Docker 未就绪：启动 Docker Desktop，再运行 `.\demo.ps1 check`。
+- Tailscale 未就绪：启动 Tailscale，确认已经登录，再运行 `tailscale ping 100.121.87.73`。
 - 密码或板卡会话失败：关闭 Cockpit，重新运行 `.\demo.ps1` 并输入密码。
 - USRP 网口异常：运行 `.\USRP292x\ConfigureUsrp2922DemoNetwork.ps1 -Target Status` 查看状态。
 - 射频重试过多：先检查天线位置、间距、频点和收发增益，再重新运行任务。

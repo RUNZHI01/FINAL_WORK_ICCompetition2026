@@ -15,6 +15,7 @@ Windows 上位机需要预先安装：
 - PowerShell 7
 - Git for Windows
 - Docker Desktop
+- Tailscale（已登录并加入板卡所在网络）
 - Python 3
 - Node.js 20
 
@@ -36,7 +37,7 @@ Windows 上位机需要预先安装：
 
 ## 日常启动
 
-给飞腾派和两台 USRP 上电，并启动 Docker Desktop。板卡启动后，在仓库根目录运行：
+启动 Docker Desktop 和 Tailscale，再给飞腾派与两台 USRP 上电。确认板卡已出现在 Tailscale 中后，在仓库根目录运行：
 
 ```powershell
 .\demo.ps1
