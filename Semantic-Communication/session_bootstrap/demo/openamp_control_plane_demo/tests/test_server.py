@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -4154,7 +4155,7 @@ class DashboardStateTest(unittest.TestCase):
         self.assertIn("pkill -f 'tcp_server.py' || true", captured)
         self.assertIn("echo restart-remote-server", captured)
 
-    def test_sync_remote_mlkem_server_assets_uploads_server_helper_and_mlkem_link_once(self) -> None:
+    def test_sync_remote_mlkem_server_assets_uploads_one_bundle_and_caches_success(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
         board_access = server.build_board_access_config(
             {
@@ -4180,20 +4181,30 @@ class DashboardStateTest(unittest.TestCase):
             (scripts_dir / "run_logger.py").write_text("HELPER = 'logger'\n", encoding="utf-8")
             (package_dir / "__init__.py").write_text("PACKAGE = True\n", encoding="utf-8")
             (package_dir / "kem.py").write_text("def demo():\n    return 'kem'\n", encoding="utf-8")
-            uploads: list[str] = []
+            ssh_commands: list[str] = []
+            archive_entries: list[str] = []
+            scp_calls = 0
 
-            def fake_write_remote_text_file(
-                _board_access: server.BoardAccessConfig,
-                *,
-                remote_path: str,
-                content: str,
-                mode: int,
-                timeout: float,
-            ) -> None:
-                del _board_access, content, mode, timeout
-                uploads.append(remote_path)
+            def fake_run_ssh_command(*, remote_command: str, **_kwargs: object):
+                ssh_commands.append(remote_command)
+                return server.subprocess.CompletedProcess(
+                    [],
+                    1 if len(ssh_commands) == 1 else 0,
+                    stdout="",
+                    stderr="",
+                )
 
-            with patch.object(state, "_write_remote_text_file", side_effect=fake_write_remote_text_file):
+            def fake_run_scp_file(**kwargs: object):
+                nonlocal scp_calls
+                scp_calls += 1
+                with tarfile.open(Path(str(kwargs["local_path"])), "r:gz") as archive:
+                    archive_entries.extend(sorted(archive.getnames()))
+                return server.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+            with (
+                patch("server.run_ssh_command", side_effect=fake_run_ssh_command),
+                patch("server.run_scp_file", side_effect=fake_run_scp_file),
+            ):
                 first = state._sync_remote_mlkem_server_assets(
                     board_access,
                     runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
@@ -4208,16 +4219,89 @@ class DashboardStateTest(unittest.TestCase):
         self.assertTrue(first["updated"])
         self.assertFalse(second["updated"])
         self.assertEqual(
-            uploads,
+            archive_entries,
             [
-                "/home/demo-user/tcp_server.py",
-                "/home/demo-user/tvm_inference_helper.py",
-                "/home/demo-user/latent_transport.py",
-                "/home/demo-user/run_logger.py",
-                "/home/demo-user/mlkem_link/__init__.py",
-                "/home/demo-user/mlkem_link/kem.py",
+                "latent_transport.py",
+                "mlkem_link/__init__.py",
+                "mlkem_link/kem.py",
+                "run_logger.py",
+                "tcp_server.py",
+                "tvm_inference_helper.py",
             ],
         )
+        self.assertEqual(scp_calls, 1)
+        self.assertEqual(len(ssh_commands), 2)
+        self.assertIn(".openamp-mlkem-assets.sha256", ssh_commands[0])
+        self.assertIn("tar -xzf", ssh_commands[1])
+
+    def test_sync_remote_mlkem_server_assets_skips_upload_when_board_manifest_matches(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            scripts_dir = Path(temp_dir) / "scripts"
+            scripts_dir.mkdir()
+            local_server_script = scripts_dir / "tcp_server.py"
+            local_server_script.write_text("print('server')\n", encoding="utf-8")
+            with (
+                patch(
+                    "server.run_ssh_command",
+                    return_value=server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                ) as run_ssh,
+                patch("server.run_scp_file") as run_scp,
+            ):
+                result = state._sync_remote_mlkem_server_assets(
+                    board_access,
+                    runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
+                    local_server_script=local_server_script,
+                )
+
+        self.assertFalse(result["updated"])
+        self.assertIn("manifest", result["note"])
+        run_ssh.assert_called_once()
+        run_scp.assert_not_called()
+
+    def test_sync_remote_mlkem_server_assets_does_not_cache_failed_install(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        board_access = server.build_board_access_config(
+            {"host": "demo-board", "user": "demo-user", "password": "demo-pass", "port": "22"},
+            fallback=state._board_access,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            scripts_dir = Path(temp_dir) / "scripts"
+            scripts_dir.mkdir()
+            local_server_script = scripts_dir / "tcp_server.py"
+            local_server_script.write_text("print('server')\n", encoding="utf-8")
+            ssh_results = [
+                server.subprocess.CompletedProcess([], 1, stdout="", stderr=""),
+                server.subprocess.CompletedProcess([], 1, stdout="", stderr="install failed"),
+                server.subprocess.CompletedProcess([], 1, stdout="", stderr=""),
+                server.subprocess.CompletedProcess([], 1, stdout="", stderr="install failed"),
+            ]
+            with (
+                patch("server.run_ssh_command", side_effect=ssh_results) as run_ssh,
+                patch(
+                    "server.run_scp_file",
+                    return_value=server.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                ) as run_scp,
+            ):
+                first = state._sync_remote_mlkem_server_assets(
+                    board_access,
+                    runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
+                    local_server_script=local_server_script,
+                )
+                second = state._sync_remote_mlkem_server_assets(
+                    board_access,
+                    runtime_env_values={"MLKEM_REMOTE_SERVER_SCRIPT": "/home/demo-user/tcp_server.py"},
+                    local_server_script=local_server_script,
+                )
+
+        self.assertTrue(first["error"])
+        self.assertTrue(second["error"])
+        self.assertEqual(run_scp.call_count, 2)
+        self.assertEqual(run_ssh.call_count, 4)
 
     def test_write_remote_text_file_uses_scp_instead_of_embedding_large_content(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)

@@ -85,7 +85,38 @@ class NoReadStream:
         raise AssertionError("polling channel path should not block on read()")
 
 
+class FakeInputStream:
+    def __init__(self, data: bytes, *, is_tty: bool) -> None:
+        self.buffer = self
+        self._data = data
+        self._is_tty = is_tty
+        self.read_calls = 0
+
+    def isatty(self) -> bool:
+        return self._is_tty
+
+    def read(self) -> bytes:
+        self.read_calls += 1
+        return self._data
+
+
 class SshWithPasswordParamikoTest(unittest.TestCase):
+    def test_read_stdin_bytes_skips_interactive_tty_without_reading(self) -> None:
+        stream = FakeInputStream(b"would block", is_tty=True)
+
+        payload = ssh_with_password_paramiko.read_stdin_bytes(stream)
+
+        self.assertEqual(payload, b"")
+        self.assertEqual(stream.read_calls, 0)
+
+    def test_read_stdin_bytes_preserves_redirected_payload(self) -> None:
+        stream = FakeInputStream(b"payload\n", is_tty=False)
+
+        payload = ssh_with_password_paramiko.read_stdin_bytes(stream)
+
+        self.assertEqual(payload, b"payload\n")
+        self.assertEqual(stream.read_calls, 1)
+
     def test_parse_args_defaults_to_long_timeout_for_tvm_pipeline(self) -> None:
         with patch.dict("ssh_with_password_paramiko.os.environ", {}, clear=True):
             args = ssh_with_password_paramiko.parse_args(

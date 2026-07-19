@@ -401,12 +401,20 @@ while time.monotonic() < usrp_deadline:
 else:
     raise SystemExit(f"USRP control did not become ready: {last_usrp}")
 
-crypto_deadline = time.monotonic() + 90.0
+crypto_started = time.monotonic()
+crypto_deadline = time.monotonic() + 180.0
+next_crypto_progress = crypto_started
 last_crypto: dict = {}
 while time.monotonic() < crypto_deadline:
     last_crypto = request_json("GET", "/api/crypto-status", timeout=8.0)
     if not last_crypto.get("error") and last_crypto.get("kem_backend") not in {None, "", "unknown"}:
         break
+    now = time.monotonic()
+    if now >= next_crypto_progress:
+        elapsed = int(now - crypto_started)
+        latest_error = str(last_crypto.get('error') or "状态端口尚未就绪")
+        print(f"等待板端安全服务：{elapsed}s，最近状态：{latest_error}", flush=True)
+        next_crypto_progress = now + 10.0
     time.sleep(2.0)
 else:
     raise SystemExit(f"board security service did not become ready: {last_crypto}")

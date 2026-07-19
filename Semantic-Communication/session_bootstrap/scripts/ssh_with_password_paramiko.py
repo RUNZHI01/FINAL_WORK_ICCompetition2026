@@ -10,6 +10,17 @@ import time
 import paramiko
 
 
+def read_stdin_bytes(stream: object) -> bytes:
+    isatty = getattr(stream, "isatty", None)
+    try:
+        if callable(isatty) and isatty():
+            return b""
+    except (OSError, ValueError):
+        return b""
+    binary_stream = getattr(stream, "buffer", stream)
+    return binary_stream.read()  # type: ignore[no-any-return,attr-defined]
+
+
 def _write_bytes(stream: object, data: bytes) -> None:
     if not data:
         return
@@ -128,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: password env {args.pass_env} is empty", file=sys.stderr)
         return 2
     command = command_parts[0] if len(command_parts) == 1 else shlex.join(command_parts)
-    stdin_bytes = sys.stdin.buffer.read()
+    stdin_bytes = read_stdin_bytes(sys.stdin)
     return run_remote_command(
         host=str(args.host),
         user=str(args.user),

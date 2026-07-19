@@ -15,6 +15,7 @@ import shlex
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -5588,17 +5589,116 @@ class DashboardState:
             if self._mlkem_remote_asset_signatures.get(signature_key) == signature:
                 return {"updated": False, "note": "remote helper assets already synced"}
 
+        remote_root = PurePosixPath(remote_server_script).parent
+        manifest_path = remote_root / ".openamp-mlkem-assets.sha256"
+        manifest_probe_command = (
+            f"test -f {shlex.quote(str(manifest_path))} && "
+            f"test \"$(cat {shlex.quote(str(manifest_path))})\" = {shlex.quote(signature)}"
+        )
+        try:
+            manifest_proc = run_ssh_command(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                remote_command=manifest_probe_command,
+                timeout=25.0,
+            )
+            if manifest_proc.returncode == 0:
+                with self._lock:
+                    self._mlkem_remote_asset_signatures[signature_key] = signature
+                print(f"[ML-KEM auto-start] 板端 helper 清单已匹配，跳过 {len(assets)} 个文件的上传")
+                return {"updated": False, "note": "remote asset manifest matched"}
+        except Exception as exc:
+            print(f"[ML-KEM auto-start] 板端 helper 清单检查失败，按冷启动更新: {exc}")
+
+        relative_assets: list[tuple[PurePosixPath, Path]] = []
         try:
             for remote_path, local_path in assets:
-                self._write_remote_text_file(
-                    board_access,
-                    remote_path=remote_path,
-                    content=local_path.read_text(encoding="utf-8"),
-                    mode=0o755,
-                    timeout=25.0,
+                relative_path = PurePosixPath(remote_path).relative_to(remote_root)
+                if relative_path.is_absolute() or ".." in relative_path.parts:
+                    raise ValueError(f"unsafe remote asset path: {remote_path}")
+                relative_assets.append((relative_path, local_path))
+        except ValueError as exc:
+            return {"updated": False, "error": True, "note": str(exc)}
+
+        local_bundle_path: Path | None = None
+        remote_bundle_path = (
+            f"/tmp/openamp-mlkem-assets.{os.getpid()}.{threading.get_ident()}.tar.gz"
+        )
+        try:
+            fd, raw_bundle_path = tempfile.mkstemp(prefix="openamp-mlkem-assets-", suffix=".tar.gz")
+            os.close(fd)
+            local_bundle_path = Path(raw_bundle_path)
+            with tarfile.open(local_bundle_path, "w:gz") as archive:
+                for relative_path, local_path in relative_assets:
+                    archive.add(local_path, arcname=relative_path.as_posix(), recursive=False)
+
+            print(
+                f"[ML-KEM auto-start] 板端 helper 清单变化，单包上传 {len(relative_assets)} 个文件 "
+                f"({local_bundle_path.stat().st_size} bytes)"
+            )
+            copy_proc = run_scp_file(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                local_path=local_bundle_path,
+                remote_path=remote_bundle_path,
+                timeout=45.0,
+            )
+            if copy_proc.returncode != 0:
+                error_output = copy_proc.stderr.strip() or copy_proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"failed to upload ML-KEM asset bundle: {error_output}")
+
+            install_lines = [
+                "set -eu",
+                f"ARCHIVE={shlex.quote(remote_bundle_path)}",
+                f"ROOT={shlex.quote(str(remote_root))}",
+                'STAGE="$(mktemp -d /tmp/openamp-mlkem-assets.XXXXXX)"',
+                'cleanup() { rm -rf "$STAGE" "$ARCHIVE"; }',
+                "trap cleanup EXIT",
+                'tar -xzf "$ARCHIVE" -C "$STAGE"',
+            ]
+            for relative_path, _local_path in relative_assets:
+                install_lines.append(
+                    f'test -f "$STAGE"/{shlex.quote(relative_path.as_posix())}'
                 )
+            for relative_path, _local_path in relative_assets:
+                remote_target = remote_root / relative_path
+                install_lines.extend(
+                    [
+                        f"mkdir -p {shlex.quote(str(remote_target.parent))}",
+                        f'install -m 0755 "$STAGE"/{shlex.quote(relative_path.as_posix())} '
+                        f"{shlex.quote(str(remote_target))}",
+                    ]
+                )
+            manifest_temp_path = manifest_path.with_name(f".{manifest_path.name}.tmp")
+            install_lines.extend(
+                [
+                    f"printf '%s\\n' {shlex.quote(signature)} > {shlex.quote(str(manifest_temp_path))}",
+                    f"mv -f {shlex.quote(str(manifest_temp_path))} {shlex.quote(str(manifest_path))}",
+                ]
+            )
+            install_proc = run_ssh_command(
+                host=board_access.host,
+                user=board_access.user,
+                password=board_access.password,
+                port=board_access.port or "22",
+                remote_command="\n".join(install_lines),
+                timeout=45.0,
+            )
+            if install_proc.returncode != 0:
+                error_output = install_proc.stderr.strip() or install_proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"failed to install ML-KEM asset bundle: {error_output}")
         except Exception as exc:
             return {"updated": False, "error": True, "note": str(exc)}
+        finally:
+            if local_bundle_path is not None:
+                try:
+                    local_bundle_path.unlink()
+                except OSError:
+                    pass
 
         with self._lock:
             self._mlkem_remote_asset_signatures[signature_key] = signature

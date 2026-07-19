@@ -75,6 +75,9 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
     assert "run_startup_usrp_readiness" in script
     assert '"/api/usrp-control/start"' in script
     assert '"/api/crypto-status"' in script
+    assert "crypto_deadline = time.monotonic() + 180.0" in script
+    assert "等待板端安全服务" in script
+    assert "last_crypto.get('error')" in script
     assert 'PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"' in script
     assert 'PYTHONUTF8="${PYTHONUTF8:-1}"' in script
     for expected in (
