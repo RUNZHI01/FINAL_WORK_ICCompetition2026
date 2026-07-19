@@ -6,7 +6,7 @@
 
 | 文档 | 用途 |
 |---|---|
-| [`runbooks/STARTUP.md`](runbooks/STARTUP.md) | Windows 上位机冷启动、20 张演示和故障处理 |
+| [`../scripts/demo/STARTUP.md`](../scripts/demo/STARTUP.md) | Windows 上位机冷启动、20 张演示和故障处理 |
 | [`USRP_OUTPUT_LAYOUT.md`](USRP_OUTPUT_LAYOUT.md) | QPSK、IQ-direct 和预录任务的板端输出目录 |
 | [`USRP_IQ_RUNTIME.md`](USRP_IQ_RUNTIME.md) | IQ-direct 的执行顺序、实测记录和限制 |
 

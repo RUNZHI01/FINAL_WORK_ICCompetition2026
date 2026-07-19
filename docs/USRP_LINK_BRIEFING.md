@@ -2,7 +2,7 @@
 
 更新时间：2026-07-18
 
-本文记录 USRP IQ-direct 可选链路、实测指标和安全边界。推荐入口 `start-demo.ps1` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，链路为：
+本文记录 USRP IQ-direct 可选链路、实测指标和安全边界。推荐入口 `.\demo.ps1 start` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，链路为：
 
 ```text
 Cockpit Desktop
@@ -72,7 +72,7 @@ ML-KEM、SM4、ML-DSA 和 SM2 当前用于会话准入与控制信道。USRP IQ 
 
 ## 相关文档
 
-- 现场操作见 [`runbooks/STARTUP.md`](./runbooks/STARTUP.md)。
+- 现场操作见 [`../scripts/demo/STARTUP.md`](../scripts/demo/STARTUP.md)。
 - 安全信道部署见 [`security/mlkem_auth_setup.md`](./security/mlkem_auth_setup.md)。
 - 输出目录见 [`USRP_OUTPUT_LAYOUT.md`](./USRP_OUTPUT_LAYOUT.md)。
 

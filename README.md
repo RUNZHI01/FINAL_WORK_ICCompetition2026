@@ -21,15 +21,15 @@ Windows 上位机需要安装：
 克隆仓库后，在仓库根目录运行：
 
 ```powershell
-pwsh -File .\init.ps1
+.\demo.ps1 init
 ```
 
-脚本会创建 `.venv`、执行 `npm ci`、构建 `iccomp-usrp-tx:latest`，并检查本地 Python 和 Docker 依赖。它不连接飞腾派，不修改板端文件。首次构建 Docker 镜像需要下载依赖，耗时取决于网络和电脑性能。
+脚本会创建 `.venv`、安装前端依赖、准备示例输入并构建 `iccomp-usrp-tx:latest`。初始化只处理上位机，不连接飞腾派。首次构建 Docker 镜像需要下载依赖。
 
 只检查当前电脑是否完成初始化：
 
 ```powershell
-pwsh -File .\init.ps1 -CheckOnly
+.\demo.ps1 check
 ```
 
 ## 日常启动
@@ -37,20 +37,18 @@ pwsh -File .\init.ps1 -CheckOnly
 板卡和 Docker Desktop 启动后，在仓库根目录运行：
 
 ```powershell
-.\Semantic-Communication\cockpit_desktop\start-demo.ps1
+.\demo.ps1 start
 ```
 
-默认板卡地址为 `100.121.87.73`，用户名为 `user`。脚本会安全询问 SSH 密码，输入内容不回显。也可以显式指定连接参数：
+也可以直接运行 `.\demo.ps1`。默认板卡地址为 `100.121.87.73`，用户名为 `user`。脚本会询问 SSH 密码，输入内容不回显。需要换地址时：
 
 ```powershell
-.\Semantic-Communication\cockpit_desktop\start-demo.ps1 `
-  -BoardHost 100.121.87.73 `
-  -BoardUser user
+.\demo.ps1 start -BoardHost 100.121.87.73 -BoardUser user
 ```
 
 一键脚本会先检查本地环境，然后恢复板端 USRP 网口、启动 Cockpit 后端、建立安全会话并检查常驻 TX/RX，最后打开 Electron 界面。启动阶段不发送图片。
 
-完整现场步骤和故障处理见 [docs/runbooks/STARTUP.md](docs/runbooks/STARTUP.md)。技术文档索引见 [docs/README.md](docs/README.md)。
+现场说明见 [scripts/demo/STARTUP.md](scripts/demo/STARTUP.md)。技术文档索引见 [docs/README.md](docs/README.md)。
 
 ## 本地复现
 
@@ -72,7 +70,8 @@ Linux 或 WSL 使用：
 
 | 路径 | 内容 |
 |---|---|
-| `Semantic-Communication/cockpit_desktop/` | Electron/React 上位机和一键启动脚本 |
+| `scripts/demo/` | Windows 初始化、启动脚本和现场说明 |
+| `Semantic-Communication/cockpit_desktop/` | Electron/React 上位机 |
 | `Semantic-Communication/session_bootstrap/` | Cockpit 后端、重建调度和演示数据 |
 | `USRP292x/` | QPSK、IQ 直传和 USRP 网络脚本 |
 | `mlkem_link/` | ML-KEM、SM4-GCM 和双签认证实现 |

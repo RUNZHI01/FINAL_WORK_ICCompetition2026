@@ -4,6 +4,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INIT_SCRIPT = PROJECT_ROOT / "scripts" / "demo" / "init.ps1"
 ROOT_README = PROJECT_ROOT / "README.md"
+STARTUP_GUIDE = PROJECT_ROOT / "scripts" / "demo" / "STARTUP.md"
+DELIVERY_DOCS = (
+    ROOT_README,
+    PROJECT_ROOT / "docs" / "README.md",
+    PROJECT_ROOT / "docs" / "USRP_LINK_BRIEFING.md",
+    PROJECT_ROOT / "docs" / "USRP_IQ_RUNTIME.md",
+    PROJECT_ROOT / "docker" / "README.md",
+    STARTUP_GUIDE,
+)
 
 
 def test_init_script_covers_fresh_windows_checkout() -> None:
@@ -34,6 +43,21 @@ def test_init_script_does_not_contact_board() -> None:
 def test_root_readme_is_the_delivery_entrypoint() -> None:
     text = ROOT_README.read_text(encoding="utf-8")
 
-    assert ".\\init.ps1" in text
-    assert ".\\Semantic-Communication\\cockpit_desktop\\start-demo.ps1" in text
-    assert "docs/runbooks/STARTUP.md" in text
+    assert ".\\demo.ps1 init" in text
+    assert ".\\demo.ps1 check" in text
+    assert ".\\demo.ps1 start" in text
+    assert "scripts/demo/STARTUP.md" in text
+
+
+def test_tracked_delivery_docs_do_not_reference_removed_entrypoints() -> None:
+    forbidden = (
+        "docs/runbooks/STARTUP.md",
+        "runbooks/STARTUP.md",
+        "cockpit_desktop/start-demo.ps1",
+        "pwsh -File .\\init.ps1",
+    )
+
+    for path in DELIVERY_DOCS:
+        text = path.read_text(encoding="utf-8")
+        for value in forbidden:
+            assert value not in text, f"{path.relative_to(PROJECT_ROOT)} still contains {value}"

@@ -41,7 +41,7 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 
 ## Tailscale 真机链路
 
-当前 Windows 现场推荐入口是 `Semantic-Communication/cockpit_desktop/start-demo.ps1`，默认 QPSK。本节的 `run-demo-tailscale.*` 是默认 IQ-direct 的兼容容器入口，同样不走 WSL：
+当前 Windows 现场推荐入口是仓库根目录的 `.\demo.ps1 start`，默认 QPSK。本节的 `run-demo-tailscale.*` 是默认 IQ-direct 的兼容容器入口，同样不走 WSL：
 
 ```powershell
 .\docker\run-demo-tailscale.ps1
