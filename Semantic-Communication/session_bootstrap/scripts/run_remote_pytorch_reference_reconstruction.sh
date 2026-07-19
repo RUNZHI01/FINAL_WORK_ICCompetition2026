@@ -3,9 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PACKAGE_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 PYTHON_HELPER_SOURCE="$SCRIPT_DIR/pytorch_reference_reconstruction.py"
 DEFAULT_ENV_FILE="$REPO_ROOT/session_bootstrap/tmp/inference_real_reconstruction_compare_run_20260311_212301.env"
-DEFAULT_LOCAL_JSCC_ROOT="/home/tianxing/TVM_LAST/finalWork/服务端/jscc-test/jscc"
+DEFAULT_LOCAL_JSCC_ROOT="$PACKAGE_ROOT/host_pic_to_latent/jscc"
+DEFAULT_LOCAL_GENERATOR_CKPT="$PACKAGE_ROOT/board_deps/pytorch/compressed_gan.pt"
 
 usage() {
   cat <<EOF
@@ -221,16 +223,18 @@ if [[ "$MODE" == "ssh" ]]; then
   PYTHON_BIN="${PYTHON_BIN_OVERRIDE:-${PYTORCH_REF_REMOTE_PYTHON:-/home/user/anaconda3/envs/myenv/bin/python}}"
   OUTPUT_PREFIX="${OUTPUT_PREFIX_OVERRIDE:-pytorch_reference_reconstruction_$(date +%Y%m%d_%H%M%S)}"
   OUTPUT_DIR="${OUTPUT_DIR_OVERRIDE:-${REMOTE_OUTPUT_BASE:-/home/user/Downloads/jscc-test/jscc/infer_outputs}/$OUTPUT_PREFIX}"
+  DEFAULT_GENERATOR_CKPT="$(dirname "$JSCC_ROOT")/export/compressed_gan.pt"
 else
   JSCC_ROOT="${JSCC_ROOT_OVERRIDE:-$DEFAULT_LOCAL_JSCC_ROOT}"
   INPUT_DIR="${INPUT_DIR_OVERRIDE:-$(dirname "$DEFAULT_LOCAL_JSCC_ROOT")/encoder_outputs}"
   PYTHON_BIN="${PYTHON_BIN_OVERRIDE:-python3}"
   OUTPUT_PREFIX="${OUTPUT_PREFIX_OVERRIDE:-pytorch_reference_reconstruction_$(date +%Y%m%d_%H%M%S)}"
   OUTPUT_DIR="${OUTPUT_DIR_OVERRIDE:-$REPO_ROOT/session_bootstrap/tmp/$OUTPUT_PREFIX}"
+  DEFAULT_GENERATOR_CKPT="$DEFAULT_LOCAL_GENERATOR_CKPT"
 fi
 
 JSCC_PARENT_DIR="$(dirname "$JSCC_ROOT")"
-GENERATOR_CKPT="${GENERATOR_CKPT_OVERRIDE:-$JSCC_PARENT_DIR/export/compressed_gan.pt}"
+GENERATOR_CKPT="${GENERATOR_CKPT_OVERRIDE:-$DEFAULT_GENERATOR_CKPT}"
 ORIGIN_CKPT="${ORIGIN_CKPT_OVERRIDE:-$JSCC_PARENT_DIR/origin/1snr_lpips_6_6_6_6_6_6_6_openimages_gan.pt}"
 SNR="${SNR_OVERRIDE:-${REMOTE_SNR_CURRENT:-${REMOTE_SNR_BASELINE:-10}}}"
 
