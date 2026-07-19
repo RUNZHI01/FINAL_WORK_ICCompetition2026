@@ -1,16 +1,16 @@
 # 飞腾弱网安全语义通信演示系统
 
-本仓库是集创赛现场演示与复现用的最终代码。系统由 Windows 上位机、两台 NI USRP-2922 和飞腾派组成，默认演示链路为：
+本仓库用于集创赛现场演示和软件复现。系统由 Windows 上位机、两台 NI USRP-2922 和飞腾派组成。现场默认链路为：
 
 ```text
 原图 -> JSCC latent -> USRP QPSK -> 飞腾派 TVM 重建 -> 上位机结果对比
 ```
 
-OpenAMP 负责板端任务准入和运行状态，ML-KEM、SM4-GCM、ML-DSA 与 SM2 用于控制信道和设备认证。射频 IQ 数据本身不经过 Tailscale，也不宣称由 ML-KEM 加密。
+OpenAMP 负责板端任务准入和运行状态。ML-KEM、SM4-GCM、ML-DSA 与 SM2 用于设备认证和控制信道保护。射频 IQ 数据由两台 USRP 直接传输，不经过 Tailscale。
 
-## 首次初始化
+## 环境要求
 
-Windows 上位机需要安装：
+Windows 上位机需要预先安装：
 
 - PowerShell 7
 - Git for Windows
@@ -18,15 +18,17 @@ Windows 上位机需要安装：
 - Python 3
 - Node.js 20
 
-克隆仓库后，在仓库根目录运行：
+## 首次初始化
+
+在仓库根目录运行：
 
 ```powershell
 .\demo.ps1 init
 ```
 
-脚本会创建 `.venv`、安装前端依赖、准备示例输入并构建 `iccomp-usrp-tx:latest`。初始化只处理上位机，不连接飞腾派。首次构建 Docker 镜像需要下载依赖。
+脚本会创建 `.venv`、安装前端依赖、准备演示输入并构建 `iccomp-usrp-tx:latest`。初始化只处理上位机，不连接飞腾派。首次运行需要联网下载 Python、Node.js 和 Docker 依赖。
 
-只检查当前电脑是否完成初始化：
+检查本机是否已经完成初始化：
 
 ```powershell
 .\demo.ps1 check
@@ -34,25 +36,29 @@ Windows 上位机需要安装：
 
 ## 日常启动
 
-板卡和 Docker Desktop 启动后，在仓库根目录运行：
+给飞腾派和两台 USRP 上电，并启动 Docker Desktop。板卡启动后，在仓库根目录运行：
 
 ```powershell
-.\demo.ps1 start
+.\demo.ps1
 ```
 
-也可以直接运行 `.\demo.ps1`。默认板卡地址为 `100.121.87.73`，用户名为 `user`。脚本会询问 SSH 密码，输入内容不回显。需要换地址时：
+也可以使用 `.\demo.ps1 start`。脚本先检查本机环境和板端服务，再恢复 USRP 网口、启动 Cockpit 后端并打开 Electron 界面。启动阶段不发送图片。
+
+默认板卡地址和用户名已经写入入口脚本。需要临时更换时，在当前 PowerShell 会话设置：
 
 ```powershell
-.\demo.ps1 start -BoardHost 100.121.87.73 -BoardUser user
+$env:REMOTE_HOST = "目标 IP"
+$env:REMOTE_USER = "目标用户名"
+.\demo.ps1
 ```
 
-一键脚本会先检查本地环境，然后恢复板端 USRP 网口、启动 Cockpit 后端、建立安全会话并检查常驻 TX/RX，最后打开 Electron 界面。启动阶段不发送图片。
+命令行参数优先于环境变量；两者都未提供时使用默认值。SSH 密码由脚本安全询问，输入不回显。
 
-现场说明见 [scripts/demo/STARTUP.md](scripts/demo/STARTUP.md)。技术文档索引见 [docs/README.md](docs/README.md)。
+现场演示步骤和故障处理见 [scripts/demo/STARTUP.md](scripts/demo/STARTUP.md)。
 
-## 本地复现
+## 无硬件复现
 
-没有飞腾派和 USRP 时，可运行容器内的依赖、API 和 Electron smoke：
+没有飞腾派和 USRP 时，可检查依赖、API 和 Electron 主进程：
 
 ```powershell
 pwsh -File .\docker\repro.ps1
@@ -64,7 +70,7 @@ Linux 或 WSL 使用：
 ./docker/repro.sh
 ```
 
-这条路径只验证软件交付是否完整，不等价于真机无线链路测试。
+该流程验证软件交付是否完整，不等价于真机无线链路测试。
 
 ## 目录
 
@@ -75,8 +81,8 @@ Linux 或 WSL 使用：
 | `Semantic-Communication/session_bootstrap/` | Cockpit 后端、重建调度和演示数据 |
 | `USRP292x/` | QPSK、IQ 直传和 USRP 网络脚本 |
 | `mlkem_link/` | ML-KEM、SM4-GCM 和双签认证实现 |
-| `board_deps/` | 板端 runtime、模型、固件和离线恢复材料 |
-| `docker/` | 复现、打包和容器入口 |
-| `docs/` | 运行手册、链路说明和安全边界 |
+| `board_deps/` | 板端运行时、模型、固件和离线恢复材料 |
+| `docker/` | 容器复现、板端 smoke 和维护入口 |
+| `docs/` | 链路、安全边界和输出目录说明 |
 
-密码、私钥、本机定位配置、运行日志和重建缓存不纳入 Git。
+技术文档入口见 [docs/README.md](docs/README.md)。真实密码、私钥、本机定位配置和运行缓存不得写入 Git。

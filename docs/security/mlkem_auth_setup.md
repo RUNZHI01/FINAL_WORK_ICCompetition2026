@@ -1,110 +1,88 @@
-# ML-KEM 安全信道部署指南
+# ML-KEM 控制信道与双签认证
 
-本文档描述 `ML-KEM + SM2 + ML-DSA` 安全信道的部署、密钥管理、容器/板端环境要求，以及常见故障排查。该信道是控制面的默认安全层，认证策略 `DUAL_REQUIRED`（SM2 + ML-DSA 双签同时校验），默认启用。
+控制信道默认启用 ML-KEM、SM4-GCM 和双签认证。`DUAL_REQUIRED` 要求 SM2 与 ML-DSA-65 同时通过。USRP 射频数据面不在该加密范围内。
 
-## 1. 架构总览
+## 组成
 
 ```text
-┌──────────────────────┐                      ┌──────────────────────┐
-│  容器（x86_64）       │   ML-KEM 握手 +      │  飞腾派（aarch64）   │
-│  Initiator / client  │  ← DUAL_REQUIRED →   │  Responder / server  │
-│                      │   SM2 + ML-DSA 签名  │                      │
-│  - 验签（不签发）     │                      │  - Tongsuo 签 SM2    │
-│  - liboqs 验 ML-DSA  │                      │  - liboqs 签 ML-DSA  │
-└──────────────────────┘                      └──────────────────────┘
-        │                                              │
-        │ TONGSUO_SIG_BRIDGE                           │ TONGSUO_SIG_BRIDGE
-        │ = /workspace/artifacts/crypto/              │ = /home/user/libtongsuo_sig_bridge.so
-        │   libtongsuo_sig_bridge.so (x86_64)         │   (aarch64, board_deps/crypto/)
-        │                                              │
-        │ OQS_INSTALL_PATH                             │ OQS_INSTALL_PATH
-        │ = /opt/liboqs                                │ = /home/user/liboqs-dist
-        └──────────────────────────────────────────────┘
+上位机容器（x86_64）                    飞腾派（aarch64）
+Initiator / client                      Responder / server
+
+ML-KEM-768 握手        <------------->  ML-KEM-768 解封装
+SM2 + ML-DSA 验签      <-------------   SM2 + ML-DSA 签名
+SM4-GCM 控制消息       <------------->  SM4-GCM 控制消息
 ```
 
-握手流程（`mlkem_link/auth.py`）：
+容器保存板端公钥，只负责验签。板端保存身份私钥并生成签名。
 
-1. `ClientHello`：客户端送 `proto_version + suite + client_nonce + kem_pk`。
-2. `ServerHelloAuth`：服务端送 `server_id + server_nonce + kem_ct + sig_policy + sm2_signature + mldsa_signature`。两个签名覆盖同一份 transcript。
-3. 客户端用预置的 peer 公钥（`server_sm2_identity.pub`、`server_mldsa_identity.pub`）验双签。
-4. `Finished` 双向密钥确认（HKDF-SHA256 派生的 transcript digest 比对）。
+## 握手
 
-成功标志：`last_sha256_match=true`、`session_count=1`、`auth_enabled=true`、`sig_policy=DUAL_REQUIRED`。
+`mlkem_link/auth.py` 实现以下流程：
 
-## 2. 文件清单
+1. `ClientHello` 发送协议版本、算法套件、client nonce 和 KEM 公钥。
+2. `ServerHelloAuth` 返回 server ID、server nonce、KEM ciphertext、签名策略和两个签名。
+3. SM2 与 ML-DSA 签名覆盖同一份 transcript。
+4. 客户端使用预置的板端公钥验签。
+5. 双方用 HKDF-SHA256 派生材料完成 `Finished` 确认。
 
-### 2.1 容器侧（x86_64）
+成功状态包括：
 
-| 路径 | 说明 |
+```text
+last_sha256_match=true
+session_count=1
+auth_enabled=true
+sig_policy=DUAL_REQUIRED
+```
+
+## 文件位置
+
+### 容器
+
+| 路径 | 内容 |
 |---|---|
-| `/workspace/mlkem_link/` | Python 包：kem / auth / kdf / secure_channel / session |
-| `/workspace/docker/tongsuo_kem_bridge.c` | ML-KEM-768 KEM 桥接源码 |
-| `/workspace/docker/tongsuo_sig_bridge.c` | SM2 签名桥接源码 |
-| `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so` | x86_64 SM2 桥接库（Dockerfile 编译） |
-| `/opt/liboqs/` | liboqs 安装目录（Dockerfile 编译） |
-| `/workspace/keys/server_sm2_identity.pub` | 板端 SM2 公钥（用于验签） |
-| `/workspace/keys/server_mldsa_identity.pub` | 板端 ML-DSA 公钥（用于验签） |
-| `/workspace/scripts/start_server_auth.sh` | 带认证模式的 server.py 启动入口 |
+| `/workspace/mlkem_link/` | KEM、认证、KDF 和安全会话代码 |
+| `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so` | x86_64 SM2 bridge |
+| `/opt/liboqs/` | x86_64 liboqs |
+| `/workspace/keys/server_sm2_identity.pub` | 板端 SM2 公钥 |
+| `/workspace/keys/server_mldsa_identity.pub` | 板端 ML-DSA 公钥 |
+| `/workspace/scripts/start_server_auth.sh` | 认证模式入口 |
 
-容器端 **不需要** 板端的私钥。容器只验签，从不签发。
+### 飞腾派
 
-### 2.2 板端侧（aarch64）
-
-| 路径 | 说明 |
+| 路径 | 内容 |
 |---|---|
-| `/home/user/libtongsuo_sig_bridge.so` | aarch64 SM2 桥接库（来自 `board_deps/crypto/`） |
-| `/home/user/liboqs-dist/` | aarch64 liboqs 安装目录 |
-| `/usr/local/tongsuo/` | Tongsuo 主安装目录（提供 SM2 实现） |
-| `/home/user/keys/server_sm2_identity.key` | SM2 私钥（600） |
+| `/home/user/libtongsuo_sig_bridge.so` | aarch64 SM2 bridge |
+| `/home/user/liboqs-dist/` | aarch64 liboqs |
+| `/usr/local/tongsuo/` | Tongsuo runtime |
+| `/home/user/keys/server_sm2_identity.key` | SM2 私钥，权限 `600` |
 | `/home/user/keys/server_sm2_identity.pub` | SM2 公钥 |
-| `/home/user/keys/server_mldsa_identity.key` | ML-DSA-65 私钥（600） |
+| `/home/user/keys/server_mldsa_identity.key` | ML-DSA-65 私钥，权限 `600` |
 | `/home/user/keys/server_mldsa_identity.pub` | ML-DSA-65 公钥 |
 
-### 2.3 仓库内的密钥材料
+仓库内的 `board_deps/crypto/public_keys/board-auth-public-keys.tar.gz` 只包含公钥快照。私钥不得进入仓库。
 
-`board_deps/crypto/public_keys/board-auth-public-keys.tar.gz` 包含演示用公钥快照。私钥 **不在仓库**（`*.key` 在 `.gitignore` 内），需要时在板端用 `board_deps/tools/gen_identity_keys.py` 现场生成。
+## 正常启动
 
-## 3. 容器内启动
+现场使用 `.\demo.ps1`。Cockpit 后端会通过 SSH 拉起板端 `tcp_server.py`，不需要手动执行本节命令。
 
-### 3.1 标准入口
+容器内单独检查认证入口：
 
 ```bash
-# 容器内
 bash /workspace/scripts/start_server_auth.sh
 ```
 
-`start_server_auth.sh` 已经配齐 15 个 `MLKEM_AUTH_*` 环境变量。关键映射：
-
-| 变量 | 容器（x86_64） | 板端（aarch64） |
-|---|---|---|
-| `MLKEM_AUTH_ENABLED` | `1` | `1` |
-| `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | `DUAL_REQUIRED` |
-| `MLKEM_AUTH_SERVER_ID` | `phytium-board` | `phytium-board` |
-| `TONGSUO_SIG_BRIDGE` | `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so` | `/home/user/libtongsuo_sig_bridge.so` |
-| `MLKEM_REMOTE_TONGSUO_SIG_BRIDGE` | `/home/user/libtongsuo_sig_bridge.so` | — |
-| `OQS_INSTALL_PATH` | `/opt/liboqs` | `/home/user/liboqs-dist` |
-| `MLKEM_REMOTE_OQS_INSTALL` | `/home/user/liboqs-dist` | — |
-| `MLKEM_AUTH_SERVER_SM2_KEY` | （容器不需要） | `/home/user/keys/server_sm2_identity.key` |
-| `MLKEM_AUTH_SERVER_SM2_PUB` | （容器不需要） | `/home/user/keys/server_sm2_identity.pub` |
-| `MLKEM_AUTH_SERVER_MLDSA_KEY` | （容器不需要） | `/home/user/keys/server_mldsa_identity.key` |
-| `MLKEM_AUTH_SERVER_MLDSA_PUB` | （容器不需要） | `/home/user/keys/server_mldsa_identity.pub` |
-| `MLKEM_AUTH_PEER_SM2_PUB` | `/workspace/keys/server_sm2_identity.pub` | （对端公钥） |
-| `MLKEM_AUTH_PEER_MLDSA_PUB` | `/workspace/keys/server_mldsa_identity.pub` | （对端公钥） |
-
-### 3.2 在 Windows 主机调用容器
-
-Windows 主机通过 docker exec 调用时，**必须** 加 `MSYS_NO_PATHCONV=1`，否则 git-bash 会把 `/workspace/...` 路径改写成 `E:/Software/Scoop/.../workspace/...`：
+从 Windows Git Bash 调用容器时，需要关闭 MSYS 路径改写：
 
 ```bash
-MSYS_NO_PATHCONV=1 docker exec iccomp-ubuntu bash -lc 'cd /workspace && bash scripts/start_server_auth.sh'
+MSYS_NO_PATHCONV=1 docker exec iccomp-ubuntu \
+  bash -lc 'cd /workspace && bash scripts/start_server_auth.sh'
 ```
 
-## 4. 板端启动
+## 板端手动启动
 
-板端 `tcp_server` 由容器内的 `server.py` 通过 SSH 在启动阶段自动拉起，使用 `setsid` 脱离 SSH 会话。如果需要手动重启：
+只在自动启动失败或调试时使用：
 
 ```bash
-# 板端（默认地址 100.121.87.73，默认用户 user；密码由当前会话提供）
 export MLKEM_AUTH_ENABLED=1
 export MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 export MLKEM_AUTH_SERVER_ID=phytium-board
@@ -112,209 +90,128 @@ export MLKEM_AUTH_SERVER_SM2_KEY=/home/user/keys/server_sm2_identity.key
 export MLKEM_AUTH_SERVER_SM2_PUB=/home/user/keys/server_sm2_identity.pub
 export MLKEM_AUTH_SERVER_MLDSA_KEY=/home/user/keys/server_mldsa_identity.key
 export MLKEM_AUTH_SERVER_MLDSA_PUB=/home/user/keys/server_mldsa_identity.pub
-export MLKEM_AUTH_PEER_SM2_PUB=/home/user/keys/server_sm2_identity.pub   # 演示：自签自验
+export MLKEM_AUTH_PEER_SM2_PUB=/home/user/keys/server_sm2_identity.pub
 export MLKEM_AUTH_PEER_MLDSA_PUB=/home/user/keys/server_mldsa_identity.pub
 export TONGSUO_SIG_BRIDGE=/home/user/libtongsuo_sig_bridge.so
 export OQS_INSTALL_PATH=/home/user/liboqs-dist
+
 setsid python /home/user/Semantic-Communication/scripts/tcp_server.py \
   > /home/user/artifacts/evidence/logs/tcp_server.log 2>&1 < /dev/null &
 ```
 
-板端没有 systemd 单元；重启板卡后必须重新拉起 `tcp_server`。
+板端没有对应的 systemd unit，重启后由一键启动脚本重新拉起。
 
-## 5. 密钥生成
+## 密钥生成与公钥同步
 
-新板或轮换密钥时，在板端执行：
+新板或轮换密钥时，在飞腾派执行：
 
 ```bash
-# 板端（必须，因为容器不能 keygen SM2）
 python /home/user/board_deps/tools/gen_identity_keys.py --dir /home/user/keys
 chmod 600 /home/user/keys/*.key
 ```
 
-这会生成：
-
-- `server_sm2_identity.key` / `.pub`（SM2: sk 32B, pk 65B）
-- `server_mldsa_identity.key` / `.pub`（ML-DSA-65: sk 4032B, pk 1952B）
-
-公钥必须同步到容器侧 `/workspace/keys/`，否则容器无法验签：
+随后把两个公钥复制到容器的 `/workspace/keys/`。以下命令会使用 SSH 的正常密码提示或已配置的密钥认证，不在命令行写密码：
 
 ```bash
-# 控制机（通过 Tailscale SSH 拉公钥到容器）
-sshpass -p user scp user@100.121.87.73:/home/user/keys/server_sm2_identity.pub /workspace/keys/
-sshpass -p user scp user@100.121.87.73:/home/user/keys/server_mldsa_identity.pub /workspace/keys/
+scp <board-user>@<board-host>:/home/<board-user>/keys/server_sm2_identity.pub \
+  /workspace/keys/
+scp <board-user>@<board-host>:/home/<board-user>/keys/server_mldsa_identity.pub \
+  /workspace/keys/
 ```
 
-## 6. 容器 x86_64 SM2 桥接编译
+同步后核对公钥指纹。私钥只保留在板端。
 
-Dockerfile 在镜像构建阶段已经编译并放到 `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so`。但如果需要重新编译（例如改了 `tongsuo_sig_bridge.c`）：
+## 关键环境变量
 
-```bash
-# 容器内
-apt-get install -y libssl-dev
-gcc -O2 -fPIC -shared /workspace/docker/tongsuo_sig_bridge.c \
-  -o /workspace/artifacts/crypto/libtongsuo_sig_bridge.so -lcrypto
-```
+| 变量 | 容器 | 飞腾派 |
+|---|---|---|
+| `MLKEM_AUTH_ENABLED` | `1` | `1` |
+| `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | `DUAL_REQUIRED` |
+| `MLKEM_AUTH_SERVER_ID` | `phytium-board` | `phytium-board` |
+| `TONGSUO_SIG_BRIDGE` | `/workspace/artifacts/crypto/libtongsuo_sig_bridge.so` | `/home/user/libtongsuo_sig_bridge.so` |
+| `OQS_INSTALL_PATH` | `/opt/liboqs` | `/home/user/liboqs-dist` |
+| `MLKEM_AUTH_PEER_SM2_PUB` | `/workspace/keys/server_sm2_identity.pub` | 对端公钥路径 |
+| `MLKEM_AUTH_PEER_MLDSA_PUB` | `/workspace/keys/server_mldsa_identity.pub` | 对端公钥路径 |
 
-**注意**：编译输出会有 `EC_KEY_*` deprecation 警告，无害。
+板端还需要四个 `MLKEM_AUTH_SERVER_*` 私钥、公钥路径，见手动启动命令。
 
-**vanilla OpenSSL 3.0.2 限制**：
+## 健康检查
 
-- ✅ 支持 SM2 **sign / verify**（走 deprecated `EC_KEY` 路径）
-- ❌ **不支持** SM2 **keygen** via `EVP_PKEY_Q_keygen("SM2")`，调用返回 `rc=-1`
-
-容器只需要 verify，所以这个限制无害。keygen 在板端 Tongsuo 里完成。
-
-## 7. 健康检查
-
-仓库自带两个标准化健康检查脚本：
-
-- `scripts/healthcheck_sm2_bridge.py` — 容器端，验 `libtongsuo_sig_bridge.so` 加载 + 板端公钥读取
-- `scripts/healthcheck_sign_verify.py` — 板端，跑 SM2 + ML-DSA 双签 + 验签 roundtrip
-
-### 7.1 容器桥接加载检查
+容器 bridge 和公钥：
 
 ```bash
-# 容器内
 python /workspace/scripts/healthcheck_sm2_bridge.py
 ```
 
-预期输出：
-
-```text
-[1/3] bridge: /workspace/artifacts/crypto/libtongsuo_sig_bridge.so (17704 bytes)
-[2/3] backend loaded: tongsuo-sm2 (pk=65B sk=32B sig=72B)
-[3/3] board pub: /workspace/keys/server_sm2_identity.pub (65B)
-OK: bridge load + board pub read
-```
-
-### 7.2 板端 sign/verify 全链路检查
+板端双签 roundtrip：
 
 ```bash
-# 板端（需要先把脚本 scp 到 /home/user/scripts/）
 python3 /home/user/scripts/healthcheck_sign_verify.py
 ```
 
-预期输出：
-
-```text
-sm2:   sk=32B  pk=65B
-mldsa: sk=4032B  pk=1952B
-loading sm2 backend...
-  -> tongsuo-sm2
-loading mldsa backend...
-  -> oqs-mldsa-65
-signing with DUAL_REQUIRED...
-  sign: ~77ms (sm2=71B, mldsa=3309B)
-verifying...
-  verify: ~3ms (ok=True sm2=True mldsa=True err=None)
-OK: DUAL_REQUIRED sign+verify roundtrip passed
-```
-
-### 7.3 端到端握手检查
+端到端握手：
 
 ```bash
-# 容器内
 bash /workspace/scripts/start_server_auth.sh 2>&1 | tee /tmp/handshake.log
 grep -E 'handshake_ms|last_sha256_match|session_count|auth_enabled|sig_policy' /tmp/handshake.log
 ```
 
-成功标志：
+`handshake_ms` 是包含进程启动和网络等待的墙钟时间，不是单独的 KEM 算法耗时。
+
+## 常见错误
+
+### bridge 路径或架构错误
+
+容器必须加载：
 
 ```text
-handshake_ms: <本次实测值>
-last_sha256_match=true
-session_count=1
-auth_enabled=true
-sig_policy=DUAL_REQUIRED
-server_id=phytium-board
+/workspace/artifacts/crypto/libtongsuo_sig_bridge.so
 ```
 
-`handshake_ms` 是会话建立的墙钟时间，受进程冷启动和持久会话复用影响。历史独立冷启动曾记录约 `1400 ms`，不要把它写成固定算法耗时。
+`board_deps/crypto/libtongsuo_sig_bridge.so` 和 `/home/user/libtongsuo_sig_bridge.so` 是 aarch64 版本，不能由 x86_64 容器加载。可用 `file` 和 `readelf -h` 检查 ELF 架构。
 
-## 8. 典型故障排查
+### Git Bash 改写容器路径
 
-### 8.1 `ImportError: 找不到 libtongsuo_sig_bridge.so`
+报错路径出现 Windows 盘符时，在 `docker exec` 前设置 `MSYS_NO_PATHCONV=1`。
 
-容器 `TONGSUO_SIG_BRIDGE` 指向了不存在的路径。
+### 容器内 SM2 keygen 失败
 
-- **不要** 用板端路径 `/home/user/libtongsuo_sig_bridge.so`，容器内没有这个文件。
-- **不要** 用 `board_deps/crypto/libtongsuo_sig_bridge.so`，那是 aarch64 二进制，x86_64 容器加载会报 `cannot open shared object file`。
-- 正确值：`/workspace/artifacts/crypto/libtongsuo_sig_bridge.so`（Dockerfile 编译）。
+容器的 OpenSSL 3.0.2 bridge 用于 SM2 验签，不负责生成 SM2 密钥。密钥应在飞腾派的 Tongsuo 环境中生成。
 
-### 8.2 `cannot open shared object file: No such file or directory`（架构不匹配）
+### 板端缺少身份变量
 
-加载 aarch64 `.so` 到 x86_64 进程时报错。检查 ELF 头：
+检查 `tcp_server.py` 进程环境：
 
 ```bash
-file /workspace/artifacts/crypto/libtongsuo_sig_bridge.so
-# 应该是: ELF 64-bit LSB shared object, x86-64
-readelf -h /workspace/artifacts/crypto/libtongsuo_sig_bridge.so | grep Machine
-# 应该是: Machine: Advanced Micro Devices X86-64 (0x3e)
+cat /proc/$(pgrep -f tcp_server.py)/environ | tr '\0' '\n' \
+  | grep MLKEM_AUTH_SERVER
 ```
 
-板端 `.so` 应该是 `Machine: AArch64 (0xb7)`。
+缺少变量时，按“板端手动启动”重新拉起进程。
 
-### 8.3 `bash: line 1: E:/Software/Scoop/apps/git/...: No such file or directory`
+### SSH 超时
 
-git-bash 路径改写问题。`docker exec bash -c "..."` 内的 `/workspace/...` 被 git-bash 改写成 Windows 路径。
+先确认上位机和飞腾派位于同一 Tailscale 网络，再检查 `REMOTE_HOST`、ACL 和板卡在线状态。不要把密码写入重试脚本。
 
-修复：在控制机命令前加 `MSYS_NO_PATHCONV=1`：
+### `control_guard_state: PROBE_ERROR`
 
-```bash
-MSYS_NO_PATHCONV=1 docker exec iccomp-ubuntu bash -lc 'cd /workspace && ...'
-```
+该状态表示 OpenAMP 控制面探测失败，不是 ML-KEM 数据面错误。重启 Cockpit 后端；若仍失败，检查板端 OpenAMP 日志和 status 接口。
 
-### 8.4 `Tongsuo SM2 keygen 失败: rc=-1`
+## 签名策略
 
-vanilla OpenSSL 3.0.2 不支持 SM2 keygen。**容器内是预期行为**，不影响验签。如果需要 keygen，去板端运行 `gen_identity_keys.py`。
+| 值 | 行为 |
+|---|---|
+| `DUAL_REQUIRED` | SM2 与 ML-DSA 都通过，默认值 |
+| `SM2_ONLY` | 只校验 SM2 |
+| `MLDSA_ONLY` | 只校验 ML-DSA |
 
-### 8.5 `已启用身份认证，但缺少 MLKEM_AUTH_SERVER_SM2_KEY`
+容器和飞腾派必须使用相同策略。
 
-板端 `tcp_server` 启动时缺少私钥环境变量。检查：
+## 代码入口
 
-```bash
-# 板端
-cat /proc/$(pgrep -f tcp_server.py)/environ | tr '\0' '\n' | grep MLKEM_AUTH_SERVER
-```
-
-应能看到 `MLKEM_AUTH_SERVER_SM2_KEY=/home/user/keys/server_sm2_identity.key` 等四个变量。如果没有，重启 `tcp_server` 并 export 全部 env。
-
-### 8.6 SSH 到 100.121.87.73 超时
-
-Tailscale 偶发抖动。用 retry loop：
-
-```bash
-for i in 1 2 3 4 5; do
-  ssh -o ConnectTimeout=5 user@100.121.87.73 true && break
-  echo "retry $i..."
-  sleep 2
-done
-```
-
-或启用 SSH ControlMaster 复用连接（见 `RunAnalogLatentBatch.py` 的 `_open_ssh_master` 实现）。
-
-### 8.7 `control_guard_state: PROBE_ERROR`
-
-OpenAMP 控制面心跳问题，**与 ML-KEM 数据面无关**。重启 `server.py` 通常能清掉。如果重启后仍持续，看 `/home/user/artifacts/evidence/logs/openamp.log` 是否有 board status 接口超时，单独追踪。
-
-## 9. 策略选项
-
-`MLKEM_AUTH_SIG_POLICY` 支持三档：
-
-| 值 | 含义 | 适用场景 |
-|---|---|---|
-| `DUAL_REQUIRED`（默认） | SM2 + ML-DSA 同时校验通过才算握手成功 | 默认部署、抗量子 + 国密合规 |
-| `SM2_ONLY` | 只校验 SM2 | 国密合规演示，不要求抗量子 |
-| `MLDSA_ONLY` | 只校验 ML-DSA | 抗量子演示，不要求国密 |
-
-切换策略时，**容器和板端必须设同一档**，否则握手会因 policy 不一致而失败。
-
-## 10. 参考
-
-- `mlkem_link/auth.py` — 协议定义、SigBackend、SM2SigBackend、MLDSA backend、`sign_transcript` / `verify_transcript` / `authenticated_handshake`
-- `docker/tongsuo_sig_bridge.c` — SM2 桥接源码
-- `docker/tongsuo_kem_bridge.c` — ML-KEM-768 KEM 桥接源码
-- `board_deps/tools/gen_identity_keys.py` — 密钥生成工具
-- `scripts/start_server_auth.sh` — 容器带认证启动入口
-- `Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py` — 主 server，自动 SSH 拉起板端 `tcp_server`
+- `mlkem_link/auth.py`：握手 transcript 和签名校验
+- `docker/tongsuo_sig_bridge.c`：SM2 bridge
+- `docker/tongsuo_kem_bridge.c`：ML-KEM-768 bridge
+- `board_deps/tools/gen_identity_keys.py`：板端身份密钥生成
+- `scripts/start_server_auth.sh`：容器认证入口
+- `Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/server.py`：Cockpit 后端与板端启动编排
