@@ -942,6 +942,35 @@ class RunRemoteReconstructionTest(unittest.TestCase):
         self.assertEqual(env["OPENAMP_DEMO_MODE"], "1")
         self.assertEqual(env["OPENAMP_DEMO_MAX_INPUTS"], str(inference_runner.DEFAULT_MAX_INPUTS))
 
+    def test_live_job_can_keep_control_batch_size_separate_from_runner_count(self) -> None:
+        access = make_access(
+            {
+                "REMOTE_PROJECT_ROOT": "/tmp/openamp_demo/project",
+                "INFERENCE_CURRENT_CMD": "unused",
+            }
+        )
+
+        with (
+            patch("inference_runner.generate_live_job_id", return_value="4243"),
+            patch("inference_runner.tempfile.mkdtemp", return_value="/tmp/openamp_demo_live_roi"),
+            patch("inference_runner.subprocess.Popen", return_value=object()) as popen_mock,
+            patch("inference_runner.Thread") as thread_cls,
+        ):
+            thread_cls.return_value.start.return_value = None
+            LiveRemoteReconstructionJob(
+                access,
+                variant="current",
+                max_inputs=100,
+                control_expected_outputs=300,
+            )
+
+        command = popen_mock.call_args.args[0]
+        self.assertEqual(command[command.index("--expected-outputs") + 1], "300")
+        runner_cmd = command[command.index("--runner-cmd") + 1]
+        self.assertIn("--max-inputs 100", runner_cmd)
+        env = popen_mock.call_args.kwargs["env"]
+        self.assertEqual(env["OPENAMP_DEMO_MAX_INPUTS"], "100")
+
     def test_live_job_constructor_passes_signed_manifest_args_for_current_overlay(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

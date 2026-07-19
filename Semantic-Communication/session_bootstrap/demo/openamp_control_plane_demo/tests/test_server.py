@@ -22,6 +22,7 @@ if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
 import server  # noqa: E402
+import demo_data  # noqa: E402
 from server import DashboardState, DemoRequestHandler  # noqa: E402
 import usrp_runtime  # noqa: E402
 
@@ -189,6 +190,36 @@ def test_clear_batch_state_only_clears_warmup_state() -> None:
     assert skipped["status"] == "ok"
     assert skipped["cleared"] is False
     assert state.get_batch_state()["batch_job_id"] == "batch-1"
+
+
+def test_completed_usrp_tvm_batch_state_hydrates_fixed_original_tvm_report_late() -> None:
+    state = DashboardState(None, 30.0, probe_cache_path=None)
+    state._batch_state = {
+        "status": "done",
+        "batch_job_id": "batch-late-quality",
+        "engine": "tvm",
+        "completed": 300,
+        "total": 300,
+        "quality_pairs": demo_data.build_quality_pairs_snapshot("usrp", include_original_tvm=False),
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        report_path = Path(tmp) / "showcase_top300_original_tvm_report.json"
+        report_path.write_text(
+            json.dumps({"aggregate": {"mean_psnr_db": 27.5, "mean_ssim": 0.965}, "audited_count": 300}),
+            encoding="utf-8",
+        )
+        previous = demo_data.SHOWCASE_ORIGINAL_TVM_REPORT
+        demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = report_path
+        try:
+            batch_state = state.get_batch_state()
+        finally:
+            demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = previous
+
+    original_tvm = batch_state["quality_pairs"]["original_tvm"]
+    assert original_tvm["label"] == "原图-TVM"
+    assert original_tvm["scope"] == "showcase_top300_fixed_audit"
+    assert original_tvm["psnr_db"] == 27.5
+    assert original_tvm["ssim"] == 0.965
 
 
 def test_iq_tail_audit_from_summary_preserves_runner_counts() -> None:
@@ -669,15 +700,28 @@ class DashboardStateTest(unittest.TestCase):
             env_values={"REMOTE_OUTPUT_BASE": "/home/user/Downloads/jscc-test/jscc/infer_outputs"},
             source_summary="test",
         )
-        with (
-            patch.object(state, "_discover_default_local_usrp_image_dir", return_value=str(server.PACKAGE_ROOT)),
-            patch.object(state._reconstruction_browser_manager, "open", return_value="http://127.0.0.1:8786/") as open_browser,
-        ):
-            state.open_reconstruction_browser()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            legacy_originals = Path(temp_dir) / "legacy_originals"
+            legacy_originals.mkdir()
+            with (
+                patch.object(state, "_discover_default_local_usrp_image_dir", return_value=str(server.PACKAGE_ROOT)),
+                patch.object(server, "LEGACY_USRP_ORIGINAL_IMAGE_DIR", legacy_originals),
+                patch.object(state._reconstruction_browser_manager, "open", return_value="http://127.0.0.1:8786/") as open_browser,
+            ):
+                state.open_reconstruction_browser()
 
         config = open_browser.call_args.args[0]
         self.assertEqual(config.manifest_root.name, "qpsk_batch_spool_arq_runs")
         self.assertEqual(config.default_source, "usrp-iq-direct")
+        self.assertEqual(
+            config.original_dir_rules,
+            (
+                {
+                    "before_usrp_token": server.USRP_ORIGINAL_GALLERY_SWITCH_TOKEN,
+                    "original_dir": str(legacy_originals.resolve()),
+                },
+            ),
+        )
         self.assertEqual(
             config.sources,
             (
@@ -806,6 +850,7 @@ class DashboardStateTest(unittest.TestCase):
             image_index: int,
             allow_preflight_degraded: bool = False,
             max_inputs: int = server.DEFAULT_MAX_INPUTS,
+            control_expected_outputs: int | None = None,
         ) -> dict[str, object]:
             self.assertEqual(variant, "current")
             self.assertEqual(image_index, 0)
@@ -893,6 +938,7 @@ class DashboardStateTest(unittest.TestCase):
             image_index: int,
             allow_preflight_degraded: bool = False,
             max_inputs: int = server.DEFAULT_MAX_INPUTS,
+            control_expected_outputs: int | None = None,
         ) -> dict[str, object]:
             self.assertEqual(variant, "current")
             self.assertEqual(max_inputs, 3)
@@ -1881,11 +1927,13 @@ class DashboardStateTest(unittest.TestCase):
             image_index: int,
             allow_preflight_degraded: bool = False,
             max_inputs: int = server.DEFAULT_MAX_INPUTS,
+            control_expected_outputs: int | None = None,
         ) -> dict[str, object]:
             self.assertEqual(variant, "current")
             self.assertEqual(image_index, 0)
             self.assertTrue(allow_preflight_degraded)
             self.assertEqual(max_inputs, 3)
+            self.assertEqual(control_expected_outputs, server.DEFAULT_MAX_INPUTS)
             return {
                 "status": "running",
                 "execution_mode": "live",
@@ -5438,6 +5486,196 @@ class ServerMainTest(unittest.TestCase):
         self.assertEqual(summary["pending_count"], 260)
         self.assertFalse(summary["all_pass"])
 
+    def test_qpsk_snapshot_counts_images_that_no_longer_need_arq_for_transport_progress(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={
+                    "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
+                    "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
+                },
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=3)
+
+            job._summary_path.write_text(
+                json.dumps(
+                    {
+                        "target_count": 3,
+                        "completed_count": 3,
+                        "pass_count": 2,
+                        "results": [
+                            {"pass": True, "rounds": 1},
+                            {"pass": True, "rounds": 2},
+                            {"pass": False, "rounds": 1},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with job._lock:
+                job._phase = "transport"
+                job._host_preprocess_completed = 3
+                job._host_preprocess_state = "completed"
+
+            snapshot = job.snapshot()
+
+        transport = snapshot["stage_progress"]["transport"]
+        self.assertEqual(snapshot["progress"]["count_label"], "2 / 3")
+        self.assertEqual(transport["label"], "USRP 已完成接收")
+        self.assertEqual(transport["completed_count"], 2)
+
+    def test_qpsk_terminal_snapshot_counts_images_that_no_longer_need_arq(self) -> None:
+        class FakeThread:
+            def __init__(self, *, target, daemon=False):
+                self.target = target
+                self.daemon = daemon
+
+            def start(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            (temp_dir / "runs").mkdir()
+            access = usrp_runtime.BoardAccessConfig(
+                host="100.121.87.73",
+                user="user",
+                password="user",
+                port="22",
+                env_file=None,
+                env_values={"MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs")},
+                source_summary="test",
+            )
+            with patch("usrp_runtime.threading.Thread", FakeThread):
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=3)
+
+            snapshot = job._build_terminal_snapshot(
+                status="success",
+                status_category="success",
+                message="done",
+                summary={
+                    "target_count": 3,
+                    "pass_count": 3,
+                    "all_pass": True,
+                    "results": [
+                        {"pass": True, "rounds": 1},
+                        {"pass": True, "rounds": 2},
+                        {"pass": True, "rounds": 3},
+                    ],
+                },
+            )
+
+        transport = snapshot["stage_progress"]["transport"]
+        self.assertEqual(transport["count_label"], "3 / 3")
+        self.assertEqual(transport["percent"], 100)
+
+    def test_rank_qpsk_probe_results_prefers_complete_low_retransmission_profile(self) -> None:
+        results = [
+            {
+                "frequency_hz": 500_000_000,
+                "rate": 5_000_000,
+                "rx_gain": 15,
+                "pass_count": 2,
+                "target_count": 3,
+                "round_record_count": 3,
+                "elapsed_sec": 16.0,
+            },
+            {
+                "frequency_hz": 500_000_000,
+                "rate": 5_000_000,
+                "rx_gain": 25,
+                "pass_count": 3,
+                "target_count": 3,
+                "round_record_count": 5,
+                "elapsed_sec": 22.0,
+            },
+            {
+                "frequency_hz": 498_000_000,
+                "rate": 2_500_000,
+                "rx_gain": 20,
+                "pass_count": 3,
+                "target_count": 3,
+                "round_record_count": 3,
+                "elapsed_sec": 25.0,
+            },
+        ]
+
+        ranked = usrp_runtime.rank_qpsk_probe_results(results)
+
+        self.assertEqual(ranked[0]["frequency_hz"], 498_000_000)
+        self.assertEqual(ranked[0]["rx_gain"], 20)
+        self.assertEqual(ranked[-1]["pass_count"], 2)
+
+    def test_qpsk_radio_probe_requires_ready_board_session(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+
+        payload = state.start_qpsk_radio_probe()
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("板卡会话", payload["message"])
+
+    def test_qpsk_radio_probe_uses_transport_summary_for_partial_failure(self) -> None:
+        snapshot = {
+            "request_state": "completed",
+            "message": "USRP 数据面批处理未全部成功。",
+            "runner_summary": {"processed_count": 1, "input_count": 3},
+            "diagnostics": {
+                "usrp_summary": {
+                    "target_count": 3,
+                    "pass_count": 1,
+                    "round_record_count": 6,
+                    "elapsed_sec": 31.5,
+                }
+            },
+        }
+
+        result = server.qpsk_probe_result_from_snapshot(
+            snapshot,
+            frequency_hz=500_000_000,
+            rate=5_000_000,
+            rx_gain=15,
+            tx_gain=30,
+        )
+
+        self.assertEqual(result["pass_count"], 1)
+        self.assertEqual(result["round_record_count"], 6)
+        self.assertEqual(result["target_count"], 3)
+        self.assertEqual(result["tx_gain"], 30)
+
+    def test_qpsk_radio_profile_omits_probe_only_arq_and_timeout_overrides(self) -> None:
+        overrides = server.qpsk_radio_profile_overrides(
+            {
+                "frequency_hz": 500_000_000,
+                "rate": 5_000_000,
+                "tx_gain": 20,
+                "rx_gain": 25,
+            }
+        )
+
+        self.assertEqual(overrides["JSCC_LINK_MODE"], "qpsk")
+        self.assertEqual(overrides["FREQ"], "500000000")
+        self.assertEqual(overrides["RATE"], "5000000")
+        self.assertEqual(overrides["TX_GAIN"], "20")
+        self.assertEqual(overrides["RX_GAIN"], "25")
+        self.assertNotIn("MLKEM_USRP_MAX_ARQ_ROUNDS", overrides)
+        self.assertNotIn("USRP_JOB_TIMEOUT_SEC", overrides)
+
     def test_usrp_snapshot_counts_completed_image_dirs_before_summary_exists(self) -> None:
         class FakeThread:
             def __init__(self, *, target, daemon=False):
@@ -5459,6 +5697,7 @@ class ServerMainTest(unittest.TestCase):
                 env_values={
                     "OPENAMP_DEMO_INPUT_SOURCE_MODE": "usrp",
                     "REMOTE_USRP_RX_DIR": "/home/user/cockpit_usrp_rx",
+                    "JSCC_LINK_MODE": "iq-direct",
                     "MLKEM_USRP_RUN_ROOT": str(temp_dir / "runs"),
                 },
                 source_summary="test",
@@ -5762,17 +6001,19 @@ class ServerMainTest(unittest.TestCase):
                 patch.object(usrp_runtime.UsrpBatchSpoolJob, "_ensure_host_latents", return_value=latent_dir),
                 patch("usrp_runtime._prepare_wire_input_dir", side_effect=fake_prepare_wire_input_dir),
                 patch("usrp_runtime._enrich_wire_manifest_with_host_images", side_effect=lambda manifest, *_: manifest),
-                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})),
+                patch("usrp_runtime._ensure_usrp_control_servers", return_value=(True, {})) as ensure_control,
                 patch("usrp_runtime._sync_iq_decode_assets_on_remote", create=True) as sync_decode_assets,
                 patch.object(usrp_runtime.UsrpBatchSpoolJob, "_wait_for_completion", return_value=None),
                 patch("usrp_runtime.subprocess.Popen", return_value=Mock(pid=1234)),
             ):
-                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=1)
+                job = usrp_runtime.UsrpBatchSpoolJob(access, variant="current", max_inputs=20)
                 job._start_and_watch()
                 job._log_handle.close()
 
         command = job._runner_command
         self.assertIn("RunQpskFileBatchSpoolArq.py", str(command[1]))
+        self.assertNotIn("--batch-size", command)
+        self.assertTrue(ensure_control.call_args.kwargs["require_reset"])
         self.assertIn("--decode-backend", command)
         self.assertEqual(command[command.index("--decode-backend") + 1], "python")
         self.assertIn("--tx-file-path-prefix-from", command)
@@ -9311,7 +9552,7 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
         self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
 
-    def test_board_access_usrp_defaults_to_iq_direct_link_mode(self) -> None:
+    def test_board_access_usrp_defaults_to_qpsk_link_mode(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)
 
         status, _, payload = request_json(
@@ -9323,8 +9564,8 @@ class DemoHTTPServerTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["board_access"]["transport_mode"], "usrp")
-        self.assertEqual(payload["board_access"]["jscc_link_mode"], "iq-direct")
-        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "iq-direct")
+        self.assertEqual(payload["board_access"]["jscc_link_mode"], "qpsk")
+        self.assertEqual(state._board_access.build_env()["JSCC_LINK_MODE"], "qpsk")
 
         status, _, payload = request_json(
             state,
@@ -9384,10 +9625,40 @@ class DemoHTTPServerTest(unittest.TestCase):
         self.assertEqual(pairs["pytorch_tvm"]["label"], "PyTorch-TVM")
         self.assertGreater(pairs["pytorch_tvm"]["psnr_db"], 30.0)
         self.assertGreater(pairs["pytorch_tvm"]["ssim"], 0.9)
-        self.assertEqual(pairs["original_tvm"]["label"], "原图-TVM")
-        self.assertGreater(pairs["original_tvm"]["psnr_db"], 20.0)
-        self.assertGreater(pairs["original_tvm"]["ssim"], 0.8)
-        self.assertIn("reconstruction_error_audit_usrp", pairs["original_tvm"]["report_path"])
+        self.assertNotIn("original_tvm", pairs)
+
+    def test_usrp_tvm_payload_exposes_fixed_top300_original_tvm_after_completion(self) -> None:
+        state = DashboardState(None, 30.0, probe_cache_path=None)
+        state._board_access = state._board_access.with_env_overrides({"MLKEM_TRANSPORT_MODE": "usrp"})
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "showcase_top300_original_tvm_report.json"
+            report_path.write_text(
+                json.dumps({"aggregate": {"mean_psnr_db": 26.25, "mean_ssim": 0.971}, "audited_count": 300}),
+                encoding="utf-8",
+            )
+            previous = demo_data.SHOWCASE_ORIGINAL_TVM_REPORT
+            demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = report_path
+            try:
+                payload = state._build_live_payload_from_batch_summary(
+                    engine="tvm",
+                    job_id="usrp-fixed-top300-quality",
+                    count=300,
+                    summary={
+                        "processed_count": 300,
+                        "selected_input_count": 300,
+                        "run_samples_ms": [250.0],
+                        "run_median_ms": 250.0,
+                        "run_mean_ms": 250.0,
+                    },
+                )
+            finally:
+                demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = previous
+
+        original_tvm = payload["quality_pairs"]["original_tvm"]
+        self.assertEqual(original_tvm["label"], "原图-TVM")
+        self.assertEqual(original_tvm["scope"], "showcase_top300_fixed_audit")
+        self.assertAlmostEqual(original_tvm["psnr_db"], 26.25)
+        self.assertAlmostEqual(original_tvm["ssim"], 0.971)
 
     def test_board_access_env_switch_refreshes_current_trusted_sha_runtime(self) -> None:
         state = DashboardState(None, 30.0, probe_cache_path=None)

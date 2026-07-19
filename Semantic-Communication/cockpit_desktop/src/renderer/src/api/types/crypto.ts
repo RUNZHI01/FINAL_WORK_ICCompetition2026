@@ -91,7 +91,7 @@ export type CryptoStatusResponse = {
   handshake_ms?: number
   /** Last encrypt+send duration in ms */
   encrypt_ms?: number
-  /** Last decrypt duration in ms */
+  /** Last encrypted-result wait and receive duration in ms (includes remote work and network wait) */
   decrypt_ms?: number
   /** Last TVM inference duration in ms */
   inference_ms?: number

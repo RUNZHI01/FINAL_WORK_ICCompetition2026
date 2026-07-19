@@ -1476,6 +1476,7 @@ class LiveRemoteReconstructionJob:
         *,
         variant: str,
         max_inputs: int = DEFAULT_MAX_INPUTS,
+        control_expected_outputs: int | None = None,
         seed: int = DEFAULT_SEED,
         timeout_sec: float = 900.0,
         heartbeat_interval_sec: float = DEFAULT_HEARTBEAT_INTERVAL_SEC,
@@ -1486,6 +1487,7 @@ class LiveRemoteReconstructionJob:
         self.job_id = generate_live_job_id()
         self.variant = variant
         self._expected_outputs = max_inputs
+        self._control_expected_outputs = max(1, int(control_expected_outputs or max_inputs))
         self._timeout_sec = timeout_sec
         self._control_transport = (
             CONTROL_TRANSPORT_HOOK if control_transport_uses_hook(control_transport) else CONTROL_TRANSPORT_NONE
@@ -1630,7 +1632,7 @@ class LiveRemoteReconstructionJob:
             "--expected-sha256",
             admission["expected_sha256"],
             "--expected-outputs",
-            str(max_inputs),
+            str(self._control_expected_outputs),
             "--output-dir",
             str(self._output_dir),
             "--heartbeat-interval-sec",
@@ -2048,6 +2050,7 @@ def launch_remote_reconstruction_job(
     *,
     variant: str,
     max_inputs: int = DEFAULT_MAX_INPUTS,
+    control_expected_outputs: int | None = None,
     seed: int = DEFAULT_SEED,
     timeout_sec: float = 900.0,
     control_transport: str = CONTROL_TRANSPORT_HOOK,
@@ -2058,6 +2061,7 @@ def launch_remote_reconstruction_job(
         access,
         variant=variant,
         max_inputs=max_inputs,
+        control_expected_outputs=control_expected_outputs,
         seed=seed,
         timeout_sec=timeout_sec,
         control_transport=control_transport,

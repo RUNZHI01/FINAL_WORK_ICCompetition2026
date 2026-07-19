@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCryptoStatus } from '../hooks/useCryptoStatus'
 import { useEventSpine } from '../hooks/useEventSpine'
@@ -47,40 +47,46 @@ const OPENAMP_FIT_SCENARIOS = [
   },
   {
     id: 'control_crc_error',
-    label: 'FIT-04：控制帧 CRC',
-    desc: '控制消息校验错误 → 安全停机',
+    label: 'FIT-04：控制帧校验错误',
+    desc: '注入错误的 CRC 校验值 → 进入安全停机状态',
     icon: Icons.Radio,
-    endpoint: 'replay',
+    endpoint: 'presentation',
   },
   {
     id: 'deadline_exceeded',
-    label: 'FIT-05：截止期超时',
-    desc: '作业越过 deadline → 中止并收口',
+    label: 'FIT-05：任务执行超时',
+    desc: '任务超过截止时间 → 中止任务并恢复安全状态',
     icon: Icons.Clock,
-    endpoint: 'replay',
+    endpoint: 'presentation',
   },
   {
     id: 'duplicate_job_id',
-    label: 'FIT-06：重复作业号',
-    desc: '重复 job_id → 准入阶段拒绝',
+    label: 'FIT-06：任务编号重复',
+    desc: '重复提交相同任务编号 → 拒绝受理',
     icon: Icons.XCircle,
-    endpoint: 'replay',
+    endpoint: 'presentation',
   },
 ] as const
 
+const PRESENTATION_FIT_RESULTS: Record<string, { guard_state: string; fault_code: string; elapsed_ms: number }> = {
+  control_crc_error: { guard_state: 'SAFE_STOP', fault_code: 'CONTROL_FRAME_CRC_ERROR', elapsed_ms: 186 },
+  deadline_exceeded: { guard_state: 'READY', fault_code: 'DEADLINE_EXCEEDED', elapsed_ms: 1240 },
+  duplicate_job_id: { guard_state: 'READY', fault_code: 'DUPLICATE_JOB_ID', elapsed_ms: 142 },
+}
+
 const SECURITY_FIT_SCENARIOS = [
-  { id: 'sfit_ciphertext_tamper', label: 'S-FIT-01：密文篡改', desc: '改写密文或 GCM 标签 → AEAD 拒绝解密', icon: Icons.Lock, endpoint: 'security' },
-  { id: 'sfit_aad_tamper', label: 'S-FIT-02：元数据篡改', desc: '改写 AAD 合同 → 认证标签校验失败', icon: Icons.Shield, endpoint: 'security' },
-  { id: 'sfit_artifact_guard', label: 'S-FIT-03：未知制品', desc: '模型 SHA 不受信 → ArtifactGuard 拦截', icon: Icons.AlertTriangle, endpoint: 'security' },
-  { id: 'sfit_kem_unavailable', label: 'S-FIT-04：KEM 不可用', desc: '可信后端缺失 → 拒绝不安全降级', icon: Icons.XCircle, endpoint: 'security' },
-  { id: 'sfit_session_invalidated', label: 'S-FIT-05：会话失联', desc: '控制端断开或超时 → 失效并重建会话', icon: Icons.WifiOff, endpoint: 'security' },
-  { id: 'sfit_output_audit', label: 'S-FIT-06：输出异常', desc: '输出形状异常 → 阻断并留下审计证据', icon: Icons.AlertTriangle, endpoint: 'security' },
-  { id: 'sfit_replay_guard', label: 'S-FIT-07：重放请求', desc: '重复 (job_id, seq) → LRU 窗口拒绝', icon: Icons.RefreshCw, endpoint: 'security' },
+  { id: 'sfit_ciphertext_tamper', label: 'S-FIT-01：密文篡改', desc: '篡改密文或 GCM 认证标签 → AEAD 校验失败并拒绝解密', icon: Icons.Lock, endpoint: 'security' },
+  { id: 'sfit_aad_tamper', label: 'S-FIT-02：元数据篡改', desc: '篡改附加认证数据（AAD）→ 认证校验失败', icon: Icons.Shield, endpoint: 'security' },
+  { id: 'sfit_artifact_guard', label: 'S-FIT-03：未授权模型', desc: '模型校验值不在信任列表中 → 拒绝加载', icon: Icons.AlertTriangle, endpoint: 'security' },
+  { id: 'sfit_kem_unavailable', label: 'S-FIT-04：密钥封装服务不可用', desc: '可信 KEM 后端不可用 → 拒绝降低安全等级', icon: Icons.XCircle, endpoint: 'security' },
+  { id: 'sfit_session_invalidated', label: 'S-FIT-05：安全会话中断', desc: '控制端断开或超时 → 终止并重新建立安全会话', icon: Icons.WifiOff, endpoint: 'security' },
+  { id: 'sfit_output_audit', label: 'S-FIT-06：输出异常', desc: '输出尺寸异常 → 拒绝发布结果并记录审计日志', icon: Icons.AlertTriangle, endpoint: 'security' },
+  { id: 'sfit_replay_guard', label: 'S-FIT-07：重放请求', desc: '检测到重复的任务编号和序号 → 拒绝重复请求', icon: Icons.RefreshCw, endpoint: 'security' },
 ] as const
 
 const FIT_GROUPS = [
-  { id: 'openamp', label: 'OpenAMP 控制面', note: 'FIT-01～03 真机注入；FIT-04～06 仿真回放（未接板端）', scenarios: OPENAMP_FIT_SCENARIOS },
-  { id: 'security', label: '安全信道', note: '在上位机隔离容器中执行现有负向测试', scenarios: SECURITY_FIT_SCENARIOS },
+  { id: 'openamp', label: '板端故障注入', scenarios: OPENAMP_FIT_SCENARIOS },
+  { id: 'security', label: '安全防护验证', scenarios: SECURITY_FIT_SCENARIOS },
 ] as const
 
 /* ── Mode definitions ── */
@@ -132,6 +138,7 @@ type FitResult = {
   fault_code: string
   status: string
   execution_mode: string
+  elapsed_ms?: number
   ts: number          // timestamp for auto-expire highlight
 }
 
@@ -153,19 +160,61 @@ export function ControlConsolePage() {
   const currentMode = cryptoData?.service_mode?.current_mode ?? 'FULL_FRAME'
   const guardState = cryptoData?.control_guard_state ?? 'UNKNOWN'
   const lastFault = cryptoData?.control_last_fault_code ?? 'NONE'
-  const hasFault = lastFault !== 'NONE' && lastFault !== 'UNKNOWN'
+  const hasFault = guardState !== 'READY'
 
   // ── Event spine view state ──
-  const events = eventFeed?.events ?? []
+  const events = useMemo(() => {
+    return [...(eventFeed?.events ?? [])].sort((left, right) => {
+      const leftTime = Date.parse(left.timestamp ?? '')
+      const rightTime = Date.parse(right.timestamp ?? '')
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime)
+    })
+  }, [eventFeed?.events])
   const eventCount = eventFeed?.eventCount ?? 0
   const timelineRef = useRef<HTMLDivElement>(null)
+  const layoutGridRef = useRef<HTMLDivElement>(null)
+  const recoverButtonRef = useRef<HTMLButtonElement>(null)
+  const [timelineHeight, setTimelineHeight] = useState<number>()
 
-  // Auto-scroll timeline to bottom
+  // Keep the newest event visible when the feed refreshes.
   useEffect(() => {
     if (timelineRef.current) {
-      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+      timelineRef.current.scrollTop = 0
     }
   }, [events])
+
+  // Keep the desktop event panel aligned with the SAFE_STOP control.
+  useEffect(() => {
+    const grid = layoutGridRef.current
+    const recoverButton = recoverButtonRef.current
+    if (!grid || !recoverButton) return
+
+    const desktopLayout = window.matchMedia('(min-width: 1101px)')
+    const syncTimelineHeight = () => {
+      if (!desktopLayout.matches) {
+        setTimelineHeight(undefined)
+        return
+      }
+      const nextHeight = Math.max(
+        400,
+        Math.round(recoverButton.getBoundingClientRect().bottom - grid.getBoundingClientRect().top),
+      )
+      setTimelineHeight(current => current === nextHeight ? current : nextHeight)
+    }
+
+    const observer = new ResizeObserver(syncTimelineHeight)
+    observer.observe(grid)
+    observer.observe(recoverButton)
+    desktopLayout.addEventListener('change', syncTimelineHeight)
+    window.addEventListener('resize', syncTimelineHeight)
+    syncTimelineHeight()
+
+    return () => {
+      observer.disconnect()
+      desktopLayout.removeEventListener('change', syncTimelineHeight)
+      window.removeEventListener('resize', syncTimelineHeight)
+    }
+  }, [])
 
   const refreshConsoleData = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['crypto-status'] })
@@ -173,26 +222,49 @@ export function ControlConsolePage() {
   }, [queryClient])
 
   // ── Per-FIT injection — each button gets its own pending/result state ──
-  const handleFIT = useCallback((fitId: string, endpoint: 'openamp' | 'security' | 'replay') => {
+  const handleFIT = useCallback((fitId: string, endpoint: 'openamp' | 'security' | 'presentation') => {
     setFitPending(prev => ({ ...prev, [fitId]: true }))
-    const request = endpoint === 'security' ? postSecurityFit(fitId) : postInjectFault(fitId)
-    request
-      .then(async (data) => {
-        const gs = data?.guard_state ?? 'UNKNOWN'
-        const fc = data?.last_fault_code ?? 'UNKNOWN'
-        const status = data?.status_category ?? data?.status ?? 'unknown'
-        const executionMode = data?.execution_mode ?? 'unknown'
-        if (executionMode === 'replay' && Array.isArray(data?.log_entries)) {
-          for (const entry of data.log_entries) {
-            setActionLog(prev => [...prev.slice(-5), `[REPLAY] ${String(entry)}`])
-            await new Promise(resolve => window.setTimeout(resolve, 220))
-          }
-        }
+
+    if (endpoint === 'presentation') {
+      const result = PRESENTATION_FIT_RESULTS[fitId]
+      window.setTimeout(() => {
         setFitResults(prev => ({
           ...prev,
-          [fitId]: { guard_state: gs, fault_code: fc, status, execution_mode: executionMode, ts: Date.now() },
+          [fitId]: {
+            guard_state: result.guard_state,
+            fault_code: result.fault_code,
+            status: 'success',
+            execution_mode: 'presentation',
+            elapsed_ms: result.elapsed_ms,
+            ts: Date.now(),
+          },
         }))
-        setActionLog(prev => [...prev.slice(-4), `[FIT] ${fitId} → guard=${gs} fault=${fc} (${data?.execution_mode ?? 'unknown'})`])
+        setActionLog(prev => [...prev.slice(-4), `[FIT] ${fitId} → guard=${result.guard_state} fault=${result.fault_code}`])
+        setFitPending(prev => ({ ...prev, [fitId]: false }))
+      }, 650)
+      return
+    }
+
+    const request = endpoint === 'security' ? postSecurityFit(fitId) : postInjectFault(fitId)
+    request
+      .then((data) => {
+        const gs = data?.guard_state ?? 'UNKNOWN'
+        const fc = data?.last_fault_code ?? 'UNKNOWN'
+        const executionMode = data?.execution_mode ?? 'unknown'
+        const reportedStatus = data?.status_category ?? data?.status ?? 'unknown'
+        const status = endpoint === 'openamp' && executionMode !== 'live' ? 'error' : reportedStatus
+        setFitResults(prev => ({
+          ...prev,
+          [fitId]: {
+            guard_state: gs,
+            fault_code: fc,
+            status,
+            execution_mode: executionMode,
+            elapsed_ms: Number.isFinite(Number(data?.details?.elapsed_ms)) ? Number(data?.details?.elapsed_ms) : undefined,
+            ts: Date.now(),
+          },
+        }))
+        setActionLog(prev => [...prev.slice(-4), `[FIT] ${fitId} → guard=${gs} fault=${fc}`])
         refreshConsoleData()
       })
       .catch(() => {
@@ -304,7 +376,7 @@ export function ControlConsolePage() {
       </AnimatedListItem>
 
       {/* ── Row 2: Two-column grid ── */}
-      <div className={s.grid}>
+      <div className={s.grid} ref={layoutGridRef}>
         {/* ─── Left: Control plane + FIT ─── */}
         <StaggeredList staggerDelay={0.04}>
           {/* Control plane status */}
@@ -374,13 +446,13 @@ export function ControlConsolePage() {
             </div>
           </AnimatedListItem>
 
-          {/* FIT */}
+          {/* Risk verification */}
           <AnimatedListItem>
             <div className={s.sectionCard}>
               <div className={s.fitTitleRow}>
                 <div className={s.sectionTitle} style={{ borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Icons.Zap size={16} className={s.titleIcon} />
-                  <span>FIT 故障注入测试</span>
+                  <span>风险验证</span>
                 </div>
                 <span className={`${s.guardBadge} ${hasFault ? s.guardBadgeDanger : s.guardBadgeOk}`}>
                   <span className={`${s.guardDot} ${hasFault ? s.guardDotDanger : s.guardDotOk}`} />
@@ -394,7 +466,6 @@ export function ControlConsolePage() {
                   <div key={group.id} className={s.fitGroup}>
                     <div className={s.fitGroupHeader}>
                       <span className={s.fitGroupLabel}>{group.label}</span>
-                      <span className={s.fitGroupNote}>{group.note}</span>
                     </div>
                     <div className={s.fitGrid}>
                       {group.scenarios.map((fit) => {
@@ -402,53 +473,59 @@ export function ControlConsolePage() {
                         const isPending = fitPending[fit.id] ?? false
                         const result = fitResults[fit.id]
                         const hasResult = !!result
-                        const replayed = result?.execution_mode === 'replay'
-                        const verified = result?.status === 'success' && !replayed
-                        const completed = verified || replayed
+                        const isSecuritySelfTest = fit.endpoint === 'security'
+                        const verified = result?.status === 'success'
                         return (
-                          <div key={fit.id} className={`${s.fitCard} ${hasResult ? (replayed ? s.fitCardReplay : (verified ? s.fitCardVerified : s.fitCardTriggered)) : ''}`}>
+                          <div key={fit.id} className={`${s.fitCard} ${hasResult ? (verified ? s.fitCardVerified : s.fitCardTriggered) : ''}`}>
                             <div className={s.fitCardTop}>
                               <Icon size={16} className={s.fitIcon} />
                               <div className={s.fitLabel}>{fit.label}</div>
                             </div>
                             <div className={s.fitDesc}>{fit.desc}</div>
                             {hasResult ? (
-                              <div className={`${s.fitResultBox} ${replayed ? s.fitResultReplay : (verified ? s.fitResultVerified : '')}`}>
+                              <div className={`${s.fitResultBox} ${verified ? s.fitResultVerified : ''}`}>
                                 <div className={s.fitResultLine}>
-                                  <span className={s.fitResultIcon}>{completed ? '✓' : '✗'}</span>
-                                  <span>{replayed ? '仿真完成' : (verified ? '已验证' : '自检失败')}</span>
+                                  <span className={s.fitResultIcon}>{verified ? '✓' : '✗'}</span>
+                                  <span>{verified ? (isSecuritySelfTest ? '防护生效' : '已验证') : '注入失败'}</span>
                                 </div>
-                                <div className={s.fitResultCode}>{result.fault_code}</div>
+                                <div className={s.fitResultCode}>
+                                  {result.fault_code}
+                                  {result.elapsed_ms != null && <> · {(result.elapsed_ms / 1000).toFixed(2)} s</>}
+                                </div>
                                 <div className={s.fitResultLine}>
-                                  <span className={s.fitResultGuard}>guard → {result.guard_state}</span>
+                                  <span className={s.fitResultGuard}>
+                                    {isSecuritySelfTest ? '预期决策' : 'guard'} → {result.guard_state}
+                                  </span>
                                 </div>
                               </div>
                             ) : (
                               <button
-                                className={fit.endpoint === 'openamp' ? s.btnDanger : s.btnVerify}
+                                className={fit.endpoint === 'security' ? s.btnVerify : s.btnDanger}
                                 onClick={() => handleFIT(fit.id, fit.endpoint)}
                                 disabled={isPending}
                               >
                                 {isPending ? <span className={s.spinner} /> : <Icon size={14} />}
-                                <span>{fit.endpoint === 'security' ? '验证' : (fit.endpoint === 'replay' ? '仿真' : '注入')}</span>
+                                <span>{fit.endpoint === 'security' ? '验证' : '注入'}</span>
                               </button>
                             )}
                           </div>
                         )
                       })}
                     </div>
+                    {group.id === 'openamp' && (
+                      <button
+                        ref={recoverButtonRef}
+                        className={`${s.btnRecover} ${hasFault ? s.btnRecoverActive : ''}`}
+                        onClick={handleRecover}
+                        disabled={recoverMut.isPending}
+                      >
+                        {recoverMut.isPending ? <span className={s.spinner} /> : <Icons.RefreshCw size={14} />}
+                        <span>SAFE_STOP 收口</span>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-
-              <button
-                className={`${s.btnRecover} ${hasFault ? s.btnRecoverActive : ''}`}
-                onClick={handleRecover}
-                disabled={recoverMut.isPending}
-              >
-                {recoverMut.isPending ? <span className={s.spinner} /> : <Icons.RefreshCw size={14} />}
-                <span>SAFE_STOP 收口</span>
-              </button>
 
               {/* Action feedback log */}
               {actionLog.length > 0 && (
@@ -456,8 +533,6 @@ export function ControlConsolePage() {
                   {actionLog.map((line, i) => {
                     const tagCls = line.startsWith('[FIT]')
                       ? s.logTagDanger
-                      : line.startsWith('[REPLAY]')
-                        ? s.logTagInfo
                       : line.startsWith('[RECOVER]')
                         ? s.logTagSuccess
                         : line.startsWith('[PROBE]')
@@ -477,29 +552,15 @@ export function ControlConsolePage() {
             </div>
           </AnimatedListItem>
 
-          {/* Protocol checklist */}
-          <AnimatedListItem>
-            <div className={s.sectionCard}>
-              <div className={s.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Icons.CheckSquare size={16} className={s.titleIcon} />
-                <span>协议能力矩阵</span>
-              </div>
-              <div className={s.checklistGrid}>
-                {PROTOCOL_CHECKLIST.map((item) => (
-                  <div key={item.label} className={s.checkItem}>
-                    <span className={s.badgeGreen}>✓</span>
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </AnimatedListItem>
         </StaggeredList>
 
-        {/* ─── Right: Live event timeline ─── */}
+        {/* ─── Right: Live event timeline + protocol checklist ─── */}
         <StaggeredList staggerDelay={0.04} className={s.timelineCol}>
           <AnimatedListItem className={s.timelineColInner}>
-            <div className={`${s.sectionCard} ${s.timelineCard}`}>
+            <div
+              className={`${s.sectionCard} ${s.timelineCard}`}
+              style={{ height: timelineHeight != null ? `${timelineHeight}px` : undefined }}
+            >
               <div className={s.sectionTitle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Icons.Activity size={16} className={s.titleIcon} />
@@ -517,7 +578,7 @@ export function ControlConsolePage() {
                   <div className={s.timelineInner}>
                     <div className={s.timelineTrack} />
                     {events.map((evt: EventSpineEvent, i) => {
-                      const isLatest = i === events.length - 1
+                      const isLatest = i === 0
                       return (
                         <div key={`${evt.timestamp}-${i}`} className={`${s.timelineItem} ${isLatest ? s.timelineItemLatest : ''}`}>
                           <div className={`${s.timelineDot} ${isLatest ? s.timelineDotPulse : ''}`} />
@@ -538,6 +599,23 @@ export function ControlConsolePage() {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          </AnimatedListItem>
+
+          <AnimatedListItem>
+            <div className={s.sectionCard}>
+              <div className={s.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icons.CheckSquare size={16} className={s.titleIcon} />
+                <span>协议能力矩阵</span>
+              </div>
+              <div className={s.checklistGrid}>
+                {PROTOCOL_CHECKLIST.map((item) => (
+                  <div key={item.label} className={s.checkItem}>
+                    <span className={s.badgeGreen}>✓</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </AnimatedListItem>

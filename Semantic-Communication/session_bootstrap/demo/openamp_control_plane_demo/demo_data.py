@@ -120,6 +120,7 @@ PRERECORDED_SAMPLE_FIXTURES = (
 )
 QUALITY_CURRENT_REPORT = REPORTS_ROOT / "quality_metrics_20260312_pytorch_vs_tvm_current.json"
 QUALITY_BASELINE_REPORT = REPORTS_ROOT / "quality_metrics_20260312_pytorch_vs_tvm_baseline.json"
+SHOWCASE_ORIGINAL_TVM_REPORT = REPORTS_ROOT / "showcase_top300_original_tvm_report.json"
 DEFAULT_DEMO_DEADLINE_MS = 300000
 DEFAULT_DEMO_EXPECTED_OUTPUTS = 300
 DEFAULT_DEMO_JOB_FLAGS = "reconstruction"
@@ -645,9 +646,9 @@ def _original_tvm_report_for_mode(mode: str) -> Path | None:
     )
 
 
-def _original_tvm_quality(mode: str) -> dict[str, Any] | None:
-    report_path = _original_tvm_report_for_mode(mode)
-    if report_path is None:
+def _showcase_original_tvm_quality() -> dict[str, Any] | None:
+    report_path = SHOWCASE_ORIGINAL_TVM_REPORT
+    if not report_path.exists():
         return None
     try:
         payload = read_json(report_path)
@@ -662,12 +663,12 @@ def _original_tvm_quality(mode: str) -> dict[str, Any] | None:
         "label": "原图-TVM",
         "psnr_db": psnr_db,
         "ssim": ssim,
-        "scope": "latest_original_reconstruction_audit",
+        "scope": "showcase_top300_fixed_audit",
         "report_path": repo_relative(report_path),
     }
 
 
-def build_quality_pairs_snapshot(mode: str = "prerecorded") -> dict[str, Any]:
+def build_quality_pairs_snapshot(mode: str = "prerecorded", *, include_original_tvm: bool = False) -> dict[str, Any]:
     pairs: dict[str, Any] = {}
     pytorch_psnr = _quality_report_mean(QUALITY_CURRENT_REPORT, "psnr_db")
     pytorch_ssim = _quality_report_mean(QUALITY_CURRENT_REPORT, "ssim")
@@ -679,9 +680,10 @@ def build_quality_pairs_snapshot(mode: str = "prerecorded") -> dict[str, Any]:
             "scope": "archived_pytorch_reference_mean",
             "report_path": repo_relative(QUALITY_CURRENT_REPORT),
         }
-    original_tvm = _original_tvm_quality(mode)
-    if original_tvm is not None:
-        pairs["original_tvm"] = original_tvm
+    if include_original_tvm:
+        original_tvm = _showcase_original_tvm_quality()
+        if original_tvm is not None:
+            pairs["original_tvm"] = original_tvm
     return pairs
 
 

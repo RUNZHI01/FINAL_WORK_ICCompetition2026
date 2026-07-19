@@ -17,6 +17,7 @@ from scripts.board_image_compare.sources import ReconstructionSource
 from scripts.board_image_compare.service import (
     ComparisonConfig,
     ComparisonServiceState,
+    OriginalDirRule,
     create_http_server,
 )
 
@@ -306,6 +307,62 @@ def test_historical_usrp_job_uses_nested_round_manifest_for_original_and_quality
     state.close()
 
 
+def test_usrp_original_directory_history_keeps_old_jobs_mapped_to_legacy_gallery(tmp_path: Path) -> None:
+    current_originals = tmp_path / "originals"
+    legacy_originals = tmp_path / "legacy_originals"
+    current_originals.mkdir()
+    legacy_originals.mkdir()
+    write_image(current_originals / "00000001.png", (200, 20, 20))
+    write_image(legacy_originals / "00000001.png", (12, 30, 60))
+    reconstruction = tmp_path / "reconstruction.png"
+    write_image(reconstruction, (12, 30, 60))
+    remote = FakeRemote(reconstruction)
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob(
+            "old",
+            "openamp3_usrp_1784297047_current",
+            f"{remote_root}/openamp3_usrp_1784297047_current/reconstructions",
+            100.0,
+        ),
+        RemoteJob(
+            "new",
+            "openamp3_usrp_1784381834_current",
+            f"{remote_root}/openamp3_usrp_1784381834_current/reconstructions",
+            300.0,
+        ),
+    ]
+    state = ComparisonServiceState(
+        cache_root=tmp_path / "cache",
+        remote_factory=lambda _config: remote,
+    )
+    state.configure(
+        ComparisonConfig(
+            board_host="board-a",
+            board_user="user",
+            board_password="user",
+            board_port=22,
+            original_dir=current_originals,
+            sources=(ReconstructionSource("usrp-iq-direct", "USRP IQ direct", "/usrp/iq-direct/tvm"),),
+            default_source="usrp-iq-direct",
+            original_dir_rules=(
+                OriginalDirRule(before_usrp_token=1784381834, original_dir=legacy_originals),
+            ),
+        )
+    )
+
+    state.list_jobs("usrp-iq-direct")
+    old_detail = state.job_detail("old")
+    new_detail = state.job_detail("new")
+    old_quality = state.pull("old", 0, "original")["quality"]
+    new_quality = state.pull("new", 0, "original")["quality"]
+
+    assert old_detail["pairs"][0]["original_dir"] == str(legacy_originals)
+    assert new_detail["pairs"][0]["original_dir"] == str(current_originals)
+    assert old_quality["psnr_db"] == "Infinity"
+    assert new_quality["psnr_db"] != "Infinity"
+    state.close()
+
+
 def test_historical_usrp_job_keeps_direct_image_manifest_support(tmp_path: Path) -> None:
     manifest_root = tmp_path / "runs"
     image_dir = manifest_root / "cockpit_usrp_usrp-123" / "image_0"
@@ -358,6 +415,67 @@ def test_qpsk_job_uses_prepared_input_manifest_for_original_and_quality(tmp_path
     assert detail["pairs"][0]["original_available"] is True
     assert result["quality"]["psnr_db"] == "Infinity"
     assert result["quality"]["ssim"] == 1.0
+    state.close()
+
+
+def test_qpsk_job_pairs_hash_named_reconstruction_with_prepared_manifest(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    prepared_dir = manifest_root / "cockpit_usrp_usrp-123" / "prepared_usrp_inputs"
+    prepared_dir.mkdir(parents=True)
+    (prepared_dir / "usrp_input_manifest.json").write_text(
+        json.dumps(
+            {
+                "files": [
+                    {
+                        "job_id": "abc123_latent",
+                        "source_image_rel": "zeta.png",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "zeta.png", (12, 30, 60))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("qpsk", "openamp3_usrp_123_current", f"{remote_root}/openamp3_usrp_123_current", 300.0)
+    ]
+    remote.list_job_images = lambda job_path: [PurePosixPath(f"{job_path}/abc123_recon.png")]
+
+    state.list_jobs("usrp-qpsk")
+    detail = state.job_detail("qpsk")
+
+    assert detail["pair_count"] == 1
+    assert detail["pairs"][0]["original_name"] == "zeta.png"
+    assert detail["pairs"][0]["original_available"] is True
+    assert detail["pairs"][0]["reconstruction_available"] is True
+    state.close()
+
+
+def test_usrp_job_prefers_actual_image_manifest_over_prepared_input_order(tmp_path: Path) -> None:
+    manifest_root = tmp_path / "runs"
+    prepared_dir = manifest_root / "cockpit_usrp_usrp-123" / "prepared_usrp_inputs"
+    prepared_dir.mkdir(parents=True)
+    (prepared_dir / "usrp_input_manifest.json").write_text(
+        json.dumps({"files": [{"original_filename": "wrong.png"}]}),
+        encoding="utf-8",
+    )
+    image_dir = manifest_root / "cockpit_usrp_usrp-123" / "image_0000"
+    image_dir.mkdir(parents=True)
+    (image_dir / "manifest.json").write_text(
+        json.dumps({"source_info": {"source_meta": {"original_filename": "right.png"}}}),
+        encoding="utf-8",
+    )
+    state, remote = configured_state(tmp_path, manifest_root=manifest_root)
+    write_image(state._config.original_dir / "wrong.png", (80, 20, 40))
+    write_image(state._config.original_dir / "right.png", (12, 30, 60))
+    remote.list_jobs = lambda remote_root: [
+        RemoteJob("usrp", "openamp3_usrp_123_current", f"{remote_root}/reconstructions", 300.0)
+    ]
+
+    state.list_jobs("usrp-iq-direct")
+
+    assert state.job_detail("usrp")["pairs"][0]["original_name"] == "right.png"
     state.close()
 
 
@@ -449,7 +567,7 @@ def test_http_uncached_reconstruction_returns_404_without_download(tmp_path: Pat
         state.close()
 
 
-def test_http_page_exposes_two_previews_and_quality_switch(tmp_path: Path) -> None:
+def test_http_page_exposes_two_previews_and_output_directory_help(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     server = create_http_server("127.0.0.1", 0, state)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -459,7 +577,12 @@ def test_http_page_exposes_two_previews_and_quality_switch(tmp_path: Path) -> No
         body = urlopen(f"http://127.0.0.1:{server.server_port}/", timeout=2).read().decode()
         assert 'id="original-preview"' in body
         assert 'id="reconstruction-preview"' in body
-        assert 'id="quality-assistance"' in body
+        assert 'id="directory-help"' in body
+        assert 'id="quality-assistance"' not in body
+        assert '/home/user/Downloads/jscc-test/jscc/infer_outputs' in body
+        assert '/home/user/Downloads/jscc-test/mnn_benchmark_outputs' in body
+        assert '/home/user/Downloads/jscc-test-usrp/qpsk/tvm' in body
+        assert '/home/user/Downloads/jscc-test-usrp/iq-direct/tvm' in body
         assert 'data-reference-mode="original"' in body
         assert 'data-reference-mode="pytorch"' in body
     finally:
@@ -474,6 +597,8 @@ def test_http_page_exposes_reconstruction_source_selector(tmp_path: Path) -> Non
     assert 'id="reconstruction-source"' in body
     assert "sourceSelect.addEventListener('change'" in script
     assert "/api/jobs?source=" in script
+    assert 'const VISIBLE_SOURCE_IDS = new Set(["usrp-qpsk", "usrp-iq-direct"])' in script
+    assert 'filter((source) => VISIBLE_SOURCE_IDS.has(source.id))' in script
 
 
 def test_http_page_ignores_job_details_from_previous_source(tmp_path: Path) -> None:

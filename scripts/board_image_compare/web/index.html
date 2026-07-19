@@ -12,10 +12,16 @@
       <h1>重建图片对比</h1>
       <p id="service-status">正在连接上位机服务</p>
     </div>
-    <label class="quality-toggle" for="quality-assistance">
-      <input id="quality-assistance" type="checkbox">
-      <span>质量辅助</span>
-    </label>
+    <div class="topbar-actions">
+      <button id="directory-help" class="icon-button" type="button" title="输出目录说明" aria-label="输出目录说明" aria-expanded="false" aria-controls="directory-help-panel">?</button>
+      <aside id="directory-help-panel" class="directory-help" hidden>
+        <strong>输出目录</strong>
+        <span>预录 TVM / PyTorch: <code>/home/user/Downloads/jscc-test/jscc/infer_outputs</code></span>
+        <span>预录 MNN: <code>/home/user/Downloads/jscc-test/mnn_benchmark_outputs</code></span>
+        <span>USRP QPSK: <code>/home/user/Downloads/jscc-test-usrp/qpsk/tvm</code></span>
+        <span>USRP IQ直传: <code>/home/user/Downloads/jscc-test-usrp/iq-direct/tvm</code></span>
+      </aside>
+    </div>
   </header>
 
   <main>
@@ -66,7 +72,6 @@
         <div class="image-stage">
           <img id="reconstruction-preview" alt="重建图预览">
           <div id="reconstruction-empty" class="empty-state">点击“拉取”获取当前图片</div>
-          <span id="quality-marker" class="quality-marker" hidden>质量提示</span>
         </div>
         <div class="quality-metrics" aria-label="当前图片质量指标">
           <span>PSNR <strong id="quality-psnr">--</strong> dB</span>

@@ -1,0 +1,13 @@
+host=lenovo
+captured_at=2026-03-12T15:21:42+08:00
+bash=/usr/bin/bash
+vmstat=/usr/bin/vmstat
+free=/usr/bin/free
+top=/usr/bin/top
+date=/usr/bin/date
+hostname=/usr/bin/hostname
+pidstat=missing
+mpstat=missing
+perf=missing
+sar=missing
+/usr/bin/time=/usr/bin/time

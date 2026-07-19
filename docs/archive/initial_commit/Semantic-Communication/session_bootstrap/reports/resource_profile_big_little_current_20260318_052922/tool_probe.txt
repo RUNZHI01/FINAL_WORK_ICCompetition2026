@@ -1,0 +1,14 @@
+host=Phytium-Pi
+captured_at=2026-03-18T05:29:22+08:00
+bash=/usr/bin/bash
+vmstat=/usr/bin/vmstat
+free=/usr/bin/free
+top=/usr/bin/top
+date=/usr/bin/date
+hostname=/usr/bin/hostname
+pidstat=missing
+mpstat=missing
+perf=missing
+sar=missing
+/usr/bin/time=missing
+required_missing=0

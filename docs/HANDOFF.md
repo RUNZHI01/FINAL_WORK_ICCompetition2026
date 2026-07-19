@@ -1,8 +1,7 @@
 # HANDOFF
 
 更新时间：2026-07-17
-当前工作分支：`perf/iq-demo-hotpath`；交付时合入 `main`
-交接前代码保存点：以当前分支最新提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
+代码版本以仓库当前提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
 
 ## 当前主线
 
@@ -45,7 +44,7 @@ $env:REMOTE_PASS = 'user'
 & 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
 ```
 
-比赛演示默认启用启动预热：`COCKPIT_STARTUP_USRP_WARMUP=1`、`COUNT=10`、`ATTEMPTS=2`。脚本必须累计完成 `10/10` 才显示 UI；首轮不足时只补跑剩余数量，不降低质量门限。每轮后都会清掉隐藏 batch-state。正式 IQ 串行长批次默认每 30 张重建 RX streamer，TX 保持常驻。若只是调 UI，可设置 `COCKPIT_STARTUP_USRP_WARMUP=0` 跳过。
+比赛演示启动不再运行 10 张图片预热。脚本在显示 UI 前只建立板卡会话，拉起 ML-KEM/认证服务和常驻 USRP TX/RX，并等待服务就绪；不会创建隐藏 batch-state 或重建输出。正式 IQ 串行长批次默认每 30 张重建 RX streamer，TX 保持常驻。
 
 IQ 源码同步与日常启动已经分开。修改 `USRP292x/`、encoder 或 TVM helper 后运行一次：
 
@@ -142,11 +141,6 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `OPENAMP_USRP_TX_DOCKER_NETWORK` | Windows `bridge`；Linux `host` | Windows Docker Desktop 直接发布 `127.0.0.1:29221`；Linux 保留 host network |
 | `OPENAMP_IQ_SEGMENT_SIZE` | `30` | IQ 串行长批次每段张数；段间重建 RX streamer，并重置常驻 TX 的发送状态 |
 | `OPENAMP_IQ_SEGMENT_REPAIR_PASSES` | `2` | 段内首轮失败项的子集补传次数；默认两轮用于覆盖偶发低同步率 |
-| `COCKPIT_STARTUP_USRP_WARMUP` | `1` | 显示 Cockpit 前先做 USRP IQ + TVM 启动预热 |
-| `COCKPIT_STARTUP_USRP_WARMUP_COUNT` | `10` | 启动预热张数；对齐 IQ streaming 的 10 张微批 |
-| `COCKPIT_STARTUP_USRP_WARMUP_MIN_SUCCESS` | 与 `COUNT` 相同，默认 `10` | 启动预热最小有效完成数；正式入口要求全量通过 |
-| `COCKPIT_STARTUP_USRP_WARMUP_ATTEMPTS` | `2` | 首轮不足时补跑剩余数量；两轮仍不足则不显示 UI |
-| `COCKPIT_STARTUP_USRP_WARMUP_TIMEOUT_SEC` | `360` | 预热完成等待上限 |
 | `ANALOG_SPS` | `2` | IQ 直传每符号采样数 |
 | `ANALOG_AMPLITUDE` | `6000` | 当前验证环境下的 TX 幅度 |
 | `ANALOG_TX_NORMALIZATION_REFERENCE_PEAK` | `6` | 固定 IQ 波形归一化参考峰值，使导频功率不随 latent 峰值变化；`0` 恢复旧的逐帧峰值归一化 |
@@ -227,9 +221,9 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | USRP IQ 历史速度 profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 历史 accepted 速度记录，不代表当前严格可靠性默认值 |
 | QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
 
-2026-07-17 最新主机侧全关后一键冷启动对应 `cockpit_usrp_usrp-1784286235`：IQ `10/10`、TVM `10/10`，约 `99.6 s` 后显示 UI。该轮由脚本自动拉起 host-network TX 和 TCP 控制代理，没有继承旧容器。上一轮可精确引用的 TVM 指标为 median `243.38 ms`、mean `248.14 ms`。
+2026-07-17 的全关冷启动记录 `cockpit_usrp_usrp-1784286235` 曾用 10 张隐藏任务验证整条链路，约 `99.6 s` 后显示 UI。当前启动脚本已经取消图片预热，只建立板卡会话，拉起 ML-KEM/认证服务和常驻 USRP TX/RX，并等待服务就绪。首次正式任务仍可能承担模型和运行时冷启动，演示前应留出一次人工冒烟测试时间。
 
-100 张热启动验收对应 `batch-1784222195-100` / `cockpit_usrp_usrp-1784222195`。正式点击复用了隐藏预热建立的 ML-KEM daemon，因此没有再次执行板端 helper 同步和热修。隐藏预热不能关闭，否则首次正式任务会重新承担约 80 秒的安全服务冷启动。该轮保持 `sync metric >= 0.75`、`pilot gain ratio >= 0.85`：261 次 OTA 中 100 次通过，116 次被质量门限拒绝后重试，45 次未形成可用同步。
+100 张热启动验收对应 `batch-1784222195-100` / `cockpit_usrp_usrp-1784222195`。该轮保持 `sync metric >= 0.75`、`pilot gain ratio >= 0.85`：261 次 OTA 中 100 次通过，116 次被质量门限拒绝后重试，45 次未形成可用同步。点击到完成共 `240.19 s`，数据只能作为热启动记录，不能推断当前无图片预热时的冷启动耗时。
 
 给写文档同学的典型值口径：
 
@@ -361,7 +355,7 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 
 ## 文件组织现状
 
-源码边界还算清楚，但根目录历史交接文档和运行残留偏多。接手时按下面划分：
+源码和文档入口已整理完成，接手时按下面划分：
 
 | 路径 | 状态 |
 |---|---|
@@ -375,7 +369,7 @@ TVM 是主路径。MNN 已接 USRP remote-dir latent；PyTorch 在 USRP 模式�
 | `logs/`、`runtime_logs/`、`local_logs/`、`.logs/`、`tmp/`、`artifacts/` | 运行输出或临时产物，不作为源码入口 |
 | `keys/` | 本地认证公钥/密钥材料，不要提交私钥 |
 
-赛前不要再移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些源码目录，很多脚本仍依赖现有相对路径；新增说明文档默认放入 `docs/`，历史 handoff、旧计划、过程审计和运行记录仅本地保留，不作为提交入口。
+不要再移动 `Semantic-Communication/`、`USRP292x/`、`mlkem_link/` 这些源码目录，很多脚本仍依赖现有相对路径。新增说明文档放入 `docs/`；临时计划、对话记录和过程审计不进入交付仓库。
 
 ## 验证命令
 
@@ -402,7 +396,10 @@ npm run typecheck
 ## 文档入口
 
 - `docs/README.md`：当前仓库总览、典型指标和板端备份边界。
-- `docs/USRP_LINK_BRIEFING.md`：今晚汇报、PPT 修改、USRP 分阶段链路和指标边界。
+- `docs/USRP_LINK_BRIEFING.md`：USRP 分阶段链路、指标和安全边界。
+- `docs/PPT_USRP_SECURITY_UPDATES.md`：PPT 中加密认证与 USRP 的 3 页修改意见。
+- `docs/DOCUMENT_USRP_SECURITY_UPDATES.md`：技术文档第 5、6 章的差量修改意见。
+- `docs/INITIAL_COMMIT_DOCUMENTS.md`：最初提交的文档归档和逐文件清单。
 - `docs/runbooks/STARTUP.md`：现场断电后最短启动流程。
 - `docs/HANDOFF.md`：交接、默认参数、实验开关和验证命令。
 - `docs/security/mlkem_auth_setup.md`：ML-KEM/SM4 与认证通道部署说明。

@@ -112,8 +112,8 @@ Set-DefaultEnv "OPENAMP_USRP_TX_DOCKER_NETWORK" "bridge"
 
 Set-DefaultEnv "MLKEM_TRANSPORT_MODE" "usrp"
 Set-DefaultEnv "OPENAMP_DEMO_INPUT_SOURCE_MODE" "usrp"
-Set-DefaultEnv "JSCC_LINK_MODE" "iq-direct"
-Set-DefaultEnv "OPENAMP_DEMO_LINK_MODE" "iq-direct"
+Set-DefaultEnv "JSCC_LINK_MODE" "qpsk"
+Set-DefaultEnv "OPENAMP_DEMO_LINK_MODE" "qpsk"
 Set-DefaultEnv "MLKEM_AUTH_ENABLED" "1"
 Set-DefaultEnv "MLKEM_AUTH_SIG_POLICY" "DUAL_REQUIRED"
 if ((Test-Path -LiteralPath $FinalImageDir -PathType Container) -and

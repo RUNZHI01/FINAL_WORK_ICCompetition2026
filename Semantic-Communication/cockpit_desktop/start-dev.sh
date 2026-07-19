@@ -122,8 +122,8 @@ configure_runtime_defaults() {
   export MLKEM_USRP_MODE="${MLKEM_USRP_MODE:-ota}"
   export MLKEM_USRP_MAX_ARQ_ROUNDS="${MLKEM_USRP_MAX_ARQ_ROUNDS:-12}"
   export OPENAMP_DEMO_INPUT_SOURCE_MODE="${OPENAMP_DEMO_INPUT_SOURCE_MODE:-usrp}"
-  export JSCC_LINK_MODE="${JSCC_LINK_MODE:-iq-direct}"
-  export OPENAMP_DEMO_LINK_MODE="${OPENAMP_DEMO_LINK_MODE:-iq-direct}"
+  export JSCC_LINK_MODE="${JSCC_LINK_MODE:-qpsk}"
+  export OPENAMP_DEMO_LINK_MODE="${OPENAMP_DEMO_LINK_MODE:-qpsk}"
   export MLKEM_CIPHER_SUITE="${MLKEM_CIPHER_SUITE:-SM4_GCM}"
   if [[ "$JSCC_LINK_MODE" == "iq-direct" ]]; then
     export OPENAMP_IQ_STREAMING_TVM="${OPENAMP_IQ_STREAMING_TVM:-0}"
@@ -326,7 +326,7 @@ run_startup_usrp_readiness() {
       "$user" \
       "$port" \
       "${REMOTE_USRP_RX_DIR:-/home/user/cockpit_usrp_rx}" \
-      "${JSCC_LINK_MODE:-iq-direct}" <<'PY'
+      "${JSCC_LINK_MODE:-qpsk}" <<'PY'
 from __future__ import annotations
 
 import json

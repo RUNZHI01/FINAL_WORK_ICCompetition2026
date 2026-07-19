@@ -1,0 +1,22 @@
+=== date ===
+2026-03-11T01:08:37+08:00
+=== uptime ===
+ 01:08:37 up 1 day, 12:21,  1 user,  load average: 0.11, 0.07, 0.09
+=== loadavg ===
+0.11 0.07 0.09 1/790 300628
+=== cpu governors ===
+/sys/devices/system/cpu/cpufreq/policy0/scaling_governor: performance
+/sys/devices/system/cpu/cpufreq/policy2/scaling_governor: performance
+/sys/devices/system/cpu/cpufreq/policy3/scaling_governor: performance
+=== cpu cur freq ===
+/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq: 1500000
+/sys/devices/system/cpu/cpufreq/policy2/scaling_cur_freq: 1800000
+/sys/devices/system/cpu/cpufreq/policy3/scaling_cur_freq: 1800000
+=== cpuinfo cur freq ===
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq: 
+/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq: 
+/sys/devices/system/cpu/cpu2/cpufreq/cpuinfo_cur_freq: 
+/sys/devices/system/cpu/cpu3/cpufreq/cpuinfo_cur_freq: 
+=== thermal ===
+/sys/class/thermal/thermal_zone0: type=sensor0 temp=33000
+/sys/class/thermal/thermal_zone1: type=sensor1 temp=32000

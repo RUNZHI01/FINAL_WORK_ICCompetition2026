@@ -1,31 +1,31 @@
-# USRP reconstruction output layout
+# USRP 重建输出目录
 
-## Browser sources
+## 对比工具数据源
 
-| Source ID | Board root | Selection |
+| 数据源 | 板端根目录 | 选择规则 |
 |---|---|---|
 | `prerecorded-pytorch` | `/home/user/Downloads/jscc-test/jscc/infer_outputs` | `pytorch_reference_reconstruction_*` |
-| `prerecorded-tvm` | `/home/user/Downloads/jscc-test/jscc/infer_outputs` | Entries outside the PyTorch prefix |
-| `prerecorded-mnn` | `/home/user/Downloads/jscc-test/mnn_benchmark_outputs` | All entries |
-| `usrp-qpsk` | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` | Historical and new QPSK TVM jobs |
-| `usrp-iq-direct` | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` | Historical and new direct-IQ TVM jobs |
+| `prerecorded-tvm` | `/home/user/Downloads/jscc-test/jscc/infer_outputs` | PyTorch 前缀以外的目录 |
+| `prerecorded-mnn` | `/home/user/Downloads/jscc-test/mnn_benchmark_outputs` | 全部目录 |
+| `usrp-qpsk` | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` | QPSK TVM 任务 |
+| `usrp-iq-direct` | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` | IQ 直传 TVM 任务 |
 
-The prerecorded source roots stay at the paths above, and prerecorded jobs are not renamed. Only strict historical `openamp3_usrp_*_current` children from `/home/user/Downloads/jscc-test-usrp/tvm` are eligible. New Demo jobs route to the QPSK or direct-IQ root from the effective `JSCC_LINK_MODE`; MNN uses the corresponding `mnn` leaf.
+预录任务沿用原目录和名称。迁移脚本只处理旧目录 `/home/user/Downloads/jscc-test-usrp/tvm` 中符合 `openamp3_usrp_*_current` 规则的任务。新任务根据 `JSCC_LINK_MODE` 写入 QPSK 或 IQ 直传目录，MNN 使用对应的 `mnn` 子目录。
 
-| Effective link mode | TVM output | MNN output |
+| 链路模式 | TVM 输出 | MNN 输出 |
 |---|---|---|
 | `qpsk` | `/home/user/Downloads/jscc-test-usrp/qpsk/tvm` | `/home/user/Downloads/jscc-test-usrp/qpsk/mnn` |
 | `iq-direct` | `/home/user/Downloads/jscc-test-usrp/iq-direct/tvm` | `/home/user/Downloads/jscc-test-usrp/iq-direct/mnn` |
 
-## Classification report
+## 分类报告
 
-The report is `Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json`. Each decision records reversible `source` and `destination` paths, `mode`, `reason`, `classification`, and the local `evidence` path. Top-level lists separate `classified`, `moved`, `already_moved`, `unresolved`, `collisions`, and `missing` entries.
+迁移报告位于 `Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json`。每条记录包含 `source`、`destination`、`mode`、`reason`、`classification` 和本地 `evidence` 路径，可用于回滚。顶层列表分别记录 `classified`、`moved`、`already_moved`、`unresolved`、`collisions` 和 `missing`。
 
-`exact-summary` means the job's own `batch_spool_summary.json` supplied the link evidence. `inherited-base-summary` is limited to a recovery/retry job classified from its base job. Missing or ambiguous summaries remain `unresolved` in the legacy root. Existing source and destination paths are a collision and block the entire apply; an existing destination with no source is `already_moved`.
+`exact-summary` 表示任务自身的 `batch_spool_summary.json` 提供了链路证据。`inherited-base-summary` 只用于能从原任务确认链路类型的 recovery/retry 任务。证据缺失或不明确的任务保留在旧目录并标记为 `unresolved`。源目录和目标目录同时存在时记为冲突并阻止迁移；只有目标目录存在时记为 `already_moved`。
 
-## Commands
+## 迁移命令
 
-Dry-run is the default:
+默认只做 dry-run：
 
 ```powershell
 $env:BOARD_HOST = '<board-host>'
@@ -38,22 +38,22 @@ python scripts/migrate_usrp_output_layout.py `
   --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json
 ```
 
-Use `--apply` only after the dry-run has the expected 239 exact direct-IQ jobs, four QPSK jobs, one inherited direct-IQ recovery job, one unresolved retry job, and no collisions or missing classified sources. Re-run the dry-run after apply; the 244 classified entries must be `already_moved`, while the unresolved retry remains in the legacy root.
+确认 dry-run 得到 239 个 IQ 直传任务、4 个 QPSK 任务、1 个继承分类的 IQ recovery、1 个 unresolved retry，并且没有冲突和缺失源目录后，才能加 `--apply`。迁移后再次执行 dry-run，244 个已分类任务应全部显示为 `already_moved`，unresolved retry 仍留在旧目录。
 
 ```powershell
-# Apply after review
+# 确认报告后执行迁移
 python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --run-root USRP292x/qpsk_batch_spool_arq_runs --legacy-root /home/user/Downloads/jscc-test-usrp/tvm --report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
 
-# Roll back destinations present in the report
+# 按报告回滚
 python scripts/migrate_usrp_output_layout.py --host $env:BOARD_HOST --user $env:BOARD_USER --rollback-report Semantic-Communication/session_bootstrap/reports/usrp_output_migration_20260717.json --apply
 ```
 
-The CLI reads `BOARD_PASSWORD` from the environment; when it is unset, it prompts through `getpass` and never accepts a plaintext password argument. It loads the system `known_hosts` file and rejects unknown host keys by default. For controlled recovery of a board with an intentionally verified but unknown key, provide `--host-key-fingerprint SHA256:<base64-fingerprint>`; that key is accepted only for this process and is not written to `known_hosts`.
+CLI 从环境变量读取 `BOARD_PASSWORD`；未设置时通过 `getpass` 询问，不接受明文密码参数。程序加载系统 `known_hosts`，默认拒绝未知主机密钥。若已人工核对新板卡指纹，可传入 `--host-key-fingerprint SHA256:<base64-fingerprint>`；该指纹只在本次进程中生效，不写入 `known_hosts`。
 
-The CLI uses Paramiko SFTP `stat`, `mkdir`, and `rename`; it does not issue remote shell move commands or overwrite a destination. Reports omit connection identity and credentials. Apply and rollback atomically update the report before each rename, after each success, and on failure; rerunning the same operation resumes from the recorded state.
+CLI 只使用 Paramiko SFTP 的 `stat`、`mkdir` 和 `rename`，不会执行远端 shell 移动命令，也不会覆盖目标目录。报告不保存连接身份和凭据。迁移与回滚会在每次 rename 前、成功后和失败时原子更新报告，重复运行会从已记录状态继续。
 
-## 2026-07-17 evidence
+## 2026-07-17 验收记录
 
-The corrected dry-run classified 244 jobs: 239 exact direct-IQ jobs, four exact QPSK jobs, and one inherited direct-IQ recovery job `openamp3_usrp_1784197230_recovery_current`. It left `openamp3_usrp_1783653522_current_retry_current` unresolved because no `batch_spool_summary.json` evidence was found. There were no collisions or missing classified sources.
+修正后的 dry-run 共分类 244 个任务：239 个 IQ 直传任务、4 个 QPSK 任务，以及 1 个继承分类的 IQ recovery 任务 `openamp3_usrp_1784197230_recovery_current`。`openamp3_usrp_1783653522_current_retry_current` 因缺少 `batch_spool_summary.json` 保持 unresolved。报告中没有冲突或缺失源目录。
 
-Apply moved all 244 classified jobs. The post-apply dry-run reported 244 `already_moved`, zero `moved`, the same unresolved retry, and `safe: true`. A read-only SFTP check confirmed 240 IQ jobs, four QPSK jobs, and only the unresolved retry in the legacy root. No prerecorded path was inspected or modified by the migration command.
+`--apply` 已迁移全部 244 个已分类任务。迁移后的 dry-run 显示 244 个 `already_moved`、0 个 `moved`、同一个 unresolved retry，并返回 `safe: true`。只读 SFTP 检查确认 IQ 目录有 240 个任务，QPSK 目录有 4 个任务，旧目录只剩 unresolved retry。迁移命令没有读取或修改预录目录。

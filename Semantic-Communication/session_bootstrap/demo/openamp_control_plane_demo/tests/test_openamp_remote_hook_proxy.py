@@ -5,6 +5,7 @@ import gzip
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -19,6 +20,7 @@ if str(DEMO_ROOT) not in sys.path:
 
 from openamp_remote_hook_proxy import (  # noqa: E402
     SSH_HELPER,
+    build_docker_exec_command,
     build_bridge_bundle_base64,
     build_remote_command,
     build_remote_sequence_command,
@@ -89,7 +91,8 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertIn('STAGE_ROOT="$(mktemp -d /tmp/openamp_demo_bridge.XXXXXX)"', command)
         self.assertIn("REMOTE_PROJECT_ROOT=''", command)
         self.assertIn(f"HOOK_EVENT_B64={hook_event_b64}", command)
-        self.assertIn('STAGE_ROOT="$STAGE_ROOT" PYTHONDONTWRITEBYTECODE=1 python3 - <<\'PY\'', command)
+        self.assertIn("BRIDGE_CACHE_ROOT=/tmp/openamp_demo_bridge_cache.$(id -u)/", command)
+        self.assertIn('BRIDGE_CACHE_ROOT="$BRIDGE_CACHE_ROOT" PYTHONDONTWRITEBYTECODE=1 python3 - <<\'PY\'', command)
         self.assertIn('bundle = base64.b64decode(', command)
         self.assertIn('HOOK_INPUT_FILE="$STAGE_ROOT/hook_event.json"', command)
         self.assertIn('IFS= read -r SUDO_PASSWORD || SUDO_PASSWORD=""', command)
@@ -99,7 +102,8 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertIn("run_bridge_with_sudo()", command)
         self.assertIn("""printf '%s\\n' "$SUDO_PASSWORD" | sudo -S -p '' env PYTHONDONTWRITEBYTECODE=1 OPENAMP_PHASE="$PHASE" PYTHONPATH="$BRIDGE_PYTHONPATH" bash -lc 'python3 "$1" --hook-stdin --rpmsg-ctrl "$2" --rpmsg-dev "$3" --output-dir "$4" < "$5"'""", command)
         self.assertIn("could not launch the board-side bridge under sudo", command)
-        self.assertIn('BRIDGE_SCRIPT="${REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}"', command)
+        self.assertIn('REMOTE_BRIDGE_SCRIPT="$BRIDGE_CACHE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py"', command)
+        self.assertIn('BRIDGE_SCRIPT="$REMOTE_BRIDGE_SCRIPT"', command)
         self.assertIn('PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$BRIDGE_PYTHONPATH${PYTHONPATH:+:$PYTHONPATH}" OPENAMP_PHASE="$PHASE" python3 "$BRIDGE_SCRIPT"', command)
         self.assertIn("OUTPUT_DIR=/tmp/openamp_demo_hook/123/job_req", command)
         self.assertNotIn("remote_project_root_missing", command)
@@ -121,10 +125,10 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertIn('[[ -f "$REMOTE_PROJECT_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py" ]]', command)
         self.assertIn('REMOTE_BRIDGE_SCRIPT="$REMOTE_PROJECT_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py"', command)
         self.assertIn('REMOTE_BRIDGE_PYTHONPATH="$REMOTE_PROJECT_ROOT"', command)
-        self.assertIn('BRIDGE_SCRIPT="${REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}"', command)
+        self.assertIn('BRIDGE_SCRIPT="$REMOTE_BRIDGE_SCRIPT"', command)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1", command)
 
-    def test_sequence_command_reuses_one_ssh_and_one_outer_sudo(self) -> None:
+    def test_sequence_command_uses_one_bridge_process(self) -> None:
         args = SimpleNamespace(
             remote_project_root="/tmp/openamp_fit/project",
             remote_jscc_dir="",
@@ -144,11 +148,17 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
 
         command = build_remote_sequence_command(args, events)
 
-        self.assertEqual(command.count("sudo -S -p '' env SUDO_PASSWORD="), 1)
-        self.assertIn("__OPENAMP_SEQUENCE_START__", command)
-        self.assertIn("__OPENAMP_SEQUENCE_END__", command)
-        self.assertIn("sleep 5.000", command)
-        self.assertEqual(command.count("openamp_rpmsg_bridge.py"), 9)
+        self.assertEqual(command.count("sudo -S -p '' env PYTHONDONTWRITEBYTECODE=1"), 1)
+        self.assertIn("PHASE=SEQUENCE", command)
+        self.assertEqual(command.count('python3 "$BRIDGE_SCRIPT" --hook-stdin'), 1)
+        bridge_bundle = build_bridge_bundle_base64()
+        self.assertEqual(command.count(bridge_bundle), 1)
+        encoded_event = re.search(r"^HOOK_EVENT_B64=([A-Za-z0-9+/=]+)$", command, re.MULTILINE)
+        assert encoded_event is not None
+        sequence_payload = json.loads(base64.b64decode(encoded_event.group(1)))
+        self.assertEqual([item["phase"] for item in sequence_payload["events"]], ["STATUS_REQ", "JOB_REQ", "STATUS_REQ"])
+        self.assertEqual(sequence_payload["events"][2]["delay_before_sec"], 5.0)
+        self.assertEqual(sequence_payload["events"][1]["output_dir"], "/tmp/openamp_demo_hook/7/job_req")
 
     def test_sequence_output_prefers_bridge_summary_over_permission_tail(self) -> None:
         events = [
@@ -231,6 +241,24 @@ class OpenampRemoteHookProxyTest(unittest.TestCase):
         self.assertNotIn("errors", run.call_args.kwargs)
         self.assertEqual(stdout.getvalue(), '{"decision":"ALLOW"}\n')
         self.assertEqual(stderr.getvalue(), "")
+
+    def test_docker_exec_command_reuses_container_and_ssh_control_socket(self) -> None:
+        args = SimpleNamespace(
+            host="demo-board",
+            user="demo-user",
+            password="demo-pass",
+            port="2202",
+        )
+
+        command = build_docker_exec_command(args, "cockpit-usrp-tx-29221")
+
+        self.assertEqual(command[:6], ["docker", "exec", "-i", "-e", "SSHPASS", "cockpit-usrp-tx-29221"])
+        self.assertIn("ControlMaster=auto", command)
+        self.assertIn("ControlPersist=60", command)
+        self.assertIn("ControlPath=/tmp/ssh_mux/%C", command)
+        self.assertIn("demo-user@demo-board", command)
+        self.assertNotIn("demo-pass", command)
+        self.assertIn("bash -lc", command[-1])
 
     def test_main_suppresses_synthetic_permission_gate_tail_when_bridge_summary_exists(self) -> None:
         args = SimpleNamespace(

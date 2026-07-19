@@ -131,6 +131,7 @@ from usrp_runtime import (
     ensure_usrp_control_servers_started,
     inspect_usrp_control_servers,
     launch_local_usrp_reconstruction_job,
+    rank_qpsk_probe_results,
     resolve_shutdown_after_transport,
     shutdown_usrp_control_servers_now,
 )
@@ -144,6 +145,51 @@ REMOTE_MNN_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" /
 REMOTE_TVM_RECONSTRUCTION_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_remote_current_real_reconstruction.sh"
 BIG_LITTLE_PIPELINE_SCRIPT = REPO_ROOT / "session_bootstrap" / "scripts" / "run_big_little_pipeline.sh"
 DEFAULT_USRP_REMOTE_OUTPUT_ROOT = "/home/user/Downloads/jscc-test-usrp"
+QPSK_RADIO_PROBE_TX_GAINS = (25, 20, 30)
+QPSK_RADIO_PROBE_RX_GAINS = (15, 10, 20, 25)
+QPSK_RADIO_PROBE_FREQS = (498_000_000, 500_000_000, 502_000_000)
+QPSK_RADIO_PROBE_RATES = (2_500_000, 5_000_000)
+QPSK_RADIO_PROBE_COUNT = 3
+QPSK_RADIO_PROBE_MAX_ARQ_ROUNDS = 1
+QPSK_RADIO_PROBE_TIMEOUT_SEC = 180
+
+
+def qpsk_probe_result_from_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    frequency_hz: int,
+    rate: int,
+    rx_gain: int,
+    tx_gain: int,
+) -> dict[str, Any]:
+    """Extract radio-only probe metrics from a completed USRP job snapshot."""
+    diagnostics = snapshot.get("diagnostics") if isinstance(snapshot.get("diagnostics"), dict) else {}
+    summary = diagnostics.get("usrp_summary") if isinstance(diagnostics.get("usrp_summary"), dict) else {}
+    runner_summary = snapshot.get("runner_summary") if isinstance(snapshot.get("runner_summary"), dict) else {}
+    target_count = max(1, int(summary.get("target_count") or runner_summary.get("input_count") or QPSK_RADIO_PROBE_COUNT))
+    return {
+        "frequency_hz": frequency_hz,
+        "rate": rate,
+        "rx_gain": rx_gain,
+        "tx_gain": tx_gain,
+        "target_count": target_count,
+        "pass_count": max(0, int(summary.get("pass_count") or 0)),
+        "round_record_count": max(0, int(summary.get("round_record_count") or 0)),
+        "elapsed_sec": float(summary.get("elapsed_sec") or 0.0),
+        "request_state": str(snapshot.get("request_state") or "timeout"),
+        "message": str(snapshot.get("message") or ""),
+    }
+
+
+def qpsk_radio_profile_overrides(result: dict[str, Any]) -> dict[str, str]:
+    """Return persistent radio settings without short-probe execution limits."""
+    return {
+        "JSCC_LINK_MODE": "qpsk",
+        "FREQ": str(int(result["frequency_hz"])),
+        "RATE": str(int(result["rate"])),
+        "TX_GAIN": str(int(result["tx_gain"])),
+        "RX_GAIN": str(int(result["rx_gain"])),
+    }
 USRP_REMOTE_OUTPUT_ROOT_KEYS = ("OPENAMP_DEMO_USRP_OUTPUT_ROOT", "USRP_REMOTE_OUTPUT_ROOT")
 DEFAULT_LOCAL_USRP_IMAGE_LATENT_DIR = PACKAGE_ROOT / "host_pic_to_latent" / "encoder_outputs_top300"
 DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
@@ -157,9 +203,11 @@ DEFAULT_LOCAL_USRP_LATENT_DIR_CANDIDATES = (
 DEFAULT_LOCAL_USRP_IMAGE_DIR_CANDIDATES = (
     PACKAGE_ROOT / "host_pic_to_latent" / "airfield300",
     PACKAGE_ROOT / "host_pic_to_latent" / "airfield",
-    WORKSPACE_ROOT / "原始图像_Top300",
     WORKSPACE_ROOT / "原始图像",
+    WORKSPACE_ROOT / "原始图像_Top300",
 )
+USRP_ORIGINAL_GALLERY_SWITCH_TOKEN = 1784381834
+LEGACY_USRP_ORIGINAL_IMAGE_DIR = WORKSPACE_ROOT / "原始图像_备份_20260718_213714"
 MLKEM_MODERN_INPUT_BYTES = 1 * 32 * 32 * 32 * 4
 MLKEM_LEGACY_INPUT_BYTES = 1 * 3 * 64 * 64 * 4
 MLKEM_AUTH_ENABLED_KEYS = ("MLKEM_AUTH_ENABLED",)
@@ -2505,6 +2553,11 @@ class DashboardState:
         self._usrp_control_status_cache: dict[str, Any] | None = None
         self._usrp_control_status_cache_ts: float = 0.0
         self._usrp_control_status_refreshing = False
+        self._qpsk_radio_probe_state: dict[str, Any] = {
+            "status": "idle",
+            "message": "尚未执行 QPSK 无线参数探测。",
+            "results": [],
+        }
         self._aircraft_position_upstream_probe_cache: dict[str, Any] | None = None
         self._aircraft_position_upstream_probe_cache_ts: float = 0.0
         self._aircraft_position_upstream_probe_refreshing = False
@@ -2850,6 +2903,14 @@ class DashboardState:
         )
         if not original_dir:
             raise RuntimeError("上位机原图目录未配置")
+        original_dir_rules = ()
+        if LEGACY_USRP_ORIGINAL_IMAGE_DIR.is_dir():
+            original_dir_rules = (
+                {
+                    "before_usrp_token": USRP_ORIGINAL_GALLERY_SWITCH_TOKEN,
+                    "original_dir": str(LEGACY_USRP_ORIGINAL_IMAGE_DIR.resolve()),
+                },
+            )
         pytorch_manifest_value = str(
             os.environ.get("OPENAMP_DEMO_PYTORCH_REFERENCE_MANIFEST", "")
         ).strip()
@@ -2869,6 +2930,7 @@ class DashboardState:
                 default_source="usrp-iq-direct",
                 manifest_root=DEFAULT_RUN_ROOT,
                 pytorch_manifest=pytorch_manifest if pytorch_manifest.is_file() else None,
+                original_dir_rules=original_dir_rules,
             )
         )
         return {"status": "ok", "url": url}
@@ -2989,6 +3051,179 @@ class DashboardState:
                 "message": "板卡会话未补齐，无法关闭 USRP persistent TX/RX。",
             }
         return shutdown_usrp_control_servers_now(board_access)
+
+    def qpsk_radio_probe_snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return json.loads(json.dumps(self._qpsk_radio_probe_state, ensure_ascii=False))
+
+    def start_qpsk_radio_probe(self) -> dict[str, Any]:
+        with self._lock:
+            board_access = self._board_access
+            active_batch = self._batch_state if isinstance(self._batch_state, dict) else None
+            if str(self._qpsk_radio_probe_state.get("status") or "") == "running":
+                return {
+                    "status": "error",
+                    "message": "QPSK 无线参数探测正在运行。",
+                }
+            if active_batch is not None and str(active_batch.get("status") or "") == "running":
+                return {
+                    "status": "error",
+                    "message": "当前批量推理尚未结束，不能并发调整 USRP 无线参数。",
+                }
+            if not board_access.connection_ready:
+                return {
+                    "status": "error",
+                    "message": "板卡会话未补齐，无法执行 QPSK 无线参数探测。",
+                }
+            self._qpsk_radio_probe_state = {
+                "status": "running",
+                "message": "正在扫描 QPSK 频点、采样率和接收增益。",
+                "target_count": QPSK_RADIO_PROBE_COUNT,
+                "results": [],
+                "started_at": time.time(),
+            }
+
+        def candidate_overrides(frequency_hz: int, rate: int, rx_gain: int, tx_gain: int) -> dict[str, str]:
+            return {
+                "JSCC_LINK_MODE": "qpsk",
+                "FREQ": str(frequency_hz),
+                "RATE": str(rate),
+                "RX_GAIN": str(rx_gain),
+                "TX_GAIN": str(tx_gain),
+                "MLKEM_USRP_MAX_ARQ_ROUNDS": str(QPSK_RADIO_PROBE_MAX_ARQ_ROUNDS),
+                "USRP_JOB_TIMEOUT_SEC": str(QPSK_RADIO_PROBE_TIMEOUT_SEC),
+                "OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT": "0",
+            }
+
+        def run_candidate(
+            frequency_hz: int,
+            rate: int,
+            rx_gain: int,
+            tx_gain: int,
+        ) -> tuple[dict[str, Any], BoardAccessConfig]:
+            candidate_access = board_access.with_env_overrides(candidate_overrides(frequency_hz, rate, rx_gain, tx_gain))
+            shutdown_usrp_control_servers_now(board_access)
+            job = launch_local_usrp_reconstruction_job(
+                candidate_access,
+                variant="current",
+                max_inputs=QPSK_RADIO_PROBE_COUNT,
+                control_transport="none",
+                inference_engine=INFERENCE_ENGINE_NONE,
+            )
+            deadline = time.monotonic() + QPSK_RADIO_PROBE_TIMEOUT_SEC + 20
+            snapshot: dict[str, Any] = {}
+            while time.monotonic() < deadline:
+                snapshot = job.snapshot()
+                if str(snapshot.get("request_state") or "") != "running":
+                    break
+                time.sleep(0.25)
+            result = qpsk_probe_result_from_snapshot(
+                snapshot,
+                frequency_hz=frequency_hz,
+                rate=rate,
+                rx_gain=rx_gain,
+                tx_gain=tx_gain,
+            )
+            return result, candidate_access
+
+        def publish_candidate(result: dict[str, Any]) -> None:
+            with self._lock:
+                state = self._qpsk_radio_probe_state
+                state["results"].append(result)
+                state["message"] = (
+                    f"已完成 {len(state['results'])} 组探测："
+                    f"{result['pass_count']}/{result['target_count']} 完整接收。"
+                )
+
+        def worker() -> None:
+            results: list[dict[str, Any]] = []
+            selected_access = board_access
+            error = ""
+            try:
+                stage_one = [(500_000_000, 5_000_000, 15, gain) for gain in QPSK_RADIO_PROBE_TX_GAINS]
+                for frequency_hz, rate, rx_gain, tx_gain in stage_one:
+                    result, _ = run_candidate(frequency_hz, rate, rx_gain, tx_gain)
+                    results.append(result)
+                    publish_candidate(result)
+
+                ranked_stage_one = rank_qpsk_probe_results(results)
+                best_stage_one = ranked_stage_one[0] if ranked_stage_one else None
+                requires_stage_two = not (
+                    best_stage_one
+                    and best_stage_one["pass_count"] >= best_stage_one["target_count"]
+                    and best_stage_one["round_record_count"] <= best_stage_one["target_count"]
+                )
+                if requires_stage_two and best_stage_one:
+                    best_gain = int(best_stage_one["rx_gain"])
+                    best_tx_gain = int(best_stage_one["tx_gain"])
+                    for rx_gain in QPSK_RADIO_PROBE_RX_GAINS:
+                        if rx_gain == best_gain:
+                            continue
+                        result, _ = run_candidate(500_000_000, 5_000_000, rx_gain, best_tx_gain)
+                        results.append(result)
+                        publish_candidate(result)
+
+                    best_radio = rank_qpsk_probe_results(results)[0]
+                    best_gain = int(best_radio["rx_gain"])
+                    best_tx_gain = int(best_radio["tx_gain"])
+                    if not (
+                        best_radio["pass_count"] >= best_radio["target_count"]
+                        and best_radio["round_record_count"] <= best_radio["target_count"]
+                    ):
+                        for frequency_hz in QPSK_RADIO_PROBE_FREQS:
+                            for rate in QPSK_RADIO_PROBE_RATES:
+                                if frequency_hz == 500_000_000 and rate == 5_000_000:
+                                    continue
+                                result, _ = run_candidate(frequency_hz, rate, best_gain, best_tx_gain)
+                                results.append(result)
+                                publish_candidate(result)
+                                if (
+                                    result["pass_count"] >= result["target_count"]
+                                    and result["round_record_count"] <= result["target_count"]
+                                ):
+                                    break
+                            else:
+                                continue
+                            break
+
+                ranked = rank_qpsk_probe_results(results)
+                if ranked:
+                    selected = ranked[0]
+                    selected_access = board_access.with_env_overrides(qpsk_radio_profile_overrides(selected))
+                    with self._lock:
+                        self._board_access = selected_access
+                        self._usrp_control_status_cache = None
+                        self._usrp_control_status_cache_ts = 0.0
+                        self._qpsk_radio_probe_state["selected"] = selected
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+            finally:
+                try:
+                    shutdown_usrp_control_servers_now(board_access)
+                    control_status = ensure_usrp_control_servers_started(selected_access, auto_start=True)
+                except Exception as exc:
+                    control_status = {"status": "error", "message": f"参数探测后恢复 TX/RX 失败: {exc}"}
+                with self._lock:
+                    state = self._qpsk_radio_probe_state
+                    state["finished_at"] = time.time()
+                    state["control_status"] = control_status
+                    if error:
+                        state["status"] = "error"
+                        state["message"] = f"QPSK 无线参数探测失败: {error}"
+                    elif str(control_status.get("status") or "") != "ready":
+                        state["status"] = "error"
+                        state["message"] = "QPSK 参数探测完成，但最佳参数下的 TX/RX 未恢复就绪。"
+                    else:
+                        state["status"] = "completed"
+                        selected = state.get("selected") or {}
+                        state["message"] = (
+                            "QPSK 无线参数探测完成，已应用最佳组合："
+                            f"{selected.get('frequency_hz', '-')} Hz / {selected.get('rate', '-')} S/s / "
+                            f"TX gain {selected.get('tx_gain', '-')} / RX gain {selected.get('rx_gain', '-')}。"
+                        )
+
+        threading.Thread(target=worker, daemon=True, name="qpsk-radio-probe").start()
+        return self.qpsk_radio_probe_snapshot()
 
     def _merged_aircraft_position_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         current = json.loads(json.dumps(self._aircraft_position, ensure_ascii=False))
@@ -3933,7 +4168,7 @@ class DashboardState:
             except ValueError as exc:
                 raise ValueError("unsupported jscc_link_mode; expected qpsk or iq-direct") from exc
         if transport_mode == "usrp":
-            overrides.setdefault("JSCC_LINK_MODE", "iq-direct")
+            overrides.setdefault("JSCC_LINK_MODE", "qpsk")
             overrides.setdefault("MLKEM_USRP_MODE", "ota")
             overrides.setdefault("OPENAMP_DEMO_INPUT_SOURCE_MODE", "usrp")
             for runner_key in (
@@ -4009,7 +4244,7 @@ class DashboardState:
                 runtime_value = str(os.environ.get(runtime_key) or "").strip()
                 if runtime_value:
                     overrides.setdefault(runtime_key, runtime_value)
-            if normalize_jscc_link_mode(overrides.get("JSCC_LINK_MODE", ""), default="iq-direct") == "iq-direct":
+            if normalize_jscc_link_mode(overrides.get("JSCC_LINK_MODE", ""), default="qpsk") == "iq-direct":
                 for key, value in (
                     ("OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT", "0"),
                     ("MLKEM_USRP_MAX_ARQ_ROUNDS", "12"),
@@ -6423,7 +6658,7 @@ class DashboardState:
         )
         if is_usrp_mode:
             payload.pop("quality", None)
-            payload["quality_pairs"] = build_quality_pairs_snapshot("usrp")
+            payload["quality_pairs"] = build_quality_pairs_snapshot("usrp", include_original_tvm=engine_key == "tvm")
             original_gallery = build_original_gallery_snapshot("usrp", count=total)
             payload["original_gallery"] = original_gallery
             preview_image_b64 = str(original_gallery.get("preview_image_b64") or "")
@@ -7068,7 +7303,17 @@ class DashboardState:
             state = self._batch_state
         if state is None:
             return {"status": "idle"}
-        return dict(state)
+        payload = dict(state)
+        status = str(payload.get("status") or "").strip().lower()
+        engine = str(payload.get("engine") or "tvm").strip().lower()
+        if status == "done" and engine == "tvm":
+            pairs = payload.get("quality_pairs")
+            merged_pairs = build_quality_pairs_snapshot("usrp", include_original_tvm=True)
+            if isinstance(pairs, dict):
+                merged_pairs = {**pairs, **merged_pairs}
+            if merged_pairs:
+                payload["quality_pairs"] = merged_pairs
+        return payload
 
     def clear_batch_state(self, *, warmup_only: bool = True, batch_job_id: str = "") -> dict[str, Any]:
         with self._lock:
@@ -7827,7 +8072,7 @@ class DashboardState:
                     state["runner_summary"] = inference_summary
                     if succeeded:
                         state.pop("quality", None)
-                        state["quality_pairs"] = build_quality_pairs_snapshot("usrp")
+                        state["quality_pairs"] = build_quality_pairs_snapshot("usrp", include_original_tvm=False)
                     state["message"] = str(last_result.get("message") or worker_error or "")
                     state["status_category"] = str(last_result.get("status_category") or ("success" if succeeded else "error"))
                     if succeeded:
@@ -8120,12 +8365,15 @@ class DashboardState:
             # Batch TVM must stay on the standard live runner so INFERENCE_CURRENT_CMD
             # can select the handwritten big.LITTLE pipeline. ML-KEM is control/auth
             # context here, not the batch data path.
-            initial_result = self.run_demo_inference(
-                variant="current",
-                image_index=0,
-                allow_preflight_degraded=allow_preflight_degraded,
-                max_inputs=effective_count,
-            )
+            inference_args: dict[str, Any] = {
+                "variant": "current",
+                "image_index": 0,
+                "allow_preflight_degraded": allow_preflight_degraded,
+                "max_inputs": effective_count,
+            }
+            if current_mode == "ROI_ONLY":
+                inference_args["control_expected_outputs"] = DEFAULT_MAX_INPUTS
+            initial_result = self.run_demo_inference(**inference_args)
         except Exception as exc:
             with self._lock:
                 state = self._batch_state
@@ -8376,9 +8624,9 @@ class DashboardState:
                         state["runner_summary"] = inference_summary or runner_summary
                         if is_live:
                             state.pop("quality", None)
-                            state["quality_pairs"] = build_quality_pairs_snapshot("usrp")
+                            state["quality_pairs"] = build_quality_pairs_snapshot("usrp", include_original_tvm=True)
                     elif is_live:
-                        state["quality_pairs"] = build_quality_pairs_snapshot("prerecorded")
+                        state["quality_pairs"] = build_quality_pairs_snapshot("prerecorded", include_original_tvm=True)
                     if (
                         not warmup
                         and not is_usrp_batch
@@ -9332,6 +9580,7 @@ class DashboardState:
         image_index: int,
         allow_preflight_degraded: bool = False,
         max_inputs: int = DEFAULT_MAX_INPUTS,
+        control_expected_outputs: int | None = None,
     ) -> dict[str, Any]:
         if self._service_mode_snapshot().get("current_mode") == "ALERT_ONLY":
             engine = "PyTorch" if str(variant).strip().lower() == "baseline" else "TVM"
@@ -9521,6 +9770,7 @@ class DashboardState:
                 live_board_access,
                 variant=variant,
                 max_inputs=max_inputs,
+                control_expected_outputs=control_expected_outputs,
                 control_transport="none",
                 link_health_profile=self._current_link_health_profile_id(),
             )
@@ -9615,6 +9865,7 @@ class DashboardState:
                                 live_board_access,
                                 variant=variant,
                                 max_inputs=max_inputs,
+                                control_expected_outputs=control_expected_outputs,
                                 control_transport="none",
                                 control_preflight=status_payload,
                                 link_health_profile=self._current_link_health_profile_id(),
@@ -9653,6 +9904,7 @@ class DashboardState:
                             live_board_access,
                             variant=variant,
                             max_inputs=max_inputs,
+                            control_expected_outputs=control_expected_outputs,
                             link_health_profile=self._current_link_health_profile_id(),
                         )
                         event_record, payload = self._register_live_job(
@@ -9675,6 +9927,7 @@ class DashboardState:
                         live_board_access,
                         variant=variant,
                         max_inputs=max_inputs,
+                        control_expected_outputs=control_expected_outputs,
                         link_health_profile=self._current_link_health_profile_id(),
                     )
                     event_record, payload = self._register_live_job(
@@ -10530,6 +10783,9 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/usrp-control":
             self.respond_json(HTTPStatus.OK, self.server.app_state.get_usrp_control_status())
             return
+        if parsed.path == "/api/qpsk-radio-probe":
+            self.respond_json(HTTPStatus.OK, self.server.app_state.qpsk_radio_probe_snapshot())
+            return
         if parsed.path == "/docs":
             self.respond_doc_view(parsed.query)
             return
@@ -10583,6 +10839,10 @@ class DemoRequestHandler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == "/api/usrp-control/stop":
                 payload = self.server.app_state.stop_usrp_control()
+                self.respond_json(HTTPStatus.OK, payload)
+                return
+            if parsed.path == "/api/qpsk-radio-probe/start":
+                payload = self.server.app_state.start_qpsk_radio_probe()
                 self.respond_json(HTTPStatus.OK, payload)
                 return
             if parsed.path == "/api/link-director/profile":

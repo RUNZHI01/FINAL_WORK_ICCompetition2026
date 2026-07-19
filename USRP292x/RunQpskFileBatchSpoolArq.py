@@ -649,21 +649,29 @@ def pull_remote_directory_to_local(
     cmd = _ssh_base_args(timeout=timeout, control_socket=control_socket) + [target, remote_cmd]
     env = os.environ.copy()
     env.update(CHILD_THREAD_ENV)
-    proc = subprocess.run(
-        cmd,
-        cwd=PROJECT_ROOT,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=False,
-        check=False,
-    )
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_text = (proc.stderr or b'').decode('utf-8', errors='replace')
-    log_path.write_text(log_text, encoding='utf-8')
-    if proc.returncode != 0:
-        raise RuntimeError(f'remote tar pull failed ({proc.returncode}): {" ".join(cmd)}\n{log_text}')
-    extract_tar_bytes(proc.stdout or b'', output_dir)
+    attempts: list[str] = []
+    for attempt in range(1, 4):
+        proc = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+        )
+        log_text = (proc.stderr or b'').decode('utf-8', errors='replace')
+        attempts.append(f'attempt={attempt} rc={proc.returncode}\n{log_text}')
+        if proc.returncode == 0:
+            log_path.write_text("\n".join(attempts), encoding='utf-8')
+            extract_tar_bytes(proc.stdout or b'', output_dir)
+            return
+        if attempt < 3:
+            time.sleep(float(attempt))
+
+    log_path.write_text("\n".join(attempts), encoding='utf-8')
+    raise RuntimeError(f'remote tar pull failed ({proc.returncode}): {" ".join(cmd)}\n{attempts[-1]}')
 
 
 def _ssh_control_socket_path() -> str:

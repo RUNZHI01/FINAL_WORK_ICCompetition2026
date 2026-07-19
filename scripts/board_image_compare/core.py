@@ -37,6 +37,7 @@ def pair_images(
     originals: Iterable[Path],
     reconstructions: Iterable[PurePosixPath],
     manifest_names: Mapping[int, str] | None = None,
+    reconstruction_names: Mapping[str, str] | None = None,
 ) -> list[ImagePair]:
     ordered_originals = sorted((Path(path) for path in originals), key=lambda path: natural_key(path.name))
     original_by_stem = {path.stem.casefold(): path for path in ordered_originals}
@@ -53,6 +54,11 @@ def pair_images(
             reconstruction_by_original_stem.setdefault(stem.removesuffix("_recon"), path)
 
     names = manifest_names or {}
+    names_by_reconstruction = {
+        str(stem).casefold(): str(name).strip()
+        for stem, name in (reconstruction_names or {}).items()
+        if str(name).strip()
+    }
     task_last_index = max(
         max(reconstruction_by_index, default=-1),
         max(names, default=-1),
@@ -85,11 +91,17 @@ def pair_images(
     ):
         if reconstruction in consumed_hash_reconstructions:
             continue
+        manifest_name = names_by_reconstruction.get(stem, "")
         pairs.append(
             ImagePair(
                 index=len(pairs),
-                original=original_by_stem.get(stem),
+                original=(
+                    original_by_stem.get(Path(manifest_name).stem.casefold())
+                    if manifest_name
+                    else original_by_stem.get(stem)
+                ),
                 reconstruction=reconstruction,
+                original_name=manifest_name,
             )
         )
     return pairs

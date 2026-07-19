@@ -3401,19 +3401,13 @@ def run_safe_stop_probe(
     return summary
 
 
-def main() -> int:
-    args = parse_args()
-    if args.response_timeout_sec <= 0:
-        raise SystemExit("ERROR: --response-timeout-sec must be > 0.")
-    if args.settle_timeout_sec < 0:
-        raise SystemExit("ERROR: --settle-timeout-sec must be >= 0.")
-    if args.max_rx_bytes <= 0:
-        raise SystemExit("ERROR: --max-rx-bytes must be > 0.")
-
-    output_dir = resolve_output_dir(args.output_dir)
-    hook_event = read_hook_event() if args.hook_stdin else {}
-    phase = determine_phase(args, hook_event)
-
+def execute_hook_phase(
+    *,
+    args: argparse.Namespace,
+    output_dir: Path,
+    phase: str,
+    hook_event: dict[str, Any],
+) -> tuple[dict[str, Any], int]:
     if phase == "STATUS_REQ":
         summary = run_status_probe(
             args=args,
@@ -3421,8 +3415,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0
+        return summary, 0
 
     if phase == "JOB_REQ" and args.hook_stdin:
         summary = run_job_probe(
@@ -3431,8 +3424,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("decision") == "ALLOW" else 2
+        return summary, 0 if summary.get("decision") == "ALLOW" else 2
 
     if phase in SIGNED_ADMISSION_PHASE_TO_MESSAGE_TYPE and args.hook_stdin:
         summary = run_signed_admission_probe(
@@ -3441,8 +3433,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     if phase == "HEARTBEAT" and args.hook_stdin:
         summary = run_heartbeat_probe(
@@ -3451,8 +3442,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     if phase == "LINK_HEALTH" and args.hook_stdin:
         summary = run_link_health_probe(
@@ -3461,8 +3451,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     if phase == "MODE_ACK" and args.hook_stdin:
         summary = run_mode_ack_probe(
@@ -3471,8 +3460,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     if phase == "JOB_DONE" and args.hook_stdin:
         summary = run_job_done_probe(
@@ -3481,8 +3469,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     if phase == "SAFE_STOP" and args.hook_stdin:
         summary = run_safe_stop_probe(
@@ -3491,8 +3478,7 @@ def main() -> int:
             phase=phase,
             hook_event=hook_event,
         )
-        print(json.dumps(summary, ensure_ascii=False))
-        return 0 if summary.get("acknowledged") else 2
+        return summary, 0 if summary.get("acknowledged") else 2
 
     summary = build_local_deny_summary(
         args=args,
@@ -3505,8 +3491,68 @@ def main() -> int:
             "locally denied until firmware support is implemented."
         ),
     )
+    return summary, 2
+
+
+SEQUENCE_START_PREFIX = "__OPENAMP_SEQUENCE_START__"
+SEQUENCE_END_PREFIX = "__OPENAMP_SEQUENCE_END__"
+
+
+def run_hook_sequence(args: argparse.Namespace, hook_event: dict[str, Any]) -> int:
+    raw_events = hook_event.get("events")
+    if not isinstance(raw_events, list):
+        raise SystemExit("ERROR: hook sequence events must be a JSON array.")
+
+    for index, item in enumerate(raw_events):
+        if not isinstance(item, dict):
+            continue
+        event = {
+            "phase": item.get("phase"),
+            "payload": item.get("payload") if isinstance(item.get("payload"), dict) else {},
+        }
+        phase = determine_phase(args, event)
+        try:
+            delay_before_sec = max(0.0, min(float(item.get("delay_before_sec", 0.0) or 0.0), 30.0))
+        except (TypeError, ValueError):
+            delay_before_sec = 0.0
+        if delay_before_sec:
+            time.sleep(delay_before_sec)
+        output_dir = resolve_output_dir(str(item.get("output_dir") or args.output_dir))
+        print(f"{SEQUENCE_START_PREFIX}:{index}:{phase}", flush=True)
+        summary, returncode = execute_hook_phase(
+            args=args,
+            output_dir=output_dir,
+            phase=phase,
+            hook_event=event,
+        )
+        print(json.dumps(summary, ensure_ascii=False), flush=True)
+        print(f"{SEQUENCE_END_PREFIX}:{index}:{phase}:{returncode}", flush=True)
+    return 0
+
+
+def main() -> int:
+    args = parse_args()
+    if args.response_timeout_sec <= 0:
+        raise SystemExit("ERROR: --response-timeout-sec must be > 0.")
+    if args.settle_timeout_sec < 0:
+        raise SystemExit("ERROR: --settle-timeout-sec must be >= 0.")
+    if args.max_rx_bytes <= 0:
+        raise SystemExit("ERROR: --max-rx-bytes must be > 0.")
+
+    output_dir = resolve_output_dir(args.output_dir)
+    hook_event = read_hook_event() if args.hook_stdin else {}
+    if args.hook_stdin and isinstance(hook_event.get("events"), list):
+        return run_hook_sequence(args, hook_event)
+
+    phase = determine_phase(args, hook_event)
+    summary, returncode = execute_hook_phase(
+        args=args,
+        output_dir=output_dir,
+        phase=phase,
+        hook_event=hook_event,
+    )
     print(json.dumps(summary, ensure_ascii=False))
-    return 2
+    return returncode
 
 
 if __name__ == "__main__":

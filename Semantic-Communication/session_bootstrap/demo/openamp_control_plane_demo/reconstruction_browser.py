@@ -23,6 +23,7 @@ class ReconstructionBrowserConfig:
     default_source: str
     manifest_root: Path | None = None
     pytorch_manifest: Path | None = None
+    original_dir_rules: tuple[dict[str, Any], ...] = ()
 
 
 class ProcessLike(Protocol):
@@ -139,6 +140,7 @@ class ReconstructionBrowserManager:
                 "default_source": config.default_source,
                 "manifest_root": str(config.manifest_root) if config.manifest_root else "",
                 "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
+                "original_dir_rules": list(config.original_dir_rules),
             }
             self._http_json("POST", f"{self.base_url}api/config", payload=payload, timeout=5.0)
             return self.base_url

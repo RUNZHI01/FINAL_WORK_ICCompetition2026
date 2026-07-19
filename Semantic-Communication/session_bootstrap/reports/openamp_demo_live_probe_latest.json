@@ -1,12 +1,12 @@
 {
-  "requested_at": "2026-07-15T16:34:00+0800",
+  "requested_at": "2026-07-19T01:07:24+0800",
   "reachable": true,
   "status": "success",
   "status_category": "success",
   "summary": "Phytium-Pi reachable; remoteproc0=running; 2 rpmsg device(s); firmware b79245f3f9f4.",
   "error": "",
   "details": {
-    "captured_at": "2026-07-15T16:34:04+0800",
+    "captured_at": "2026-07-19T01:07:28+0800",
     "hostname": "Phytium-Pi",
     "whoami": "user",
     "remoteproc": [

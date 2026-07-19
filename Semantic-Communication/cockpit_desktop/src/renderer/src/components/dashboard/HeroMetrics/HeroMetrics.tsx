@@ -8,35 +8,6 @@ import { comparisonResultFromInferencePayload } from '../../../hooks/comparisonR
 import { shouldDisplayDashboardBatch } from '../../../hooks/dashboardBatchDisplayState'
 import s from './HeroMetrics.module.css'
 
-function Sparkline({ data, color }: { data: number[], color: string }) {
-  if (!data || data.length === 0) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const width = 48;
-  const height = 16;
-
-  if (data.length === 1) {
-    return (
-      <svg width={width} height={height} className={s.sparkline} viewBox={`0 -2 ${width} ${height + 4}`}>
-        <circle cx={width / 2} cy={height / 2} r={2.5} fill={color} />
-      </svg>
-    );
-  }
-  
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((d - min) / range) * height;
-    return `${x},${y}`;
-  }).join(' L ');
-
-  return (
-    <svg width={width} height={height} className={s.sparkline} viewBox={`0 -2 ${width} ${height + 4}`}>
-      <path d={`M ${points}`} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 interface HeroMetricsProps {
   system: UseQueryResult<SystemStatusResponse>
   inferenceProgress?: any
@@ -93,10 +64,6 @@ export function HeroMetrics({ system, inferenceProgress, batchState, currentMode
           : '批量完成'
         : '空闲'
 
-  // Mock data for sparklines to show activity
-  const mockReconstructionData = [145, 142, 138, 135, 132, 130, 131, 129, 130];
-  const mockSpeedupData = [85, 88, 90, 91, 92, 93, 92.5, 93, 93];
-
   return (
     <div className={s.container}>
       {/* System Status — with colored dot */}
@@ -130,12 +97,9 @@ export function HeroMetrics({ system, inferenceProgress, batchState, currentMode
         </div>
         <div className={s.metricValueContainer}>
           {baseReconstructionCurrent != null ? (
-            <>
-              <span className={`${s.metricValue} ${s.metricHighlight}`}>
-                <CountUp end={baseReconstructionCurrent} decimals={1} duration={350} /> ms
-              </span>
-              {isActiveInference && <Sparkline data={mockReconstructionData} color="var(--color-primary)" />}
-            </>
+            <span className={`${s.metricValue} ${s.metricHighlight}`}>
+              <CountUp end={baseReconstructionCurrent} decimals={1} duration={350} /> ms
+            </span>
           ) : (
             <span className={s.metricValue}>—</span>
           )}
@@ -170,7 +134,6 @@ export function HeroMetrics({ system, inferenceProgress, batchState, currentMode
             <span className={s.metricValueGiant}>
               <CountUp end={baseImprovementPct} decimals={1} duration={350} />%
             </span>
-            {isActiveInference && <Sparkline data={mockSpeedupData} color="var(--color-primary)" />}
           </div>
         </div>
       )}

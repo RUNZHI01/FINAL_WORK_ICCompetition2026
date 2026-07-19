@@ -1,12 +1,6 @@
 # Analog-Latent-IQ PHY for LGJSCC over NI-USRP-2922
 
-本文档说明当前 analog latent-IQ 主链路。目标是把 LGJSCC Encoder 输出的连续 latent 直接映射成 USRP I/Q 波形，让真实无线信道作用在语义 latent 上，而不是把 latent 当作可靠文件做 QPSK/CRC 传输。当前演示、指标和安全口径见 [`../USRP_LINK_BRIEFING.md`](../USRP_LINK_BRIEFING.md)。
-
-完整 0-16 Pro 方案见：
-
-```text
-docs/design/analog_latent_iq_phy_full_proposal.md
-```
+本文档说明当前 analog latent-IQ 主链路。LGJSCC Encoder 输出的连续 latent 被映射为 USRP I/Q 波形，真实无线信道直接作用在语义表示上。演示指标和安全口径见 [`../USRP_LINK_BRIEFING.md`](../USRP_LINK_BRIEFING.md)。
 
 ## 数据链路
 
@@ -55,7 +49,7 @@ USRP292x/RunAnalogLatentBatch.py
 USRP292x/test_analog_latent_link.py
 ```
 
-这是有意设计，不是漏写。原来的 USRP 服务本身就是通用 `sc16` 收发器，可以继续复用。本分支已包含这些复用文件：
+原有 USRP 服务是通用 `sc16` 收发器，因此直接复用以下文件：
 
 ```text
 USRP292x/BuildOtaTools.sh
@@ -67,7 +61,7 @@ USRP292x/OtaTxControl.py
 USRP292x/OtaRxControl.py
 ```
 
-`BuildOtaTools.sh` 在本分支里只编译 analog 路线需要的两个 persistent server，避免把 QPSK decoder 和其他旧工具链一起引入。
+`BuildOtaTools.sh` 只编译 analog 路线需要的两个 persistent server，不依赖 QPSK decoder。
 
 完整端到端还需要三处非 USRP 目录修改：
 
@@ -210,7 +204,7 @@ pilot_gains
 
 对 2922 这种两台设备本振未锁定的场景，CFO 估计使用已知 repeated CFO pilot 的相位斜率，避免只用整段重复相关时在 1024 symbols 下对 kHz 级 CFO 发生模糊。默认仍保留 `cfo_pilot_symbols=1024 repeated twice` 的帧结构。
 
-robust sync 默认开启。普通路径会先做一次快速同步和 CFO 估计；如果 sync candidate 不满足完整 frame 长度，或者 `sync_metric` 低于门限，会自动进入 CFO grid fallback：
+robust CFO grid 已实现，但主演示配置通过 `ANALOG_ROBUST_SYNC=0` 关闭，因为它会明显扩大低质量帧的解码尾部。需要排查大频偏时可单独开启：
 
 ```text
 --sync-candidates 12
@@ -298,17 +292,17 @@ python3 USRP292x/RunAnalogLatentBatch.py \
   --run-id cable_001
 ```
 
-当前真实 RF runner 支持 `--rx-capture-mode=local`。如需两机 `remote-pull/remote-decode`，建议后续按 QPSK runner 的 SSH/SCP 模式补齐。
+真实 RF runner 支持 `local`、`remote-pull` 和 `remote-decode`。Cockpit 默认使用 `remote-decode`：板端接收并恢复 latent，结果直接写入 `REMOTE_USRP_RX_DIR`，上位机只取状态和摘要，不拉取原始 IQ capture。
 
 ## 默认 PHY 参数
 
 ```text
 sample_rate: 5 MS/s
-sps: 4
-symbol_rate: 1.25 MSym/s
+sps: 2
+symbol_rate: 2.5 MSym/s
 rrc_beta: 0.35
 rrc_span: 8
-sc16_amplitude: 3000
+sc16_amplitude: 6000
 zero_guard_samples: 4096
 tail_guard_samples: 4096
 cfo_pilot_symbols: 1024 repeated twice
@@ -316,11 +310,11 @@ sync_pilot_symbols: 1024
 data_block_symbols: 4096
 mid_pilot_symbols: 128
 capture_margin_samples: 20000
-rx_post_quantize: true
+rx_post_quantize: false
 payload_is_bit_exact: false
 ```
 
-这些参数符合 NI-USRP-2922 的保守使用方式：`5 MS/s` 低于 25 MS/s 最大 I/Q 采样率，`sc16` 对应 16-bit I/Q 样本，短帧 airtime 通常是几十毫秒量级。`sc16_amplitude=3000` 是数字幅度，不等于 RF 输出功率；真实线缆测试仍必须从低 TX/RX gain 开始并加衰减。
+`5 MS/s` 低于 NI-USRP-2922 的 25 MS/s 最大 I/Q 采样率，`sc16` 对应 16-bit I/Q 样本。`sc16_amplitude=6000` 是数字幅度，不等于 RF 输出功率；线缆直连时仍要加衰减，并从低 TX/RX gain 开始测试。
 
 ## TVM / Generator 信道模式
 

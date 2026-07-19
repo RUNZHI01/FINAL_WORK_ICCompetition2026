@@ -1,0 +1,5 @@
+# host=Phytium-Pi
+# captured_at=2026-03-30T15:14:44+08:00
+              总计         已用        空闲      共享    缓冲/缓存    可用
+内存：       3.4Gi       1.8Gi       399Mi        93Mi       1.2Gi       1.3Gi
+交换：          0B          0B          0B

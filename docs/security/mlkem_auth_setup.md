@@ -222,13 +222,15 @@ grep -E 'handshake_ms|last_sha256_match|session_count|auth_enabled|sig_policy' /
 成功标志：
 
 ```text
-handshake_ms: ~1400
+handshake_ms: <本次实测值>
 last_sha256_match=true
 session_count=1
 auth_enabled=true
 sig_policy=DUAL_REQUIRED
 server_id=phytium-board
 ```
+
+`handshake_ms` 是会话建立的墙钟时间，受进程冷启动和持久会话复用影响。历史独立冷启动曾记录约 `1400 ms`，不要把它写成固定算法耗时。
 
 ## 8. 典型故障排查
 

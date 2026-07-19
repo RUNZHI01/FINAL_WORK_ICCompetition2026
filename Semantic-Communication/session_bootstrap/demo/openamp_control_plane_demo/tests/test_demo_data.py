@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -9,10 +11,12 @@ DEMO_ROOT = Path(__file__).resolve().parents[1]
 if str(DEMO_ROOT) not in sys.path:
     sys.path.insert(0, str(DEMO_ROOT))
 
+import demo_data  # noqa: E402
 from demo_data import (  # noqa: E402
     build_aircraft_position_snapshot,
     build_original_gallery_snapshot,
     build_prerecorded_inference_result,
+    build_quality_pairs_snapshot,
     build_snapshot,
 )
 
@@ -193,6 +197,27 @@ class DemoDataTest(unittest.TestCase):
             payload["evidence"][0]["path"],
             "session_bootstrap/tmp/quality_metrics_inputs_20260312/reference/pytorch_reference_manifest.json",
         )
+
+    def test_original_tvm_quality_uses_fixed_top300_report_only_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "showcase_top300_original_tvm_report.json"
+            report_path.write_text(
+                json.dumps({"aggregate": {"mean_psnr_db": 25.5, "mean_ssim": 0.965}, "audited_count": 300}),
+                encoding="utf-8",
+            )
+            previous = demo_data.SHOWCASE_ORIGINAL_TVM_REPORT
+            demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = report_path
+            try:
+                self.assertNotIn("original_tvm", build_quality_pairs_snapshot("usrp"))
+
+                pairs = build_quality_pairs_snapshot("usrp", include_original_tvm=True)
+            finally:
+                demo_data.SHOWCASE_ORIGINAL_TVM_REPORT = previous
+
+        self.assertEqual(pairs["original_tvm"]["label"], "原图-TVM")
+        self.assertEqual(pairs["original_tvm"]["scope"], "showcase_top300_fixed_audit")
+        self.assertAlmostEqual(pairs["original_tvm"]["psnr_db"], 25.5)
+        self.assertAlmostEqual(pairs["original_tvm"]["ssim"], 0.965)
 
 
 if __name__ == "__main__":

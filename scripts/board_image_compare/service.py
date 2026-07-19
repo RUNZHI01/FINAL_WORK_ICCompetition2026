@@ -31,6 +31,12 @@ _USRP_SOURCE_IDS = frozenset({"usrp-qpsk", "usrp-iq-direct"})
 
 
 @dataclass(frozen=True)
+class OriginalDirRule:
+    before_usrp_token: int
+    original_dir: Path
+
+
+@dataclass(frozen=True)
 class ComparisonConfig:
     board_host: str
     board_user: str
@@ -41,6 +47,7 @@ class ComparisonConfig:
     default_source: str
     manifest_root: Path | None = None
     pytorch_manifest: Path | None = None
+    original_dir_rules: tuple[OriginalDirRule, ...] = ()
 
 
 def _local_image_paths(root: Path) -> list[Path]:
@@ -67,6 +74,16 @@ def _manifest_original_name(payload: object) -> str:
     source_meta = source_info.get("source_meta") if isinstance(source_info, dict) else None
     value = source_meta.get("original_filename") if isinstance(source_meta, dict) else ""
     return str(value or "").strip()
+
+
+def _usrp_token_number(job_name: str) -> int | None:
+    token = extract_usrp_token(job_name)
+    if token is None:
+        return None
+    prefix = token.split("_", 1)[0].strip()
+    if not prefix.isdigit():
+        return None
+    return int(prefix)
 
 
 def _quality_metrics_payload(metrics: QualityMetrics) -> dict[str, Any]:
@@ -130,6 +147,9 @@ class ComparisonServiceState:
             raise ValueError("board host and user are required")
         if not config.original_dir.is_dir():
             raise ValueError(f"original directory not found: {config.original_dir}")
+        for rule in config.original_dir_rules:
+            if not rule.original_dir.is_dir():
+                raise ValueError(f"historical original directory not found: {rule.original_dir}")
         source_ids = {source.id for source in config.sources}
         if not source_ids:
             raise ValueError("at least one reconstruction source is required")
@@ -222,6 +242,13 @@ class ComparisonServiceState:
             "default_source": config.default_source,
             "manifest_root": str(config.manifest_root) if config.manifest_root else "",
             "pytorch_manifest": str(config.pytorch_manifest) if config.pytorch_manifest else "",
+            "original_dir_rules": [
+                {
+                    "before_usrp_token": rule.before_usrp_token,
+                    "original_dir": str(rule.original_dir),
+                }
+                for rule in config.original_dir_rules
+            ],
         }
 
     def public_state(self) -> dict[str, Any]:
@@ -302,20 +329,6 @@ class ComparisonServiceState:
         candidates = [path for path in root.iterdir() if path.is_dir() and path.name in candidate_names]
         candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         for run_dir in candidates:
-            prepared_manifest = run_dir / "prepared_usrp_inputs" / "usrp_input_manifest.json"
-            try:
-                prepared_payload = json.loads(prepared_manifest.read_text(encoding="utf-8"))
-                prepared_files = prepared_payload.get("files", []) if isinstance(prepared_payload, dict) else []
-            except (OSError, ValueError, json.JSONDecodeError):
-                prepared_files = []
-            prepared_names = {
-                index: name
-                for index, record in enumerate(prepared_files)
-                if (name := _manifest_original_name(record))
-            }
-            if prepared_names:
-                return prepared_names
-
             names: dict[int, str] = {}
             for image_dir in sorted(run_dir.glob("**/image_*")):
                 if not image_dir.is_dir():
@@ -330,17 +343,88 @@ class ComparisonServiceState:
                     names[index] = original_name
             if names:
                 return names
+
+            prepared_manifest = run_dir / "prepared_usrp_inputs" / "usrp_input_manifest.json"
+            try:
+                prepared_payload = json.loads(prepared_manifest.read_text(encoding="utf-8"))
+                prepared_files = prepared_payload.get("files", []) if isinstance(prepared_payload, dict) else []
+            except (OSError, ValueError, json.JSONDecodeError):
+                prepared_files = []
+            prepared_names = {
+                index: name
+                for index, record in enumerate(prepared_files)
+                if (name := _manifest_original_name(record))
+            }
+            if prepared_names:
+                return prepared_names
         return {}
+
+    def _load_qpsk_reconstruction_names(self, job: RemoteJob) -> dict[str, str]:
+        config = self._require_config()
+        root = config.manifest_root
+        if root is None or not root.is_dir():
+            return {}
+        token = extract_usrp_token(job.name)
+        if token is None:
+            return {}
+        base_token = token.split("_", 1)[0]
+        candidate_names = {
+            f"cockpit_usrp_usrp-{token}",
+            f"cockpit_usrp_usrp-{base_token}",
+        }
+        candidates = [path for path in root.iterdir() if path.is_dir() and path.name in candidate_names]
+        candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+        for run_dir in candidates:
+            prepared_manifest = run_dir / "prepared_usrp_inputs" / "usrp_input_manifest.json"
+            try:
+                payload = json.loads(prepared_manifest.read_text(encoding="utf-8"))
+                records = payload.get("files", []) if isinstance(payload, dict) else []
+            except (OSError, ValueError, json.JSONDecodeError):
+                records = []
+            names: dict[str, str] = {}
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                job_id = str(record.get("job_id") or "").strip()
+                original_name = _manifest_original_name(record)
+                if job_id and original_name:
+                    names[job_id.removesuffix("_latent").casefold()] = original_name
+            if names:
+                return names
+        return {}
+
+    def _original_dir_for_job(self, job: RemoteJob) -> Path:
+        config = self._require_config()
+        token_number = _usrp_token_number(job.name)
+        if token_number is None:
+            return config.original_dir
+        for rule in sorted(config.original_dir_rules, key=lambda item: item.before_usrp_token):
+            if token_number < rule.before_usrp_token:
+                return rule.original_dir
+        return config.original_dir
 
     def job_detail(self, job_id: str) -> dict[str, Any]:
         job = self._job(job_id)
         with self._lock:
             pairs = self._pairs.get(job_id)
         if pairs is None:
-            config = self._require_config()
-            originals = _local_image_paths(config.original_dir)
+            originals = _local_image_paths(self._original_dir_for_job(job))
             reconstructions = self._require_remote().list_job_images(job.path)
-            pairs = pair_images(originals, reconstructions, self._load_manifest_names(job))
+            with self._lock:
+                source_id = self._selected_source
+            if source_id == "usrp-qpsk":
+                has_indexed_reconstructions = any(
+                    path.name.split("_", 1)[0].split(".", 1)[0].isdigit()
+                    for path in reconstructions
+                )
+                pairs = pair_images(
+                    originals,
+                    reconstructions,
+                    self._load_manifest_names(job) if has_indexed_reconstructions else None,
+                    reconstruction_names=self._load_qpsk_reconstruction_names(job),
+                )
+            else:
+                pairs = pair_images(originals, reconstructions, self._load_manifest_names(job))
             with self._lock:
                 self._pairs[job_id] = pairs
         return {
@@ -360,6 +444,7 @@ class ComparisonServiceState:
         return {
             "index": pair.index,
             "original_name": pair.original.name if pair.original else pair.original_name,
+            "original_dir": str(pair.original.parent) if pair.original else "",
             "reconstruction_name": pair.reconstruction.name if pair.reconstruction else "",
             "original_available": pair.original is not None and pair.original.is_file(),
             "reconstruction_available": pair.reconstruction is not None,
@@ -662,6 +747,20 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
             payload = self._read_json()
             if parsed.path == "/api/config":
                 sources = _sources_from_payload(payload.get("sources"))
+                original_dir_rules: list[OriginalDirRule] = []
+                for item in payload.get("original_dir_rules", []):
+                    if not isinstance(item, dict):
+                        continue
+                    try:
+                        before_usrp_token = int(item.get("before_usrp_token"))
+                    except (TypeError, ValueError):
+                        continue
+                    original_dir_rules.append(
+                        OriginalDirRule(
+                            before_usrp_token=before_usrp_token,
+                            original_dir=Path(str(item.get("original_dir", ""))).resolve(),
+                        )
+                    )
                 config = ComparisonConfig(
                     board_host=str(payload.get("board_host", "")),
                     board_user=str(payload.get("board_user", "")),
@@ -680,6 +779,7 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
                         if payload.get("pytorch_manifest")
                         else None
                     ),
+                    original_dir_rules=tuple(original_dir_rules),
                 )
                 self._json(HTTPStatus.OK, self.server.state.configure(config))
                 return

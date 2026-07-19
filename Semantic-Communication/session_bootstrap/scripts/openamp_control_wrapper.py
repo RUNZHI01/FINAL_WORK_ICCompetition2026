@@ -767,6 +767,25 @@ def get_effective_job_flags(args: argparse.Namespace, signed_admission: dict[str
     return str(args.job_flags)
 
 
+def build_job_done_payload(
+    *,
+    job_id: int,
+    elapsed_ms: int,
+    return_code: int | None,
+    timed_out: bool,
+    expected_outputs: int,
+) -> dict[str, Any]:
+    succeeded = (return_code or 0) == 0 and not timed_out
+    return {
+        "job_id": job_id,
+        "elapsed_ms": elapsed_ms,
+        "result_code": 0 if succeeded else 1,
+        "output_count": expected_outputs if succeeded else 0,
+        "runner_exit_code": return_code,
+        "timed_out": timed_out,
+    }
+
+
 def main() -> int:
     args = parse_args()
     if args.transport == "hook" and not args.control_hook_cmd:
@@ -1072,13 +1091,13 @@ def main() -> int:
     emit_event(
         trace_path=trace_path,
         phase="JOB_DONE",
-        payload={
-            "job_id": control_job_id,
-            "elapsed_ms": elapsed_ms,
-            "result_code": 0 if (return_code or 0) == 0 and not timed_out else 1,
-            "runner_exit_code": return_code,
-            "timed_out": timed_out,
-        },
+        payload=build_job_done_payload(
+            job_id=control_job_id,
+            elapsed_ms=elapsed_ms,
+            return_code=return_code,
+            timed_out=timed_out,
+            expected_outputs=expected_outputs,
+        ),
         transport=args.transport,
         hook_cmd=args.control_hook_cmd,
         hook_timeout_sec=args.control_hook_timeout_sec,

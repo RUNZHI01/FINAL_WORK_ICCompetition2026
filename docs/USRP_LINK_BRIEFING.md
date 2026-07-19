@@ -1,8 +1,8 @@
 # USRP IQ 直传链路汇报口径
 
-更新时间：2026-07-17
+更新时间：2026-07-18
 
-这份文档供今晚进度同步、PPT 修改和答辩准备使用。当前主演示路径已经固定为：
+本文记录 USRP IQ 主链路、实测指标和安全边界。PPT 与技术文档的差量修改分别见 [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) 和 [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。主演示路径为：
 
 ```text
 Cockpit Desktop
@@ -44,7 +44,7 @@ Deep JSCC encoder 输出的是连续实数 latent，不是已经调制好的射�
 - 默认门限为 sync metric `>= 0.75`、pilot gain ratio `>= 0.85`、EVM `<= 0.75`、估计 SNR `>= 3 dB`。
 - RX 停滞后会关闭旧会话并向常驻 RX server 发送真实 `RESET`，不再只重连 TCP 控制口。
 - 默认关闭 RF decode 与 TVM 的重叠流水线。真板测试中资源争用使总耗时和 p95 变差，串行路径的图像质量更稳定。
-- Cockpit 显示前严格预热 10 张，要求累计 `10/10` 完成；首轮不足时只补跑剩余数量，不降低质量门限。
+- Cockpit 显示前只建立板卡会话，拉起安全服务与常驻 USRP TX/RX，并等待服务就绪；启动阶段不发送图片。
 
 ## 指标应如何解释
 
@@ -53,7 +53,7 @@ Deep JSCC encoder 输出的是连续实数 latent，不是已经调制好的射�
 | 单帧名义空口时长 | 约 `9.58 ms` | 只计算波形样本数除以 `5 Msps`，不含等待、同步、解码和重试 |
 | IQ 传输/解包 | median `411.59 ms`，p95 `3423.45 ms` | 300 张严格可靠性 profile；长尾主要来自质量门限和 ARQ |
 | TVM 核心推理 | median `245.42 ms`，mean `254.71 ms` | 300 张严格 profile；这是最接近“单张重建推理速度”的数字 |
-| 最新一键冷启动 | IQ `10/10`，TVM `10/10`，约 `99.6 s` | job `cockpit_usrp_usrp-1784286235`；主机服务与容器全关后复现 |
+| 历史全链路冷启动 | IQ `10/10`，TVM `10/10`，约 `99.6 s` | job `cockpit_usrp_usrp-1784286235`；这是旧图片预热方案的记录，不代表当前启动时间 |
 | 预录 TVM 参考线 | median `243.30 ms`，mean `252.91 ms` | 不含 USRP，用于证明 handwritten + big.LITTLE 的约 250 ms 指标已恢复 |
 | 100 张整批演示 | 点击到完成 `240.19 s` | 包含编码、261 次 OTA 尝试、板端解码、TVM 和图片保存 |
 | QPSK 对照 | 约 `2.96 s/image` | 可靠字节链路，速度明显慢于 IQ 主线 |
@@ -68,31 +68,19 @@ ML-KEM、SM4、ML-DSA 和 SM2 当前用于会话准入与控制信道。USRP IQ 
 
 答辩时可以说：“安全信道先认证设备并授权任务，语义数据面再通过 USRP 发送。”不能说“无线 IQ payload 已被 ML-KEM+SM4 加密”。
 
-## PPT 需要修改的内容
+安全状态中的耗时字段也要按边界解释：`handshake_ms` 是建立会话的墙钟时间，受冷启动和服务复用影响；历史 `decrypt_ms` 还包含等待板端执行、网络接收和结果读取，不是纯 SM4-GCM 解密时间。USRP 模式只使用安全会话做准入，不能用这两个字段推导 IQ 数据面密码开销。
 
-1. 主架构图改成控制面和数据面两条线。控制面标 Tailscale、ML-KEM+SM4、ML-DSA+SM2；数据面标 JSCC latent 和 USRP RF。
-2. IQ 直传页补上 RMS 归一化、复数配对、导频、RRC、同步/CFO/增益恢复。不要画成 encoder 输出直接接天线。
-3. 可靠性页写清常驻 TX/RX、30 张分段、ARQ12、两轮失败子集补传、质量门限和 RX RESET。
-4. 性能页分四行展示空口、传输/解包、TVM core、整批墙钟。约 250 ms 只标在 TVM core 上。
-5. TVM 页注明 handwritten artifact、SHA 匹配和大核 2 推理；小核 0、1 负责预取与保存。
-6. 安全页明确控制/认证面准入边界，并解释为什么连续 IQ 数据面没有直接套 AEAD。
-7. 演示流程页改成“上电与网口检查 -> 一键启动 -> 隐藏预热 10/10 -> 正式批次 -> 图片对比”。
+## 材料修改入口
 
-## 书面材料需要同步的点
+- PPT 只建议修改 3 页：[`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md)。
+- 技术文档只整理加密认证和 USRP 的差量内容：[`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。
 
-- 把“USRP 数据经过 Tailscale”改为“控制面经过 Tailscale，RF 数据面不经过”。
-- 把“取消 QPSK 后不再需要同步和纠错”改为“取消字节级 QPSK/CRC，保留模拟同步、质量门限和 ARQ”。
-- 指标表注明样本数、median/mean/p95 和统计边界。
-- 图像质量同时说明原图-TVM与 PyTorch-TVM口径，不能把两组 PSNR/SSIM 混写。
-- 写入默认频率 `500 MHz`、采样率 `5 Msps`、`sps=2`、TX/RX gain `25/15`，并注明现场天线位置和频谱环境会影响重试次数。
-- 把 QPSK 定位为 fallback，不要删除或继续改动其主逻辑。
-
-## 今晚可直接汇报的进度
+## 当前可汇报进度
 
 - IQ 主链路已接入 Cockpit，默认认证、加密和 USRP IQ 直传均开启。
 - 300 张严格质量门限回归达到 `300/300` accepted，TVM 核心仍在约 245 ms。
 - 修复了 RX 服务“端口仍在但 UHD 收不到样本”时只重连控制口的问题，现在会执行真实 RESET。
 - 修复了板端 RX server 启动成功但 SSH 命令等待约 60 秒的问题，改为 `setsid -f` 后启动约 4.6 秒返回。
-- 一键启动改为累计预热 `10/10` 才显示 UI；首轮不足时只补跑剩数量。最新全关后冷启动约 `99.6 s` 通过。
+- 一键启动会在显示 UI 前确认板卡、安全服务和 USRP 控制端口就绪，不再运行隐藏图片任务。
 - 上位机 TX 的 USRP UDP 数据面由本机 Docker 容器访问物理 USRP；Windows 通过 bridge 直接映射 `29221` TCP 控制口，Linux 默认使用 host network。这些本机链路均不经 Tailscale。
 - 板端同步包已于 2026-07-17 重新生成并部署，关键文件 SHA-256 一致，`tvm310_safe` 运行时检查通过。

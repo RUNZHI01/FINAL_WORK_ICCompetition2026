@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import base64
 import gzip
+import hashlib
 import io
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 import shlex
@@ -160,17 +162,25 @@ def build_bridge_bundle_base64() -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def build_remote_command(args: argparse.Namespace, *, phase: str, job_id: int, hook_event_b64: str = "") -> str:
+def build_remote_command(
+    args: argparse.Namespace,
+    *,
+    phase: str,
+    job_id: int,
+    hook_event_b64: str = "",
+) -> str:
     remote_output_dir = f"{args.remote_output_root.rstrip('/')}/{job_id or 'adhoc'}/{phase.lower()}"
     remote_project_root = str(args.remote_project_root or "").strip()
     # Keep the validated bundle fallback, but prefer the existing remote project copy when available
     # to avoid re-extracting the bridge runtime on every heartbeat.
     bridge_bundle = build_bridge_bundle_base64()
+    bridge_cache_key = hashlib.sha256(base64.b64decode(bridge_bundle)).hexdigest()[:20]
     return f"""
 set -euo pipefail
 PHASE={shlex.quote(phase)}
 OUTPUT_DIR={shlex.quote(remote_output_dir)}
 REMOTE_PROJECT_ROOT={shlex.quote(remote_project_root)}
+BRIDGE_CACHE_ROOT=/tmp/openamp_demo_bridge_cache.$(id -u)/{bridge_cache_key}
 HOOK_EVENT_B64={shlex.quote(hook_event_b64)}
 STAGE_ROOT="$(mktemp -d /tmp/openamp_demo_bridge.XXXXXX)"
 HOOK_INPUT_FILE="$STAGE_ROOT/hook_event.json"
@@ -187,7 +197,10 @@ if [[ -n "$REMOTE_PROJECT_ROOT" ]] && [[ -f "$REMOTE_PROJECT_ROOT/session_bootst
   REMOTE_BRIDGE_SCRIPT="$REMOTE_PROJECT_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py"
   REMOTE_BRIDGE_PYTHONPATH="$REMOTE_PROJECT_ROOT"
 else
-  STAGE_ROOT="$STAGE_ROOT" PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+  if [[ ! -f "$BRIDGE_CACHE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py" ]] || [[ ! -f "$BRIDGE_CACHE_ROOT/openamp_mock/protocol.py" ]]; then
+    rm -rf "$BRIDGE_CACHE_ROOT"
+    mkdir -p "$BRIDGE_CACHE_ROOT"
+    BRIDGE_CACHE_ROOT="$BRIDGE_CACHE_ROOT" PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import base64
 import gzip
 import io
@@ -195,16 +208,19 @@ import os
 from pathlib import Path
 import tarfile
 
-stage_root = Path(os.environ["STAGE_ROOT"])
+stage_root = Path(os.environ["BRIDGE_CACHE_ROOT"])
 stage_root.mkdir(parents=True, exist_ok=True)
 bundle = base64.b64decode({bridge_bundle!r})
 with gzip.GzipFile(fileobj=io.BytesIO(bundle), mode="rb") as gzip_file:
     with tarfile.open(fileobj=gzip_file, mode="r:") as archive:
         archive.extractall(stage_root)
 PY
+  fi
+  REMOTE_BRIDGE_SCRIPT="$BRIDGE_CACHE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py"
+  REMOTE_BRIDGE_PYTHONPATH="$BRIDGE_CACHE_ROOT"
 fi
-BRIDGE_SCRIPT="${{REMOTE_BRIDGE_SCRIPT:-$STAGE_ROOT/session_bootstrap/scripts/openamp_rpmsg_bridge.py}}"
-BRIDGE_PYTHONPATH="${{REMOTE_BRIDGE_PYTHONPATH:-$STAGE_ROOT}}"
+BRIDGE_SCRIPT="$REMOTE_BRIDGE_SCRIPT"
+BRIDGE_PYTHONPATH="$REMOTE_BRIDGE_PYTHONPATH"
 if [[ "${{SUDO_PASSWORD+x}}" != "x" ]]; then
   IFS= read -r SUDO_PASSWORD || SUDO_PASSWORD=""
 fi
@@ -319,64 +335,26 @@ def sequence_events(event: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def build_remote_sequence_command(args: argparse.Namespace, events: list[dict[str, Any]]) -> str:
-    steps: list[str] = []
-    for index, event in enumerate(events):
+    bridge_events: list[dict[str, Any]] = []
+    for event in events:
         phase = detect_phase(event)
         job_id = detect_job_id(event)
-        raw_event = json.dumps(
-            {"phase": phase, "payload": event.get("payload", {})},
-            ensure_ascii=False,
-            separators=(",", ":"),
+        bridge_events.append(
+            {
+                "phase": phase,
+                "payload": event.get("payload", {}),
+                "delay_before_sec": float(event.get("delay_before_sec", 0.0) or 0.0),
+                "output_dir": f"{args.remote_output_root.rstrip('/')}/{job_id or 'adhoc'}/{phase.lower()}",
+            }
         )
-        hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
-        delay_before_sec = float(event.get("delay_before_sec", 0.0) or 0.0)
-        phase_command = build_remote_command(
-            args,
-            phase=phase,
-            job_id=job_id,
-            hook_event_b64=hook_event_b64,
-        )
-        steps.append(
-            f"""
-printf '%s:%d:%s\\n' {shlex.quote(SEQUENCE_START_PREFIX)} {index} {shlex.quote(phase)}
-sleep {delay_before_sec:.3f}
-if (
-{phase_command}
-); then
-  sequence_rc=0
-else
-  sequence_rc=$?
-fi
-printf '%s:%d:%s:%d\\n' {shlex.quote(SEQUENCE_END_PREFIX)} {index} {shlex.quote(phase)} "$sequence_rc"
-""".strip()
-        )
-
-    sequence_body = "\n\n".join(steps)
-    return f"""
-set -uo pipefail
-SEQUENCE_STAGE_ROOT="$(mktemp -d /tmp/openamp_demo_sequence.XXXXXX)"
-SEQUENCE_SCRIPT="$SEQUENCE_STAGE_ROOT/run_sequence.sh"
-cleanup_sequence() {{
-  if command -v sudo >/dev/null 2>&1; then
-    printf '%s\\n' "${{SUDO_PASSWORD:-}}" | sudo -S -p '' rm -rf "$SEQUENCE_STAGE_ROOT" >/dev/null 2>&1 || true
-  fi
-  rm -rf "$SEQUENCE_STAGE_ROOT" >/dev/null 2>&1 || true
-}}
-trap cleanup_sequence EXIT
-cat >"$SEQUENCE_SCRIPT" <<'OPENAMP_SEQUENCE_SCRIPT'
-#!/usr/bin/env bash
-set -uo pipefail
-{sequence_body}
-OPENAMP_SEQUENCE_SCRIPT
-chmod 700 "$SEQUENCE_SCRIPT"
-if [[ "$(id -u)" -eq 0 ]] || {{ [[ -r {shlex.quote(args.rpmsg_dev)} ]] && [[ -w {shlex.quote(args.rpmsg_dev)} ]]; }}; then
-  SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
-elif command -v sudo >/dev/null 2>&1; then
-  printf '%s\\n' "${{SUDO_PASSWORD:-}}" | sudo -S -p '' env SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
-else
-  SUDO_PASSWORD="${{SUDO_PASSWORD:-}}" bash "$SEQUENCE_SCRIPT"
-fi
-""".strip()
+    raw_event = json.dumps({"events": bridge_events}, ensure_ascii=False, separators=(",", ":"))
+    hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
+    return build_remote_command(
+        args,
+        phase="SEQUENCE",
+        job_id=detect_job_id(events[0]) if events else 0,
+        hook_event_b64=hook_event_b64,
+    )
 
 
 def parse_sequence_output(raw: str, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -453,6 +431,65 @@ def decode_completed_output(value: str | bytes | None) -> str:
     return value
 
 
+def resolve_docker_exec_container() -> str:
+    runner = str(os.environ.get("OPENAMP_SSH_RUNNER") or "").strip().lower()
+    if runner != "docker":
+        return ""
+    tx_port = str(os.environ.get("TX_CONTROL_PORT") or os.environ.get("USRP_TX_CONTROL_PORT") or "29221").strip()
+    container = str(os.environ.get("OPENAMP_SSH_DOCKER_CONTAINER") or f"cockpit-usrp-tx-{tx_port}").strip()
+    if not container:
+        return ""
+    try:
+        probe = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", container],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    return container if probe.returncode == 0 and probe.stdout.strip() == "true" else ""
+
+
+def build_docker_exec_command(args: argparse.Namespace, container: str) -> list[str]:
+    ssh_options = [
+        "-p",
+        args.port,
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "BatchMode=no",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-o",
+        "ControlMaster=auto",
+        "-o",
+        "ControlPersist=60",
+        "-o",
+        "ControlPath=/tmp/ssh_mux/%C",
+    ]
+    remote_command = shlex.join(["bash", "-lc", build_remote_stdin_wrapper_command()])
+    return [
+        "docker",
+        "exec",
+        "-i",
+        "-e",
+        "SSHPASS",
+        container,
+        "sh",
+        "-c",
+        'mkdir -p /tmp/ssh_mux && chmod 700 /tmp/ssh_mux && exec sshpass -e ssh "$@"',
+        "sh",
+        *ssh_options,
+        f"{args.user}@{args.host}",
+        remote_command,
+    ]
+
+
 def main() -> int:
     args = normalize_args(parse_args())
     raw_event = sys.stdin.read()
@@ -467,25 +504,33 @@ def main() -> int:
         hook_event_b64 = base64.b64encode(raw_event.encode("utf-8")).decode("ascii")
         remote_command = build_remote_command(args, phase=phase, job_id=job_id, hook_event_b64=hook_event_b64)
     remote_input = f"{args.password}\n{remote_command}\n".encode("utf-8")
-    command = [
-        resolve_bash_executable(),
-        str(SSH_HELPER),
-        "--host",
-        args.host,
-        "--user",
-        args.user,
-        "--pass",
-        args.password,
-        "--port",
-        args.port,
-        "--",
-        "bash",
-        "-lc",
-        build_remote_stdin_wrapper_command(),
-    ]
+    docker_container = resolve_docker_exec_container()
+    if docker_container:
+        command = build_docker_exec_command(args, docker_container)
+    else:
+        command = [
+            resolve_bash_executable(),
+            str(SSH_HELPER),
+            "--host",
+            args.host,
+            "--user",
+            args.user,
+            "--pass",
+            args.password,
+            "--port",
+            args.port,
+            "--",
+            "bash",
+            "-lc",
+            build_remote_stdin_wrapper_command(),
+        ]
+    command_env = os.environ.copy()
+    if docker_container:
+        command_env["SSHPASS"] = args.password
     result = subprocess.run(
         command,
         cwd=PROJECT_ROOT,
+        env=command_env,
         input=remote_input,
         capture_output=True,
         check=False,

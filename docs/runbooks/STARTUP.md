@@ -39,7 +39,7 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 .\Semantic-Communication\cockpit_desktop\start-demo.ps1 -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
 ```
 
-默认会启用 USRP IQ 直传、ML-KEM+SM4、ML-DSA+SM2，并在显示界面前静默预热 10 张。必须累计 `10/10` 才显示界面；首轮不足时只补跑剩余数量，最多两轮。Windows 下 TX 容器使用 bridge 并直接发布 `127.0.0.1:29221`；原生 Linux 使用 host network。无需手工启动 TX 容器或控制代理。
+默认启用 USRP IQ 直传、ML-KEM+SM4 和 ML-DSA+SM2。界面显示前，脚本会建立板卡会话，拉起安全服务和常驻 USRP TX/RX，再检查状态端点与控制端口；启动阶段不发送图片，也不创建隐藏重建任务。Windows 下 TX 容器使用 bridge 并发布 `127.0.0.1:29221`；原生 Linux 使用 host network。无需手工启动 TX 容器或控制代理。
 
 5. 界面出现后检查：
 

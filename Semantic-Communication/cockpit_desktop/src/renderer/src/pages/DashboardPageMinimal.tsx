@@ -670,6 +670,14 @@ export function DashboardPageMinimal() {
               ? `MNN 批量完成：${batchProgress}/${batchTotalImages}`
               : `批量完成：${batchProgress}/${batchTotalImages}${modeTag}`
           : `等待操作员启动 TVM ${batchCount} 张`
+  const inferenceStageStatus = String(inferenceStage.status || '').trim().toLowerCase()
+  const inferenceStageHasStarted =
+    inferenceStage.completed > 0
+    || ['running', 'active', 'completed', 'done', 'success'].includes(inferenceStageStatus)
+  const currentStageLooksLikeReconstruction = /推理|重建|tvm|mnn|pytorch|inference|reconstruct/i.test(String(currentStage))
+  const shouldShowReconstructionLog =
+    (isSingleLiveRunning && (activeTransport !== 'usrp' || currentStageLooksLikeReconstruction))
+    || (isBatchRunning && (activeTransport !== 'usrp' || inferenceStageHasStarted))
   const progressBadge = isRunning
     ? '运行中'
     : isDone
@@ -733,7 +741,9 @@ export function DashboardPageMinimal() {
     : undefined
   const selectedLinkMode = pendingJsccLinkMode ?? configuredLinkMode
   const currentWrapperSummary = (currentResult?.wrapper_summary ?? undefined) as JsonObject | undefined
-  const activeLinkMode: JsccLinkMode = extractJsccLinkMode(currentWrapperSummary) ?? selectedLinkMode
+  const activeLinkMode: JsccLinkMode = isRunning
+    ? extractJsccLinkMode(currentWrapperSummary) ?? selectedLinkMode
+    : selectedLinkMode
   const iqRadioMetrics: IqRadioMetrics | undefined = extractIqRadioMetrics(currentWrapperSummary)
   const iqTailAudit = cryptoData?.batch_iq_tail_audit ?? null
   const iqTailSampleCount = iqTailCount(iqTailAudit, 'record_count') ?? iqRadioMetrics?.sample_count ?? null
@@ -998,7 +1008,7 @@ export function DashboardPageMinimal() {
                   </div>
                 )}
 
-                <LiveLogStream isRunning={isRunning} />
+                <LiveLogStream isRunning={shouldShowReconstructionLog} />
               </div>
 
               <GpsForwardStream

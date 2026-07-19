@@ -2169,6 +2169,23 @@ def _count_processed_from_results(results: list[dict[str, Any]]) -> int:
     return processed
 
 
+def rank_qpsk_probe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rank short QPSK radio probes by completion, ARQ pressure, then duration."""
+    def score(item: dict[str, Any]) -> tuple[int, int, int, float]:
+        target = max(1, _parse_int(item.get("target_count"), 1))
+        passed = max(0, _parse_int(item.get("pass_count"), 0))
+        rounds = max(0, _parse_int(item.get("round_record_count"), 0))
+        elapsed = max(0.0, _parse_float(item.get("elapsed_sec"), float("inf")))
+        return (
+            1 if passed >= target else 0,
+            passed,
+            -rounds,
+            -elapsed,
+        )
+
+    return sorted((dict(item) for item in results), key=score, reverse=True)
+
+
 def _count_progress_from_image_dirs(run_dir: Path) -> dict[str, int]:
     processed = 0
     passed = 0
@@ -2497,7 +2514,7 @@ class UsrpBatchSpoolJob:
                 remote_run_root=remote_run_root,
                 remote_project_root=remote_project_root,
                 auto_start=auto_start_control,
-                require_reset=self._link_mode == LINK_MODE_IQ_DIRECT,
+                require_reset=self._link_mode in {LINK_MODE_QPSK, LINK_MODE_IQ_DIRECT},
                 log_dir=REPO_ROOT / "USRP292x" / "server_logs",
             )
             self._control_server_diagnostics = control_diagnostics
@@ -2960,6 +2977,9 @@ class UsrpBatchSpoolJob:
 
     def _set_transport_progress(self, summary: dict[str, Any]) -> None:
         self._transport_total = max(1, int(summary.get("target_count") or self._expected_outputs))
+        if self._link_mode == LINK_MODE_QPSK:
+            self._transport_completed = max(0, int(summary.get("pass_count") or 0))
+            return
         self._transport_completed = max(
             int(summary.get("completed_count") or 0),
             int(summary.get("pass_count") or 0),
@@ -3259,6 +3279,8 @@ class UsrpBatchSpoolJob:
         summary = dict(summary or {})
         target_count = max(1, int(summary.get("target_count") or self._expected_outputs))
         pass_count = int(summary.get("pass_count") or 0)
+        transport_completed = pass_count
+        transport_label = "USRP 已完成接收" if self._link_mode == LINK_MODE_QPSK else "USRP 传输/解包"
         all_pass = bool(summary.get("all_pass")) if summary else False
         per_image_sec = float(summary.get("per_image_sec") or 0.0)
         payload_airtime_ms_mean = float(summary.get("payload_airtime_ms_mean") or 0.0)
@@ -3373,9 +3395,9 @@ class UsrpBatchSpoolJob:
         )
         transport_progress = self._build_progress_payload(
             state="completed" if bool(summary.get("all_pass")) else ("fallback" if status != "success" else "completed"),
-            label="USRP 传输/解包",
-            percent=100 if bool(summary.get("all_pass")) else int(round((pass_count / target_count) * 100)),
-            completed_count=pass_count,
+            label=transport_label,
+            percent=int(round((transport_completed / target_count) * 100)),
+            completed_count=transport_completed,
             expected_count=target_count,
             event_log=[],
         )
@@ -3567,14 +3589,14 @@ class UsrpBatchSpoolJob:
         results = summary.get("results") if isinstance(summary.get("results"), list) else []
         processed_count = _count_processed_from_results(results) if results else 0
         pass_count = int(summary.get("pass_count") or 0)
-
         log_progress = _parse_progress_from_log(self._log_path, fallback_target=target_count)
         processed_count = max(processed_count, int(log_progress.get("processed") or 0))
         pass_count = max(pass_count, int(log_progress.get("pass_count") or 0))
         image_dir_progress = _count_progress_from_image_dirs(self._run_dir)
         processed_count = max(processed_count, int(image_dir_progress.get("processed") or 0))
         pass_count = max(pass_count, int(image_dir_progress.get("pass_count") or 0))
-        percent = int(round((processed_count / target_count) * 100)) if target_count > 0 else 0
+        transport_completed = pass_count if self._link_mode == LINK_MODE_QPSK else processed_count
+        transport_percent = int(round((transport_completed / target_count) * 100)) if target_count > 0 else 0
         with self._lock:
             phase = self._phase
             inference_completed = self._inference_completed
@@ -3648,8 +3670,8 @@ class UsrpBatchSpoolJob:
             "progress": self._build_progress_payload(
                 state="running",
                 label=progress_label,
-                percent=int(round((inference_completed / max(1, inference_total)) * 100)) if phase == "inference" else percent,
-                completed_count=inference_completed if phase == "inference" else processed_count,
+                percent=int(round((inference_completed / max(1, inference_total)) * 100)) if phase == "inference" else transport_percent,
+                completed_count=inference_completed if phase == "inference" else transport_completed,
                 expected_count=target_count,
                 event_log=[],
             ),
@@ -3665,9 +3687,9 @@ class UsrpBatchSpoolJob:
                 ),
                 "transport": self._build_progress_payload(
                     state="completed" if transport_done else "running",
-                    label="USRP 传输/解包",
-                    percent=100 if transport_done else percent,
-                    completed_count=target_count if transport_done else processed_count,
+                    label="USRP 已完成接收" if self._link_mode == LINK_MODE_QPSK else "USRP 传输/解包",
+                    percent=transport_percent,
+                    completed_count=transport_completed,
                     expected_count=target_count,
                     event_log=[],
                 ),

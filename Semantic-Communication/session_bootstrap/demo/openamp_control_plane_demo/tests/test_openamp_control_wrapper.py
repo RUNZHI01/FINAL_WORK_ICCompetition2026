@@ -75,6 +75,18 @@ def build_signed_bundle(temp_dir: Path, *, variant: str) -> tuple[Path, Path]:
 
 
 class OpenAMPControlWrapperTest(unittest.TestCase):
+    def test_job_done_reports_the_admitted_control_output_count(self) -> None:
+        payload = openamp_control_wrapper.build_job_done_payload(
+            job_id=2026,
+            elapsed_ms=1234,
+            return_code=0,
+            timed_out=False,
+            expected_outputs=300,
+        )
+
+        self.assertEqual(payload["result_code"], 0)
+        self.assertEqual(payload["output_count"], 300)
+
     def test_resolve_bash_executable_uses_git_exec_path_before_wsl_bash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
             temp_dir = Path(temp_dir_raw)

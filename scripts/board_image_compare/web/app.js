@@ -11,14 +11,14 @@ const elements = {
   jobSelect: document.querySelector('#job-select'),
   refreshJobs: document.querySelector('#refresh-jobs'),
   pullImage: document.querySelector('#pull-image'),
-  qualityAssistance: document.querySelector('#quality-assistance'),
+  directoryHelp: document.querySelector('#directory-help'),
+  directoryHelpPanel: document.querySelector('#directory-help-panel'),
   originalPreview: document.querySelector('#original-preview'),
   reconstructionPreview: document.querySelector('#reconstruction-preview'),
   originalEmpty: document.querySelector('#original-empty'),
   reconstructionEmpty: document.querySelector('#reconstruction-empty'),
   originalName: document.querySelector('#original-name'),
   reconstructionName: document.querySelector('#reconstruction-name'),
-  qualityMarker: document.querySelector('#quality-marker'),
   qualityPsnr: document.querySelector('#quality-psnr'),
   qualitySsim: document.querySelector('#quality-ssim'),
   previousImage: document.querySelector('#previous-image'),
@@ -38,9 +38,10 @@ const state = {
   detail: null,
   index: 0,
   quality: {},
-  qualityEnabled: false,
   referenceMode: 'original',
 }
+
+const VISIBLE_SOURCE_IDS = new Set(["usrp-qpsk", "usrp-iq-direct"])
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
@@ -155,11 +156,6 @@ function renderPreview() {
   elements.reconstructionEmpty.textContent = pair.reconstruction_available
     ? '点击“拉取”获取当前图片'
     : '当前序号没有重建图'
-  const marked = state.qualityEnabled && quality?.suspected
-  elements.qualityMarker.hidden = !marked
-  elements.qualityMarker.title = marked
-    ? `PSNR ${Number(quality.psnr_db).toFixed(2)} dB / SSIM ${Number(quality.ssim).toFixed(3)} / ${quality.reason}`
-    : ''
   renderThumbnails()
 }
 
@@ -185,11 +181,6 @@ function renderThumbnails() {
     label.className = 'index'
     label.textContent = String(index + 1)
     button.append(label)
-    if (state.qualityEnabled && qualityFor(index)?.suspected) {
-      const dot = document.createElement('span')
-      dot.className = 'quality-dot'
-      button.append(dot)
-    }
     button.addEventListener('click', () => setIndex(index))
     elements.thumbnailStrip.append(button)
   }
@@ -214,8 +205,6 @@ function resetSelectedJob() {
   elements.originalCount.textContent = '0 张'
   elements.originalName.textContent = '未选择'
   elements.reconstructionName.textContent = '未拉取'
-  elements.qualityMarker.hidden = true
-  elements.qualityMarker.title = ''
   elements.qualityPsnr.textContent = '--'
   elements.qualitySsim.textContent = '--'
   elements.thumbnailStrip.replaceChildren()
@@ -309,15 +298,6 @@ async function pullCurrent() {
   }
 }
 
-async function setQualityAssistance(enabled) {
-  state.qualityEnabled = enabled
-  await requestJson('/api/quality-scan', {
-    method: 'POST',
-    body: JSON.stringify({ enabled, job_id: currentJobId() }),
-  })
-  renderPreview()
-}
-
 async function pollState() {
   const sourceEpoch = state.sourceEpoch
   const sourceId = state.sourceId
@@ -340,9 +320,12 @@ async function pollState() {
 async function initialize() {
   try {
     state.config = await requestJson('/api/config')
-    state.sourceId = state.config.default_source
+    const visibleSources = (state.config.sources || []).filter((source) => VISIBLE_SOURCE_IDS.has(source.id))
+    state.sourceId = visibleSources.some((source) => source.id === state.config.default_source)
+      ? state.config.default_source
+      : visibleSources[0]?.id || ''
     elements.sourceSelect.replaceChildren()
-    for (const source of state.config.sources || []) {
+    for (const source of visibleSources) {
       const option = document.createElement('option')
       option.value = source.id
       option.textContent = source.label
@@ -366,7 +349,11 @@ elements.pullImage.addEventListener('click', pullCurrent)
 elements.previousImage.addEventListener('click', () => setIndex(state.index - 1))
 elements.nextImage.addEventListener('click', () => setIndex(state.index + 1))
 elements.imageIndex.addEventListener('change', () => setIndex(Number(elements.imageIndex.value) - 1))
-elements.qualityAssistance.addEventListener('change', () => setQualityAssistance(elements.qualityAssistance.checked))
+elements.directoryHelp.addEventListener('click', () => {
+  const open = elements.directoryHelpPanel.hidden
+  elements.directoryHelpPanel.hidden = !open
+  elements.directoryHelp.setAttribute('aria-expanded', String(open))
+})
 for (const button of elements.referenceModes) {
   button.addEventListener('click', () => {
     state.referenceMode = button.dataset.referenceMode || 'original'

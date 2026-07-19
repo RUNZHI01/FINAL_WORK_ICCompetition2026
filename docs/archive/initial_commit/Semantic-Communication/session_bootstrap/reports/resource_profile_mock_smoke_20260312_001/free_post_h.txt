@@ -1,0 +1,5 @@
+# host=lenovo
+# captured_at=2026-03-12T15:21:47+08:00
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       2.4Gi        12Gi       3.5Mi       683Mi        13Gi
+Swap:          4.0Gi          0B       4.0Gi

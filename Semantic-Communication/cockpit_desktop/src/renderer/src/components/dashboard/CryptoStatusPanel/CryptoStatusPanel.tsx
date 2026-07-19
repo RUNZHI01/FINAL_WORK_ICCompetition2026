@@ -272,6 +272,7 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
   const runtimeItems: MetricItem[] = [
     { label: '通道状态', value: st.label },
   ]
+  const showTcpPayloadTimings = data.security_scope !== 'control_gate'
 
   if (data.handshake_ms != null) {
     runtimeItems.push({ label: '握手耗时', value: `${data.handshake_ms.toFixed(1)} ms`, tone: 'mono' })
@@ -284,13 +285,13 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
       half: true,
     })
   }
-  if (data.encrypt_ms != null) {
+  if (showTcpPayloadTimings && data.encrypt_ms != null) {
     runtimeItems.push({ label: '加密发送', value: `${data.encrypt_ms.toFixed(1)} ms`, tone: 'mono' })
   }
-  if (data.decrypt_ms != null) {
-    runtimeItems.push({ label: '解密接收', value: `${data.decrypt_ms.toFixed(1)} ms`, tone: 'mono' })
+  if (showTcpPayloadTimings && data.decrypt_ms != null) {
+    runtimeItems.push({ label: '结果等待/接收', value: `${data.decrypt_ms.toFixed(1)} ms`, tone: 'mono' })
   }
-  if (data.inference_ms != null) {
+  if (showTcpPayloadTimings && data.inference_ms != null) {
     runtimeItems.push({ label: 'TVM 推理', value: `${data.inference_ms.toFixed(1)} ms`, tone: 'mono' })
   }
   if (data.last_sha256_match != null) {
@@ -376,6 +377,25 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
         </div>
       </div>
 
+      <div className={s.testSection}>
+        <div className={s.actionRow}>
+          <button
+            className={s.testBtn}
+            onClick={handleTest}
+            disabled={testing || resetting}
+          >
+            {testing ? <span className={s.spinner} /> : '测试加密通道'}
+          </button>
+          <button
+            className={s.secondaryBtn}
+            onClick={handleReset}
+            disabled={testing || resetting}
+          >
+            {resetting ? <span className={s.spinner} /> : '重置安全信道'}
+          </button>
+        </div>
+      </div>
+
       {/* Batch benchmark results */}
       {data.batch_status === 'done' && (data.batch_benchmark || data.batch_transport_benchmark || data.batch_inference_benchmark || data.batch_iq_stage_benchmark) && (() => {
         const inferenceBm = data.batch_inference_benchmark ?? data.batch_benchmark
@@ -430,25 +450,6 @@ export function CryptoStatusPanel({ authConfig }: CryptoStatusPanelProps) {
           </div>
         )
       })()}
-
-      <div className={s.testSection}>
-        <div className={s.actionRow}>
-          <button
-            className={s.testBtn}
-            onClick={handleTest}
-            disabled={testing || resetting}
-          >
-            {testing ? <span className={s.spinner} /> : '测试加密通道'}
-          </button>
-          <button
-            className={s.secondaryBtn}
-            onClick={handleReset}
-            disabled={testing || resetting}
-          >
-            {resetting ? <span className={s.spinner} /> : '重置安全信道'}
-          </button>
-        </div>
-      </div>
 
       {infoItems.length > 0 && (
         <div className={s.infoSection}>

@@ -136,9 +136,26 @@ fi
 
 if [[ "$SSH_RUNNER" == "docker" ]]; then
   DOCKER_IMAGE="${OPENAMP_SSH_DOCKER_IMAGE:-iccomp-usrp-tx:latest}"
+  DOCKER_CONTAINER="${OPENAMP_SSH_DOCKER_CONTAINER:-cockpit-usrp-tx-${TX_CONTROL_PORT:-${USRP_TX_CONTROL_PORT:-29221}}}"
   if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: OPENAMP_SSH_RUNNER=docker but docker was not found in PATH." >&2
     exit 1
+  fi
+  if [[ -n "$DOCKER_CONTAINER" ]] && \
+     [[ "$(docker inspect -f '{{.State.Running}}' "$DOCKER_CONTAINER" 2>/dev/null || true)" == "true" ]]; then
+    DOCKER_SSH_OPTIONS=(
+      "${SSH_OPTIONS[@]}"
+      -o ControlMaster=auto
+      -o ControlPersist=60
+      -o ControlPath=/tmp/ssh_mux/%C
+    )
+    SSHPASS="$SSH_PASS" exec docker exec -i \
+      -e SSHPASS \
+      "$DOCKER_CONTAINER" \
+      sh -c 'mkdir -p /tmp/ssh_mux && chmod 700 /tmp/ssh_mux && exec sshpass -e ssh "$@"' sh \
+      "${DOCKER_SSH_OPTIONS[@]}" \
+      "${SSH_USER}@${HOST}" \
+      "$REMOTE_COMMAND"
   fi
   SSHPASS="$SSH_PASS" exec docker run --rm -i \
     -e SSHPASS \

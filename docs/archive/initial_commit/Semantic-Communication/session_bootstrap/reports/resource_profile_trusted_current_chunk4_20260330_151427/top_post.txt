@@ -1,0 +1,235 @@
+# host=Phytium-Pi
+# captured_at=2026-03-30T15:15:15+08:00
+top - 15:15:15 up 11 days, 21:14,  1 user,  load average: 0.24, 0.06, 0.02
+任务: 226 total,   1 running, 225 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  2.8 us,  2.8 sy,  0.0 ni, 94.4 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :   3461.3 total,    235.2 free,   1813.4 used,   1412.7 buff/cache
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   1350.9 avail Mem 
+
+ 进程号 USER      PR  NI    VIRT    RES    SHR    %CPU  %MEM     TIME+ COMMAND
+2284389 user      20   0   16444   3244   2620 R  11.8   0.1   0:00.05 top
+      1 root      20   0  169072   9840   6156 S   0.0   0.3   0:59.23 systemd
+      2 root      20   0       0      0      0 S   0.0   0.0   0:00.83 kthreadd
+      3 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_gp
+      4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_par_gp
+      8 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 mm_percpu_wq
+      9 root      20   0       0      0      0 S   0.0   0.0   0:00.00 rcu_tasks_kthre
+     10 root      20   0       0      0      0 S   0.0   0.0   0:15.15 ksoftirqd/0
+     11 root      20   0       0      0      0 I   0.0   0.0   1:07.40 rcu_preempt
+     12 root      rt   0       0      0      0 S   0.0   0.0   0:03.57 migration/0
+     13 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/0
+     14 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/1
+     15 root      rt   0       0      0      0 S   0.0   0.0   0:04.01 migration/1
+     16 root      20   0       0      0      0 S   0.0   0.0   0:05.81 ksoftirqd/1
+     19 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/2
+     20 root      rt   0       0      0      0 S   0.0   0.0   0:00.25 migration/2
+     21 root      20   0       0      0      0 S   0.0   0.0   4:17.25 ksoftirqd/2
+     24 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/3
+     25 root      rt   0       0      0      0 S   0.0   0.0   0:00.24 migration/3
+     26 root      20   0       0      0      0 S   0.0   0.0   0:04.99 ksoftirqd/3
+     29 root      20   0       0      0      0 S   0.0   0.0   0:00.00 kdevtmpfs
+     30 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 netns
+     31 root      20   0       0      0      0 S   0.0   0.0   0:00.00 kauditd
+     34 root      20   0       0      0      0 S   0.0   0.0   0:00.00 oom_reaper
+     35 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 writeback
+     36 root      20   0       0      0      0 S   0.0   0.0   0:12.99 kcompactd0
+     37 root      25   5       0      0      0 S   0.0   0.0   0:00.00 ksmd
+     38 root      39  19       0      0      0 S   0.0   0.0   0:26.27 khugepaged
+     49 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 cryptd
+     76 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kintegrityd
+     77 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kblockd
+     78 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 blkcg_punt_bio
+     79 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 tpm_dev_wq
+     80 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 ata_sff
+     81 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 edac-poller
+     82 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 devfreq_wq
+     83 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 watchdogd
+     86 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rpciod
+     88 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 xprtiod
+    116 root      20   0       0      0      0 S   0.0   0.0   0:28.94 kswapd0
+    117 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nfsiod
+    121 root      20   0       0      0      0 S   0.0   0.0   0:00.12 hwrng
+    122 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 irq/15-arm-smmu
+    123 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 card0-crtc0
+    124 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvme-wq
+    125 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvme-reset-wq
+    126 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvme-delete-wq
+    127 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvme_fc_wq
+    128 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvme_tcp_wq
+    129 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvmet-buffered-
+    130 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 nvmet_tcp_wq
+    131 root      20   0       0      0      0 S   0.0   0.0   0:00.00 scsi_eh_0
+    132 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 scsi_tmf_0
+    133 root      20   0       0      0      0 S   0.0   0.0   0:00.00 spi0
+    139 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 vfio-irqfd-clea
+    145 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 mmc_complete
+    147 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 irq/117-es8336_
+    148 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 irq/119-pciehp
+    159 root      20   0       0      0      0 S   0.0   0.0   0:50.37 jbd2/mmcblk0p1-
+    160 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 ext4-rsv-conver
+    161 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 ipv6_addrconf
+    183 root      19  -1   46116  11024   7648 S   0.0   0.3   0:51.73 systemd-journal
+    199 root     -51   0       0      0      0 S   0.0   0.0   0:00.00 irq/108-vxd
+    210 root       0 -20       0      0      0 S   0.0   0.0   0:00.00 loop0
+    214 root       0 -20       0      0      0 S   0.0   0.0   0:00.00 loop2
+    218 root       0 -20       0      0      0 S   0.0   0.0   0:00.00 loop4
+    221 root       0 -20       0      0      0 S   0.0   0.0   0:00.01 loop5
+    223 root       0 -20       0      0      0 S   0.0   0.0   0:00.01 loop6
+    225 root       0 -20       0      0      0 S   0.0   0.0   0:00.04 loop7
+    227 root       0 -20       0      0      0 S   0.0   0.0   0:00.15 loop8
+    228 root      20   0   10744   6192   2964 S   0.0   0.2   0:02.33 systemd-udevd
+    260 systemd+  20   0   18732   5776   4840 S   0.0   0.2   1:10.17 systemd-network
+    262 root      20   0    7800   7156   1332 S   0.0   0.2   0:00.41 haveged
+    263 systemd+  20   0   90672   5760   4944 S   0.0   0.2   0:02.08 systemd-timesyn
+    266 systemd+  20   0   25596  12196   7120 S   0.0   0.3   3:24.89 systemd-resolve
+    356 root      20   0  244528  10108   6008 S   0.0   0.3   0:24.28 accounts-daemon
+    369 avahi     20   0    7172   3156   2732 S   0.0   0.1   0:31.89 avahi-daemon
+    380 root      20   0   14064   2520   2268 S   0.0   0.1   0:01.85 cron
+    382 message+  20   0    9476   5352   3232 S   0.0   0.2  10:40.95 dbus-daemon
+    383 root      20   0  884524  18568  12292 S   0.0   0.5  25:26.48 NetworkManager
+    389 root      20   0   43240  17332   8436 S   0.0   0.5   0:00.58 networkd-dispat
+    391 root      20   0  236156   9560   6044 S   0.0   0.3   0:11.67 polkitd
+    393 syslog    20   0  221268   4460   2772 S   0.0   0.1   0:16.46 rsyslogd
+    399 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 cfg80211
+    403 root      20   0   17088   6304   5352 S   0.0   0.2   0:03.16 systemd-logind
+    404 root      20   0  392484  10556   8104 S   0.0   0.3   0:01.27 udisksd
+    405 root      20   0   12896   7188   6028 S   0.0   0.2   0:35.95 wpa_supplicant
+    409 avahi     20   0    6896    328      0 S   0.0   0.0   0:00.00 avahi-daemon
+    418 root      20   0    1968    488    432 S   0.0   0.0   0:00.03 rtk_hciattach
+    467 root      20   0    8124   3940   3492 S   0.0   0.1   0:00.06 bluetoothd
+    501 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rtw88_sdio: tx
+    528 root      20   0   13920   1744   1488 S   0.0   0.0   0:48.12 init_pwm_fan.sh
+    533 root      20   0 1253340  64024  11912 S   0.0   1.8  10:49.67 tailscaled
+    534 root      20   0  121264  18304  10168 S   0.0   0.5   0:00.41 unattended-upgr
+    539 root      20   0 2007704  25572   3532 S   0.0   0.7   4:23.37 containerd
+    544 root      20   0  244336  10636   6712 S   0.0   0.3   0:00.33 ModemManager
+    549 root      20   0  306216   9108   5316 S   0.0   0.3   0:00.43 lightdm
+    562 root      20   0   12232   5952   5064 S   0.0   0.2   0:24.42 sshd
+    593 root      20   0  914792 154876  44232 S   0.0   4.4  10:22.68 Xorg
+    741 rtkit     21   1  152516   2740   2496 S   0.0   0.1   0:09.18 rtkit-daemon
+    767 root      10 -10       0      0      0 S   0.0   0.0   0:00.00 krfcommd
+    897 root      20   0  162232   7460   5932 S   0.0   0.2   0:00.18 lightdm
+   1244 root      20   0 2040896  33884   4776 S   0.0   1.0   3:05.28 dockerd
+   1247 root      20   0    2060    676    576 S   0.0   0.0  14:12.19 rc.local
+   1249 whoopsie  20   0  252924  12412  10520 S   0.0   0.4   0:00.16 whoopsie
+   1255 kernoops  20   0   11468   2404   1932 S   0.0   0.1   0:26.52 kerneloops
+   1258 root      20   0   12532   1864   1752 S   0.0   0.1   0:00.00 agetty
+   1260 kernoops  20   0   11468   2504   2032 S   0.0   0.1   0:26.68 kerneloops
+   1263 root      20   0   12760   1336   1228 S   0.0   0.0   0:00.00 agetty
+   2393 user      20   0   18908   8024   6204 S   0.0   0.2   0:00.42 systemd
+   2394 user      20   0  169808   4852   1680 S   0.0   0.1   0:00.00 (sd-pam)
+   2403 user       9 -11  700460  11320   6844 S   0.0   0.3   0:00.29 pulseaudio
+   2406 user      20   0  245488   6356   5272 S   0.0   0.2   0:00.07 gnome-keyring-d
+   2411 user      20   0    8584   4440   3108 S   0.0   0.1   8:58.89 dbus-daemon
+   2415 user      20   0  246156  11892   8468 S   0.0   0.3   0:00.27 kwalletd5
+   2416 user      20   0  272452  18020   9812 S   0.0   0.5   0:03.45 xfce4-session
+   2488 user      20   0    5304   1344    908 S   0.0   0.0   0:02.64 ssh-agent
+   2504 user      20   0  374308  33908  13916 S   0.0   1.0   0:07.00 fcitx
+   2514 user      20   0    7956   3404   2876 S   0.0   0.1   0:00.09 dbus-daemon
+   2518 user      39  19    4916   1744   1532 S   0.0   0.0   0:00.00 fcitx-dbus-watc
+   2519 user      20   0  305808   5268   4616 S   0.0   0.1   0:00.02 at-spi-bus-laun
+   2524 user      20   0    7940   3708   3048 S   0.0   0.1   0:00.19 dbus-daemon
+   2528 user      20   0  230420   5444   4440 S   0.0   0.2   0:01.29 xfconfd
+   2534 user      20   0  161428   6428   5648 S   0.0   0.2   0:00.21 at-spi2-registr
+   2539 user      20   0  230540  14804   9716 S   0.0   0.4   0:12.58 xfce4-screensav
+   2540 user      20   0  269884  15572   8684 S   0.0   0.4   0:00.34 xfce4-notifyd
+   2547 user      20   0  245116   6812   5824 S   0.0   0.2   0:00.08 gvfsd
+   2558 user      20   0   88012   2176   1968 S   0.0   0.1   0:00.00 gpg-agent
+   2560 user      20   0 1090792  51696  20752 S   0.0   1.5   5:54.72 xfwm4
+   2585 user      20   0  234564  13956   8620 S   0.0   0.4   0:00.48 xfsettingsd
+   2614 root      20   0  257980  11332   7740 S   0.0   0.3   0:00.64 upowerd
+   2799 user      20   0  376964  39784  16208 S   0.0   1.1   0:43.36 xfce4-panel
+   2820 user      20   0  480868  31800  16696 S   0.0   0.9   0:14.33 Thunar
+   2828 user      20   0  646392  44896  20500 S   0.0   1.3   0:25.08 xfdesktop
+   2830 user      20   0  250308   9684   6096 S   0.0   0.3   4:52.99 sogoupinyin-wat
+   2831 user      20   0  319532   9200   7220 S   0.0   0.3   0:00.57 gvfs-udisks2-vo
+   2838 user      20   0  322240   8172   7056 S   0.0   0.2   0:21.27 gvfs-afc-volume
+   2844 user      20   0 3893132 656812 143136 S   0.0  18.5  72:46.96 firefox
+   2845 user      20   0  241092   7860   5088 S   0.0   0.2   0:00.03 gvfs-goa-volume
+   2851 user      20   0  193612   9872   7568 S   0.0   0.3   0:01.26 xfce4-power-man
+   2854 user      20   0  557168  18612  10344 S   0.0   0.5   0:00.24 goa-daemon
+   2865 user      20   0  196496  15660  10720 S   0.0   0.4   0:04.36 panel-6-systray
+   2867 user      20   0  552008  20780  12328 S   0.0   0.6  23:52.51 panel-8-pulseau
+   2868 user      20   0  285436  19716  11764 S   0.0   0.6   0:00.99 panel-10-notifi
+   2869 user      20   0  240884  16728  10772 S   0.0   0.5   0:00.93 panel-14-action
+   2892 user      20   0  320376   6856   5808 S   0.0   0.2   0:01.82 goa-identity-se
+   2895 user      20   0  242928   6236   5284 S   0.0   0.2   0:00.04 gvfs-gphoto2-vo
+   2899 user      20   0 1121.8g  76788  37200 S   0.0   2.2  47:55.02 cfw
+   2903 user      20   0  241348   4584   4116 S   0.0   0.1   0:00.01 agent
+   2913 user      20   0  240948   6132   5392 S   0.0   0.2   0:00.04 gvfs-mtp-volume
+   2918 user      20   0  644908  24152  13160 S   0.0   0.7   0:01.71 evolution-alarm
+   2925 user      20   0  801448  65268  10336 S   0.0   1.8   2:32.15 sogoupinyin-ser
+   2933 user      20   0  322784  13444   6664 S   0.0   0.4   0:02.39 gvfsd-trash
+   2944 user      20   0  482700  30972  16052 S   0.0   0.9  20:19.86 nm-applet
+   2961 user      20   0  382476   6936   5596 S   0.0   0.2   0:00.20 xiccd
+   2968 user      20   0  167480   5824   5236 S   0.0   0.2   0:00.00 gvfsd-metadata
+   2981 colord    20   0  251580  12964   7704 S   0.0   0.4   0:00.41 colord
+   2982 user      20   0  192144  10496   8480 S   0.0   0.3   0:00.13 polkit-gnome-au
+   3021 user      20   0 1012056  15904   9732 S   0.0   0.4   0:00.29 evolution-sourc
+   3024 user      20   0  439504  29964  12224 S   0.0   0.8   0:01.80 blueman-applet
+   3066 user      20   0  846088  16420  10240 S   0.0   0.5   0:00.44 evolution-calen
+   3075 user      20   0   32.2g  20284  11784 S   0.0   0.6   0:00.07 cfw
+   3077 user      20   0   32.2g  19908  11300 S   0.0   0.6   0:00.11 cfw
+   3087 user      20   0   32.2g   9408    760 S   0.0   0.3   0:00.00 cfw
+   3098 user      20   0  156376   4596   4140 S   0.0   0.1   0:00.01 dconf-service
+   3109 user      20   0  681076  17660  11700 S   0.0   0.5   0:00.18 evolution-addre
+   3148 user      20   0  412476  38964  13940 S   0.0   1.1   0:01.31 blueman-tray
+   3166 user      20   0   43104   4496   3844 S   0.0   0.1   0:00.00 obexd
+   3203 user      20   0  934556  10932   7464 S   0.0   0.3   0:00.18 xdg-desktop-por
+   3209 user      20   0  462896   5948   5244 S   0.0   0.2   0:00.05 xdg-document-po
+   3210 user      20   0   32.4g  59800  46864 S   0.0   1.7  28:01.23 cfw
+   3216 user      20   0  240760   5340   4824 S   0.0   0.2   0:00.01 xdg-permission-
+   3234 user      20   0  436884  19980  12488 S   0.0   0.6   0:00.42 xdg-desktop-por
+   3239 user      20   0   32.3g  29476  19752 S   0.0   0.8  52:36.04 cfw
+   3249 user      20   0  223568  26400  17452 S   0.0   0.7   0:00.20 Socket Process
+   3257 user      20   0 1129.7g 119548  59540 S   0.0   3.4 712:09.77 cfw
+   3328 user      20   0 2603296 123012  53832 S   0.0   3.5   0:14.33 Privileged Cont
+   3336 user      20   0  266856  27284  15664 S   0.0   0.8   0:00.48 RDD Process
+   3406 user      20   0 2489936  69872  45212 S   0.0   2.0   0:03.53 WebExtensions
+   3439 user      20   0 5518420  41300   7480 S   0.0   1.2 160:05.38 clash-linux
+   3474 user      20   0  245036   5928   5276 S   0.0   0.2   0:00.01 gnome-keyring-d
+   3498 user      20   0 2692672 134456  55948 S   0.0   3.8  36:36.47 Isolated Web Co
+   3528 user      20   0  222500  26792  15880 S   0.0   0.8   0:00.50 Utility Process
+ 119786 root       0 -20       0      0      0 S   0.0   0.0   0:00.07 loop10
+ 119816 root      20   0 2070776  38532   8952 S   0.0   1.1   1:42.72 snapd
+ 495653 root       0 -20       0      0      0 S   0.0   0.0   0:00.00 loop9
+1331083 root       0 -20       0      0      0 I   0.0   0.0   0:06.76 kworker/2:1H-kblockd
+1344978 user      20   0  607628  46948  27120 S   0.0   1.3   0:02.77 gnome-terminal-
+1344989 user      20   0   19340   8592   3108 S   0.0   0.2   0:00.16 bash
+1347991 user      20   0 2430484  57432  44468 S   0.0   1.6   0:00.31 Web Content
+1369806 root       0 -20       0      0      0 S   0.0   0.0   0:00.00 loop1
+1386897 user      20   0 2430484  59660  44372 S   0.0   1.7   0:00.33 Web Content
+1387124 user      20   0 2430484  59580  44304 S   0.0   1.7   0:00.31 Web Content
+2147427 root      20   0       0      0      0 I   0.0   0.0   0:00.49 kworker/3:2-mm_percpu_wq
+2164581 root       0 -20       0      0      0 I   0.0   0.0   0:02.11 kworker/1:0H-kblockd
+2164594 root      20   0   35252   6732   5440 S   0.0   0.2   0:00.02 cupsd
+2164596 root      20   0  172488   9500   8068 S   0.0   0.3   0:00.05 cups-browsed
+2199709 root       0 -20       0      0      0 I   0.0   0.0   0:00.18 kworker/u9:2-rtw_tx_wq
+2206783 root      20   0       0      0      0 I   0.0   0.0   0:00.98 kworker/1:1-mm_percpu_wq
+2245716 root      20   0       0      0      0 I   0.0   0.0   0:00.71 kworker/0:2-mm_percpu_wq
+2263150 root       0 -20       0      0      0 I   0.0   0.0   0:01.71 kworker/0:1H-mmc_complete
+2265572 root      20   0       0      0      0 I   0.0   0.0   0:00.00 kworker/3:0-cgroup_destroy
+2273568 root      20   0       0      0      0 I   0.0   0.0   0:01.57 kworker/u8:1-phy0
+2275042 root       0 -20       0      0      0 I   0.0   0.0   0:00.03 kworker/u9:1-rtw_tx_wq
+2277586 root      20   0       0      0      0 I   0.0   0.0   0:00.00 kworker/0:0
+2280516 root      20   0       0      0      0 I   0.0   0.0   0:00.31 kworker/u8:3-phy0
+2281257 root      20   0       0      0      0 I   0.0   0.0   0:00.00 kworker/1:0-cgroup_destroy
+2281569 root      20   0       0      0      0 I   0.0   0.0   0:00.43 kworker/2:0-events
+2282185 root      20   0       0      0      0 I   0.0   0.0   0:00.34 kworker/u8:2-events_power_efficient
+2282297 root      20   0       0      0      0 I   0.0   0.0   0:00.00 kworker/2:1-mm_percpu_wq
+2282337 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/3:0H
+2282370 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/1:1H
+2282701 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/0:2H
+2282979 root      20   0       0      0      0 I   0.0   0.0   0:00.31 kworker/2:2-events
+2283020 root       0 -20       0      0      0 I   0.0   0.0   0:00.09 kworker/3:1H-kblockd
+2283605 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/2:0H
+2283680 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/0:0H
+2283812 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/3:2H-kblockd
+2284206 root      20   0   15464   7792   6552 S   0.0   0.2   0:00.03 sshd
+2284257 user      20   0   15852   4984   3648 S   0.0   0.1   0:00.02 sshd
+2284287 user      20   0   13920   2936   2668 S   0.0   0.1   0:00.01 bash
+2284290 user      20   0   15164   2556   2312 S   0.0   0.1   0:00.01 vmstat
+2284291 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/1:2H
+2284337 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/2:2H
+2284355 root      20   0   12360    432    368 S   0.0   0.0   0:00.00 sleep
+2284393 root      20   0   12360    540    476 S   0.0   0.0   0:00.00 sleep

@@ -81,6 +81,41 @@ def test_push_directory_to_remote_uses_ssh_stdin_without_shell(tmp_path):
     assert kwargs["shell"] is False
 
 
+def test_pull_remote_directory_retries_transient_ssh_disconnect(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "decode_summary.json").write_text('{"crc_ok": true}', encoding="utf-8")
+    output = tmp_path / "output"
+    successful_pull = subprocess.CompletedProcess(
+        args=["ssh"],
+        returncode=0,
+        stdout=qpsk_batch.tar_directory_bytes(source),
+        stderr=b"",
+    )
+    disconnected = subprocess.CompletedProcess(
+        args=["ssh"],
+        returncode=255,
+        stdout=b"",
+        stderr=b"kex_exchange_identification: Connection closed by remote host\n",
+    )
+
+    with (
+        patch.object(qpsk_batch.subprocess, "run", side_effect=[disconnected, successful_pull]) as run,
+        patch.object(qpsk_batch.time, "sleep") as sleep,
+    ):
+        qpsk_batch.pull_remote_directory_to_local(
+            target="user@board",
+            remote_dir="/tmp/decode",
+            output_dir=output,
+            log_path=tmp_path / "pull.log",
+            control_socket=None,
+        )
+
+    assert run.call_count == 2
+    sleep.assert_called_once()
+    assert (output / "decode_summary.json").read_text(encoding="utf-8") == '{"crc_ok": true}'
+
+
 def test_ssh_base_args_uses_docker_runner_when_requested(monkeypatch):
     monkeypatch.setenv("OPENAMP_SSH_RUNNER", "docker")
     monkeypatch.setenv("OPENAMP_SSH_DOCKER_IMAGE", "iccomp-usrp-tx:latest")

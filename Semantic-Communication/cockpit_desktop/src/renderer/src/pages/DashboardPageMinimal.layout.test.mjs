@@ -54,6 +54,14 @@ test('reconstruction comparison action shares the applied directory button layou
   assert.doesNotMatch(tsx, /className=\{s\.pathComparisonButton\}/)
 })
 
+test('demo reconstruction log refreshes every 800ms only during reconstruction', () => {
+  assert.match(tsx, /const LIVE_LOG_ACTIONS = \[/)
+  assert.match(tsx, /setInterval\([\s\S]*?\}, 800\)/)
+  assert.match(tsx, /const shouldShowReconstructionLog[\s\S]*inferenceStage/)
+  assert.match(tsx, /<LiveLogStream isRunning=\{shouldShowReconstructionLog\} \/>/)
+  assert.doesNotMatch(tsx, /<LiveLogStream isRunning=\{isRunning\} \/>/)
+})
+
 test('external comparison link is restricted to loopback http', () => {
   assert.match(electronMain, /parsed\.protocol !== 'http:'/)
   assert.match(electronMain, /\['127\.0\.0\.1', 'localhost'\]\.includes\(parsed\.hostname\)/)
@@ -165,6 +173,21 @@ test('security config shows the effective protection scope from crypto status', 
   assert.match(cryptoPanelTsx, /label:\s*'作用范围'/)
   assert.match(cryptoPanelTsx, /data\.security_scope_label/)
   assert.doesNotMatch(cryptoPanelTsx, /security_scope_note/)
+})
+
+test('idle transport badge follows the selected link instead of a previous batch summary', () => {
+  assert.match(
+    tsx,
+    /const activeLinkMode: JsccLinkMode\s*=\s*isRunning\s*\?\s*extractJsccLinkMode\(currentWrapperSummary\)\s*\?\?\s*selectedLinkMode\s*:\s*selectedLinkMode/,
+  )
+})
+
+test('USRP control-gate mode hides stale TCP payload timings', () => {
+  assert.match(cryptoPanelTsx, /showTcpPayloadTimings\s*=\s*data\.security_scope\s*!==\s*'control_gate'/)
+  assert.match(cryptoPanelTsx, /showTcpPayloadTimings\s*&&\s*data\.encrypt_ms/)
+  assert.match(cryptoPanelTsx, /showTcpPayloadTimings\s*&&\s*data\.decrypt_ms/)
+  assert.match(cryptoPanelTsx, /label:\s*'结果等待\/接收'/)
+  assert.doesNotMatch(cryptoPanelTsx, /label:\s*'解密接收'/)
 })
 
 test('server identity is shown with board password metadata instead of security config', () => {
