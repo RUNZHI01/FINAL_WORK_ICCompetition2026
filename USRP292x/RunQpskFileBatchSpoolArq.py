@@ -60,6 +60,10 @@ FAST_ARQ_DEFAULTS = {
 }
 
 
+def format_round_index(round_idx: int) -> str:
+    return f'{int(round_idx):03d}'
+
+
 @dataclass
 class ImageState:
     index: int
@@ -774,7 +778,7 @@ def run_external_command(
 def build_remote_batch_rx_path(args: argparse.Namespace, *, round_idx: int, batch_idx: int) -> str:
     return (
         f'{args.remote_rx_run_root.rstrip("/")}/'
-        f'{args.run_id}/round{round_idx}/batch_{batch_idx:04d}/batch_rx.sc16'
+        f'{args.run_id}/round{format_round_index(round_idx)}/batch_{batch_idx:04d}/batch_rx.sc16'
     )
 
 
@@ -870,7 +874,7 @@ def make_waveform(
     round_params: RoundParams,
 ) -> ScheduledBurst:
     started = time.monotonic()
-    round_dir = image.image_dir / f'round{round_idx}'
+    round_dir = image.image_dir / f'round{format_round_index(round_idx)}'
     tx_sc16 = round_dir / 'tx_qpsk.sc16'
     manifest = round_dir / 'manifest.json'
     only_csv = ','.join(str(item) for item in only_chunks)
@@ -927,7 +931,7 @@ def build_batch_tx(
     bursts: list[ScheduledBurst],
     gap_samples: int,
 ) -> tuple[Path, int]:
-    batch_tx = run_dir / f'round{round_idx}' / f'batch_{batch_idx:04d}' / 'batch_tx.sc16'
+    batch_tx = run_dir / f'round{format_round_index(round_idx)}' / f'batch_{batch_idx:04d}' / 'batch_tx.sc16'
     batch_tx.parent.mkdir(parents=True, exist_ok=True)
     offset = 0
     with batch_tx.open('wb') as out:
@@ -1320,8 +1324,9 @@ def decode_batch_remote(
 
 def merge_image(args: argparse.Namespace, image: ImageState, round_idx: int) -> float:
     started = time.monotonic()
-    merge_summary = image.image_dir / f'merge_round{round_idx}.json'
-    merged_bin = image.image_dir / f'merged_round{round_idx}.bin'
+    round_token = format_round_index(round_idx)
+    merge_summary = image.image_dir / f'merge_round{round_token}.json'
+    merged_bin = image.image_dir / f'merged_round{round_token}.bin'
     reference = image.input_path.read_bytes()
     source_chunks = split_payload(reference, args.chunk_bytes)
     merged_by_seq: dict[int, bytes] = {}
@@ -1537,7 +1542,7 @@ def run_round(args: argparse.Namespace, run_dir: Path, round_idx: int, images: l
     max_workers_used = 1
     for batch_idx, group in enumerate(active_groups):
         batch_started = time.monotonic()
-        batch_dir = run_dir / f'round{round_idx}' / f'batch_{batch_idx:04d}'
+        batch_dir = run_dir / f'round{format_round_index(round_idx)}' / f'batch_{batch_idx:04d}'
         make_started = time.monotonic()
         bursts = [
             make_waveform(

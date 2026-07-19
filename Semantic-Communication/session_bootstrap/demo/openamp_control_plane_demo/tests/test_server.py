@@ -30,6 +30,39 @@ import usrp_runtime  # noqa: E402
 REPO_ROOT = DEMO_ROOT.parents[2]
 
 
+def test_stage_merged_wire_blobs_selects_latest_numeric_legacy_round(tmp_path) -> None:
+    run_dir = tmp_path / "run"
+    image_dir = run_dir / "image_0000"
+    image_dir.mkdir(parents=True)
+    metadata = json.dumps(
+        {"job_id": "sample", "payload_codec": "float32-raw"},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    round9 = len(metadata).to_bytes(4, "big") + metadata + b"round-9"
+    round12 = len(metadata).to_bytes(4, "big") + metadata + b"round-12"
+    (image_dir / "merged_round9.bin").write_bytes(round9)
+    (image_dir / "merged_round12.bin").write_bytes(round12)
+
+    manifest = usrp_runtime._stage_merged_wire_blobs_for_remote_decode(
+        run_dir,
+        tmp_path / "stage",
+    )
+
+    assert Path(manifest["files"][0]["source_bin"]).name == "merged_round12.bin"
+    assert Path(manifest["files"][0]["target_bin"]).read_bytes() == round12
+
+
+def test_count_progress_accepts_padded_qpsk_round_zero(tmp_path) -> None:
+    image_dir = tmp_path / "image_0000"
+    image_dir.mkdir()
+    (image_dir / "decode_summary.json").write_text('{"status":"ok"}', encoding="utf-8")
+    (image_dir / "merged_round000.bin").write_bytes(b"wire")
+
+    progress = usrp_runtime._count_progress_from_image_dirs(tmp_path)
+
+    assert progress == {"processed": 1, "pass_count": 1}
+
+
 def test_transport_benchmark_exposes_iq_remote_pull_and_cleanup_metrics() -> None:
     benchmark = usrp_runtime._transport_benchmark_from_summary(
         {

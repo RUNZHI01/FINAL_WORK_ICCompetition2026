@@ -1435,6 +1435,11 @@ def _safe_rmtree(path: Path) -> None:
         pass
 
 
+def _merged_round_number(path: Path) -> int:
+    match = re.fullmatch(r"merged_round(\d+)\.bin", path.name)
+    return int(match.group(1)) if match else -1
+
+
 def _stage_merged_wire_blobs_for_remote_decode(run_dir: Path, output_dir: Path) -> dict[str, Any]:
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -1449,10 +1454,10 @@ def _stage_merged_wire_blobs_for_remote_decode(run_dir: Path, output_dir: Path) 
 
     image_dirs = sorted(path for path in run_dir.glob("image_*") if path.is_dir())
     for image_dir in image_dirs:
-        merged_bins = sorted(image_dir.glob("merged_round*.bin"))
+        merged_bins = list(image_dir.glob("merged_round*.bin"))
         if not merged_bins:
             continue
-        merged_bin = merged_bins[-1]
+        merged_bin = max(merged_bins, key=_merged_round_number)
         blob_bytes = merged_bin.read_bytes()
         meta, payload_bytes = unpack_transport_frame(blob_bytes)
         job_id = str(meta.get("job_id") or merged_bin.stem)
@@ -2203,7 +2208,7 @@ def _count_progress_from_image_dirs(run_dir: Path) -> dict[str, int]:
         status_ok = str(summary.get("status") or "").strip().lower() in {"", "ok", "success"}
         has_payload = (
             (image_dir / "received_latent.npz").is_file()
-            or (image_dir / "merged_round0.bin").is_file()
+            or any(image_dir.glob("merged_round*.bin"))
             or bool(summary.get("frame_complete"))
         )
         if status_ok and has_payload:

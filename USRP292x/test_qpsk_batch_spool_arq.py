@@ -14,6 +14,15 @@ if str(PROJECT_ROOT) not in sys.path:
 from USRP292x import RunQpskFileBatchSpoolArq as qpsk_batch  # noqa: E402
 
 
+def test_format_round_index_uses_three_digits():
+    formatter = getattr(qpsk_batch, "format_round_index", None)
+
+    assert formatter is not None
+    assert formatter(0) == "000"
+    assert formatter(1) == "001"
+    assert formatter(12) == "012"
+
+
 def test_tx_control_file_path_maps_workspace_path_to_container_mount(tmp_path):
     repo_root = tmp_path / "repo"
     tx_file = repo_root / "USRP292x" / "qpsk_batch_spool_arq_runs" / "run1" / "batch_tx.sc16"
