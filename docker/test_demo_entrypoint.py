@@ -51,3 +51,14 @@ def test_removed_public_entrypoints_are_absent() -> None:
     cockpit_dir = PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop"
     assert not (cockpit_dir / "start-demo.ps1").exists()
     assert not (cockpit_dir / "start-demo-config.ps1").exists()
+
+
+def test_help_and_startup_guide_publish_temporary_remote_environment() -> None:
+    entrypoint = DEMO_SCRIPT.read_text(encoding="utf-8-sig")
+    guide = (DEMO_SCRIPT_DIR / "STARTUP.md").read_text(encoding="utf-8")
+
+    for name in ("REMOTE_HOST", "REMOTE_USER"):
+        assert name in entrypoint
+        assert name in guide
+    assert "Remove-Item Env:REMOTE_HOST" in guide
+    assert "Remove-Item Env:REMOTE_USER" in guide

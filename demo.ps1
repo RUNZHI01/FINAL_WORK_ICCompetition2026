@@ -66,7 +66,7 @@ switch ($Action) {
     }
     "help" {
         Assert-NoBoundParameters -Names ($StartParameterNames + $InitParameterNames) -ForAction $Action
-        Write-Output @"
+        Write-Output @'
 用法：
   .\demo.ps1             启动现场演示
   .\demo.ps1 start       启动现场演示
@@ -74,8 +74,14 @@ switch ($Action) {
   .\demo.ps1 check       只读检查本机环境
   .\demo.ps1 help        显示本帮助
 
+临时连接配置：
+  $env:REMOTE_HOST = "100.121.87.73"
+  $env:REMOTE_USER = "user"
+  .\demo.ps1
+
+命令行参数优先；变量为空时使用默认地址和用户。
 现场说明：scripts/demo/STARTUP.md
-"@
+'@
         exit 0
     }
 }

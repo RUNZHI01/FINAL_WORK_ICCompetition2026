@@ -159,6 +159,20 @@ try {
     foreach ($Name in $EnvironmentNames) {
         [Environment]::SetEnvironmentVariable($Name, $null, "Process")
     }
+    $env:REMOTE_HOST = "   "
+    $env:REMOTE_USER = ""
+    $Fallback = Resolve-DemoStartupConfig `
+        -BoundParameters @{} `
+        -BoardHost "100.121.87.73" `
+        -BoardUser "user" `
+        -BoardPort 22 `
+        -BoardPassword ""
+    Assert-Equal "100.121.87.73" $Fallback.Host "blank environment host falls back to default"
+    Assert-Equal "user" $Fallback.User "blank environment user falls back to default"
+
+    foreach ($Name in $EnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($Name, $null, "Process")
+    }
     $Defaults = Resolve-DemoStartupConfig `
         -BoundParameters @{} `
         -BoardHost "100.121.87.73" `

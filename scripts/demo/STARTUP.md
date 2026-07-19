@@ -24,7 +24,24 @@
 
 也可以写成 `.\demo.ps1 start`。脚本保留默认 IP 和用户名，只询问板卡 SSH 密码，输入不回显。启动完成前不会发送图片。
 
-需要换地址时：
+需要临时换地址时，先在当前 PowerShell 设置环境变量：
+
+```powershell
+$env:REMOTE_HOST = "100.121.87.73"
+$env:REMOTE_USER = "user"
+.\demo.ps1
+```
+
+命令行参数优先于环境变量。变量为空或不存在时，脚本继续使用默认地址和用户。
+
+恢复默认值：
+
+```powershell
+Remove-Item Env:REMOTE_HOST -ErrorAction SilentlyContinue
+Remove-Item Env:REMOTE_USER -ErrorAction SilentlyContinue
+```
+
+也可以只为本次命令指定地址：
 
 ```powershell
 .\demo.ps1 start -BoardHost 100.121.87.73 -BoardUser user
