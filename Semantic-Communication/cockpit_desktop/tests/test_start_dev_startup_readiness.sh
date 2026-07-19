@@ -47,9 +47,44 @@ exit 0
 SH
 chmod +x "$FAKE_BIN/powershell.exe"
 
+MISSING_NODE_MODULES="$TMP_ROOT/missing-node-modules"
+READY_NODE_MODULES="$TMP_ROOT/ready-node-modules"
+mkdir -p "$READY_NODE_MODULES/.bin"
+touch "$READY_NODE_MODULES/.bin/electron-vite"
+set +e
 PATH="$FAKE_BIN:$PATH" \
 START_DEV_TEST_EVENTS="$EVENT_LOG" \
 TMPDIR="$TMP_ROOT" \
+COCKPIT_NODE_MODULES_DIR="$MISSING_NODE_MODULES" \
+COCKPIT_BACKEND_PORT=18079 \
+COCKPIT_FRONTEND_PORT=15173 \
+REMOTE_HOST=100.121.87.73 \
+REMOTE_USER=user \
+REMOTE_PASS=test-secret \
+  "$COCKPIT_DIR/start-dev.sh" >"$TMP_ROOT/missing-deps.out" 2>&1
+missing_deps_status=$?
+set -e
+
+if [[ "$missing_deps_status" -eq 0 ]]; then
+  echo "startup should fail when cockpit node_modules is missing" >&2
+  cat "$TMP_ROOT/missing-deps.out" >&2
+  exit 1
+fi
+if ! grep -q 'init.ps1' "$TMP_ROOT/missing-deps.out"; then
+  echo "missing dependency error should point to init.ps1" >&2
+  cat "$TMP_ROOT/missing-deps.out" >&2
+  exit 1
+fi
+if grep -q '^backend-start ' "$EVENT_LOG"; then
+  echo "backend started before local dependency preflight" >&2
+  cat "$EVENT_LOG" >&2
+  exit 1
+fi
+
+PATH="$FAKE_BIN:$PATH" \
+START_DEV_TEST_EVENTS="$EVENT_LOG" \
+TMPDIR="$TMP_ROOT" \
+COCKPIT_NODE_MODULES_DIR="$READY_NODE_MODULES" \
 COCKPIT_BACKEND_PORT=18079 \
 COCKPIT_FRONTEND_PORT=15173 \
 REMOTE_HOST=100.121.87.73 \

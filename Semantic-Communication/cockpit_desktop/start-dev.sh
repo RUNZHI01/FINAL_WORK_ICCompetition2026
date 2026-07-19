@@ -12,6 +12,7 @@ FRONTEND_LOG="${TMPDIR:-/tmp}/cockpit-vite.log"
 DEFAULT_AIRCRAFT_POSITION_ENV="$REPO_ROOT/session_bootstrap/tmp/aircraft_position_baidu_ip.local.env"
 AUTH_KEYS_DIR="$PACKAGE_ROOT/keys"
 AUTH_PUBLIC_KEYS_ARCHIVE="$PACKAGE_ROOT/board_deps/crypto/public_keys/board-auth-public-keys.tar.gz"
+NODE_MODULES_DIR="${COCKPIT_NODE_MODULES_DIR:-$SCRIPT_DIR/node_modules}"
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 export PYTHONUTF8="${PYTHONUTF8:-1}"
 
@@ -282,6 +283,17 @@ truthy_env() {
   esac
 }
 
+assert_local_dependencies() {
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "ERROR: npm 未安装。请先在仓库根目录运行 .\\init.ps1。" >&2
+    return 1
+  fi
+  if [[ ! -f "$NODE_MODULES_DIR/.bin/electron-vite" && ! -f "$NODE_MODULES_DIR/.bin/electron-vite.cmd" ]]; then
+    echo "ERROR: Cockpit 前端依赖未安装。请先在仓库根目录运行 .\\init.ps1。" >&2
+    return 1
+  fi
+}
+
 resolve_board_password() {
   local candidate
   for candidate in "${REMOTE_PASS:-}" "${REMOTE_PASSWORD:-}" "${PHYTIUM_PI_PASS:-}" "${PHYTIUM_PI_PASSWORD:-}" "${BOARD_PASS:-}"; do
@@ -443,6 +455,7 @@ PYTHON_CMD="$(resolve_python)" || {
   exit 1
 }
 
+assert_local_dependencies
 configure_runtime_defaults
 
 echo "启动 Cockpit Desktop 开发环境..."

@@ -68,8 +68,75 @@ function Read-BoardPassword {
     }
 }
 
+function Assert-DemoHostReady {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$DockerImage
+    )
+
+    $Missing = @()
+    $VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    $NodeModulesMarker = Join-Path $RepoRoot "Semantic-Communication\cockpit_desktop\node_modules\.bin\electron-vite"
+    $WorkspaceRoot = Split-Path -Parent $RepoRoot
+    $InputCandidates = @(
+        (Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"),
+        (Join-Path $RepoRoot "host_pic_to_latent\encoder_outputs_top300"),
+        (Join-Path $RepoRoot "host_pic_to_latent\encoder_outputs"),
+        (Join-Path $WorkspaceRoot "原始图像")
+    )
+
+    if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
+        $Missing += ".venv"
+    }
+    if (-not (Test-Path -LiteralPath $NodeModulesMarker -PathType Leaf)) {
+        $Missing += "Cockpit node_modules"
+    }
+    $InputReady = $false
+    foreach ($Candidate in $InputCandidates) {
+        if (-not (Test-Path -LiteralPath $Candidate -PathType Container)) {
+            continue
+        }
+        $InputCount = @(
+            Get-ChildItem -LiteralPath $Candidate -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Extension -in @(".pt", ".npz", ".npy", ".jpg", ".jpeg", ".png") }
+        ).Count
+        if ($InputCount -ge 20) {
+            $InputReady = $true
+            break
+        }
+    }
+    if (-not $InputReady) {
+        $Missing += "至少 20 个上位机图片或 latent 输入"
+    }
+
+    $Docker = Get-Command docker -ErrorAction SilentlyContinue
+    if (-not $Docker) {
+        $Missing += "Docker Desktop"
+    }
+    else {
+        & $Docker.Source info *> $null
+        if ($LASTEXITCODE -ne 0) {
+            $Missing += "Docker Desktop（服务未启动）"
+        }
+        else {
+            & $Docker.Source image inspect $DockerImage *> $null
+            if ($LASTEXITCODE -ne 0) {
+                $Missing += "Docker image $DockerImage"
+            }
+        }
+    }
+
+    if ($Missing.Count -gt 0) {
+        throw "本机尚未完成初始化：`n- $($Missing -join "`n- ")`n请先在仓库根目录运行 .\init.ps1。"
+    }
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $ScriptDir "start-demo-config.ps1")
+
+$RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
+$DockerImage = if ($env:OPENAMP_SSH_DOCKER_IMAGE) { $env:OPENAMP_SSH_DOCKER_IMAGE } else { "iccomp-usrp-tx:latest" }
+Assert-DemoHostReady -RepoRoot $RepoRoot -DockerImage $DockerImage
 
 $StartupConfig = Resolve-DemoStartupConfig `
     -BoundParameters $PSBoundParameters `
@@ -85,12 +152,19 @@ if ([string]::IsNullOrEmpty($Password)) {
     $Password = Read-BoardPassword
 }
 
-$RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
 $WorkspaceRoot = Split-Path -Parent $RepoRoot
 $FinalImageDir = Join-Path $WorkspaceRoot "原始图像"
 $FinalLatentDir = Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"
 $FinalInputOrder = Join-Path $RepoRoot "host_pic_to_latent\showcase_final_300_order.tsv"
 $Bash = Find-GitBash -ExplicitPath $GitBashPath
+if (-not $env:COCKPIT_PYTHON) {
+    $env:ICCOMP_VENV_PYTHON_WIN = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    $CockpitPython = (& $Bash -lc 'cygpath -u "$ICCOMP_VENV_PYTHON_WIN"').Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CockpitPython)) {
+        throw "Failed to resolve the initialized Python environment for Git Bash."
+    }
+    [Environment]::SetEnvironmentVariable("COCKPIT_PYTHON", $CockpitPython, "Process")
+}
 
 [Environment]::SetEnvironmentVariable("REMOTE_HOST", $BoardHost, "Process")
 [Environment]::SetEnvironmentVariable("PHYTIUM_PI_HOST", $BoardHost, "Process")

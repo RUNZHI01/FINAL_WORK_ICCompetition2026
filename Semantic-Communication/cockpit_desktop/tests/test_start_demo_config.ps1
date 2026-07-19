@@ -185,6 +185,13 @@ try {
     Assert-NotMatches $StartDemo 'Set-DefaultEnv\s+"REMOTE_(HOST|USER|SSH_PORT)"' "wrapper does not preserve stale connection environment"
     Assert-Matches $StartDemo 'Set-DefaultEnv\s+"JSCC_LINK_MODE"\s+"qpsk"' "recommended wrapper defaults to QPSK"
     Assert-Matches $StartDemo 'Set-DefaultEnv\s+"OPENAMP_DEMO_LINK_MODE"\s+"qpsk"' "recommended backend defaults to QPSK"
+    Assert-Matches $StartDemo 'Assert-DemoHostReady' "wrapper checks local dependencies"
+    Assert-Matches $StartDemo 'host_pic_to_latent\\encoder_outputs' "wrapper checks a host latent cache"
+    $PreflightIndex = $StartDemo.IndexOf('Assert-DemoHostReady -RepoRoot')
+    $BoardNetworkIndex = $StartDemo.IndexOf('& $BoardNetworkScript')
+    if ($PreflightIndex -lt 0 -or $BoardNetworkIndex -lt 0 -or $PreflightIndex -ge $BoardNetworkIndex) {
+        throw "local dependency preflight must run before board network recovery"
+    }
 
     $StartDev = Get-Content -Raw -LiteralPath (Join-Path $CockpitDir "start-dev.sh")
     Assert-Matches $StartDev 'JSCC_LINK_MODE="\$\{JSCC_LINK_MODE:-qpsk\}"' "Git Bash entry defaults to QPSK"
