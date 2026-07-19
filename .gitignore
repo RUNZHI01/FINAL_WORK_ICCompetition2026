@@ -81,3 +81,7 @@ Semantic-Communication/session_bootstrap/config/agent_loops/
 Semantic-Communication/session_bootstrap/state/
 Semantic-Communication/session_bootstrap/demo/openamp_control_plane_demo/runtime/event_archives/
 .worktrees/
+
+# Local AI-assisted planning artifacts
+/.superpowers/
+/docs/superpowers/
