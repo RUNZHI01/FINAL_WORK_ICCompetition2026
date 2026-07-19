@@ -602,6 +602,21 @@ def test_http_page_closes_directory_help_modal_from_overlay_or_escape(tmp_path: 
     assert "event.key === 'Escape'" in script
 
 
+def test_http_static_frontend_assets_are_not_cached(tmp_path: Path) -> None:
+    state, _ = configured_state(tmp_path)
+    server = create_http_server("127.0.0.1", 0, state)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        response = urlopen(f"http://127.0.0.1:{server.server_port}/app.js", timeout=2)
+        assert response.headers["Cache-Control"] == "no-store"
+    finally:
+        server.shutdown()
+        server.server_close()
+        state.close()
+
+
 def test_http_page_exposes_reconstruction_source_selector(tmp_path: Path) -> None:
     body, script = fetch_page_assets(configured_http_state(tmp_path))
 

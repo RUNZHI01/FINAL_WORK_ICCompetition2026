@@ -658,6 +658,12 @@ class ComparisonRequestHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         return
 
+    def end_headers(self) -> None:
+        suffix = Path(urlparse(self.path).path).suffix.lower()
+        if suffix in {".css", ".html", ".js"}:
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def _json(self, status: HTTPStatus, payload: object) -> None:
         body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
         self.send_response(status.value)
