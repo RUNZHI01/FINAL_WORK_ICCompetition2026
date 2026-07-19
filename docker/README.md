@@ -96,6 +96,7 @@ bash docker/run-board-cli-benchmark-fast.sh
 
 - `pull-board-deps.*`：从已验证板卡刷新 `board_deps/`。
 - `package-submission.sh`：从干净克隆生成交付包。
-- `start-tailscale.sh`、`tailscale-login.*`：维护 Docker volume 中的 Tailscale 登录状态。
+- `start-tailscale.sh`：优先复用容器已有的板卡路由；目标不可达时再启动容器内 Tailscale。
+- `tailscale-login.*`：只用于初始化容器内 Tailscale 的备用登录状态。
 
 这些脚本会更新备份、登录状态或交付文件，不属于日常启动步骤。

@@ -416,6 +416,30 @@ def test_prepare_iq_board_sync_manifest_avoids_password_placeholder_and_lists_al
         assert rel_path in extract_section
 
 
+def test_pull_board_deps_powershell_normalizes_embedded_bash_to_lf() -> None:
+    script = (PROJECT_ROOT / "docker" / "pull-board-deps.ps1").read_text(encoding="utf-8-sig")
+    shell_script = read_script("pull-board-deps.sh")
+
+    assert '$PullScript = $PullScript.Replace("`r`n", "`n")' in script
+    assert 'bash /workspace/docker/start-tailscale.sh' in script
+    assert '-v "${ProjectRoot}:/workspace:ro"' in script
+    assert "--exclude='*.tmp'" in script
+    assert 'bash /workspace/docker/start-tailscale.sh' in shell_script
+    assert '-v "${PROJECT_ROOT}:/workspace:ro"' in shell_script
+    assert "--exclude='*.tmp'" in shell_script
+
+
+def test_start_tailscale_reuses_an_existing_container_route_before_starting_daemon() -> None:
+    script = read_script("start-tailscale.sh")
+
+    assert 'ROUTE_MODE="${TS_ROUTE_MODE:-${TAILSCALE_ROUTE_MODE:-auto}}"' in script
+    assert 'ROUTE_TARGET="${TAILSCALE_PING_TARGET:-${REMOTE_HOST:-${PHYTIUM_PI_HOST:-}}}"' in script
+    assert 'ROUTE_PORT="${REMOTE_SSH_PORT:-${PHYTIUM_PI_PORT:-22}}"' in script
+    assert 'target is reachable through the existing container route' in script
+    assert script.index("probe_existing_route") < script.index("command -v tailscaled")
+    assert script.index("probe_existing_route") < script.index("/dev/net/tun is missing")
+
+
 def test_prepare_iq_board_sync_manifest_activates_board_tvm_env_for_validation() -> None:
     script = (PROJECT_ROOT / "scripts" / "prepare_iq_board_sync.sh").read_text(encoding="utf-8")
     validation_section = script.split("## 同步后板端验证", 1)[1]

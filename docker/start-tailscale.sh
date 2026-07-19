@@ -10,6 +10,10 @@ ACCEPT_ROUTES="${TS_ACCEPT_ROUTES:-${TAILSCALE_ACCEPT_ROUTES:-true}}"
 EXTRA_ARGS="${TS_EXTRA_ARGS:-${TAILSCALE_EXTRA_ARGS:-}}"
 LOGIN_MODE="${TS_LOGIN_MODE:-${TAILSCALE_LOGIN_MODE:-authkey}}"
 LOGIN_WAIT_SEC="${TS_LOGIN_WAIT_SEC:-${TAILSCALE_LOGIN_WAIT_SEC:-30}}"
+ROUTE_MODE="${TS_ROUTE_MODE:-${TAILSCALE_ROUTE_MODE:-auto}}"
+ROUTE_TARGET="${TAILSCALE_PING_TARGET:-${REMOTE_HOST:-${PHYTIUM_PI_HOST:-}}}"
+ROUTE_PORT="${REMOTE_SSH_PORT:-${PHYTIUM_PI_PORT:-22}}"
+ROUTE_PROBE_TIMEOUT_SEC="${TS_ROUTE_PROBE_TIMEOUT_SEC:-3}"
 
 log() {
     printf '[tailscale] %s\n' "$*"
@@ -19,6 +23,31 @@ die() {
     printf '[tailscale] %s\n' "$*" >&2
     exit 1
 }
+
+probe_existing_route() {
+    [ -n "${ROUTE_TARGET}" ] || return 1
+    case "${ROUTE_PORT}" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    command -v timeout >/dev/null 2>&1 || return 1
+    timeout "${ROUTE_PROBE_TIMEOUT_SEC}" \
+        bash -c 'exec 3<>/dev/tcp/"$1"/"$2"' _ "${ROUTE_TARGET}" "${ROUTE_PORT}" \
+        >/dev/null 2>&1
+}
+
+case "${ROUTE_MODE}" in
+    auto|host|embedded) ;;
+    *) die "invalid TS_ROUTE_MODE=${ROUTE_MODE}; expected auto, host, or embedded" ;;
+esac
+
+if [ "${ROUTE_MODE}" != "embedded" ] && probe_existing_route; then
+    log "target is reachable through the existing container route; embedded tailscale is not needed"
+    exit 0
+fi
+
+if [ "${ROUTE_MODE}" = "host" ]; then
+    die "target is not reachable through the existing container route"
+fi
 
 command -v tailscaled >/dev/null 2>&1 || die "tailscaled is not installed"
 command -v tailscale >/dev/null 2>&1 || die "tailscale is not installed"

@@ -25,7 +25,7 @@ mkdir -p "${OUT_DIR}"
 
 read -r -d '' pull_script <<'SCRIPT' || true
 set -euo pipefail
-bash docker/start-tailscale.sh >/tmp/tailscale-start.log 2>&1
+bash /workspace/docker/start-tailscale.sh >/tmp/tailscale-start.log 2>&1
 mkdir -p \
   /out/crypto/public_keys \
   /out/tvm/baseline \
@@ -84,7 +84,7 @@ fetch_stream "OpenAMP full source" "tar -C /home/user/phytium-dev -czf - --exclu
 fetch_stream "OpenAMP current build metadata" "BASE=/home/user/phytium-dev/release_v1.4.0-jobdone-v14/example/system/amp/openamp_for_linux; tar -C \"\$BASE\" -czf - phytiumpi_aarch64_firefly_openamp_core0.elf phytiumpi_aarch64_firefly_openamp_core0.map sdkconfig sdkconfig.h configs common inc src/slaver_00_example.c main.c makefile Kconfig ft_openamp.ld README.md" "/out/openamp/source/release_v1.4.0-jobdone-v14-openamp-build-artifacts.tar.gz"
 fetch_stream "OpenAMP runtime services" "tar -C /home/user -czf - --exclude='.openamp-demo/board_position_api_service/*.log' --exclude='*/__pycache__' .openamp-demo/board_position_api_service" "/out/openamp/runtime/openamp-demo-runtime-services.tar.gz"
 fetch_stream "board public auth keys" "tar -C /home/user/keys -czf - server_sm2_identity.pub server_mldsa_identity.pub .gitignore" "/out/crypto/public_keys/board-auth-public-keys.tar.gz"
-fetch_stream "board ML-KEM remote runtime snapshot" "tar -C /home/user -czf - --exclude='*/__pycache__' --exclude='*.pyc' tcp_server.py tvm_inference_helper.py artifact_guard.py latent_transport.py replay_guard.py run_logger.py gen_identity_keys.py mlkem_link" "/out/runtime/mlkem-remote-runtime-snapshot.tar.gz"
+fetch_stream "board ML-KEM remote runtime snapshot" "tar -C /home/user -czf - --exclude='*/__pycache__' --exclude='*.pyc' --exclude='*.tmp' tcp_server.py tvm_inference_helper.py artifact_guard.py latent_transport.py replay_guard.py run_logger.py gen_identity_keys.py mlkem_link" "/out/runtime/mlkem-remote-runtime-snapshot.tar.gz"
 split_large_file "/out/openamp/source/release_v1.4.0-jobdone-v14-openamp-source.tar.gz"
 (
   cd /out
@@ -100,6 +100,7 @@ docker run --rm \
     --cap-add=NET_RAW \
     --device=/dev/net/tun \
     -v "${TAILSCALE_STATE_VOLUME}:/var/lib/tailscale" \
+    -v "${PROJECT_ROOT}:/workspace:ro" \
     -v "${OUT_DIR}:/out" \
     -e "TAILSCALE_PING_TARGET=${TAILSCALE_PING_TARGET}" \
     -e TS_LOGIN_WAIT_SEC=8 \
