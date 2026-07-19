@@ -70,8 +70,8 @@ if [[ "$missing_deps_status" -eq 0 ]]; then
   cat "$TMP_ROOT/missing-deps.out" >&2
   exit 1
 fi
-if ! grep -q 'init.ps1' "$TMP_ROOT/missing-deps.out"; then
-  echo "missing dependency error should point to init.ps1" >&2
+if ! grep -q 'demo.ps1 init' "$TMP_ROOT/missing-deps.out"; then
+  echo "missing dependency error should point to demo.ps1 init" >&2
   cat "$TMP_ROOT/missing-deps.out" >&2
   exit 1
 fi

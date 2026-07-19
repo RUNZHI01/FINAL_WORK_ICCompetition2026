@@ -49,7 +49,9 @@ function Assert-NotMatches {
 }
 
 $CockpitDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$ConfigScript = Join-Path $CockpitDir "start-demo-config.ps1"
+$PackageRoot = (Resolve-Path (Join-Path $CockpitDir "..\..")).Path
+$DemoScriptDir = Join-Path $PackageRoot "scripts\demo"
+$ConfigScript = Join-Path $DemoScriptDir "start-config.ps1"
 $EnvironmentNames = @(
     "REMOTE_HOST",
     "PHYTIUM_PI_HOST",
@@ -178,9 +180,9 @@ try {
             -BoardPassword ""
     } "out-of-range environment port is rejected"
 
-    $StartDemo = Get-Content -Raw -LiteralPath (Join-Path $CockpitDir "start-demo.ps1")
+    $StartDemo = Get-Content -Raw -LiteralPath (Join-Path $DemoScriptDir "start.ps1")
     Assert-Matches $StartDemo '\[string\]\$BoardPassword\s*=\s*""' "wrapper has no default password"
-    Assert-Matches $StartDemo 'start-demo-config\.ps1' "wrapper loads the configuration helper"
+    Assert-Matches $StartDemo 'start-config\.ps1' "wrapper loads the configuration helper"
     Assert-Matches $StartDemo 'Resolve-DemoStartupConfig' "wrapper resolves one startup configuration"
     Assert-NotMatches $StartDemo 'Set-DefaultEnv\s+"REMOTE_(HOST|USER|SSH_PORT)"' "wrapper does not preserve stale connection environment"
     Assert-Matches $StartDemo 'Set-DefaultEnv\s+"JSCC_LINK_MODE"\s+"qpsk"' "recommended wrapper defaults to QPSK"
@@ -197,7 +199,6 @@ try {
     Assert-Matches $StartDev 'JSCC_LINK_MODE="\$\{JSCC_LINK_MODE:-qpsk\}"' "Git Bash entry defaults to QPSK"
     Assert-Matches $StartDev 'OPENAMP_DEMO_LINK_MODE="\$\{OPENAMP_DEMO_LINK_MODE:-qpsk\}"' "Git Bash backend defaults to QPSK"
 
-    $PackageRoot = (Resolve-Path (Join-Path $CockpitDir "..\..")).Path
     $DockerPowerShell = Get-Content -Raw -LiteralPath (Join-Path $PackageRoot "docker\run-demo-tailscale.ps1")
     $DockerBash = Get-Content -Raw -LiteralPath (Join-Path $PackageRoot "docker\run-demo-tailscale.sh")
     Assert-Matches $DockerPowerShell 'JSCC_LINK_MODE\s*=\s*"iq-direct"' "PowerShell compatibility entry remains IQ-direct"

@@ -285,11 +285,11 @@ truthy_env() {
 
 assert_local_dependencies() {
   if ! command -v npm >/dev/null 2>&1; then
-    echo "ERROR: npm 未安装。请先在仓库根目录运行 .\\init.ps1。" >&2
+    echo "ERROR: npm 未安装。请先在仓库根目录运行 .\\demo.ps1 init。" >&2
     return 1
   fi
   if [[ ! -f "$NODE_MODULES_DIR/.bin/electron-vite" && ! -f "$NODE_MODULES_DIR/.bin/electron-vite.cmd" ]]; then
-    echo "ERROR: Cockpit 前端依赖未安装。请先在仓库根目录运行 .\\init.ps1。" >&2
+    echo "ERROR: Cockpit 前端依赖未安装。请先在仓库根目录运行 .\\demo.ps1 init。" >&2
     return 1
   fi
 }

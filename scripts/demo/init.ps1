@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$ProjectRoot = (Resolve-Path $PSScriptRoot).Path
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $VenvDir = Join-Path $ProjectRoot ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $CockpitDir = Join-Path $ProjectRoot "Semantic-Communication\cockpit_desktop"
@@ -134,8 +134,27 @@ function Assert-CheckoutReady {
         $Missing += "至少 20 个上位机 latent 输入"
     }
     if ($Missing.Count -gt 0) {
-        throw "初始化尚未完成：`n- $($Missing -join "`n- ")`n请运行 .\init.ps1"
+        throw "初始化尚未完成：`n- $($Missing -join "`n- ")`n请运行 .\demo.ps1 init"
     }
+}
+
+function Wait-SetupJob {
+    param(
+        [Parameter(Mandatory = $true)][System.Management.Automation.Job]$Job,
+        [Parameter(Mandatory = $true)][string]$Step
+    )
+
+    $null = Wait-Job -Job $Job
+    Receive-Job -Job $Job -ErrorAction Continue
+    if ($Job.State -ne "Completed") {
+        $Reason = $Job.ChildJobs[0].JobStateInfo.Reason
+        Remove-Job -Job $Job -Force
+        if ($Reason) {
+            throw "$Step 失败：$($Reason.Message)"
+        }
+        throw "$Step 失败。"
+    }
+    Remove-Job -Job $Job
 }
 
 Write-Step "检查本机工具"
@@ -160,18 +179,29 @@ if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
         -Step "创建 Python 虚拟环境"
 }
 
-Write-Step "安装 Python 依赖"
-Invoke-Native `
-    -Command $VenvPython `
-    -Arguments @("-m", "pip", "install", "--disable-pip-version-check", "-r", (Join-Path $ProjectRoot "requirements.txt")) `
-    -Step "安装 Python 依赖"
+$PythonJob = Start-Job -Name "demo-python-deps" -ScriptBlock {
+    param([string]$PythonPath, [string]$RequirementsPath)
+    & $PythonPath -m pip install --disable-pip-version-check -r $RequirementsPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "pip install 退出码 $LASTEXITCODE"
+    }
+} -ArgumentList $VenvPython, (Join-Path $ProjectRoot "requirements.txt")
 
-if (-not (Test-PythonModule -Python $VenvPython -Module "torch")) {
-    Write-Step "安装读取 .pt latent 所需的 CPU 版 PyTorch"
-    Invoke-Native `
-        -Command $VenvPython `
-        -Arguments @("-m", "pip", "install", "--index-url", "https://download.pytorch.org/whl/cpu", "torch") `
-        -Step "安装 PyTorch"
+$NodeJob = $null
+if ($ForceNodeInstall -or -not (Test-Path -LiteralPath $NodeModulesMarker -PathType Leaf)) {
+    Write-Step "并行安装 Python 与 Cockpit 前端依赖"
+    $NodeJob = Start-Job -Name "demo-node-deps" -ScriptBlock {
+        param([string]$NpmPath, [string]$WorkingDirectory)
+        Set-Location -LiteralPath $WorkingDirectory
+        $NpmArguments = @("ci", "--prefer-offline", "--no-audit", "--no-fund")
+        & $NpmPath @NpmArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm ci 退出码 $LASTEXITCODE"
+        }
+    } -ArgumentList $Npm, $CockpitDir
+}
+else {
+    Write-Step "后台安装 Python 依赖；复用已有 Cockpit 前端依赖"
 }
 
 if ((Get-AvailableLatentCount) -lt 20) {
@@ -189,21 +219,22 @@ if ((Get-AvailableLatentCount) -lt 20) {
     }
 }
 
-if ($ForceNodeInstall -or -not (Test-Path -LiteralPath $NodeModulesMarker -PathType Leaf)) {
-    Write-Step "安装 Cockpit 前端依赖"
-    Push-Location $CockpitDir
+Wait-SetupJob -Job $PythonJob -Step "安装 Python 依赖"
+if ($NodeJob) {
     try {
-        Invoke-Native -Command $Npm -Arguments @("ci") -Step "npm ci"
+        Wait-SetupJob -Job $NodeJob -Step "安装 Cockpit 前端依赖"
     }
     catch {
         throw "Cockpit 前端依赖安装失败。若 Electron 正在运行，请先关闭 Cockpit 再重试。`n$($_.Exception.Message)"
     }
-    finally {
-        Pop-Location
-    }
 }
-else {
-    Write-Step "复用已有 Cockpit 前端依赖"
+
+if (-not (Test-PythonModule -Python $VenvPython -Module "torch")) {
+    Write-Step "安装读取 .pt latent 所需的 CPU 版 PyTorch"
+    Invoke-Native `
+        -Command $VenvPython `
+        -Arguments @("-m", "pip", "install", "--index-url", "https://download.pytorch.org/whl/cpu", "torch") `
+        -Step "安装 PyTorch"
 }
 
 $ImageExists = Test-DockerImage -Docker $Docker -Image $DockerImage
@@ -237,4 +268,4 @@ Invoke-Native `
     -Step "Docker 依赖检查"
 
 Assert-CheckoutReady -Docker $Docker
-Write-Step "初始化完成。日常启动请运行 .\Semantic-Communication\cockpit_desktop\start-demo.ps1"
+Write-Step "初始化完成。日常启动请运行 .\demo.ps1 start"

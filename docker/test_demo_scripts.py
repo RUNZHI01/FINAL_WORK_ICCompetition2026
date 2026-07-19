@@ -102,7 +102,7 @@ def test_start_dev_defaults_enable_auth_and_protect_remote_auth_paths_from_msys(
 
 
 def test_start_demo_initializes_services_without_image_warmup() -> None:
-    script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-demo.ps1").read_text(
+    script = (PROJECT_ROOT / "scripts" / "demo" / "start.ps1").read_text(
         encoding="utf-8-sig"
     )
 
@@ -120,7 +120,7 @@ def test_start_demo_initializes_services_without_image_warmup() -> None:
 
 
 def test_start_demo_recovers_board_usrp_network_before_cockpit_startup() -> None:
-    script = (PROJECT_ROOT / "Semantic-Communication" / "cockpit_desktop" / "start-demo.ps1").read_text(
+    script = (PROJECT_ROOT / "scripts" / "demo" / "start.ps1").read_text(
         encoding="utf-8-sig"
     )
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-INIT_SCRIPT = PROJECT_ROOT / "init.ps1"
+INIT_SCRIPT = PROJECT_ROOT / "scripts" / "demo" / "init.ps1"
 ROOT_README = PROJECT_ROOT / "README.md"
 
 
@@ -13,6 +13,9 @@ def test_init_script_covers_fresh_windows_checkout() -> None:
     assert "[switch]$ForceNodeInstall" in text
     assert '"-m", "venv"' in text
     assert '"ci"' in text
+    assert '"--prefer-offline"' in text
+    assert '"--no-audit"' in text
+    assert '"--no-fund"' in text
     assert "iccomp-usrp-tx:latest" in text
     assert "docker/check_deps.py" in text
     assert "torch" in text

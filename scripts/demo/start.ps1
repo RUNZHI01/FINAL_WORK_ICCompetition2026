@@ -127,14 +127,15 @@ function Assert-DemoHostReady {
     }
 
     if ($Missing.Count -gt 0) {
-        throw "本机尚未完成初始化：`n- $($Missing -join "`n- ")`n请先在仓库根目录运行 .\init.ps1。"
+        throw "本机尚未完成初始化：`n- $($Missing -join "`n- ")`n请先在仓库根目录运行 .\demo.ps1 init。"
     }
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $ScriptDir "start-demo-config.ps1")
+. (Join-Path $ScriptDir "start-config.ps1")
 
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
+$CockpitDir = Join-Path $RepoRoot "Semantic-Communication\cockpit_desktop"
 $DockerImage = if ($env:OPENAMP_SSH_DOCKER_IMAGE) { $env:OPENAMP_SSH_DOCKER_IMAGE } else { "iccomp-usrp-tx:latest" }
 Assert-DemoHostReady -RepoRoot $RepoRoot -DockerImage $DockerImage
 
@@ -204,7 +205,7 @@ if ((Test-Path -LiteralPath $FinalImageDir -PathType Container) -and
 }
 Set-DefaultEnv "MSYS2_ARG_CONV_EXCL" "*"
 
-[Environment]::SetEnvironmentVariable("COCKPIT_SCRIPT_DIR_WIN", $ScriptDir, "Process")
+[Environment]::SetEnvironmentVariable("COCKPIT_SCRIPT_DIR_WIN", $CockpitDir, "Process")
 
 $BoardNetworkScript = Join-Path $RepoRoot "USRP292x\ConfigureUsrp2922DemoNetwork.ps1"
 if (-not (Test-Path -LiteralPath $BoardNetworkScript -PathType Leaf)) {

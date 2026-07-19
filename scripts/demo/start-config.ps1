@@ -1,3 +1,4 @@
+# Connection values shared by the public demo entrypoint and its tests.
 Set-StrictMode -Version Latest
 
 function Get-FirstNonEmptyDemoValue {
