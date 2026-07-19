@@ -91,7 +91,7 @@ configure_runtime_defaults() {
   ensure_auth_public_keys
   local auth_keys_dir_win default_image_dir
   auth_keys_dir_win="$(to_windows_path "$AUTH_KEYS_DIR")"
-  default_image_dir="$PACKAGE_ROOT/../原始图像_Top300"
+  default_image_dir="$PACKAGE_ROOT/../原始图像"
   if [[ -z "${OPENAMP_DEMO_LOCAL_IMAGE_DIR:-}" && -d "$default_image_dir" ]]; then
     export OPENAMP_DEMO_LOCAL_IMAGE_DIR="$(to_windows_path "$default_image_dir")"
   fi

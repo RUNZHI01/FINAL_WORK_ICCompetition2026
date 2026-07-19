@@ -57,9 +57,9 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 
 7. 图片对比目录：
 
-- 发送原图（上位机，展示 Top 300）：`E:\Main\Career\集创赛\原始图像_Top300_最终`
+- 发送原图（上位机，展示 Top 300）：`E:\Main\Career\集创赛\原始图像`
 - Top 300 latent 缓存（上位机）：`host_pic_to_latent/encoder_outputs_top300`
-- 完整原始图像回退目录：`E:\Main\Career\集创赛\原始图像`
+- 完整原始图像回退目录：`E:\Main\Career\集创赛\原始图像_备份_20260718_213714`
 - 预录 latent 输入（板端）：`/home/user/Downloads/jscc-test/简化版latent`
 - USRP IQ 接收解包（板端）：`/home/user/cockpit_usrp_rx/cockpit_usrp_*_rx`
 - 预录 TVM 重建（板端）：`/home/user/Downloads/jscc-test/jscc/infer_outputs/openamp3_handwritten_mean4_v7_big_little_current/reconstructions`

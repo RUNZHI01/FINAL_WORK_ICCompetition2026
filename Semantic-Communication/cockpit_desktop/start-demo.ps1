@@ -82,7 +82,7 @@ function Resolve-BoardPassword {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
 $WorkspaceRoot = Split-Path -Parent $RepoRoot
-$FinalImageDir = Join-Path $WorkspaceRoot "原始图像_Top300_最终"
+$FinalImageDir = Join-Path $WorkspaceRoot "原始图像"
 $FinalLatentDir = Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"
 $FinalInputOrder = Join-Path $RepoRoot "host_pic_to_latent\showcase_final_300_order.tsv"
 $Bash = Find-GitBash -ExplicitPath $GitBashPath
