@@ -567,7 +567,7 @@ def test_http_uncached_reconstruction_returns_404_without_download(tmp_path: Pat
         state.close()
 
 
-def test_http_page_exposes_two_previews_and_output_directory_help(tmp_path: Path) -> None:
+def test_http_page_exposes_two_previews_and_modal_output_directory_help(tmp_path: Path) -> None:
     state, _ = configured_state(tmp_path)
     server = create_http_server("127.0.0.1", 0, state)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -578,6 +578,10 @@ def test_http_page_exposes_two_previews_and_output_directory_help(tmp_path: Path
         assert 'id="original-preview"' in body
         assert 'id="reconstruction-preview"' in body
         assert 'id="directory-help"' in body
+        assert 'id="directory-help-overlay"' in body
+        assert 'role="dialog"' in body
+        assert 'aria-modal="true"' in body
+        assert 'id="directory-help-close"' in body
         assert 'id="quality-assistance"' not in body
         assert '/home/user/Downloads/jscc-test/jscc/infer_outputs' in body
         assert '/home/user/Downloads/jscc-test/mnn_benchmark_outputs' in body
@@ -589,6 +593,13 @@ def test_http_page_exposes_two_previews_and_output_directory_help(tmp_path: Path
         server.shutdown()
         server.server_close()
         state.close()
+
+
+def test_http_page_closes_directory_help_modal_from_overlay_or_escape(tmp_path: Path) -> None:
+    _, script = fetch_page_assets(configured_http_state(tmp_path))
+
+    assert "directoryHelpOverlay.addEventListener('click'" in script
+    assert "event.key === 'Escape'" in script
 
 
 def test_http_page_exposes_reconstruction_source_selector(tmp_path: Path) -> None:

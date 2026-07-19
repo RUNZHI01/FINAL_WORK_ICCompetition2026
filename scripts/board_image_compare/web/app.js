@@ -12,7 +12,9 @@ const elements = {
   refreshJobs: document.querySelector('#refresh-jobs'),
   pullImage: document.querySelector('#pull-image'),
   directoryHelp: document.querySelector('#directory-help'),
-  directoryHelpPanel: document.querySelector('#directory-help-panel'),
+  directoryHelpOverlay: document.querySelector('#directory-help-overlay'),
+  directoryHelpDialog: document.querySelector('#directory-help-dialog'),
+  directoryHelpClose: document.querySelector('#directory-help-close'),
   originalPreview: document.querySelector('#original-preview'),
   reconstructionPreview: document.querySelector('#reconstruction-preview'),
   originalEmpty: document.querySelector('#original-empty'),
@@ -193,6 +195,13 @@ function setIndex(index) {
   renderPreview()
 }
 
+function setDirectoryHelpOpen(open) {
+  elements.directoryHelpOverlay.hidden = !open
+  elements.directoryHelp.setAttribute('aria-expanded', String(open))
+  if (open) elements.directoryHelpDialog.focus()
+  else elements.directoryHelp.focus()
+}
+
 function resetSelectedJob() {
   state.sourceEpoch += 1
   state.sourceReady = false
@@ -349,10 +358,13 @@ elements.pullImage.addEventListener('click', pullCurrent)
 elements.previousImage.addEventListener('click', () => setIndex(state.index - 1))
 elements.nextImage.addEventListener('click', () => setIndex(state.index + 1))
 elements.imageIndex.addEventListener('change', () => setIndex(Number(elements.imageIndex.value) - 1))
-elements.directoryHelp.addEventListener('click', () => {
-  const open = elements.directoryHelpPanel.hidden
-  elements.directoryHelpPanel.hidden = !open
-  elements.directoryHelp.setAttribute('aria-expanded', String(open))
+elements.directoryHelp.addEventListener('click', () => setDirectoryHelpOpen(true))
+elements.directoryHelpClose.addEventListener('click', () => setDirectoryHelpOpen(false))
+elements.directoryHelpOverlay.addEventListener('click', (event) => {
+  if (event.target === elements.directoryHelpOverlay) setDirectoryHelpOpen(false)
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !elements.directoryHelpOverlay.hidden) setDirectoryHelpOpen(false)
 })
 for (const button of elements.referenceModes) {
   button.addEventListener('click', () => {

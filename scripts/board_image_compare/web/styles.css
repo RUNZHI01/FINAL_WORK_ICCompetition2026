@@ -22,10 +22,14 @@ button, input, select { font: inherit; }
 h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
 .topbar p { margin: 3px 0 0; font-size: 12px; color: #586575; }
 
-.topbar-actions { position: relative; }
-.directory-help { position: absolute; top: 42px; right: 0; z-index: 10; width: min(540px, calc(100vw - 32px)); padding: 12px; display: grid; gap: 6px; border: 1px solid #aeb8c2; border-radius: 6px; background: #fff; box-shadow: 0 8px 20px rgba(33, 43, 54, 0.16); font-size: 12px; }
-.directory-help span { color: #586575; overflow-wrap: anywhere; }
-.directory-help code { color: #25313d; font-family: Consolas, "Courier New", monospace; }
+.directory-help-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(24, 32, 42, 0.42); }
+.directory-help-overlay[hidden] { display: none; }
+.directory-help-dialog { width: min(560px, 100%); border: 1px solid #aeb8c2; border-radius: 6px; background: #fff; box-shadow: 0 16px 42px rgba(20, 28, 38, 0.28); }
+.directory-help-header { min-height: 52px; padding: 8px 10px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #dbe0e5; }
+.directory-help-header h2 { margin: 0; font-size: 15px; }
+.directory-help-content { padding: 16px; display: grid; gap: 10px; font-size: 12px; }
+.directory-help-content span { color: #586575; overflow-wrap: anywhere; }
+.directory-help-content code { color: #25313d; font-family: Consolas, "Courier New", monospace; }
 
 main { padding: 16px 24px 20px; }
 .directory-grid, .preview-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }

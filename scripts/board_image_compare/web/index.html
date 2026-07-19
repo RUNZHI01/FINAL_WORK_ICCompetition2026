@@ -13,14 +13,7 @@
       <p id="service-status">正在连接上位机服务</p>
     </div>
     <div class="topbar-actions">
-      <button id="directory-help" class="icon-button" type="button" title="输出目录说明" aria-label="输出目录说明" aria-expanded="false" aria-controls="directory-help-panel">?</button>
-      <aside id="directory-help-panel" class="directory-help" hidden>
-        <strong>输出目录</strong>
-        <span>预录 TVM / PyTorch: <code>/home/user/Downloads/jscc-test/jscc/infer_outputs</code></span>
-        <span>预录 MNN: <code>/home/user/Downloads/jscc-test/mnn_benchmark_outputs</code></span>
-        <span>USRP QPSK: <code>/home/user/Downloads/jscc-test-usrp/qpsk/tvm</code></span>
-        <span>USRP IQ直传: <code>/home/user/Downloads/jscc-test-usrp/iq-direct/tvm</code></span>
-      </aside>
+      <button id="directory-help" class="icon-button" type="button" title="输出目录说明" aria-label="输出目录说明" aria-expanded="false" aria-controls="directory-help-dialog">?</button>
     </div>
   </header>
 
@@ -91,6 +84,21 @@
 
     <div id="thumbnail-strip" class="thumbnail-strip" aria-label="图片序号缩略导航"></div>
   </main>
+
+  <div id="directory-help-overlay" class="directory-help-overlay" hidden>
+    <section id="directory-help-dialog" class="directory-help-dialog" role="dialog" aria-modal="true" aria-labelledby="directory-help-title" tabindex="-1">
+      <header class="directory-help-header">
+        <h2 id="directory-help-title">输出目录</h2>
+        <button id="directory-help-close" class="icon-button" type="button" title="关闭" aria-label="关闭">&times;</button>
+      </header>
+      <div class="directory-help-content">
+        <span>预录 TVM / PyTorch: <code>/home/user/Downloads/jscc-test/jscc/infer_outputs</code></span>
+        <span>预录 MNN: <code>/home/user/Downloads/jscc-test/mnn_benchmark_outputs</code></span>
+        <span>USRP QPSK: <code>/home/user/Downloads/jscc-test-usrp/qpsk/tvm</code></span>
+        <span>USRP IQ直传: <code>/home/user/Downloads/jscc-test-usrp/iq-direct/tvm</code></span>
+      </div>
+    </section>
+  </div>
 
   <script type="module" src="/app.js"></script>
 </body>
