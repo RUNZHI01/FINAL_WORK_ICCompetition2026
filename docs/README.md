@@ -15,7 +15,6 @@
 | 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP QPSK、认证加密默认开启、启动前仅检查服务就绪 |
 | 要修改 PPT 的加密与 USRP 部分 | [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) | 只改第 9、14、20 页的精简文案 |
 | 要修改技术文档的加密与 USRP 部分 | [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md) | 第 5、6 章的差量修改和证据口径 |
-| 要查看最初提交中的文档 | [`INITIAL_COMMIT_DOCUMENTS.md`](./INITIAL_COMMIT_DOCUMENTS.md) | 937 份原始文档的归档位置和完整清单 |
 | 要了解当前 USRP IQ 实际链路 | [`USRP_IQ_RUNTIME.md`](./USRP_IQ_RUNTIME.md) | 数据面执行顺序、控制/安全边界和 300 张实测卡点 |
 | 要跑旧交付容器入口 | `docker/run-demo-tailscale.ps1` | 原生 PowerShell + Docker 的 Electron 真机链路 |
 | 要从零复测板端性能 | `docker/run-board-cli-smoke.*` | 自包含上传依赖后跑 TVM / MNN / PyTorch |

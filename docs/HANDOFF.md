@@ -400,7 +400,6 @@ npm run typecheck
 - `docs/USRP_LINK_BRIEFING.md`：USRP 分阶段链路、指标和安全边界。
 - `docs/PPT_USRP_SECURITY_UPDATES.md`：PPT 中加密认证与 USRP 的 3 页修改意见。
 - `docs/DOCUMENT_USRP_SECURITY_UPDATES.md`：技术文档第 5、6 章的差量修改意见。
-- `docs/INITIAL_COMMIT_DOCUMENTS.md`：最初提交的文档归档和逐文件清单。
 - `docs/runbooks/STARTUP.md`：现场断电后最短启动流程。
 - `docs/HANDOFF.md`：交接、默认参数、实验开关和验证命令。
 - `docs/security/mlkem_auth_setup.md`：ML-KEM/SM4 与认证通道部署说明。
