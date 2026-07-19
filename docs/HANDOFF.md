@@ -1,11 +1,11 @@
 # HANDOFF
 
-更新时间：2026-07-17
+更新时间：2026-07-19
 代码版本以仓库当前提交为准；需要精确 hash 时运行 `git log -1 --oneline`。
 
 ## 当前主线
 
-演示主线是 `Cockpit Desktop -> USRP IQ 直传 -> 板端 TVM big.LITTLE 重建`。QPSK 已能稳定跑通，作为可靠 fallback 保留，不建议继续改。预录 TVM/MNN/PyTorch 已恢复；预录模式只走推理进度，不走 USRP 三阶段进度。
+现场推荐主线是 `Cockpit Desktop -> USRP QPSK -> 板端 TVM big.LITTLE 重建`。IQ-direct 已接入 Cockpit，继续作为可切换链路和兼容容器入口的默认模式。预录 TVM/MNN/PyTorch 已恢复；预录模式只走推理进度，不走 USRP 三阶段进度。
 
 默认 UI 分工：
 
@@ -20,7 +20,7 @@
 
 | 方向 | 初版状态 | 当前状态 |
 |---|---|---|
-| 主数据面 | 以预录/传统 live 路径为主，USRP 更接近验证链路 | 默认 USRP IQ 直传，QPSK 作为稳定 fallback |
+| 主数据面 | 以预录/传统 live 路径为主，USRP 更接近验证链路 | 推荐入口默认 USRP QPSK；IQ-direct 可切换，兼容容器入口默认启用 |
 | TVM 指标 | 需要恢复约 250 ms 的 big.LITTLE 预录指标 | 预录 TVM 已恢复，300 张 median `243.30 ms`，mean `252.91 ms` |
 | IQ 直传 | 不是主演示路径 | 已接入 Cockpit、板端 remote-dir、TVM big.LITTLE；2026-07-16 严格质量门限下 `300/300` 通过 |
 | QPSK | 还在调试和性能对比 | 已能 300/300 跑通，但约 `2.96 s/image`，不再继续优化 |
@@ -30,19 +30,20 @@
 | IQ 可靠性 | 弱同步、burst miss、299/300 等问题容易暴露 | 30 张分段、两轮失败子集补传、固定峰值导频和质量门限已完成 300 张回归；RX 停滞后会执行真实 `RESET`，不再只重连控制口 |
 | 安全链路 | UI 和真实作用范围不够明确 | 默认启用 ML-KEM+SM4 和 ML-DSA+SM2；API/UI 明确显示作用范围 |
 | 安全边界 | 容易被误说成 USRP IQ payload 已加密 | 已明确：USRP IQ 数据面不做 ML-KEM/SM4 payload 加密，安全信道用于控制/认证面准入 |
-| 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-dev.sh` 统一默认 USRP IQ、Docker SSH/TX、板端 venv、认证开关和常用 IQ 参数；板端 USRP RX 网口可由 systemd 开机自恢复 |
+| 启动环境 | 偏真机 Linux/手动配置，迁到 Windows/容器后状态分散 | `start-demo.ps1` / `start-dev.sh` 统一默认 USRP QPSK、Docker SSH/TX、板端 venv 和认证开关；板端 USRP RX 网口可由 systemd 开机自恢复 |
 | 板卡会话 | 地址、密码、目录参数容易散落在脚本里 | Cockpit 可写入 board access；板卡地址、RX 目录、链路模式向参数化收敛 |
 | 文档和测试 | 资料分散在运行日志和零散报告里 | 新增/更新 runbook、安全审计、HANDOFF、layout tests、crypto scope/gate/auth 负测 |
 
 ## 启动方式
 
-当前仍保留 Git Bash 启动外壳，Bash/SSH 热路径优先走 Docker，不用 WSL。
+当前推荐使用 PowerShell 包装入口；它仍以 Git Bash 作为底层启动外壳，Bash/SSH 热路径优先走 Docker，不用 WSL。
 
 ```powershell
 cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
-$env:REMOTE_PASS = 'user'
-& 'E:\Software\Scoop\apps\git\current\bin\bash.exe' -lc './Semantic-Communication/cockpit_desktop/start-dev.sh'
+.\Semantic-Communication\cockpit_desktop\start-demo.ps1
 ```
+
+默认连接 `user@100.121.87.73:22`，但没有默认密码。可显式传 `-BoardPassword`，也可设置 `REMOTE_PASS`、`REMOTE_PASSWORD`、`PHYTIUM_PI_PASS`、`PHYTIUM_PI_PASSWORD` 或 `BOARD_PASS`；都未提供时，入口会在终端安全询问。显式 `-BoardHost`、`-BoardUser`、`-BoardPort` 优先于旧的进程环境变量。
 
 比赛演示启动不再运行 10 张图片预热。脚本在显示 UI 前只建立板卡会话，拉起 ML-KEM/认证服务和常驻 USRP TX/RX，并等待服务就绪；不会创建隐藏 batch-state 或重建输出。正式 IQ 串行长批次默认每 30 张重建 RX streamer，TX 保持常驻。
 
@@ -50,7 +51,7 @@ IQ 源码同步与日常启动已经分开。修改 `USRP292x/`、encoder 或 TV
 
 ```powershell
 pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify `
-  -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+  -BoardHost 100.121.87.73 -BoardUser user
 ```
 
 同步包和 SSH/SCP 都在 Docker 内处理，不用 WSL。当前 Tailscale 地址可以保留；现场变化时用 `-BoardHost` 覆盖。`-Verify` 只做哈希、`py_compile` 和 runner 入口检查，不会向 `tvm310_safe` 安装 pytest。需要重编译 OTA server 时额外加 `-BuildOta`，并先停掉正在运行的 RX/TX 任务。
@@ -60,7 +61,7 @@ pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify `
 - 后端：`http://127.0.0.1:8079`
 - 前端/Electron/Vite：`http://localhost:5173/#/`
 - 板卡默认地址：`100.121.87.73`
-- 板卡用户名/密码：`user / user`
+- 板卡默认用户名：`user`；密码仅保存在当前演示会话
 - 板端 IQ decode Python：`/home/user/venv/bin/python`
 
 USRP2922 网口恢复脚本按用途分开。上位机/TX 侧使用：
@@ -119,7 +120,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 
 ## 推荐运行参数
 
-`start-dev.sh` 当前默认值如下，接手时以这里为准：
+推荐 `start-demo.ps1` / `start-dev.sh` 当前默认值如下。兼容 `docker/run-demo-tailscale.*` 单独默认 `iq-direct`，不要把两套入口混写：
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
@@ -127,8 +128,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | `REMOTE_USER` | `user` | 板卡 SSH 用户 |
 | `MLKEM_TRANSPORT_MODE` | `usrp` | Cockpit 默认进入 USRP 模式 |
 | `OPENAMP_DEMO_INPUT_SOURCE_MODE` | `usrp` | 默认从 USRP 数据面取输入 |
-| `JSCC_LINK_MODE` | `iq-direct` | USRP 数据面默认 IQ 直传 |
-| `OPENAMP_DEMO_LINK_MODE` | `iq-direct` | 后端 runner 选择 IQ 直传 |
+| `JSCC_LINK_MODE` | `qpsk` | 推荐入口默认可靠 QPSK；兼容容器入口默认 `iq-direct` |
+| `OPENAMP_DEMO_LINK_MODE` | `qpsk` | 推荐入口后端 runner 选择 QPSK |
 | `MLKEM_AUTH_ENABLED` | `1` | 默认开启认证面 |
 | `MLKEM_AUTH_SIG_POLICY` | `DUAL_REQUIRED` | SM2 和 ML-DSA 都要通过 |
 | `MLKEM_AUTH_SERVER_ID` | `phytium-board` | UI 中显示的服务端标识 |
@@ -219,7 +220,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 | USRP IQ 热启动验收（2026-07-17） | 100 | `104.061 s` 总计，261 次 OTA，`100/100` accepted | core wall `85.212 s`，median `244.92 ms`，mean `261.75 ms` | 点击到完成 `240.19 s`；POST `0.857 s`；CPU/MEM 峰值 `92.38%/62.56%` |
 | USRP IQ 严格可靠性 profile | 300 | median `411.59 ms`, p95 `3423.45 ms`, `300/300` accepted | median `245.42 ms`, mean `254.71 ms`, p95 `301.73 ms` | 30 张分段；11 次 RESET 共 `448.69 ms`；10 次 worker 清理共 `522.72 ms` |
 | USRP IQ 历史速度 profile | 300 | median `166.63 ms`, p95 `198.46 ms`, max `15934.08 ms` | median `241.20 ms`, p95 `242.59 ms`, max `259.35 ms` | 历史 accepted 速度记录，不代表当前严格可靠性默认值 |
-| QPSK fallback | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
+| QPSK（推荐默认） | 300 | `2961.78 ms/image` | median `240.06 ms`, p95 `242.88 ms` | 稳定但慢，不再优化 |
 
 2026-07-17 的全关冷启动记录 `cockpit_usrp_usrp-1784286235` 曾用 10 张隐藏任务验证整条链路，约 `99.6 s` 后显示 UI。当前启动脚本已经取消图片预热，只建立板卡会话，拉起 ML-KEM/认证服务和常驻 USRP TX/RX，并等待服务就绪。首次正式任务仍可能承担模型和运行时冷启动，演示前应留出一次人工冒烟测试时间。
 
@@ -229,12 +230,12 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8079/api/session/board-acc
 
 | 可写项 | 推荐写法 |
 |---|---|
-| 主链路 | USRP IQ 直传 + 板端 TVM big.LITTLE 重建 |
+| IQ-direct 性能路径 | USRP IQ 直传 + 板端 TVM big.LITTLE 重建 |
 | 100 张演示时长 | 热启动点击到完成 `240.19 s`，即约 4 分钟；`100/100` accepted，fallback `0` |
 | IQ 传输/解包 | 当前严格 300 张 profile：median `411.59 ms`，p95 `3423.45 ms`，`300/300` accepted；历史速度 profile 可单独标注 median `166.63 ms` |
 | TVM 重建 | 当前严格 300 张 profile：median `245.42 ms`，mean `254.71 ms`，p95 `301.73 ms` |
 | 250 ms 参考线 | 预录 TVM 300 张 median `243.30 ms`，mean `252.91 ms` |
-| QPSK 对照 | 约 `2.96 s/image`，作为稳定 fallback，不作为速度主线 |
+| QPSK 推荐入口 | 约 `2.96 s/image`，作为稳定现场默认，不作为速度指标主线 |
 | 图像质量 | PSNR `37.0445`，SSIM `0.97494`，artifact SHA matched |
 | Cockpit 双口径质量 | PyTorch-TVM `35.6942 dB / 0.97284`（归档参考均值）；原图-TVM `22.1991 dB / 0.94213`（最近一次 30 张审计），均不是本轮 100 张逐图审计 |
 | 安全口径 | ML-KEM+SM4 和 ML-DSA+SM2 用于控制/认证面准入；USRP IQ payload 不宣称已加密 |

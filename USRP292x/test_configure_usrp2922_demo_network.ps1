@@ -82,7 +82,7 @@ $boardWhatIf = powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath `
     -Target Board `
     -BoardHost "demo-board" `
     -BoardUser "user" `
-    -BoardPassword "user" `
+    -BoardPassword "test-secret" `
     -WhatIf 2>&1
 
 if ($LASTEXITCODE -ne 0) {

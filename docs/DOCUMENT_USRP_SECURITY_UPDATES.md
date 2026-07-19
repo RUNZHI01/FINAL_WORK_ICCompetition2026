@@ -32,7 +32,7 @@ USRP IQ 数据面不经过 Tailscale，也没有把连续 latent 波形封装成
 
 第 755-771 段仍在描述 QPSK、wire blob、WebP 和分块 CRC，应整体替换。Deep JSCC encoder 的原理前文已经介绍，此处从其输出开始：发送端对连续实数 latent 做全局 RMS 归一化，把相邻两个实数分别放入复数符号的 I、Q 分量；随后加入保护段、同步序列和导频，进行 RRC 成形并转换为 `sc16` 样本。接收端完成 DC、定时、CFO、复增益和相位恢复，得到 noisy latent，再交给 handwritten TVM artifact 重建图像。
 
-第 773-792 段的三种 QPSK RX 模式和 selective ARQ 缺块回补已不是主演示路径。当前方案省掉量化、QPSK 映射、CRC 分包和字节解包，但没有省掉同步与误差控制。默认常驻 TX/RX，按 30 张分段；单图最多 12 次 ARQ，每段失败子集最多补传 2 轮。同步、pilot gain、EVM 和 SNR 门限共同决定帧是否接收。全部样本 accepted 后才进入 TVM。RF 解码与 TVM 重叠执行在真板上产生资源争用，故默认使用质量优先的串行路径。
+第 773-792 段的三种 QPSK RX 模式和 selective ARQ 缺块回补对应当前推荐现场入口。若材料同时介绍 IQ-direct，可说明该可选路径省掉量化、QPSK 映射、CRC 分包和字节解包，但没有省掉同步与误差控制。IQ-direct 使用常驻 TX/RX，按 30 张分段；单图最多 12 次 ARQ，每段失败子集最多补传 2 轮。同步、pilot gain、EVM 和 SNR 门限共同决定帧是否接收。全部样本 accepted 后才进入 TVM。RF 解码与 TVM 重叠执行在真板上产生资源争用，故 IQ profile 使用质量优先的串行路径。
 
 第 794 段的验收结果改用下表，不再沿用 QPSK 的 `0.95 s/image`：
 

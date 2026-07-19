@@ -104,7 +104,7 @@ MSYS_NO_PATHCONV=1 docker exec iccomp-ubuntu bash -lc 'cd /workspace && bash scr
 板端 `tcp_server` 由容器内的 `server.py` 通过 SSH 在启动阶段自动拉起，使用 `setsid` 脱离 SSH 会话。如果需要手动重启：
 
 ```bash
-# 板端（100.121.87.73, user/user）
+# 板端（默认地址 100.121.87.73，默认用户 user；密码由当前会话提供）
 export MLKEM_AUTH_ENABLED=1
 export MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
 export MLKEM_AUTH_SERVER_ID=phytium-board

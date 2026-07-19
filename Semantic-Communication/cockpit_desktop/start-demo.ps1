@@ -3,7 +3,7 @@ param(
     [string]$BoardUser = "user",
     [int]$BoardPort = 22,
     [string]$GitBashPath = "",
-    [string]$BoardPassword = "user"
+    [string]$BoardPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,26 +51,15 @@ function Find-GitBash {
     throw "Git Bash not found. Install Git for Windows or pass -GitBashPath. WSL bash is intentionally not used."
 }
 
-function Resolve-BoardPassword {
-    param([string]$ExplicitPassword)
-
-    foreach ($candidate in @(
-        $ExplicitPassword,
-        $env:REMOTE_PASS,
-        $env:REMOTE_PASSWORD,
-        $env:PHYTIUM_PI_PASS,
-        $env:PHYTIUM_PI_PASSWORD,
-        $env:BOARD_PASS
-    )) {
-        if ($candidate) {
-            return $candidate
-        }
-    }
-
+function Read-BoardPassword {
     $secure = Read-Host "Board SSH password" -AsSecureString
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     try {
-        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        if ([string]::IsNullOrEmpty($password)) {
+            throw "Board SSH password must not be empty."
+        }
+        return $password
     }
     finally {
         if ($bstr -ne [IntPtr]::Zero) {
@@ -80,20 +69,35 @@ function Resolve-BoardPassword {
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "start-demo-config.ps1")
+
+$StartupConfig = Resolve-DemoStartupConfig `
+    -BoundParameters $PSBoundParameters `
+    -BoardHost $BoardHost `
+    -BoardUser $BoardUser `
+    -BoardPort $BoardPort `
+    -BoardPassword $BoardPassword
+$BoardHost = $StartupConfig.Host
+$BoardUser = $StartupConfig.User
+$BoardPort = $StartupConfig.Port
+$Password = $StartupConfig.Password
+if ([string]::IsNullOrEmpty($Password)) {
+    $Password = Read-BoardPassword
+}
+
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
 $WorkspaceRoot = Split-Path -Parent $RepoRoot
 $FinalImageDir = Join-Path $WorkspaceRoot "原始图像"
 $FinalLatentDir = Join-Path $RepoRoot "Semantic-Communication\session_bootstrap\tmp\pytorch_board_runtime_20260717\showcase_usrp_final_300"
 $FinalInputOrder = Join-Path $RepoRoot "host_pic_to_latent\showcase_final_300_order.tsv"
 $Bash = Find-GitBash -ExplicitPath $GitBashPath
-$Password = Resolve-BoardPassword -ExplicitPassword $BoardPassword
 
-Set-DefaultEnv "REMOTE_HOST" $BoardHost
-Set-DefaultEnv "PHYTIUM_PI_HOST" $BoardHost
-Set-DefaultEnv "REMOTE_USER" $BoardUser
-Set-DefaultEnv "PHYTIUM_PI_USER" $BoardUser
-Set-DefaultEnv "REMOTE_SSH_PORT" ([string]$BoardPort)
-Set-DefaultEnv "PHYTIUM_PI_PORT" ([string]$BoardPort)
+[Environment]::SetEnvironmentVariable("REMOTE_HOST", $BoardHost, "Process")
+[Environment]::SetEnvironmentVariable("PHYTIUM_PI_HOST", $BoardHost, "Process")
+[Environment]::SetEnvironmentVariable("REMOTE_USER", $BoardUser, "Process")
+[Environment]::SetEnvironmentVariable("PHYTIUM_PI_USER", $BoardUser, "Process")
+[Environment]::SetEnvironmentVariable("REMOTE_SSH_PORT", ([string]$BoardPort), "Process")
+[Environment]::SetEnvironmentVariable("PHYTIUM_PI_PORT", ([string]$BoardPort), "Process")
 [Environment]::SetEnvironmentVariable("REMOTE_PASS", $Password, "Process")
 [Environment]::SetEnvironmentVariable("PHYTIUM_PI_PASSWORD", $Password, "Process")
 

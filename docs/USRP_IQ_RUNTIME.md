@@ -1,6 +1,6 @@
 # 当前 USRP IQ 直传链路
 
-本文说明 2026-07-17 Cockpit Desktop 默认链路的实际执行过程。当前主线是 `上位机图像 -> Deep JSCC latent -> USRP IQ -> 飞腾派 TVM big.LITTLE -> 重建图像`。QPSK 代码仍保留为 fallback，但不参与本文的时序数据。
+本文说明 2026-07-17 Cockpit Desktop 的 IQ-direct 路径及其实测执行过程：`上位机图像 -> Deep JSCC latent -> USRP IQ -> 飞腾派 TVM big.LITTLE -> 重建图像`。当前推荐的 `start-demo.ps1` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，以本文为准。QPSK 不参与本文的时序数据。
 
 ## 三个平面
 

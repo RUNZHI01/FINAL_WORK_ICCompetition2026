@@ -54,7 +54,7 @@ COCKPIT_BACKEND_PORT=18079 \
 COCKPIT_FRONTEND_PORT=15173 \
 REMOTE_HOST=100.121.87.73 \
 REMOTE_USER=user \
-REMOTE_PASS=user \
+  REMOTE_PASS=test-secret \
   "$COCKPIT_DIR/start-dev.sh" >"$TMP_ROOT/start-dev.out"
 
 if ! grep -q '^startup-services$' "$EVENT_LOG"; then

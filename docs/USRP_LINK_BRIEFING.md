@@ -2,7 +2,7 @@
 
 更新时间：2026-07-18
 
-本文记录 USRP IQ 主链路、实测指标和安全边界。PPT 与技术文档的差量修改分别见 [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) 和 [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。主演示路径为：
+本文记录 USRP IQ-direct 可选链路、实测指标和安全边界。PPT 与技术文档的差量修改分别见 [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) 和 [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md)。推荐 `start-demo.ps1` 默认使用 QPSK；切到 IQ-direct 或使用兼容 `run-demo-tailscale.*` 入口时，链路为：
 
 ```text
 Cockpit Desktop
@@ -56,7 +56,7 @@ Deep JSCC encoder 输出的是连续实数 latent，不是已经调制好的射�
 | 历史全链路冷启动 | IQ `10/10`，TVM `10/10`，约 `99.6 s` | job `cockpit_usrp_usrp-1784286235`；这是旧图片预热方案的记录，不代表当前启动时间 |
 | 预录 TVM 参考线 | median `243.30 ms`，mean `252.91 ms` | 不含 USRP，用于证明 handwritten + big.LITTLE 的约 250 ms 指标已恢复 |
 | 100 张整批演示 | 点击到完成 `240.19 s` | 包含编码、261 次 OTA 尝试、板端解码、TVM 和图片保存 |
-| QPSK 对照 | 约 `2.96 s/image` | 可靠字节链路，速度明显慢于 IQ 主线 |
+| QPSK 对照 | 约 `2.96 s/image` | 推荐入口默认的可靠字节链路，速度明显慢于 IQ-direct |
 
 不要把 `243 ms` 写成“USRP 端到端单张时延”。它是 TVM 核心执行时间。整批演示时间还受上位机编码、RF 重试和 PNG 保存影响。
 
@@ -77,7 +77,7 @@ ML-KEM、SM4、ML-DSA 和 SM2 当前用于会话准入与控制信道。USRP IQ 
 
 ## 当前可汇报进度
 
-- IQ 主链路已接入 Cockpit，默认认证、加密和 USRP IQ 直传均开启。
+- IQ-direct 已接入 Cockpit；选择该链路时，认证和加密控制面仍默认开启。
 - 300 张严格质量门限回归达到 `300/300` accepted，TVM 核心仍在约 245 ms。
 - 修复了 RX 服务“端口仍在但 UHD 收不到样本”时只重连控制口的问题，现在会执行真实 RESET。
 - 修复了板端 RX server 启动成功但 SSH 命令等待约 60 秒的问题，改为 `setsid -f` 后启动约 4.6 秒返回。

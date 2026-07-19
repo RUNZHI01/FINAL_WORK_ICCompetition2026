@@ -15,7 +15,7 @@
 | 上位机 Docker/SSH/TX | `docker/` | Docker runner、Tailscale、板端 smoke、备份拉取 |
 | USRP 数据面代码 | `USRP292x/` | 上位机 TX、板端 RX、QPSK/IQ 直传 runner |
 
-当前板卡默认 SSH 账号口令是 `user/user`，用于快速恢复演示。不要把 Tailscale 凭据或私钥放入本目录；`crypto/public_keys/` 只保存公钥归档。
+当前板卡默认 SSH 用户名是 `user`；密码由参数、环境变量或当前终端会话提供，不写入本目录。不要把 Tailscale 凭据或私钥放入本目录；`crypto/public_keys/` 只保存公钥归档。
 
 ## 内容清单
 

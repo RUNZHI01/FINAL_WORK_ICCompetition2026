@@ -41,58 +41,30 @@ Linux / WSL 需要可用 `DISPLAY`；Windows 原生 PowerShell 需要先启动 V
 
 ## Tailscale 真机链路
 
-当前 Windows 现场复现优先使用原生 PowerShell + Docker，不走 WSL：
+当前 Windows 现场推荐入口是 `Semantic-Communication/cockpit_desktop/start-demo.ps1`，默认 QPSK。本节的 `run-demo-tailscale.*` 是默认 IQ-direct 的兼容容器入口，同样不走 WSL：
 
 ```powershell
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 内置当前验证环境默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`OPENAMP_SSH_RUNNER=docker`、`OPENAMP_USRP_TX_RUNNER=docker`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、`REMOTE_USRP_DECODE_PYTHON=/home/user/venv/bin/python`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`ANALOG_RX_TAIL_SEC=0.040`、`RX_ARM_WAIT_MS=500`、`ANALOG_SYNC_PROFILE=fast-first`、`ANALOG_FAST_SYNC_CANDIDATES=4`、`ANALOG_FAST_SYNC_SEARCH_WINDOW_SYMBOLS=1024`、`ANALOG_FALLBACK_SYNC_CANDIDATES=4`、`ANALOG_FALLBACK_SYNC_SEARCH_WINDOW_SYMBOLS=1024`、`ANALOG_IQ_QUALITY_GATE=1`、`ANALOG_IQ_QUALITY_MIN_SYNC_METRIC=0.75`、`ANALOG_IQ_MIN_PILOT_GAIN_RATIO=0.85`、`ANALOG_IQ_MAX_EVM_RMS=0.75`、`ANALOG_IQ_MIN_SNR_DB=3.0`、`ANALOG_REMOTE_DECODED_FORMAT=npy`、`ANALOG_RX_SC16_MMAP=1`、`ANALOG_RX_CLIPPING_DECIMATION=8`、`ANALOG_RX_POST_QUANTIZE=0`、`ANALOG_RX_BATCH_SESSION_CONTROL=1`、`ANALOG_RX_BATCH_SESSION_MAX_IMAGES=16`、`ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS=1`、`ANALOG_REMOTE_DECODE_RESPONSE_MODE=minimal`、`ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY=1`、`ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC=0.05`、`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5`、`ANALOG_RETRY_ON_BURST_MISS=1`、`ANALOG_RETRY_ON_LOW_SYNC=1`、`ANALOG_LOW_SYNC_RETRY_THRESHOLD=0.08`、`ANALOG_ROBUST_SYNC=0`、`ANALOG_DECODE_PIPELINE_WARMUP=1`、`OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`、`MLKEM_USRP_MAX_ARQ_ROUNDS=12`、`USRP_MAX_ARQ_ROUNDS=12`、`OPENAMP_TVM_BATCH_RUNNER=biglittle`。质量门限开启时 `ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC` 会被安全地压成 0，等待完整 sync/pilot summary 后再放行 TVM。板卡密码不写入脚本；在 Electron 界面里填写，或运行前按需设置 `REMOTE_PASS`。
+兼容入口的关键默认值如下；完整 IQ 参数以 [`../docs/HANDOFF.md`](../docs/HANDOFF.md#推荐运行参数) 为准。
 
-名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。USRP 数据面应由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不能把 IQ/latent 主数据绕到 Tailscale 文件传输。默认 `ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 会在板端解码后再取结果，避免把原始 IQ 捕获文件拉回控制面。快速 IQ profile 使用 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0` 保持 TX/RX 常驻，使用 `RX_ARM_WAIT_MS=500` 等待 RX capture 真正启动，使用 `ANALOG_SYNC_PROFILE=fast-first` 和 IQ quality gate 拒绝低质量 decoded latent，并用 ARQ 重试，避免 300/300 但 TVM 重建为彩色噪声；quality gate 要求 `sync_metric>=0.25` 且 `pilot_gain_min_over_initial>=0.25`，并默认等待完整 summary。使用 `ANALOG_DECODE_PIPELINE_WARMUP=1` 预热板端 decode-server，并用 `ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5` 限制“未开始接收”的恢复长尾；正常 `STOP` drain 仍保持 8 秒保护。`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O；演示后可清理板端 `/tmp/usrp292x_remote_runs`。USRP 后接重建当前支持 TVM 和 MNN；PyTorch 只作为预录参考对照，不走 USRP 数据面。USRP transport 结果卡片使用 raw round records 的 median/p95，避免 RF/RX 单次离群值污染典型时延。
+| 参数 | 默认值 |
+|---|---|
+| `REMOTE_HOST` / `REMOTE_USER` / `REMOTE_SSH_PORT` | `100.121.87.73` / `user` / `22` |
+| `MLKEM_TRANSPORT_MODE` / `OPENAMP_DEMO_INPUT_SOURCE_MODE` | `usrp` / `usrp` |
+| `JSCC_LINK_MODE` / `OPENAMP_DEMO_LINK_MODE` | `iq-direct` / `iq-direct` |
+| `OPENAMP_SSH_RUNNER` / `OPENAMP_USRP_TX_RUNNER` | `docker` / `docker` |
+| `MLKEM_AUTH_ENABLED` / `MLKEM_AUTH_SIG_POLICY` | `1` / `DUAL_REQUIRED` |
+| `OPENAMP_IQ_SEGMENT_SIZE` / `OPENAMP_IQ_SEGMENT_REPAIR_PASSES` | `30` / `2` |
+| `ANALOG_IQ_QUALITY_MIN_SYNC_METRIC` | `0.75` |
+| `ANALOG_IQ_MIN_PILOT_GAIN_RATIO` | `0.85` |
 
-切 USRP/IQ 现场链路时，同一入口会转发 USRP 相关环境变量，例如：
+板卡密码不写入脚本；在 Electron 界面填写，或在运行前设置 `REMOTE_PASS`。
 
-```powershell
-$env:MLKEM_TRANSPORT_MODE="usrp"
-$env:OPENAMP_DEMO_INPUT_SOURCE_MODE="usrp"
-$env:REMOTE_USRP_RX_DIR="/home/user/cockpit_usrp_rx"
-$env:JSCC_LINK_MODE="iq-direct"
-$env:MLKEM_AUTH_ENABLED="1"
-$env:MLKEM_AUTH_SIG_POLICY="DUAL_REQUIRED"
-$env:ANALOG_SPS="2"
-$env:ANALOG_AMPLITUDE="6000"
-$env:ANALOG_RX_TAIL_SEC="0.040"
-$env:ANALOG_REMOTE_DECODED_FORMAT="npy"
-$env:ANALOG_RX_SC16_MMAP="1"
-$env:ANALOG_RX_CLIPPING_DECIMATION="8"
-$env:ANALOG_RX_BATCH_SESSION_CONTROL="1"
-$env:ANALOG_RX_BATCH_SESSION_MAX_IMAGES="16"
-$env:ANALOG_PRECREATE_REMOTE_CAPTURE_DIRS="1"
-$env:ANALOG_REMOTE_DECODE_RESPONSE_ONLY_SUMMARY="1"
-$env:ANALOG_REMOTE_DECODE_SOFT_COMPLETE_SEC="0.05"
-$env:ANALOG_MIN_SYNC_METRIC="0.05"
-$env:ANALOG_ROBUST_SYNC="0"
-$env:ANALOG_REMOTE_CLEANUP_MODE="skip"
-$env:ANALOG_DECODE_PIPELINE_WARMUP="1"
-$env:OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT="0"
-$env:MLKEM_USRP_MAX_ARQ_ROUNDS="12"
-$env:USRP_MAX_ARQ_ROUNDS="12"
-$env:ANALOG_RETRY_ON_BURST_MISS="1"
-$env:ANALOG_RETRY_ON_LOW_SYNC="1"
-$env:ANALOG_LOW_SYNC_RETRY_THRESHOLD="0.08"
-.\docker\run-demo-tailscale.ps1
-```
+名字里的 Tailscale 只表示控制面：cockpit API、SSH 拉起板端进程、状态和日志走 Tailscale。IQ/latent 数据面由本机 TX USRP 和板端 RX USRP 通过射频链路承载，不绕到 Tailscale 文件传输。`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 让板端就地解码，避免拉回原始 IQ capture。快速 IQ profile 保持 TX/RX 常驻，并用 ARQ 和 quality gate 拒绝低质量 latent；当前门限是 `sync_metric >= 0.75`、`pilot_gain_min_over_initial >= 0.85`、EVM `<= 0.75`、估计 SNR `>= 3.0 dB`。正常 `STOP` drain 保留 8 秒保护。
 
-`run-demo-tailscale.*` 仍默认设置 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本会先显式设置 USRP IQ 和认证默认值：
-
-```text
-OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp
-MLKEM_TRANSPORT_MODE=usrp
-JSCC_LINK_MODE=iq-direct
-MLKEM_AUTH_ENABLED=1
-MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED
-```
+`run-demo-tailscale.*` 仍设置历史名称 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded`，但同时显式设置 `OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`MLKEM_TRANSPORT_MODE=usrp`、`JSCC_LINK_MODE=iq-direct` 和双签认证，因此实际运行的是 IQ-direct 真机链路。
 
 如果只想复现预录 TVM 250 ms，请在运行前临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并在记录里说明是否启用认证 gate。
 

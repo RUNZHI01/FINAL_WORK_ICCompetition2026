@@ -10,7 +10,7 @@ param(
 
     [string]$BoardHost = "100.121.87.73",
     [string]$BoardUser = "user",
-    [string]$BoardPassword = "user",
+    [string]$BoardPassword = "",
     [int]$BoardPort = 22,
     [string]$BoardInterface = "eth0",
     [switch]$Fast,
@@ -195,6 +195,38 @@ function ConvertTo-ShellSingleQuoted {
     return "'" + ($Text -replace "'", "'\\''") + "'"
 }
 
+function Resolve-BoardPassword {
+    if ($BoardPassword) {
+        return $BoardPassword
+    }
+    foreach ($Candidate in @(
+        $env:REMOTE_PASS,
+        $env:REMOTE_PASSWORD,
+        $env:PHYTIUM_PI_PASS,
+        $env:PHYTIUM_PI_PASSWORD,
+        $env:BOARD_PASS
+    )) {
+        if ($Candidate) {
+            return $Candidate
+        }
+    }
+
+    $Secure = Read-Host "Board SSH password" -AsSecureString
+    $Bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
+    try {
+        $Password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($Bstr)
+        if ([string]::IsNullOrEmpty($Password)) {
+            throw "Board SSH password must not be empty."
+        }
+        return $Password
+    }
+    finally {
+        if ($Bstr -ne [IntPtr]::Zero) {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Bstr)
+        }
+    }
+}
+
 function New-BoardRemoteCommand {
     $scriptPath = "/home/user/USRP292x/SetupUsrp2922BoardNetwork.sh"
     $quotedScript = ConvertTo-ShellSingleQuoted $scriptPath
@@ -236,6 +268,7 @@ function New-BoardRemoteCommand {
 }
 
 function Configure-BoardLink {
+    $Script:BoardPassword = Resolve-BoardPassword
     $scriptDir = $Script:DemoScriptRoot
     if (-not $scriptDir) {
         throw "Cannot resolve script directory for board network configuration."

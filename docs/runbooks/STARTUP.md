@@ -3,7 +3,7 @@
 日常启动只执行下面 1-7 步。仅首次部署或 IQ 源码更新后执行一次同步：
 
 ```powershell
-pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify -BoardHost 100.121.87.73 -BoardUser user
 ```
 
 1. 上电板卡，等 2 分钟。确认 Docker Desktop 已启动。
@@ -36,10 +36,10 @@ cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026
 4. 拉起 Cockpit Desktop：
 
 ```powershell
-.\Semantic-Communication\cockpit_desktop\start-demo.ps1 -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+.\Semantic-Communication\cockpit_desktop\start-demo.ps1 -BoardHost 100.121.87.73 -BoardUser user
 ```
 
-默认启用 USRP QPSK、ML-KEM+SM4 和 ML-DSA+SM2。界面显示前，脚本会建立板卡会话，拉起安全服务和常驻 USRP TX/RX，再检查状态端点与控制端口；启动阶段不发送图片，也不创建隐藏重建任务。Windows 下 TX 容器使用 bridge 并发布 `127.0.0.1:29221`；原生 Linux 使用 host network。无需手工启动 TX 容器或控制代理。
+脚本没有默认密码。可传 `-BoardPassword` 或预先设置 `REMOTE_PASS`；两者都没有时，PowerShell 会安全询问一次。默认启用 USRP QPSK、ML-KEM+SM4 和 ML-DSA+SM2。界面显示前，脚本会建立板卡会话，拉起安全服务和常驻 USRP TX/RX，再检查状态端点与控制端口；启动阶段不发送图片，也不创建隐藏重建任务。Windows 下 TX 容器使用 bridge 并发布 `127.0.0.1:29221`；原生 Linux 使用 host network。无需手工启动 TX 容器或控制代理。
 
 5. 界面出现后检查：
 

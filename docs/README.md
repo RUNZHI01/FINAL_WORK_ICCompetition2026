@@ -12,7 +12,7 @@
 |---|---|---|
 | 一台能跑 Docker 的电脑 | `docker/repro.*` | 镜像构建、依赖检查、预录 API、Electron smoke |
 | 想先看桌面端界面 | `docker/run-demo.*` | 原生 Electron cockpit，使用预录数据 |
-| 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP IQ 直传、认证加密默认开启、启动前仅检查服务就绪 |
+| 能连上飞腾派和 USRP | `Semantic-Communication/cockpit_desktop/start-demo.ps1` | 现场主流程：USRP QPSK、认证加密默认开启、启动前仅检查服务就绪 |
 | 要修改 PPT 的加密与 USRP 部分 | [`PPT_USRP_SECURITY_UPDATES.md`](./PPT_USRP_SECURITY_UPDATES.md) | 只改第 9、14、20 页的精简文案 |
 | 要修改技术文档的加密与 USRP 部分 | [`DOCUMENT_USRP_SECURITY_UPDATES.md`](./DOCUMENT_USRP_SECURITY_UPDATES.md) | 第 5、6 章的差量修改和证据口径 |
 | 要查看最初提交中的文档 | [`INITIAL_COMMIT_DOCUMENTS.md`](./INITIAL_COMMIT_DOCUMENTS.md) | 937 份原始文档的归档位置和完整清单 |
@@ -23,26 +23,26 @@
 
 ## 当前演示 Quick Start
 
-现场演示主线是 `Cockpit Desktop -> USRP IQ 直传 -> 板端 TVM big.LITTLE 重建`。Windows 现场入口已经封装成 PowerShell 脚本；它会查找 Git Bash 作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL：
+现场推荐主线是 `Cockpit Desktop -> USRP QPSK -> 板端 TVM big.LITTLE 重建`。Windows 入口已经封装成 PowerShell 脚本；它会查找 Git Bash 作为启动外壳，Bash/SSH/TX 热路径优先走 Docker，不使用 WSL。IQ-direct 仍可在界面中切换，并由旧容器入口默认启用，但不再是推荐入口的启动默认值：
 
 ```powershell
 cd E:\Main\Career\集创赛\FINAL_WORK_ICCompetition2026\Semantic-Communication\cockpit_desktop
 .\start-demo.ps1
 ```
 
-`start-demo.ps1` 默认按当前板卡恢复口径使用 `user/user`。如果现场改过板卡地址或密码，用参数覆盖：
+`start-demo.ps1` 默认连接 `user@100.121.87.73:22`，但不提供默认密码。密码按“显式 `-BoardPassword`、进程环境变量、终端安全提示”的顺序取得。如果现场改过板卡地址、用户或密码，用参数覆盖：
 
 ```powershell
 .\start-demo.ps1 -BoardHost '<board-ip>' -BoardUser '<board-user>' -BoardPassword '<board-password>'
 ```
 
-`start-demo.ps1` 是当前推荐入口。`start-dev.sh` 仍是底层 Git Bash 入口，保留给调试；`docker/run-demo-tailscale.ps1` 是旧交付容器入口，也可以直接运行：
+`start-demo.ps1` 是当前推荐入口。`start-dev.sh` 是底层 Git Bash 入口，二者默认均为 QPSK。`docker/run-demo-tailscale.ps1` 是默认 IQ-direct 的兼容容器入口；如果当前目录仍是 `cockpit_desktop`，运行：
 
 ```powershell
-.\docker\run-demo-tailscale.ps1
+..\..\docker\run-demo-tailscale.ps1
 ```
 
-当前默认值：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_PASS=user`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=iq-direct`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`、`REMOTE_USRP_RX_DIR=/home/user/cockpit_usrp_rx`、板端 IQ decode Python 为 `/home/user/venv/bin/python`、Windows 下 `OPENAMP_USRP_TX_DOCKER_NETWORK=bridge`、`OPENAMP_IQ_SEGMENT_SIZE=30`、`OPENAMP_IQ_SEGMENT_REPAIR_PASSES=2`、`ANALOG_TX_NORMALIZATION_REFERENCE_PEAK=6`。原生 Linux 未显式配置时仍使用 Docker host network。
+推荐入口的核心默认值为：`REMOTE_HOST=100.121.87.73`、`REMOTE_USER=user`、`REMOTE_SSH_PORT=22`、`MLKEM_TRANSPORT_MODE=usrp`、`OPENAMP_DEMO_INPUT_SOURCE_MODE=usrp`、`JSCC_LINK_MODE=qpsk`、`MLKEM_AUTH_ENABLED=1`、`MLKEM_AUTH_SIG_POLICY=DUAL_REQUIRED`。可用 `REMOTE_PASS`、`REMOTE_PASSWORD`、`PHYTIUM_PI_PASS`、`PHYTIUM_PI_PASSWORD` 或 `BOARD_PASS` 提供会话密码；都未设置时，PowerShell 会安全询问一次。完整参数见 [`HANDOFF.md`](./HANDOFF.md#推荐运行参数)。
 
 `start-dev.sh` 不再发送图片做启动预热。显示 Cockpit Desktop 前，脚本只配置板卡会话、拉起 ML-KEM/认证服务和常驻 USRP TX/RX，并等待状态端点与控制端口就绪。`ANALOG_WARMUP_LOCAL_CODEC` 和 `ANALOG_DECODE_PIPELINE_WARMUP` 仍用于初始化进程内 codec/FFT，不读取演示图片，也不产生重建结果。端到端图片链路由操作员进入界面后启动。
 
@@ -79,7 +79,7 @@ sudo ./USRP292x/SetupUsrp2922BoardNetwork.sh
 
 通用诊断入口是 `./USRP292x/Usrp2922Network.sh detect|probe|auto-init|status`。板端当前部署在 `/home/user/USRP292x/`，若自动探测选错双网口设备，可显式加 `USRP2922_BOARD_IFACE=eth0`。
 
-2026-07-17 热启动验收中，USRP IQ + TVM 100 张从点击到完成为 `240.19 s`，`100/100` accepted、fallback `0`，正式 POST 仅 `0.857 s`；TVM median `244.92 ms`。写材料时还应保留当前严格 300 张可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 只能作为单独优化记录。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；QPSK fallback 约 `2.96 s/image`。图像质量口径见 `HANDOFF.md`，不要混用原图-TVM与 PyTorch-TVM。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
+2026-07-17 热启动验收中，USRP IQ + TVM 100 张从点击到完成为 `240.19 s`，`100/100` accepted、fallback `0`，正式 POST 仅 `0.857 s`；TVM median `244.92 ms`。写材料时还应保留当前严格 300 张可靠性回归：USRP IQ `300/300` accepted，传输/解包 median `411.59 ms`、p95 `3423.45 ms`；板端 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。历史速度 profile 的 IQ median `166.63 ms`、p95 `198.46 ms` 只能作为单独优化记录。预录 TVM 250 ms 参考线为 median `243.30 ms`、mean `252.91 ms`；推荐默认的 QPSK 可靠链路约 `2.96 s/image`。图像质量口径见 `HANDOFF.md`，不要混用原图-TVM与 PyTorch-TVM。USRP IQ 数据面走射频链路，不经过 Tailscale，也不宣称 IQ payload 已被 ML-KEM/SM4 加密；安全信道用于控制/认证面准入。
 
 旧启动方案曾用 10 张隐藏任务做全链路冷启动验收，对应 `cockpit_usrp_usrp-1784286235`，约 `99.6 s`。当前入口已取消图片预热，界面显示前只等待板卡、安全服务和 USRP 控制端口就绪；该历史数字不能再当作当前启动耗时。USRP 每个阶段的输入输出和指标解释见 [`USRP_LINK_BRIEFING.md`](./USRP_LINK_BRIEFING.md)。
 
@@ -98,13 +98,13 @@ bash board_deps/install-board-deps.sh
 bash board_deps/verify-board-deps.sh
 ```
 
-当前板卡默认 SSH 账号口令是 `user/user`，已写入现场启动脚本，方便断电或换机后快速恢复。Tailscale 凭据和私钥不进入仓库；`board_deps/crypto/public_keys/` 只保存演示需要的公钥归档。
+当前板卡默认 SSH 用户名是 `user`；密码不写入仓库或启动脚本。Tailscale 凭据和私钥同样不进入仓库；`board_deps/crypto/public_keys/` 只保存演示需要的公钥归档。
 
 IQ 数据面源码的日常同步与整机依赖恢复是两件事。修改 `USRP292x/`、encoder 或 TVM helper 后，用 PowerShell 7 重新打包、部署并校验；地址参数可覆盖，默认保留当前 Tailscale 地址：
 
 ```powershell
 pwsh -File .\docker\prepare-iq-board-sync.ps1 -Deploy -Verify `
-  -BoardHost 100.121.87.73 -BoardUser user -BoardPassword user
+  -BoardHost 100.121.87.73 -BoardUser user
 ```
 
 该命令在 Docker 内执行 SSH/SCP，不依赖 WSL，也不会安装或修改板端 Python 包。需要重编译板端 OTA 二进制时额外加 `-BuildOta`，运行前先停止正在使用 RX/TX server 的任务。
@@ -127,7 +127,7 @@ python scripts/audit_reconstruction_error.py `
 - `Semantic-Communication/session_bootstrap/`：demo server、OpenAMP 控制面脚本、板端运行脚本和必要 fixture；新运行报告默认本地忽略。
 - `mlkem_link/`：ML-KEM + SM2 + ML-DSA 安全信道 Python 包（kem、auth、kdf、secure_channel、session）。
 - `board_deps/`：板端固件、UHD images、模型、runtime、输入样本和校验清单。
-- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`，当前 USRP 默认），以及原有 QPSK/CRC/ARQ 可靠字节链路兜底。
+- `USRP292x/`：NI USRP-2922 / N210 数据面。包含两条并存路线：推荐入口默认使用 QPSK/CRC/ARQ 可靠字节链路；analog latent-IQ 直传链路（`AnalogLatentLink.py` + `RunAnalogLatentBatch.py`）可在界面中切换，并由兼容容器入口默认启用。
 - `scripts/board_image_compare/`：上位机重建对比服务、SFTP 懒加载、质量辅助和板端资源保护。
 - `docker/`：Docker 复现、Electron demo、Tailscale 和板端 smoke 的入口脚本。
 
@@ -188,11 +188,11 @@ Windows 现场优先使用原生 PowerShell + Docker，不走 WSL。用于启动
 .\docker\run-demo-tailscale.ps1
 ```
 
-`run-demo-tailscale.*` 仍保留兼容入口，默认连接 `100.121.87.73:22`，使用 Docker SSH/TX runner、USRP IQ 直传、双签认证、30 张分段和 big.LITTLE TVM。当前演示账号口令为 `user/user`，比赛现场可通过参数或 `REMOTE_HOST`、`REMOTE_USER`、`REMOTE_PASS` 覆盖。完整默认参数表见 [`HANDOFF.md`](./HANDOFF.md#推荐运行参数)。
+`run-demo-tailscale.*` 仍保留兼容入口，默认连接 `user@100.121.87.73:22`，使用 Docker SSH/TX runner、USRP IQ 直传、双签认证、30 张分段和 big.LITTLE TVM。它不提供默认密码；运行前可设置 `REMOTE_PASS`。完整默认参数表见 [`HANDOFF.md`](./HANDOFF.md#推荐运行参数)。
 
-这个入口仍保留 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本已经显式设置 USRP IQ 和认证默认值，所以当前演示按 USRP IQ 主线理解。若只想复现预录 TVM 250 ms，可临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并保持认证设置按测试目的单独说明。2026-07-16 当前严格 profile 已完成 IQ `300/300` 和 TVM `300/300`：传输/解包 median `411.59 ms`、p95 `3423.45 ms`；后接 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。预录 TVM 参考线为 median `243.30 ms`、mean `252.91 ms`。
+这个兼容入口仍保留 `ICCOMP_COCKPIT_PROFILE=tvm250-prerecorded` 这个历史 profile 名称，但脚本会显式设置 USRP IQ 和认证默认值。若只想复现预录 TVM 250 ms，可临时覆盖 `OPENAMP_DEMO_INPUT_SOURCE_MODE=prerecorded`、`MLKEM_TRANSPORT_MODE=tcp`，并保持认证设置按测试目的单独说明。2026-07-16 严格 IQ profile 已完成 IQ `300/300` 和 TVM `300/300`：传输/解包 median `411.59 ms`、p95 `3423.45 ms`；后接 TVM median `245.42 ms`、mean `254.71 ms`、p95 `301.73 ms`。预录 TVM 参考线为 median `243.30 ms`、mean `252.91 ms`。
 
-切到 USRP 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面应由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 用于让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk` 兜底。快速 IQ profile 默认 `OPENAMP_DEMO_USRP_SHUTDOWN_AFTER_TRANSPORT=0`，保持 TX/RX 常驻，避免每轮反复初始化；`RX_ARM_WAIT_MS=500` 给 RX server 更保守的启动确认窗口；`ANALOG_DECODE_PIPELINE_WARMUP=1` 会把板端 decode 冷启动挪到 worker startup；`ANALOG_RX_STOP_ARM_FAIL_FULL_DRAIN_TIMEOUT_SEC=1.5` 只缩短未真正开始接收时的 arm-failure 恢复，不改变正常 `STOP` drain 的 8 秒保护；`ANALOG_REMOTE_CLEANUP_MODE=skip` 用于避免热路径后台删除抢板端 I/O，演示后可清理 `/tmp/usrp292x_remote_runs`。USRP 后接重建目前支持 TVM 和 MNN；PyTorch 在 cockpit 中只作为预录参考对照，不启动 USRP 数据面。Cockpit 的 USRP transport 对比优先显示 raw round records 的 median/p95，避免单个 RF/RX outlier 把结果卡片拉歪。
+使用兼容容器入口的 IQ-direct 模式时，Tailscale 只承载控制面：cockpit API、SSH 启停板端进程、状态、日志和结果取回。IQ/latent 主数据面由本机 TX USRP 到板端 RX USRP 的射频链路承载，不经过 Tailscale；`ANALOG_REMOTE_DECODE_RESULT_MODE=remote-dir` 让板端就地解码，避免把原始 IQ 捕获文件拉回控制面。该入口默认 `JSCC_LINK_MODE=iq-direct`，也可在 cockpit 里切回 `qpsk`。IQ 参数与实验开关见 [`HANDOFF.md`](./HANDOFF.md#推荐运行参数)。USRP 后接重建目前支持 TVM 和 MNN；PyTorch 在 cockpit 中只作为预录参考对照，不启动 USRP 数据面。
 
 IQ 串行长批次默认按 30 张分段。分段边界会重建 RX streamer，TX streamer 保持常驻并清空上一段发送状态，避免反复创建 TX streamer 导致 UHD FIFO ACK 超时。段内仍使用现有单图 ARQ 和质量门限，首轮失败项默认最多补传两轮；每段结束后通过常驻 decode worker 清理板端临时 capture，防止 `/dev/shm` 累积。所有图像 accepted 后才启动 TVM，不会把部分结果发布成有效重建。`OPENAMP_IQ_SEGMENT_SIZE=0` 可恢复旧的连续长批次；`OPENAMP_IQ_SEGMENT_REPAIR_PASSES=0` 只关闭段级失败项补传。`ANALOG_PIPELINE_DEPTH>1` 仍使用原 pipeline 路径，为避免存在在途 capture 时重置 RF，该路径不做分段 RESET。QPSK 不受此配置影响。
 
@@ -457,7 +457,7 @@ JSCC Enc → 实数 latent → I/Q 配对 → Channel → I/Q 还原 → JSCC De
 
 已实现功能与限制：
 
-- QPSK 链路保留为兜底演示路径；Cockpit 切到 USRP 模式时默认使用 `iq-direct`，也可在界面手动切回 `qpsk`。`JSCC_LINK_MODE` 环境变量和 Cockpit 的 JSCC 链路开关都可切换：`qpsk` 走原可靠字节链路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
+- 推荐 `start-demo.ps1` / `start-dev.sh` 默认使用 `qpsk`；兼容 `run-demo-tailscale.*` 默认使用 `iq-direct`。两者都可通过 `JSCC_LINK_MODE` 或 Cockpit 的 JSCC 链路开关切换：`qpsk` 走可靠字节链路，`iq-direct` 切到 `RunAnalogLatentBatch.py`。
 - IQ 直传 PHY 层（`USRP292x/AnalogLatentLink.py`）已完成并通过软件 loopback、CFO/AWGN/相位扫描测试。
 - 2026-07-09 早期 fast profile 验证 `20/20`，USRP transport median `213.53 ms`、decode median `67.04 ms`、名义 airtime `9.578 ms`；同轮 TVM big.LITTLE median `240.89 ms`。当前严格 profile 已改为 ARQ12、30 张分段、两轮失败子集补传和 `.npy` remote-dir，并完成 `300/300` gate。
 - 2026-07-11 USRP 模式下 MNN 已接入 remote-dir latent；一次 MNN/USRP 启动卡死的根因为后端在持有 `DashboardState` 锁时 arm ML-KEM security，已改为锁外执行并加回归测试。PyTorch 未接入 USRP 后接推理，点击 PyTorch 会返回预录参考，不消耗 USRP 链路。
