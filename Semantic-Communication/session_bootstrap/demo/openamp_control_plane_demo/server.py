@@ -2927,7 +2927,7 @@ class DashboardState:
                 board_port=int(board_access.port or 22),
                 original_dir=Path(original_dir).resolve(),
                 sources=reconstruction_sources,
-                default_source="usrp-iq-direct",
+                default_source="usrp-qpsk",
                 manifest_root=DEFAULT_RUN_ROOT,
                 pytorch_manifest=pytorch_manifest if pytorch_manifest.is_file() else None,
                 original_dir_rules=original_dir_rules,

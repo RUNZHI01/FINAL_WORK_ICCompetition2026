@@ -712,7 +712,7 @@ class DashboardStateTest(unittest.TestCase):
 
         config = open_browser.call_args.args[0]
         self.assertEqual(config.manifest_root.name, "qpsk_batch_spool_arq_runs")
-        self.assertEqual(config.default_source, "usrp-iq-direct")
+        self.assertEqual(config.default_source, "usrp-qpsk")
         self.assertEqual(
             config.original_dir_rules,
             (
