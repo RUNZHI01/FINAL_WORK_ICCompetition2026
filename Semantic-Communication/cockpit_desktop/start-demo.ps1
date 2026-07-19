@@ -135,7 +135,7 @@ if (-not (Test-Path -LiteralPath $BoardNetworkScript -PathType Leaf)) {
 
 Write-Host "[demo] Git Bash: $Bash"
 Write-Host "[demo] Board: $BoardUser@$BoardHost`:$BoardPort"
-Write-Host "[demo] Defaults: USRP IQ direct, ML-KEM+SM4, ML-DSA+SM2, no image warmup"
+Write-Host "[demo] Defaults: USRP QPSK, ML-KEM+SM4, ML-DSA+SM2, no image warmup"
 if ($env:OPENAMP_DEMO_LOCAL_LATENT_DIR -eq $FinalLatentDir) {
     Write-Host "[demo] Showcase inputs: $FinalImageDir (300 pre-encoded latents)"
 }
